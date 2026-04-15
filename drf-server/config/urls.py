@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.urls import path
 from django.shortcuts import render
+from apps.accounts.views import login_view
 
 
 # 작동확인용
@@ -10,5 +11,6 @@ def dashboard(request):
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("", dashboard),
+    path("", login_view),
+    path("dashboard/", dashboard),
 ]

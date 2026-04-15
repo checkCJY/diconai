@@ -1,0 +1,464 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>로그인 — 산재 예방 통합 관제 플랫폼</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #1976d2;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;
+    font-size: 13px;
+  }
+
+  .login-box {
+    width: 380px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+
+  /* 로고 영역 */
+  .logo-area {
+    width: 100%;
+    max-width: 280px;
+    height: 72px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .logo-area img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+
+  .logo-placeholder {
+    width: 100%;
+    height: 100%;
+    border: 1px dashed rgba(255,255,255,0.5);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255,255,255,0.6);
+    font-size: 12px;
+  }
+
+  /* 플랫폼 명 */
+  .platform-name {
+    color: #fff;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    margin-bottom: 28px;
+    text-align: center;
+  }
+
+  /* 입력 폼 카드 영역 */
+  .form-area {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  /* 입력 필드 래퍼 */
+  .input-wrap {
+    position: relative;
+    width: 100%;
+  }
+
+  .input-wrap input {
+    width: 100%;
+    height: 46px;
+    padding: 0 36px 0 14px;
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 4px;
+    background: rgba(255,255,255,0.95);
+    font-family: inherit;
+    font-size: 13px;
+    color: #222;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .input-wrap input::placeholder {
+    color: #aaa;
+  }
+
+  .input-wrap input:focus {
+    border-color: #fff;
+    background: #fff;
+  }
+
+  .input-wrap input.error {
+    border-color: #f44336;
+    background: #fff8f8;
+  }
+
+  /* 지움 버튼 */
+  .clear-btn {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    color: #999;
+    line-height: 1;
+  }
+
+  .clear-btn.visible {
+    display: flex;
+  }
+
+  .clear-btn:hover {
+    color: #555;
+  }
+
+  .clear-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* 에러 메시지 */
+  .error-msg {
+    display: none;
+    font-size: 11px;
+    color: #ffcdd2;
+    padding: 3px 2px 0;
+    min-height: 16px;
+  }
+
+  .error-msg.visible {
+    display: block;
+  }
+
+  /* 로그인 버튼 */
+  .login-btn {
+    width: 100%;
+    height: 46px;
+    margin-top: 4px;
+    background: rgba(255,255,255,0.25);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.5);
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 2px;
+    transition: background 0.15s;
+  }
+
+  .login-btn:hover {
+    background: rgba(255,255,255,0.35);
+  }
+
+  .login-btn:active {
+    background: rgba(255,255,255,0.2);
+  }
+
+  /* 하단 문의 문구 */
+  .footer-text {
+    margin-top: 20px;
+    text-align: center;
+    color: rgba(255,255,255,0.75);
+    font-size: 11px;
+    line-height: 1.8;
+  }
+
+  .footer-text a {
+    color: rgba(255,255,255,0.85);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<div class="login-box">
+
+  <!-- ② 로고 -->
+  <div class="logo-area">
+    <div class="logo-placeholder">LOGO</div>
+  </div>
+
+  <!-- ③ 플랫폼명 -->
+  <div class="platform-name">산재 예방 통합 관제 플랫폼</div>
+
+  <!-- ④ 아이디/비밀번호 입력란 -->
+  <div class="form-area">
+
+    <!-- 아이디 -->
+    <div>
+      <div class="input-wrap">
+        <input
+          type="text"
+          id="username"
+          name="username"
+          placeholder="아이디"
+          autocomplete="username"
+          maxlength="20"
+        >
+        <button type="button" class="clear-btn" id="usernameClear" aria-label="아이디 지우기">
+          <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="8" cy="8" r="7" fill="#bbb"/>
+            <line x1="5.2" y1="5.2" x2="10.8" y2="10.8" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>
+            <line x1="10.8" y1="5.2" x2="5.2" y2="10.8" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+      <div class="error-msg" id="usernameError"></div>
+    </div>
+
+    <!-- 비밀번호 -->
+    <div>
+      <div class="input-wrap">
+        <input
+          type="password"
+          id="password"
+          name="password"
+          placeholder="비밀번호"
+          autocomplete="current-password"
+        >
+        <button type="button" class="clear-btn" id="passwordClear" aria-label="비밀번호 지우기">
+          <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="8" cy="8" r="7" fill="#bbb"/>
+            <line x1="5.2" y1="5.2" x2="10.8" y2="10.8" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>
+            <line x1="10.8" y1="5.2" x2="5.2" y2="10.8" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+      <div class="error-msg" id="passwordError"></div>
+    </div>
+
+    <!-- 비밀번호 확인 -->
+    <div>
+      <div class="input-wrap">
+        <input
+          type="password"
+          id="passwordConfirm"
+          name="passwordConfirm"
+          placeholder="비밀번호 확인"
+          autocomplete="current-password"
+        >
+        <button type="button" class="clear-btn" id="passwordConfirmClear" aria-label="비밀번호 확인 지우기">
+          <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="8" cy="8" r="7" fill="#bbb"/>
+            <line x1="5.2" y1="5.2" x2="10.8" y2="10.8" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>
+            <line x1="10.8" y1="5.2" x2="5.2" y2="10.8" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+      <div class="error-msg" id="passwordConfirmError"></div>
+    </div>
+
+  </div>
+
+  <!-- ⑤ 로그인 버튼 -->
+  <button type="button" class="login-btn" id="loginBtn">로그인</button>
+
+  <!-- ⑥ 로그인 관련 문의 문구 -->
+  <div class="footer-text">
+    로그인 · 비밀번호 문의<br>
+    시스템 담당자 연락처: 010-1234-5678
+  </div>
+
+</div>
+
+<script>
+  const usernameInput = document.getElementById('username');
+  const passwordInput = document.getElementById('password');
+  const passwordConfirmInput = document.getElementById('passwordConfirm');
+  const usernameClear = document.getElementById('usernameClear');
+  const passwordClear = document.getElementById('passwordClear');
+  const passwordConfirmClear = document.getElementById('passwordConfirmClear');
+  const usernameError = document.getElementById('usernameError');
+  const passwordError = document.getElementById('passwordError');
+  const passwordConfirmError = document.getElementById('passwordConfirmError');
+  const loginBtn = document.getElementById('loginBtn');
+
+  /* ---- 지움 버튼 토글 ---- */
+  function toggleClear(input, clearBtn) {
+    if (input.value.length > 0) {
+      clearBtn.classList.add('visible');
+    } else {
+      clearBtn.classList.remove('visible');
+    }
+  }
+
+  usernameInput.addEventListener('input', () => {
+    toggleClear(usernameInput, usernameClear);
+    clearError(usernameInput, usernameError);
+  });
+
+  passwordInput.addEventListener('input', () => {
+    toggleClear(passwordInput, passwordClear);
+    clearError(passwordInput, passwordError);
+  });
+
+  passwordConfirmInput.addEventListener('input', () => {
+    toggleClear(passwordConfirmInput, passwordConfirmClear);
+    clearError(passwordConfirmInput, passwordConfirmError);
+  });
+
+  usernameClear.addEventListener('click', () => {
+    usernameInput.value = '';
+    usernameClear.classList.remove('visible');
+    clearError(usernameInput, usernameError);
+    usernameInput.focus();
+  });
+
+  passwordClear.addEventListener('click', () => {
+    passwordInput.value = '';
+    passwordClear.classList.remove('visible');
+    clearError(passwordInput, passwordError);
+    passwordInput.focus();
+  });
+
+  passwordConfirmClear.addEventListener('click', () => {
+    passwordConfirmInput.value = '';
+    passwordConfirmClear.classList.remove('visible');
+    clearError(passwordConfirmInput, passwordConfirmError);
+    passwordConfirmInput.focus();
+  });
+
+  /* ---- 에러 표시/제거 ---- */
+  function showError(input, errorEl, message) {
+    input.classList.add('error');
+    errorEl.textContent = message;
+    errorEl.classList.add('visible');
+  }
+
+  function clearError(input, errorEl) {
+    input.classList.remove('error');
+    errorEl.textContent = '';
+    errorEl.classList.remove('visible');
+  }
+
+  /* ---- 아이디 유효성 검사 ---- */
+  const RE_ALNUM = /^[a-zA-Z0-9]*$/;
+
+  function validateUsername() {
+    const val = usernameInput.value;
+
+    if (val === '') {
+      showError(usernameInput, usernameError, '아이디를 입력해주세요.');
+      return false;
+    }
+    if (!RE_ALNUM.test(val)) {
+      showError(usernameInput, usernameError, '아이디는 영문 또는 숫자만 입력할 수 있습니다.');
+      return false;
+    }
+    if (val.length < 4 || val.length > 20) {
+      showError(usernameInput, usernameError, '아이디를 4~20자로 입력해주세요.');
+      return false;
+    }
+
+    clearError(usernameInput, usernameError);
+    return true;
+  }
+
+  /* ---- 비밀번호 유효성 검사 ---- */
+  function validatePassword() {
+    const val = passwordInput.value;
+
+    if (val === '') {
+      showError(passwordInput, passwordError, '비밀번호를 입력해주세요.');
+      return false;
+    }
+    if (val.length < 8) {
+      showError(passwordInput, passwordError, '비밀번호를 8자 이상 입력해야 합니다.');
+      return false;
+    }
+
+    const hasLetter = /[a-zA-Z]/.test(val);
+    const hasNumber = /[0-9]/.test(val);
+    const hasSpecial = /[^a-zA-Z0-9]/.test(val);
+    const combinations = [hasLetter, hasNumber, hasSpecial].filter(Boolean).length;
+
+    if (combinations < 2) {
+      showError(passwordInput, passwordError, '비밀번호는 영문, 숫자, 특수문자 중 2가지 이상을 포함해야 합니다.');
+      return false;
+    }
+
+    clearError(passwordInput, passwordError);
+    return true;
+  }
+
+  /* ---- 비밀번호 확인 유효성 검사 ---- */
+  function validatePasswordConfirm() {
+    const val = passwordConfirmInput.value;
+
+    if (val === '') {
+      showError(passwordConfirmInput, passwordConfirmError, '비밀번호를 입력해주세요.');
+      return false;
+    }
+    if (val !== passwordInput.value) {
+      showError(passwordConfirmInput, passwordConfirmError, '비밀번호가 일치하지 않습니다.');
+      return false;
+    }
+
+    clearError(passwordConfirmInput, passwordConfirmError);
+    return true;
+  }
+
+  /* ---- 로그인 버튼 ---- */
+  loginBtn.addEventListener('click', () => {
+    const idOk = validateUsername();
+    const pwOk = validatePassword();
+    const pwConfirmOk = validatePasswordConfirm();
+
+    if (!idOk || !pwOk || !pwConfirmOk) return;
+
+    // 유효성 통과 시 서버로 전송
+    const payload = {
+      username: usernameInput.value,
+      password: passwordInput.value,
+    };
+
+    fetch('/api/auth/login/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+      .then(res => {
+        if (!res.ok) return res.json().then(d => Promise.reject(d));
+        return res.json();
+      })
+      .then(() => {
+        window.location.href = '/dashboard/';
+      })
+      .catch(() => {
+        showError(usernameInput, usernameError, '아이디 또는 비밀번호가 올바르지 않습니다.');
+      });
+  });
+
+  /* ---- Enter 키 지원 ---- */
+  [usernameInput, passwordInput, passwordConfirmInput].forEach(el => {
+    el.addEventListener('keydown', e => {
+      if (e.key === 'Enter') loginBtn.click();
+    });
+  });
+</script>
+</body>
+</html>
