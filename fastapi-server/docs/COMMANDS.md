@@ -8,3 +8,4 @@ deactivate
 
 ### FastAPI 실행 명령어
 uvicorn main:app --reload --port 8001
+uvicorn websocket:app --reload --port 8001

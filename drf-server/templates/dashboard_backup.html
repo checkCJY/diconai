@@ -6,7 +6,6 @@
 <meta charset="UTF-8">
 <title>산재 예방 통합 관제 시스템</title>
 <link rel="stylesheet" href="{% static 'css/style.css' %}">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 </head>
 <body>
 
@@ -136,72 +135,50 @@
     </div>
 
     <!-- 13번 -->
-    <div class="panel panel-chart">
+    <div class="panel">
       <div class="panel-title">AI 예측 — 내 근처 유해가스 위험 <span class="more">+ 상세 보기</span></div>
       <div class="ai-nav">
-        <span id="aiGasName" class="caution-text fw">CO (일산화탄소)</span>
-        <span class="sub">◁ 1 / 3 ▷</span>
+        <span class="caution-text fw">CH4(메탄)</span>
+        <span class="sub">◁ 1 / 8 ▷</span>
       </div>
       <div class="ai-vals">
-        <div><div class="sub">현재 농도</div><div id="aiCurrentVal" class="big caution-text">-- ppm</div></div>
-        <div><div class="sub">12시간 내 최대 예상 농도</div><div id="aiMaxVal" class="big danger-text">-- ppm</div></div>
+        <div><div class="sub">현재 농도</div><div class="big caution-text">5%</div></div>
+        <div><div class="sub">12시간 내 최대 예상 농도</div><div class="big danger-text">10%</div></div>
       </div>
-      <div class="chart-wrap">
-        <div class="chart-controls">
-          <span class="sub">Y축 스케일</span>
-          <div class="scale-btns">
-            <button class="scale-btn" id="gasZoomOut" title="범위 확대">−</button>
-            <span class="scale-val" id="gasScaleVal">자동</span>
-            <button class="scale-btn" id="gasZoomIn" title="범위 축소">+</button>
-            <button class="scale-btn scale-reset" id="gasReset" title="자동 복귀">↺</button>
-          </div>
-        </div>
-        <canvas id="chartGas"></canvas>
-      </div>
+      <div class="graph-box">📈 AI 예측 그래프 (더미)</div>
     </div>
 
     <!-- 14번 -->
     <div class="panel">
       <div class="panel-title">스마트 전력 시스템 위험 현황 <span class="more">+ 상세 보기</span></div>
       <div class="sub">현재 전체 스마트 파워 전력 사용량</div>
-      <div class="power-total" id="powerTotal">1,280 MW</div>
-      <div class="danger-text" id="powerChangePct" style="font-size:11px;margin-bottom:4px;">기준 대비 ▲ +19%</div>
+      <div class="power-total">1,280 MW</div>
+      <div class="danger-text" style="font-size:11px;margin-bottom:4px;">기준 대비 ▲ +19%</div>
       <table class="tbl">
-        <thead><tr><th>설비명</th><th>전력 사용량</th><th>온도</th><th>위험도</th></tr></thead>
-        <tbody id="powerTableBody">
-          <tr><td>압연기</td><td>15.2 MWh</td><td>125°C</td><td><span class="brisk danger">위험</span></td></tr>
-          <tr><td>송풍기</td><td>15 MWh</td><td>125°C</td><td><span class="brisk danger">위험</span></td></tr>
-          <tr><td>집진기</td><td>5.2 MWh</td><td>125°C</td><td><span class="brisk caution">주의</span></td></tr>
-          <tr><td>전자기 교반기</td><td>3.4 MWh</td><td>125°C</td><td><span class="brisk caution">주의</span></td></tr>
+        <thead><tr><th>설비명</th><th>전력 사용량</th><th>위험도</th></tr></thead>
+        <tbody>
+          <tr><td>압연기</td><td>15.2 MWh</td><td><span class="brisk danger">위험</span></td></tr>
+          <tr><td>송풍기</td><td>15 MWh</td><td><span class="brisk danger">위험</span></td></tr>
+          <tr><td>집진기</td><td>5.2 MWh</td><td><span class="brisk caution">주의</span></td></tr>
+          <tr><td>전자기 교반기</td><td>3.4 MWh</td><td><span class="brisk caution">주의</span></td></tr>
         </tbody>
       </table>
     </div>
 
     <!-- 15번 -->
-    <div class="panel panel-chart">
+    <div class="panel">
       <div class="panel-title">AI 예측 — 스마트 전력 시스템 위험 <span class="more">+ 상세 보기</span></div>
       <div class="ai-nav">
-        <span id="aiPowerEquipName" class="fw">압연기</span>
+        <span class="fw">압연기</span>
         <span class="sub">◁ 1 / 20 ▷</span>
       </div>
       <div class="eta-box">
         <div class="sub">위험 도달 예상 시간</div>
-        <div class="eta-val" id="aiPowerEta">25 분 뒤</div>
+        <div class="eta-val">25 분 뒤</div>
       </div>
       <div class="sub">12시간 내 예상 최대 부하</div>
-      <div class="danger-text fw" id="aiPowerMaxLoad" style="font-size:14px;margin-bottom:4px;">450 kW <span style="font-size:11px;font-weight:400;">(정상 대비 110%)</span></div>
-      <div class="chart-wrap">
-        <div class="chart-controls">
-          <span class="sub">Y축 스케일</span>
-          <div class="scale-btns">
-            <button class="scale-btn" id="powerZoomOut" title="범위 확대">−</button>
-            <span class="scale-val" id="powerScaleVal">자동</span>
-            <button class="scale-btn" id="powerZoomIn" title="범위 축소">+</button>
-            <button class="scale-btn scale-reset" id="powerReset" title="자동 복귀">↺</button>
-          </div>
-        </div>
-        <canvas id="chartPower"></canvas>
-      </div>
+      <div class="danger-text fw" style="font-size:14px;margin-bottom:4px;">450 kW <span style="font-size:11px;font-weight:400;">(정상 대비 110%)</span></div>
+      <div class="graph-box">📈 AI 예측 그래프 (더미)</div>
     </div>
 
   </div>
