@@ -6,7 +6,7 @@ from apps.accounts.views import login_view
 
 # 작동확인용
 def dashboard(request):
-    return render(request, "dashboard.html")
+    return render(request, "dashboard_web.html")
 
 
 urlpatterns = [

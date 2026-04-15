@@ -1,0 +1,189 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>산재 예방 통합 관제 시스템</title>
+<link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+
+<header class="header">
+  <div class="header-left">
+    <button class="hamburger">☰</button>
+    <div class="logo-box">LOGO</div>
+    <div class="system-name">산재 예방 통합 관제 시스템</div>
+  </div>
+  <div class="header-center">
+    <div class="user-name">홍 길 동님</div>
+    <div class="user-role">환영합니다.</div>
+  </div>
+  <div class="header-right">
+    <div class="time-box">
+      <div>현재 시스템 시간 : <span id="clock"></span></div>
+      <div class="sub">마지막 갱신 시간 : <span id="lastUpdate"></span></div>
+    </div>
+    <div class="header-icons">
+      <button class="icon-btn">⟳</button>
+      <button class="icon-btn">🏠</button>
+      <button class="icon-btn">🔔<span class="badge">9</span></button>
+    </div>
+    <button class="logout-btn">로그아웃</button>
+  </div>
+</header>
+
+<div class="body-wrap">
+
+  <!-- 상단 3컬럼 -->
+  <div class="top-row">
+
+    <!-- 좌측: 8번 + 11번 -->
+    <div class="col-left">
+      <div class="panel">
+        <div class="panel-title">나의 안전확인</div>
+        <div class="safety-item"><span>PPE 착용</span><span class="done">완료</span></div>
+        <div class="safety-item"><span>안전 확인 체크리스트</span><span class="done">완료</span></div>
+        <div class="safety-item"><span>VR 교육</span><span class="todo">미완료</span></div>
+        <button class="safety-btn">나의 안전 확인 바로가기</button>
+      </div>
+      <div class="panel">
+        <div class="panel-title">작업자 현황 <span class="more">+ 상세 보기</span></div>
+        <div class="donut-wrap">
+          <div class="donut">
+            <div class="donut-inner">
+              <div class="sub" style="font-size:7px;">현재 나의 상태</div>
+              <div class="donut-status">정상</div>
+            </div>
+          </div>
+          <div class="legend">
+            <div class="legend-item"><span class="dot danger"></span>위험</div>
+            <div class="legend-item"><span class="dot caution"></span>주의</div>
+            <div class="legend-item"><span class="dot safe"></span>정상</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 가운데: 9번 맵 -->
+    <div class="col-mid">
+      <div class="panel panel-map">
+        <div class="panel-title">실시간 모니터링 <span class="more">+ 상세 보기</span></div>
+        <div class="map-tabs">
+          <button class="map-tab active">전체</button>
+          <button class="map-tab">작업자</button>
+          <button class="map-tab">위험구역</button>
+          <button class="map-tab">유해가스 센서</button>
+          <button class="map-tab">설비</button>
+          <button class="map-tab">스마트 전력 시스템</button>
+        </div>
+        <div class="map-area">
+          <div class="map-grid"></div>
+          <div style="position:relative;z-index:1;text-align:center;color:var(--text2)">
+            <div style="font-size:36px;">🗺</div>
+            <p>에어위드 연동 전 준비 중</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 우측: 10번 이벤트 -->
+    <div class="col-right">
+      <div class="panel" style="flex:1;overflow:hidden;">
+        <div class="panel-title">이벤트 현황 <span class="more">+ 상세 보기</span></div>
+        <div class="event-item">
+          <div class="event-head">
+            <span><span class="dot danger"></span>홍길동 작업자</span>
+            <span class="sub">00:27</span>
+          </div>
+          <div class="danger-text event-desc">작업 전 완전 확인 미완료</div>
+        </div>
+        <div class="event-item">
+          <div class="event-head">
+            <span><span class="dot danger"></span>유해가스 센서 1</span>
+            <span class="sub">00:30</span>
+          </div>
+          <div class="danger-text event-desc">산소 농도 정상 범위 이하로 저하</div>
+        </div>
+        <div class="event-item">
+          <div class="event-head">
+            <span><span class="dot caution"></span>주의 구역</span>
+            <span class="sub">00:25</span>
+          </div>
+          <div class="caution-text event-desc">스마트 파워 시스템 이상으로 인한 주의 구역 발생</div>
+        </div>
+        <div class="event-summary">
+          최근 24시간 동안 발생한 이벤트 현황<br>
+          <span class="danger-text">위험 2건</span> / <span class="caution-text">주의 1건</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 하단 4개 패널 -->
+  <div class="bottom-row">
+
+    <!-- 12번 -->
+    <div class="panel">
+      <div class="panel-title">내 근처 유해가스 위험 현황 <span class="more">+ 상세 보기</span></div>
+      <div class="sensor-tag">유해가스 1</div>
+      <table class="tbl">
+        <thead><tr><th>가스 종류</th><th>현재 농도</th><th>측정 단위</th><th>위험도</th></tr></thead>
+        <tbody id="gasTableBody"></tbody>
+      </table>
+    </div>
+
+    <!-- 13번 -->
+    <div class="panel">
+      <div class="panel-title">AI 예측 — 내 근처 유해가스 위험 <span class="more">+ 상세 보기</span></div>
+      <div class="ai-nav">
+        <span id="aiGasName" class="caution-text fw">CO (일산화탄소)</span>
+        <span class="sub">◁ 1 / 3 ▷</span>
+      </div>
+      <div class="ai-vals">
+        <div><div class="sub">현재 농도</div><div id="aiCurrentVal" class="big caution-text">-- ppm</div></div>
+        <div><div class="sub">12시간 내 최대 예상 농도</div><div id="aiMaxVal" class="big danger-text">-- ppm</div></div>
+      </div>
+      <div class="graph-box">📈 AI 예측 그래프 (더미)</div>
+    </div>
+
+    <!-- 14번 -->
+    <div class="panel">
+      <div class="panel-title">스마트 전력 시스템 위험 현황 <span class="more">+ 상세 보기</span></div>
+      <div class="sub">현재 전체 스마트 파워 전력 사용량</div>
+      <div class="power-total">1,280 MW</div>
+      <div class="danger-text" style="font-size:11px;margin-bottom:4px;">기준 대비 ▲ +19%</div>
+      <table class="tbl">
+        <thead><tr><th>설비명</th><th>전력 사용량</th><th>위험도</th></tr></thead>
+        <tbody>
+          <tr><td>압연기</td><td>15.2 MWh</td><td><span class="brisk danger">위험</span></td></tr>
+          <tr><td>송풍기</td><td>15 MWh</td><td><span class="brisk danger">위험</span></td></tr>
+          <tr><td>집진기</td><td>5.2 MWh</td><td><span class="brisk caution">주의</span></td></tr>
+          <tr><td>전자기 교반기</td><td>3.4 MWh</td><td><span class="brisk caution">주의</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 15번 -->
+    <div class="panel">
+      <div class="panel-title">AI 예측 — 스마트 전력 시스템 위험 <span class="more">+ 상세 보기</span></div>
+      <div class="ai-nav">
+        <span class="fw">압연기</span>
+        <span class="sub">◁ 1 / 20 ▷</span>
+      </div>
+      <div class="eta-box">
+        <div class="sub">위험 도달 예상 시간</div>
+        <div class="eta-val">25 분 뒤</div>
+      </div>
+      <div class="sub">12시간 내 예상 최대 부하</div>
+      <div class="danger-text fw" style="font-size:14px;margin-bottom:4px;">450 kW <span style="font-size:11px;font-weight:400;">(정상 대비 110%)</span></div>
+      <div class="graph-box">📈 AI 예측 그래프 (더미)</div>
+    </div>
+
+  </div>
+</div>
+
+<script src="{% static 'js/main.js' %}"></script>
+</body>
+</html>
