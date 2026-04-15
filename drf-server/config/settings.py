@@ -42,6 +42,9 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "apps.accounts",
+    "apps.alarms",
+    "apps.geofence",
+    "apps.sensors",
 ]
 
 MIDDLEWARE = [
