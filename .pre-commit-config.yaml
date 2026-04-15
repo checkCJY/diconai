@@ -1,0 +1,22 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.2
+    hooks:
+      - id: ruff
+        args: [--fix]
+        # backend와 ai-server 폴더 내의 모든 .py 파일을 검사
+        files: ^(drf-server|fastapi-server)/.*\.py$
+      - id: ruff-format
+        files: ^(drf-server|fastapi-server)/.*\.py$
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+        # 모든 파일에 대해 공백 검사 (필요시 특정 폴더 제외 가능)
+        exclude: ^(.*/migrations/|static/)
+      - id: end-of-file-fixer
+      - id: check-yaml
+        files: \.(yml|yaml)$
+      - id: check-added-large-files
+        args: ['--maxkb=500']
