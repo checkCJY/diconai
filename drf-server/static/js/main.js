@@ -47,6 +47,113 @@ gasData.forEach(g => {
 // }
 
 
+// ── Chart.js 실시간 차트 ────────────────────────────────
+const MAX_POINTS = 30; // 슬라이딩 윈도우 (초)
+
+function nowLabel() {
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+function pushData(chart, label, ...values) {
+    chart.data.labels.push(label);
+    values.forEach((v, i) => chart.data.datasets[i].data.push(v));
+    if (chart.data.labels.length > MAX_POINTS) {
+        chart.data.labels.shift();
+        chart.data.datasets.forEach(ds => ds.data.shift());
+    }
+    chart.update('none');
+}
+
+const CHART_DEFAULTS = {
+    animation: false,
+    responsive: true,
+    maintainAspectRatio: true,
+    plugins: { legend: { labels: { color: '#aaa', font: { size: 10 }, boxWidth: 12 } } },
+    scales: {
+        x: { ticks: { color: '#666', maxTicksLimit: 6, font: { size: 9 } }, grid: { color: '#2a2a2a' } },
+        y: { ticks: { color: '#666', font: { size: 9 } },                   grid: { color: '#2a2a2a' } },
+    },
+};
+
+// 13번 — 유해가스 AI 예측 차트
+const ctxGas = document.getElementById('chartGas');
+const gasChart = ctxGas ? new Chart(ctxGas, {
+    type: 'line',
+    data: {
+        labels: [],
+        datasets: [
+            {
+                label: '현재 농도 (ppm)',
+                data: [],
+                borderColor: '#f59e0b',
+                backgroundColor: 'rgba(245,158,11,0.12)',
+                tension: 0.4, pointRadius: 2, fill: true,
+            },
+            {
+                label: '예측 최대 농도 (ppm)',
+                data: [],
+                borderColor: '#ef4444',
+                backgroundColor: 'transparent',
+                borderDash: [5, 3],
+                tension: 0.4, pointRadius: 2, fill: false,
+            },
+        ],
+    },
+    options: CHART_DEFAULTS,
+}) : null;
+
+// 15번 — 전력 AI 예측 차트
+const ctxPower = document.getElementById('chartPower');
+const powerChart = ctxPower ? new Chart(ctxPower, {
+    type: 'line',
+    data: {
+        labels: [],
+        datasets: [
+            {
+                label: '예상 최대 부하 (kW)',
+                data: [],
+                borderColor: '#ef4444',
+                backgroundColor: 'rgba(239,68,68,0.12)',
+                tension: 0.4, pointRadius: 2, fill: true,
+            },
+        ],
+    },
+    options: CHART_DEFAULTS,
+}) : null;
+
+// ── Y축 스케일 조절 ─────────────────────────────────────
+const scaleState = { gas: null, power: null };
+
+function adjustYScale(key, chart, direction) {
+    if (!chart) return;
+    const labelEl = document.getElementById(key + 'ScaleVal');
+    // direction: +1 = 범위 축소(확대), -1 = 범위 확대(축소), 0 = 자동 리셋
+    if (direction === 0) {
+        scaleState[key] = null;
+        chart.options.scales.y.max = undefined;
+        chart.options.scales.y.min = undefined;
+        if (labelEl) labelEl.textContent = '자동';
+    } else {
+        const current = scaleState[key] ?? chart.scales.y.max;
+        const factor  = direction > 0 ? 0.75 : 1.35;
+        scaleState[key] = Math.max(1, Math.round(current * factor));
+        chart.options.scales.y.max = scaleState[key];
+        if (labelEl) labelEl.textContent = scaleState[key].toLocaleString();
+    }
+    chart.update('none');
+}
+
+// 버튼 이벤트 등록
+document.getElementById('gasZoomIn') ?.addEventListener('click', () => adjustYScale('gas',   gasChart,   +1));
+document.getElementById('gasZoomOut')?.addEventListener('click', () => adjustYScale('gas',   gasChart,   -1));
+document.getElementById('gasReset')  ?.addEventListener('click', () => adjustYScale('gas',   gasChart,    0));
+
+document.getElementById('powerZoomIn') ?.addEventListener('click', () => adjustYScale('power', powerChart, +1));
+document.getElementById('powerZoomOut')?.addEventListener('click', () => adjustYScale('power', powerChart, -1));
+document.getElementById('powerReset')  ?.addEventListener('click', () => adjustYScale('power', powerChart,  0));
+
 const ws = new WebSocket("ws://localhost:8001/ws/sensors/");
 const statusDiv = document.getElementById("status");
 const outputPre = document.getElementById("output");
@@ -93,4 +200,53 @@ ws.onmessage = (event) => {
     if (aiMaxVal) {
         aiMaxVal.textContent = Math.round(data.co * 1.5) + " ppm";
     }
+
+    // Panel 14: 스마트 전력 시스템 위험 현황
+    const powerTotal = document.getElementById("powerTotal");
+    const powerChangePct = document.getElementById("powerChangePct");
+    const powerTableBody = document.getElementById("powerTableBody");
+
+    if (powerTotal && data.total_power_mw !== undefined) {
+        powerTotal.textContent = data.total_power_mw.toLocaleString() + " MW";
+    }
+    if (powerChangePct && data.power_change_pct !== undefined) {
+        const pct = data.power_change_pct;
+        const sign = pct >= 0 ? "▲ +" : "▼ ";
+        powerChangePct.textContent = `기준 대비 ${sign}${pct}%`;
+        powerChangePct.className = pct >= 15 ? "danger-text" : "caution-text";
+        powerChangePct.style.cssText = "font-size:11px;margin-bottom:4px;";
+    }
+    if (powerTableBody && data.equipment) {
+        const levelLabel = { danger: "위험", caution: "주의", safe: "정상" };
+        powerTableBody.innerHTML = data.equipment.map(eq =>
+            `<tr>
+                <td>${eq.name}</td>
+                <td>${eq.mwh} MWh</td>
+                <td>${eq.temp}°C</td>
+                <td><span class="brisk ${eq.level}">${levelLabel[eq.level]}</span></td>
+            </tr>`
+        ).join("");
+    }
+
+    // Panel 15: AI 예측 — 스마트 전력 시스템 위험
+    const aiPowerEquipName = document.getElementById("aiPowerEquipName");
+    const aiPowerEta       = document.getElementById("aiPowerEta");
+    const aiPowerMaxLoad   = document.getElementById("aiPowerMaxLoad");
+
+    if (aiPowerEquipName && data.ai_power_equipment) {
+        aiPowerEquipName.textContent = data.ai_power_equipment;
+    }
+    if (aiPowerEta && data.ai_eta_min !== undefined) {
+        aiPowerEta.textContent = data.ai_eta_min + " 분 뒤";
+    }
+    if (aiPowerMaxLoad && data.ai_max_load_kw !== undefined) {
+        aiPowerMaxLoad.innerHTML =
+            `${data.ai_max_load_kw.toLocaleString()} kW ` +
+            `<span style="font-size:11px;font-weight:400;">(정상 대비 ${data.ai_max_load_pct}%)</span>`;
+    }
+
+    // 차트 실시간 업데이트
+    const tick = nowLabel();
+    if (gasChart)   pushData(gasChart,   tick, data.co, Math.round(data.co * 1.5));
+    if (powerChart) pushData(powerChart, tick, data.ai_max_load_kw);
 };

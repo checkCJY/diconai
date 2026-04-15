@@ -10,5 +10,5 @@ def dashboard(request):
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("dashboard/", dashboard),
+    path("", dashboard),
 ]
