@@ -10,7 +10,6 @@ class CustomUser(AbstractUser):
     """
 
     class UserType(models.TextChoices):
-        SUPERADMIN = "superadmin", "슈퍼관리자"
         ADMIN = "admin", "관리자"
         WORKER = "worker", "작업자"
 

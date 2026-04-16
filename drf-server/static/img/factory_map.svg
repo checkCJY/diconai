@@ -1,0 +1,212 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1300" height="600" viewBox="0 0 1300 600">
+<rect width="1300" height="600" fill="#1a2d42"/>
+<defs>
+  <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
+    <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#4a7fa5" stroke-width="0.4" opacity="0.25"/>
+  </pattern>
+</defs>
+<rect width="1300" height="600" fill="url(#grid)"/>
+<rect x="20" y="20" width="1260" height="560" rx="0" fill="none" stroke="#4a7fa5" stroke-width="3" opacity="0.6"/>
+<line x1="433" y1="20" x2="433" y2="580" stroke="#4a7fa5" stroke-width="1" stroke-dasharray="8 5" opacity="0.3"/>
+<line x1="866" y1="20" x2="866" y2="580" stroke="#4a7fa5" stroke-width="1" stroke-dasharray="8 5" opacity="0.3"/>
+<line x1="20" y1="300" x2="1280" y2="300" stroke="#4a7fa5" stroke-width="1" stroke-dasharray="8 5" opacity="0.3"/>
+<text x="226" y="42" fill="#4a7fa5" font-size="14" text-anchor="middle" font-family="sans-serif" opacity="0.4">A구역 — 압연</text>
+<text x="649" y="42" fill="#4a7fa5" font-size="14" text-anchor="middle" font-family="sans-serif" opacity="0.4">B구역 — 제련</text>
+<text x="1073" y="42" fill="#4a7fa5" font-size="14" text-anchor="middle" font-family="sans-serif" opacity="0.4">C구역 — 전력/집진</text>
+<text x="226" y="590" fill="#4a7fa5" font-size="14" text-anchor="middle" font-family="sans-serif" opacity="0.4">D구역 — 출하</text>
+<text x="649" y="590" fill="#4a7fa5" font-size="14" text-anchor="middle" font-family="sans-serif" opacity="0.4">E구역 — 교반</text>
+<text x="1073" y="590" fill="#4a7fa5" font-size="14" text-anchor="middle" font-family="sans-serif" opacity="0.4">F구역 — 관리동</text>
+<!-- 로딩 도크 -->
+<rect x="540" y="20" width="220" height="90" fill="#2a4a6a" stroke="#4a7fa5" stroke-width="2"/>
+<line x1="550" y1="110" x2="560" y2="20" stroke="#e3b341" stroke-width="2.5" opacity="0.8"/>
+<line x1="575" y1="110" x2="585" y2="20" stroke="#e3b341" stroke-width="2.5" opacity="0.8"/>
+<line x1="600" y1="110" x2="610" y2="20" stroke="#e3b341" stroke-width="2.5" opacity="0.8"/>
+<line x1="625" y1="110" x2="635" y2="20" stroke="#e3b341" stroke-width="2.5" opacity="0.8"/>
+<line x1="650" y1="110" x2="660" y2="20" stroke="#e3b341" stroke-width="2.5" opacity="0.8"/>
+<line x1="675" y1="110" x2="685" y2="20" stroke="#e3b341" stroke-width="2.5" opacity="0.8"/>
+<line x1="700" y1="110" x2="710" y2="20" stroke="#e3b341" stroke-width="2.5" opacity="0.8"/>
+<line x1="725" y1="110" x2="735" y2="20" stroke="#e3b341" stroke-width="2.5" opacity="0.8"/>
+<rect x="540" y="20" width="220" height="90" fill="none" stroke="#4a7fa5" stroke-width="2.5"/>
+<polygon points="650,55 630,35 670,35" fill="#4a7fa5" opacity="0.6"/>
+<line x1="650" y1="55" x2="650" y2="95" stroke="#4a7fa5" stroke-width="2"/>
+<text x="650" y="75" fill="#a0c4e0" font-size="13" text-anchor="middle" font-family="sans-serif">로딩 도크 1</text>
+<text x="650" y="90" fill="#7aaccc" font-size="11" text-anchor="middle" font-family="sans-serif">LOADING DOCK</text>
+<!-- 컨베이어 수평 -->
+<rect x="900" y="45" width="340" height="28" rx="4" fill="#2a4a6a" stroke="#4a7fa5" stroke-width="1.5"/>
+<circle cx="914" cy="59" r="12" fill="#1a3a5a" stroke="#4a7fa5" stroke-width="1.5"/>
+<circle cx="1226" cy="59" r="12" fill="#1a3a5a" stroke="#4a7fa5" stroke-width="1.5"/>
+<line x1="914" y1="47" x2="1226" y2="47" stroke="#4a7fa5" stroke-width="1"/>
+<line x1="914" y1="71" x2="1226" y2="71" stroke="#4a7fa5" stroke-width="1"/>
+<line x1="940" y1="47" x2="940" y2="71" stroke="#4a7fa5" stroke-width="1" opacity="0.4"/>
+<line x1="970" y1="47" x2="970" y2="71" stroke="#4a7fa5" stroke-width="1" opacity="0.4"/>
+<line x1="1000" y1="47" x2="1000" y2="71" stroke="#4a7fa5" stroke-width="1" opacity="0.4"/>
+<line x1="1030" y1="47" x2="1030" y2="71" stroke="#4a7fa5" stroke-width="1" opacity="0.4"/>
+<line x1="1060" y1="47" x2="1060" y2="71" stroke="#4a7fa5" stroke-width="1" opacity="0.4"/>
+<line x1="1090" y1="47" x2="1090" y2="71" stroke="#4a7fa5" stroke-width="1" opacity="0.4"/>
+<line x1="1120" y1="47" x2="1120" y2="71" stroke="#4a7fa5" stroke-width="1" opacity="0.4"/>
+<line x1="1150" y1="47" x2="1150" y2="71" stroke="#4a7fa5" stroke-width="1" opacity="0.4"/>
+<line x1="1180" y1="47" x2="1180" y2="71" stroke="#4a7fa5" stroke-width="1" opacity="0.4"/>
+<line x1="1210" y1="47" x2="1210" y2="71" stroke="#4a7fa5" stroke-width="1" opacity="0.4"/>
+<text x="1073" y="92" fill="#7aaccc" font-size="11" text-anchor="middle" font-family="sans-serif">컨베이어 CONVEYOR</text>
+<!-- 컨베이어 수직 -->
+<rect x="1226" y="71" width="28" height="200" rx="4" fill="#2a4a6a" stroke="#4a7fa5" stroke-width="1.5"/>
+<circle cx="1240" cy="83" r="12" fill="#1a3a5a" stroke="#4a7fa5" stroke-width="1.5"/>
+<circle cx="1240" cy="259" r="12" fill="#1a3a5a" stroke="#4a7fa5" stroke-width="1.5"/>
+<line x1="1228" y1="83" x2="1228" y2="259" stroke="#4a7fa5" stroke-width="1"/>
+<line x1="1252" y1="83" x2="1252" y2="259" stroke="#4a7fa5" stroke-width="1"/>
+<line x1="1228" y1="120" x2="1252" y2="120" stroke="#4a7fa5" stroke-width="1" opacity="0.4"/>
+<line x1="1228" y1="150" x2="1252" y2="150" stroke="#4a7fa5" stroke-width="1" opacity="0.4"/>
+<line x1="1228" y1="180" x2="1252" y2="180" stroke="#4a7fa5" stroke-width="1" opacity="0.4"/>
+<line x1="1228" y1="210" x2="1252" y2="210" stroke="#4a7fa5" stroke-width="1" opacity="0.4"/>
+<line x1="1228" y1="240" x2="1252" y2="240" stroke="#4a7fa5" stroke-width="1" opacity="0.4"/>
+<!-- 로봇암 1 -->
+<rect x="50" y="70" width="90" height="90" rx="2" fill="#1e3a52" stroke="#4a7fa5" stroke-width="1.5"/>
+<line x1="95" y1="115" x2="75" y2="90" stroke="#6ab0d4" stroke-width="3" stroke-linecap="round"/>
+<line x1="75" y1="90" x2="65" y2="78" stroke="#6ab0d4" stroke-width="3" stroke-linecap="round"/>
+<circle cx="95" cy="120" r="8" fill="#4a7fa5"/>
+<circle cx="75" cy="90" r="5" fill="#6ab0d4"/>
+<rect x="60" y="85" width="14" height="8" rx="1" fill="#4a7fa5" opacity="0.7"/>
+<text x="95" y="175" fill="#a0c4e0" font-size="12" text-anchor="middle" font-family="sans-serif">로봇암</text>
+<!-- 로봇암 2 -->
+<rect x="50" y="210" width="90" height="90" rx="2" fill="#1e3a52" stroke="#4a7fa5" stroke-width="1.5"/>
+<line x1="95" y1="255" x2="115" y2="230" stroke="#6ab0d4" stroke-width="3" stroke-linecap="round"/>
+<line x1="115" y1="230" x2="125" y2="218" stroke="#6ab0d4" stroke-width="3" stroke-linecap="round"/>
+<circle cx="95" cy="260" r="8" fill="#4a7fa5"/>
+<circle cx="115" cy="230" r="5" fill="#6ab0d4"/>
+<rect x="118" y="225" width="14" height="8" rx="1" fill="#4a7fa5" opacity="0.7"/>
+<!-- 압연기 -->
+<rect x="160" y="75" width="190" height="100" rx="2" fill="#1e3a52" stroke="#4a7fa5" stroke-width="1.5"/>
+<rect x="175" y="90" width="55" height="35" rx="2" fill="#2a4a6a" stroke="#4a7fa5" stroke-width="1"/>
+<rect x="240" y="90" width="55" height="35" rx="2" fill="#2a4a6a" stroke="#4a7fa5" stroke-width="1"/>
+<rect x="175" y="132" width="120" height="16" rx="1" fill="#4a7fa5" opacity="0.3"/>
+<circle cx="195" cy="158" r="7" fill="#4a7fa5" opacity="0.6"/>
+<circle cx="225" cy="158" r="7" fill="#4a7fa5" opacity="0.6"/>
+<circle cx="255" cy="158" r="7" fill="#4a7fa5" opacity="0.6"/>
+<text x="255" y="192" fill="#a0c4e0" font-size="13" text-anchor="middle" font-family="sans-serif">압연기</text>
+<!-- 가스 탱크 1 -->
+<ellipse cx="460" cy="110" rx="28" ry="60" fill="#2a4a6a" stroke="#4a7fa5" stroke-width="2"/>
+<ellipse cx="460" cy="110" rx="18" ry="50" fill="#1e3a52" stroke="#4a7fa5" stroke-width="1"/>
+<line x1="460" y1="50" x2="460" y2="36" stroke="#4a7fa5" stroke-width="2.5"/>
+<line x1="448" y1="38" x2="472" y2="38" stroke="#4a7fa5" stroke-width="2.5"/>
+<ellipse cx="528" cy="110" rx="28" ry="60" fill="#2a4a6a" stroke="#4a7fa5" stroke-width="2"/>
+<ellipse cx="528" cy="110" rx="18" ry="50" fill="#1e3a52" stroke="#4a7fa5" stroke-width="1"/>
+<line x1="528" y1="50" x2="528" y2="36" stroke="#4a7fa5" stroke-width="2.5"/>
+<line x1="516" y1="38" x2="540" y2="38" stroke="#4a7fa5" stroke-width="2.5"/>
+<text x="494" y="188" fill="#a0c4e0" font-size="13" text-anchor="middle" font-family="sans-serif">가스 탱크 GAS TANK</text>
+<!-- 기계군 1 -->
+<rect x="160" y="210" width="110" height="75" rx="2" fill="#1e3a52" stroke="#4a7fa5" stroke-width="1.5"/>
+<rect x="172" y="222" width="35" height="28" rx="1" fill="#2a4a6a" stroke="#4a7fa5" stroke-width="1"/>
+<rect x="215" y="222" width="35" height="28" rx="1" fill="#2a4a6a" stroke="#4a7fa5" stroke-width="1"/>
+<rect x="172" y="256" width="78" height="16" rx="1" fill="#4a7fa5" opacity="0.3"/>
+<rect x="285" y="210" width="110" height="75" rx="2" fill="#1e3a52" stroke="#4a7fa5" stroke-width="1.5"/>
+<rect x="297" y="222" width="86" height="50" rx="1" fill="#2a4a6a" stroke="#4a7fa5" stroke-width="1"/>
+<line x1="340" y1="222" x2="340" y2="272" stroke="#4a7fa5" stroke-width="1" opacity="0.5"/>
+<circle cx="320" cy="247" r="10" fill="#4a7fa5" opacity="0.4"/>
+<circle cx="360" cy="247" r="10" fill="#4a7fa5" opacity="0.4"/>
+<!-- 가스 탱크 2 -->
+<ellipse cx="640" cy="230" rx="28" ry="60" fill="#2a4a6a" stroke="#4a7fa5" stroke-width="2"/>
+<ellipse cx="640" cy="230" rx="18" ry="50" fill="#1e3a52" stroke="#4a7fa5" stroke-width="1"/>
+<line x1="640" y1="170" x2="640" y2="156" stroke="#4a7fa5" stroke-width="2.5"/>
+<line x1="628" y1="158" x2="652" y2="158" stroke="#4a7fa5" stroke-width="2.5"/>
+<ellipse cx="710" cy="230" rx="28" ry="60" fill="#2a4a6a" stroke="#4a7fa5" stroke-width="2"/>
+<ellipse cx="710" cy="230" rx="18" ry="50" fill="#1e3a52" stroke="#4a7fa5" stroke-width="1"/>
+<line x1="710" y1="170" x2="710" y2="156" stroke="#4a7fa5" stroke-width="2.5"/>
+<line x1="698" y1="158" x2="722" y2="158" stroke="#4a7fa5" stroke-width="2.5"/>
+<text x="675" y="305" fill="#a0c4e0" font-size="13" text-anchor="middle" font-family="sans-serif">가스 탱크 GAS TANK</text>
+<!-- 송풍기 -->
+<rect x="760" y="175" width="100" height="100" rx="2" fill="#1e3a52" stroke="#4a7fa5" stroke-width="1.5"/>
+<circle cx="810" cy="225" r="42" fill="none" stroke="#4a7fa5" stroke-width="1.5"/>
+<circle cx="810" cy="225" r="28" fill="#2a4a6a" stroke="#4a7fa5" stroke-width="1.5"/>
+<circle cx="810" cy="225" r="10" fill="#4a7fa5"/>
+<line x1="810" y1="197" x2="810" y2="183" stroke="#4a7fa5" stroke-width="2"/>
+<line x1="838" y1="225" x2="852" y2="225" stroke="#4a7fa5" stroke-width="2"/>
+<line x1="810" y1="253" x2="810" y2="267" stroke="#4a7fa5" stroke-width="2"/>
+<line x1="782" y1="225" x2="768" y2="225" stroke="#4a7fa5" stroke-width="2"/>
+<text x="810" y="292" fill="#a0c4e0" font-size="13" text-anchor="middle" font-family="sans-serif">송풍기</text>
+<!-- 집진기 -->
+<rect x="900" y="120" width="90" height="150" rx="2" fill="#1e3a52" stroke="#4a7fa5" stroke-width="1.5"/>
+<rect x="915" y="135" width="60" height="100" rx="1" fill="#2a4a6a" stroke="#4a7fa5" stroke-width="1"/>
+<line x1="945" y1="120" x2="945" y2="102" stroke="#4a7fa5" stroke-width="3"/>
+<line x1="930" y1="104" x2="960" y2="104" stroke="#4a7fa5" stroke-width="2.5"/>
+<circle cx="930" cy="175" r="8" fill="#4a7fa5" opacity="0.6"/>
+<circle cx="945" cy="195" r="8" fill="#4a7fa5" opacity="0.6"/>
+<circle cx="960" cy="175" r="8" fill="#4a7fa5" opacity="0.6"/>
+<text x="945" y="287" fill="#a0c4e0" font-size="13" text-anchor="middle" font-family="sans-serif">집진기</text>
+<!-- 제어 패널 -->
+<rect x="900" y="315" width="75" height="60" rx="2" fill="#1e3a52" stroke="#4a7fa5" stroke-width="1.5"/>
+<rect x="912" y="325" width="51" height="36" rx="1" fill="#2a4a6a" stroke="#4a7fa5" stroke-width="1"/>
+<circle cx="922" cy="350" r="4" fill="#3fb950" opacity="0.9"/>
+<circle cx="937" cy="350" r="4" fill="#e3b341" opacity="0.9"/>
+<circle cx="952" cy="350" r="4" fill="#f85149" opacity="0.9"/>
+<rect x="985" y="315" width="75" height="60" rx="2" fill="#1e3a52" stroke="#4a7fa5" stroke-width="1.5"/>
+<rect x="997" y="325" width="51" height="36" rx="1" fill="#2a4a6a" stroke="#4a7fa5" stroke-width="1"/>
+<circle cx="1007" cy="350" r="4" fill="#3fb950" opacity="0.9"/>
+<circle cx="1022" cy="350" r="4" fill="#3fb950" opacity="0.9"/>
+<circle cx="1037" cy="350" r="4" fill="#e3b341" opacity="0.9"/>
+<!-- 전자기 교반기 -->
+<rect x="460" y="370" width="200" height="110" rx="2" fill="#1e3a52" stroke="#4a7fa5" stroke-width="1.5"/>
+<ellipse cx="560" cy="425" rx="75" ry="38" fill="none" stroke="#4a7fa5" stroke-width="1.5"/>
+<ellipse cx="560" cy="425" rx="52" ry="24" fill="#2a4a6a" stroke="#4a7fa5" stroke-width="1"/>
+<line x1="488" y1="418" x2="474" y2="418" stroke="#4a7fa5" stroke-width="2.5"/>
+<line x1="632" y1="418" x2="646" y2="418" stroke="#4a7fa5" stroke-width="2.5"/>
+<line x1="474" y1="408" x2="474" y2="428" stroke="#4a7fa5" stroke-width="2.5"/>
+<line x1="646" y1="408" x2="646" y2="428" stroke="#4a7fa5" stroke-width="2.5"/>
+<text x="560" y="498" fill="#a0c4e0" font-size="13" text-anchor="middle" font-family="sans-serif">전자기 교반기</text>
+<!-- 하단 기계군 -->
+<rect x="50" y="380" width="170" height="80" rx="2" fill="#1e3a52" stroke="#4a7fa5" stroke-width="1.5"/>
+<rect x="62" y="394" width="50" height="50" rx="1" fill="#2a4a6a" stroke="#4a7fa5" stroke-width="1"/>
+<rect x="122" y="394" width="40" height="22" rx="1" fill="#2a4a6a" stroke="#4a7fa5" stroke-width="1"/>
+<rect x="122" y="422" width="40" height="22" rx="1" fill="#2a4a6a" stroke="#4a7fa5" stroke-width="1"/>
+<rect x="170" y="394" width="38" height="50" rx="1" fill="#2a4a6a" stroke="#4a7fa5" stroke-width="1"/>
+<rect x="50" y="475" width="170" height="80" rx="2" fill="#1e3a52" stroke="#4a7fa5" stroke-width="1.5"/>
+<rect x="62" y="489" width="46" height="46" rx="1" fill="#2a4a6a" stroke="#4a7fa5" stroke-width="1"/>
+<rect x="116" y="489" width="38" height="46" rx="1" fill="#2a4a6a" stroke="#4a7fa5" stroke-width="1"/>
+<rect x="162" y="489" width="36" height="46" rx="1" fill="#2a4a6a" stroke="#4a7fa5" stroke-width="1"/>
+<rect x="240" y="420" width="150" height="90" rx="2" fill="#1e3a52" stroke="#4a7fa5" stroke-width="1.5"/>
+<circle cx="290" cy="465" r="28" fill="none" stroke="#4a7fa5" stroke-width="1.5"/>
+<circle cx="290" cy="465" r="16" fill="#2a4a6a" stroke="#4a7fa5" stroke-width="1"/>
+<rect x="325" y="450" width="52" height="36" rx="1" fill="#2a4a6a" stroke="#4a7fa5" stroke-width="1"/>
+<!-- 스마트 파워 패널 -->
+<rect x="900" y="390" width="100" height="170" rx="2" fill="#1e3a52" stroke="#4a7fa5" stroke-width="1.5"/>
+<rect x="914" y="404" width="72" height="90" rx="1" fill="#2a4a6a" stroke="#4a7fa5" stroke-width="1"/>
+<circle cx="930" cy="420" r="5" fill="#3fb950" opacity="0.9"/>
+<circle cx="950" cy="420" r="5" fill="#3fb950" opacity="0.9"/>
+<circle cx="970" cy="420" r="5" fill="#e3b341" opacity="0.9"/>
+<rect x="916" y="432" width="68" height="3" rx="1" fill="#4a7fa5" opacity="0.5"/>
+<rect x="916" y="442" width="68" height="3" rx="1" fill="#4a7fa5" opacity="0.5"/>
+<rect x="916" y="452" width="68" height="3" rx="1" fill="#4a7fa5" opacity="0.5"/>
+<rect x="916" y="462" width="68" height="3" rx="1" fill="#4a7fa5" opacity="0.5"/>
+<rect x="916" y="472" width="68" height="3" rx="1" fill="#4a7fa5" opacity="0.5"/>
+<rect x="914" y="502" width="72" height="50" rx="1" fill="#2a4a6a" stroke="#4a7fa5" stroke-width="1"/>
+<text x="950" y="524" fill="#7aaccc" font-size="11" text-anchor="middle" font-family="sans-serif">POWER</text>
+<text x="950" y="540" fill="#7aaccc" font-size="11" text-anchor="middle" font-family="sans-serif">PANEL</text>
+<text x="950" y="572" fill="#a0c4e0" font-size="13" text-anchor="middle" font-family="sans-serif">스마트파워</text>
+<!-- 관리동 -->
+<rect x="1015" y="330" width="200" height="220" rx="2" fill="#1e3a52" stroke="#4a7fa5" stroke-width="1.5"/>
+<rect x="1030" y="345" width="170" height="120" rx="1" fill="#2a4a6a" stroke="#4a7fa5" stroke-width="1"/>
+<line x1="1115" y1="345" x2="1115" y2="465" stroke="#4a7fa5" stroke-width="1" opacity="0.4"/>
+<rect x="1033" y="350" width="78" height="45" rx="1" fill="#1a3a5a" stroke="#4a7fa5" stroke-width="0.8"/>
+<rect x="1118" y="350" width="78" height="45" rx="1" fill="#1a3a5a" stroke="#4a7fa5" stroke-width="0.8"/>
+<rect x="1033" y="402" width="163" height="53" rx="1" fill="#1a3a5a" stroke="#4a7fa5" stroke-width="0.8"/>
+<rect x="1033" y="472" width="75" height="55" rx="1" fill="#4a7fa5" opacity="0.15" stroke="#4a7fa5" stroke-width="1"/>
+<rect x="1118" y="472" width="75" height="55" rx="1" fill="#4a7fa5" opacity="0.15" stroke="#4a7fa5" stroke-width="1"/>
+<text x="1115" y="543" fill="#a0c4e0" font-size="13" text-anchor="middle" font-family="sans-serif">관리동</text>
+<!-- 하단 기계군 2 -->
+<rect x="700" y="380" width="130" height="100" rx="2" fill="#1e3a52" stroke="#4a7fa5" stroke-width="1.5"/>
+<rect x="714" y="394" width="102" height="72" rx="1" fill="#2a4a6a" stroke="#4a7fa5" stroke-width="1"/>
+<line x1="765" y1="394" x2="765" y2="466" stroke="#4a7fa5" stroke-width="1" opacity="0.4"/>
+<circle cx="742" cy="430" r="12" fill="#4a7fa5" opacity="0.3"/>
+<circle cx="788" cy="430" r="12" fill="#4a7fa5" opacity="0.3"/>
+<rect x="700" y="492" width="130" height="90" rx="2" fill="#1e3a52" stroke="#4a7fa5" stroke-width="1.5"/>
+<rect x="714" y="506" width="102" height="62" rx="1" fill="#2a4a6a" stroke="#4a7fa5" stroke-width="1"/>
+<polygon points="765,514 745,540 785,540" fill="#4a7fa5" opacity="0.4"/>
+<!-- EXIT -->
+<rect x="20" y="490" width="90" height="50" rx="2" fill="#1a6b1a" stroke="#3fb950" stroke-width="2.5"/>
+<text x="65" y="521" fill="#3fb950" font-size="18" text-anchor="middle" font-family="sans-serif" font-weight="bold">EXIT</text>
+<polygon points="20,560 55,540 55,580" fill="#3fb950" opacity="0.8"/>
+<!-- 치수선 -->
+<line x1="20" y1="596" x2="1280" y2="596" stroke="#4a7fa5" stroke-width="1" opacity="0.4"/>
+<line x1="20" y1="590" x2="20" y2="600" stroke="#4a7fa5" stroke-width="1" opacity="0.4"/>
+<line x1="1280" y1="590" x2="1280" y2="600" stroke="#4a7fa5" stroke-width="1" opacity="0.4"/>
+<text x="650" y="598" fill="#4a7fa5" font-size="11" text-anchor="middle" font-family="sans-serif" opacity="0.5">1900</text>
+</svg>
