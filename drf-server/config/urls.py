@@ -5,7 +5,7 @@ from django.shortcuts import render
 
 # 작동확인용
 def dashboard(request):
-    return render(request, "dashboard.html")
+    return render(request, "dashboard_sh.html")
 
 
 urlpatterns = [

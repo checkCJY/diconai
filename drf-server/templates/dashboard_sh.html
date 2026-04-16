@@ -1,0 +1,474 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>산재 예방 통합 관제 시스템</title>
+<link rel="stylesheet" href="{% static 'css/style.css' %}">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  #map {
+    width: 100% !important;
+    height: 100% !important;
+    background: #1c2128;
+    border-radius: 4px;
+    flex: 1;
+  }
+  .leaflet-popup-content-wrapper {
+    background: #1c2128;
+    color: #e6edf3;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    font-size: 11px;
+    font-family: 'Malgun Gothic', sans-serif;
+  }
+  .leaflet-popup-tip { background: #1c2128; }
+  .leaflet-popup-content { margin: 8px 12px; line-height: 1.8; }
+  .popup-title { font-weight: 700; font-size: 12px; margin-bottom: 4px; color: #58a6ff; }
+  .popup-status-normal  { color: #3fb950; }
+  .popup-status-caution { color: #e3b341; }
+  .popup-status-danger  { color: #f85149; }
+  .map-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+  .ws-status {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 8px;
+    background: #30363d;
+    color: #8b949e;
+  }
+  .ws-status.connected { background: #0d3822; color: #3fb950; }
+  .ws-status.error     { background: #3d1a1a; color: #f85149; }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-left">
+    <button class="hamburger">☰</button>
+    <div class="logo-box">LOGO</div>
+    <div class="system-name">산재 예방 통합 관제 시스템</div>
+  </div>
+  <div class="header-center">
+    <div class="user-name">홍 길 동님</div>
+    <div class="user-role">환영합니다.</div>
+  </div>
+  <div class="header-right">
+    <div class="time-box">
+      <div>현재 시스템 시간 : <span id="clock"></span></div>
+      <div class="sub">마지막 갱신 시간 : <span id="lastUpdate"></span></div>
+    </div>
+    <div class="header-icons">
+      <button class="icon-btn">⟳</button>
+      <button class="icon-btn">🏠</button>
+      <button class="icon-btn">🔔<span class="badge">9</span></button>
+    </div>
+    <button class="logout-btn">로그아웃</button>
+  </div>
+</header>
+
+<div class="body-wrap">
+
+  <div class="top-row">
+
+    <!-- 좌측: 8번 + 11번 -->
+    <div class="col-left">
+      <div class="panel">
+        <div class="panel-title">나의 안전확인</div>
+        <div class="safety-item"><span>PPE 착용</span><span class="done">완료</span></div>
+        <div class="safety-item"><span>안전 확인 체크리스트</span><span class="done">완료</span></div>
+        <div class="safety-item"><span>VR 교육</span><span class="todo">미완료</span></div>
+        <button class="safety-btn">나의 안전 확인 바로가기</button>
+      </div>
+      <div class="panel">
+        <div class="panel-title">작업자 현황 <span class="more">+ 상세 보기</span></div>
+        <div class="donut-wrap">
+          <div class="donut">
+            <div class="donut-inner">
+              <div class="sub" style="font-size:7px;">현재 나의 상태</div>
+              <div class="donut-status">정상</div>
+            </div>
+          </div>
+          <div class="legend">
+            <div class="legend-item"><span class="dot danger"></span>위험</div>
+            <div class="legend-item"><span class="dot caution"></span>주의</div>
+            <div class="legend-item"><span class="dot safe"></span>정상</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 가운데: MN-02 실시간 모니터링 -->
+    <div class="col-mid">
+      <div class="panel panel-map">
+        <div class="panel-title">
+          실시간 모니터링
+          <span id="wsStatus" class="ws-status">연결 중...</span>
+          <span class="more">+ 상세 보기</span>
+        </div>
+        <div class="map-tabs">
+          <button class="map-tab active" data-layer="all">전체</button>
+          <button class="map-tab" data-layer="worker">작업자</button>
+          <button class="map-tab" data-layer="geofence">위험구역</button>
+          <button class="map-tab" data-layer="gas">유해가스 센서</button>
+          <button class="map-tab" data-layer="facility">설비</button>
+          <button class="map-tab" data-layer="power">스마트 전력</button>
+          <button class="map-tab" data-layer="location">위치센서</button>
+        </div>
+        <div class="map-area" style="padding:0;">
+          <div id="map"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 우측: 10번 이벤트 -->
+    <div class="col-right">
+      <div class="panel" style="flex:1;overflow:hidden;">
+        <div class="panel-title">이벤트 현황 <span class="more">+ 상세 보기</span></div>
+        <div class="event-item">
+          <div class="event-head">
+            <span><span class="dot danger"></span>홍길동 작업자</span>
+            <span class="sub">00:27</span>
+          </div>
+          <div class="danger-text event-desc">작업 전 완전 확인 미완료</div>
+        </div>
+        <div class="event-item">
+          <div class="event-head">
+            <span><span class="dot danger"></span>유해가스 센서 1</span>
+            <span class="sub">00:30</span>
+          </div>
+          <div class="danger-text event-desc">산소 농도 정상 범위 이하로 저하</div>
+        </div>
+        <div class="event-item">
+          <div class="event-head">
+            <span><span class="dot caution"></span>주의 구역</span>
+            <span class="sub">00:25</span>
+          </div>
+          <div class="caution-text event-desc">스마트 파워 시스템 이상으로 인한 주의 구역 발생</div>
+        </div>
+        <div class="event-summary">
+          최근 24시간 동안 발생한 이벤트 현황<br>
+          <span class="danger-text">위험 2건</span> / <span class="caution-text">주의 1건</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 하단 4개 패널 -->
+  <div class="bottom-row">
+    <div class="panel">
+      <div class="panel-title">내 근처 유해가스 위험 현황 <span class="more">+ 상세 보기</span></div>
+      <div class="sensor-tag">유해가스 1</div>
+      <table class="tbl">
+        <thead><tr><th>가스 종류</th><th>현재 농도</th><th>측정 단위</th><th>위험도</th></tr></thead>
+        <tbody id="gasTableBody"></tbody>
+      </table>
+    </div>
+    <div class="panel panel-chart">
+      <div class="panel-title">AI 예측 — 내 근처 유해가스 위험 <span class="more">+ 상세 보기</span></div>
+      <div class="ai-nav">
+        <span id="aiGasName" class="caution-text fw">CO (일산화탄소)</span>
+        <span class="sub">◁ 1 / 3 ▷</span>
+      </div>
+      <div class="ai-vals">
+        <div><div class="sub">현재 농도</div><div id="aiCurrentVal" class="big caution-text">-- ppm</div></div>
+        <div><div class="sub">12시간 내 최대 예상 농도</div><div id="aiMaxVal" class="big danger-text">-- ppm</div></div>
+      </div>
+      <div class="chart-wrap">
+        <div class="chart-controls">
+          <span class="sub">Y축 스케일</span>
+          <div class="scale-btns">
+            <button class="scale-btn" id="gasZoomOut">−</button>
+            <span class="scale-val" id="gasScaleVal">자동</span>
+            <button class="scale-btn" id="gasZoomIn">+</button>
+            <button class="scale-btn scale-reset" id="gasReset">↺</button>
+          </div>
+        </div>
+        <canvas id="chartGas"></canvas>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">스마트 전력 시스템 위험 현황 <span class="more">+ 상세 보기</span></div>
+      <div class="sub">현재 전체 스마트 파워 전력 사용량</div>
+      <div class="power-total" id="powerTotal">1,280 MW</div>
+      <div class="danger-text" id="powerChangePct" style="font-size:11px;margin-bottom:4px;">기준 대비 ▲ +19%</div>
+      <table class="tbl">
+        <thead><tr><th>설비명</th><th>전력 사용량</th><th>온도</th><th>위험도</th></tr></thead>
+        <tbody id="powerTableBody">
+          <tr><td>압연기</td><td>15.2 MWh</td><td>125°C</td><td><span class="brisk danger">위험</span></td></tr>
+          <tr><td>송풍기</td><td>15 MWh</td><td>125°C</td><td><span class="brisk danger">위험</span></td></tr>
+          <tr><td>집진기</td><td>5.2 MWh</td><td>125°C</td><td><span class="brisk caution">주의</span></td></tr>
+          <tr><td>전자기 교반기</td><td>3.4 MWh</td><td>125°C</td><td><span class="brisk caution">주의</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="panel panel-chart">
+      <div class="panel-title">AI 예측 — 스마트 전력 시스템 위험 <span class="more">+ 상세 보기</span></div>
+      <div class="ai-nav">
+        <span id="aiPowerEquipName" class="fw">압연기</span>
+        <span class="sub">◁ 1 / 20 ▷</span>
+      </div>
+      <div class="eta-box">
+        <div class="sub">위험 도달 예상 시간</div>
+        <div class="eta-val" id="aiPowerEta">25 분 뒤</div>
+      </div>
+      <div class="sub">12시간 내 예상 최대 부하</div>
+      <div class="danger-text fw" id="aiPowerMaxLoad" style="font-size:14px;margin-bottom:4px;">450 kW <span style="font-size:11px;font-weight:400;">(정상 대비 110%)</span></div>
+      <div class="chart-wrap">
+        <div class="chart-controls">
+          <span class="sub">Y축 스케일</span>
+          <div class="scale-btns">
+            <button class="scale-btn" id="powerZoomOut">−</button>
+            <span class="scale-val" id="powerScaleVal">자동</span>
+            <button class="scale-btn" id="powerZoomIn">+</button>
+            <button class="scale-btn scale-reset" id="powerReset">↺</button>
+          </div>
+        </div>
+        <canvas id="chartPower"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="{% static 'js/main.js' %}"></script>
+<script>
+// ────────────────────────────────────────────
+// MN-02 실시간 모니터링 지도 (이성현)
+// ────────────────────────────────────────────
+
+const STATUS_COLOR = { normal: "#3fb950", caution: "#e3b341", danger: "#f85149" };
+const ZONE_COLOR   = { danger: "#f85149", warning: "#e3b341", normal: "#3fb950" };
+
+function riskColor(level) {
+  return [STATUS_COLOR.normal, STATUS_COLOR.caution, STATUS_COLOR.danger][level] ?? STATUS_COLOR.normal;
+}
+function levelToStatus(level) {
+  return ["normal","caution","danger"][level] ?? "normal";
+}
+
+// ── 더미 데이터 (좌표 자유 배치) ─────────────
+const DUMMY_GAS_SENSORS = [
+  { id:1, name:"가스센서 A", device_id:"sensor_01", x:150,  y:80,  risk_level:2, co:230, h2s:4,  o2:20.8 },
+  { id:2, name:"가스센서 B", device_id:"sensor_02", x:600,  y:200, risk_level:1, co:20,  h2s:12, o2:19.5 },
+  { id:3, name:"가스센서 C", device_id:"sensor_03", x:1000, y:100, risk_level:0, co:10,  h2s:2,  o2:21.0 },
+  { id:4, name:"가스센서 D", device_id:"sensor_04", x:900,  y:450, risk_level:1, co:35,  h2s:8,  o2:20.1 },
+  { id:5, name:"가스센서 E", device_id:"sensor_05", x:300,  y:400, risk_level:0, co:8,   h2s:1,  o2:21.0 },
+];
+
+const DUMMY_POWER_DEVICES = [
+  { id:1, name:"스마트파워 A", device_id:"power_01", x:400,  y:150, risk_level:1 },
+  { id:2, name:"스마트파워 B", device_id:"power_02", x:800,  y:300, risk_level:0 },
+  { id:3, name:"스마트파워 C", device_id:"power_03", x:200,  y:500, risk_level:2 },
+  { id:4, name:"스마트파워 D", device_id:"power_04", x:1100, y:400, risk_level:0 },
+];
+
+const DUMMY_GEOFENCES = [
+  { id:1, name:"위험구역 A", zone_type:"danger",  polygon:[[80,50],[280,50],[280,200],[80,200]] },
+  { id:2, name:"주의구역 B", zone_type:"warning", polygon:[[500,300],[750,300],[750,520],[500,520]] },
+  { id:3, name:"관리구역 C", zone_type:"normal",  polygon:[[850,100],[1150,100],[1150,350],[850,350]] },
+];
+
+// ── 작업자 (행동 패턴 다양화) ────────────────
+const DUMMY_WORKERS = [
+  { id:1, name:"작업자 A", x:150, y:120, movement_status:"moving",     current_geofence:"위험구역 A",
+    dx:4, dy:2, // 이동 방향벡터
+  },
+  { id:2, name:"작업자 B", x:600, y:350, movement_status:"moving",     current_geofence:null,
+    dx:-3, dy:4,
+  },
+  { id:3, name:"작업자 C", x:950, y:200, movement_status:"stationary", current_geofence:"관리구역 C",
+    dx:0, dy:0,
+  },
+  { id:4, name:"작업자 D", x:350, y:480, movement_status:"moving",     current_geofence:null,
+    dx:5, dy:-3,
+  },
+];
+
+// ── Leaflet 초기화 ───────────────────────────
+const map = L.map("map", {
+  crs: L.CRS.Simple,
+  minZoom: -2, maxZoom: 2,
+  zoomControl: false,
+  dragging: false,
+  scrollWheelZoom: false,
+  doubleClickZoom: false,
+  touchZoom: false,
+});
+
+// bounds를 넓혀서 지도 꽉 채움
+const bounds = [[0,0],[600,1300]];
+L.imageOverlay("{% static 'img/factory_map.svg' %}", bounds).addTo(map);
+map.fitBounds(bounds);
+
+// ── 레이어 그룹 ──────────────────────────────
+const layers = {
+  gas:      L.layerGroup().addTo(map),
+  power:    L.layerGroup().addTo(map),
+  geofence: L.layerGroup().addTo(map),
+  worker:   L.layerGroup().addTo(map),
+};
+
+// ── 팝업 HTML ────────────────────────────────
+function gasPopupHtml(s) {
+  const st = levelToStatus(s.risk_level);
+  const label = {normal:"정상",caution:"주의",danger:"위험"}[st];
+  return `<div class='popup-title'>📡 ${s.name}</div>
+    <div>ID: ${s.device_id}</div>
+    <div>상태: <span class='popup-status-${st}'>${label}</span></div>
+    <div>CO: ${s.co} ppm &nbsp; H2S: ${s.h2s} ppm &nbsp; O2: ${s.o2}%</div>`;
+}
+function powerPopupHtml(d) {
+  const st = levelToStatus(d.risk_level);
+  const label = {normal:"정상",caution:"주의",danger:"위험"}[st];
+  return `<div class='popup-title'>⚡ ${d.name}</div>
+    <div>ID: ${d.device_id}</div>
+    <div>상태: <span class='popup-status-${st}'>${label}</span></div>`;
+}
+function workerPopupHtml(w) {
+  const statusLabel = {moving:"이동 중", stationary:"정지", idle:"대기"};
+  return `<div class='popup-title'>👷 ${w.name}</div>
+    <div>현재 구역: ${w.current_geofence || "구역 밖"}</div>
+    <div>상태: ${statusLabel[w.movement_status] || w.movement_status}</div>
+    <div>위치: x:${w.x}, y:${w.y}</div>`;
+}
+
+// ── 마커 참조 저장 ────────────────────────────
+const gasMarkers    = {};
+const workerMarkers = {};
+
+// ── 지도 그리기 ──────────────────────────────
+function drawAll() {
+  DUMMY_GAS_SENSORS.forEach(s => {
+    const m = L.circleMarker([s.y, s.x], {
+      radius:9, fillColor:riskColor(s.risk_level),
+      color:"#fff", weight:1.5, fillOpacity:0.9,
+    }).bindPopup(gasPopupHtml(s), { maxWidth:220 });
+    m.addTo(layers.gas);
+    gasMarkers[s.device_id] = { marker:m, data:s };
+  });
+
+  DUMMY_POWER_DEVICES.forEach(d => {
+    // 전력장비는 사각형 마커로 구분 (circleMarker에 dashArray로 표현)
+    L.circleMarker([d.y, d.x], {
+      radius:9, fillColor:riskColor(d.risk_level),
+      color:"#e3b341", weight:2, fillOpacity:0.85,
+      dashArray: "4 2",
+    }).bindPopup(powerPopupHtml(d), { maxWidth:220 }).addTo(layers.power);
+  });
+
+  DUMMY_GEOFENCES.forEach(g => {
+    const latlngs = g.polygon.map(([x,y]) => [y,x]);
+    const color = ZONE_COLOR[g.zone_type] || "#888";
+    L.polygon(latlngs, { color, fillColor:color, fillOpacity:0.15, weight:2 })
+     .bindPopup(`<div class='popup-title'>🚧 ${g.name}</div><div>유형: ${g.zone_type}</div>`)
+     .addTo(layers.geofence);
+  });
+
+  DUMMY_WORKERS.forEach(w => {
+    const m = L.circleMarker([w.y, w.x], {
+      radius:8, fillColor:"#58a6ff",
+      color:"#fff", weight:2, fillOpacity:1,
+    }).bindPopup(workerPopupHtml(w), { maxWidth:200 });
+    m.addTo(layers.worker);
+    workerMarkers[w.id] = { marker:m, data:w };
+  });
+}
+drawAll();
+
+// ── 탭 필터 ──────────────────────────────────
+const TAB_LAYER_MAP = {
+  all:      ["gas","power","geofence","worker"],
+  worker:   ["worker"],
+  geofence: ["geofence"],
+  gas:      ["gas"],
+  facility: ["power"],
+  power:    ["power"],
+  location: [],
+};
+document.querySelectorAll(".map-tab").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".map-tab").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    const visible = TAB_LAYER_MAP[btn.dataset.layer] || [];
+    Object.entries(layers).forEach(([name, layer]) => {
+      visible.includes(name) ? map.addLayer(layer) : map.removeLayer(layer);
+    });
+  });
+});
+
+// ── 작업자 이동 시뮬레이션 (행동 패턴 반영) ──
+setInterval(() => {
+  Object.values(workerMarkers).forEach(({ marker, data }) => {
+    if (data.movement_status !== "moving") return;
+    const cur = marker.getLatLng();
+
+    // 벽에 부딪히면 방향 반전
+    let nx = cur.lng + data.dx + (Math.random() - 0.5) * 3;
+    let ny = cur.lat + data.dy + (Math.random() - 0.5) * 3;
+
+    if (nx <= 0 || nx >= 1290) data.dx *= -1;
+    if (ny <= 0 || ny >= 590)  data.dy *= -1;
+
+    nx = Math.max(0, Math.min(1290, nx));
+    ny = Math.max(0, Math.min(590,  ny));
+
+    marker.setLatLng([ny, nx]);
+    data.x = Math.round(nx);
+    data.y = Math.round(ny);
+
+    // 팝업 열려있으면 내용 갱신
+    if (marker.isPopupOpen()) {
+      marker.setPopupContent(workerPopupHtml(data));
+    }
+  });
+}, 1000);
+
+// ── WebSocket 연동 ────────────────────────────
+const wsStatusEl = document.getElementById("wsStatus");
+
+function connectWS() {
+  const ws = new WebSocket("ws://127.0.0.1:8001/ws/sensors/");
+
+  ws.onopen = () => {
+    wsStatusEl.textContent = "● 실시간 연결";
+    wsStatusEl.className = "ws-status connected";
+  };
+
+  ws.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+
+    // 가스센서 A WebSocket 실시간 반영
+    const entry = gasMarkers["sensor_01"];
+    if (entry) {
+      const level = data.level === "위험" ? 2 : 0;
+      entry.marker.setStyle({ fillColor: riskColor(level) });
+      entry.data.risk_level = level;
+      entry.data.co  = data.co;
+      entry.data.h2s = data.h2s;
+      entry.data.o2  = data.o2;
+      if (entry.marker.isPopupOpen()) {
+        entry.marker.setPopupContent(gasPopupHtml(entry.data));
+      }
+    }
+  };
+
+  ws.onerror = () => {
+    wsStatusEl.textContent = "● 연결 오류";
+    wsStatusEl.className = "ws-status error";
+  };
+
+  ws.onclose = () => {
+    wsStatusEl.textContent = "● 연결 끊김";
+    wsStatusEl.className = "ws-status error";
+    setTimeout(connectWS, 5000);
+  };
+}
+
+connectWS();
+</script>
+</body>
+</html>
