@@ -1,5 +1,5 @@
 from django.contrib import admin
-from django.urls import path
+from django.urls import path ,include
 from django.shortcuts import render
 
 
@@ -7,8 +7,14 @@ from django.shortcuts import render
 def dashboard(request):
     return render(request, "dashboard.html")
 
+def alarm_panel(request):
+    return render(request, "alarm_panel.html")
+    
+
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("", dashboard),
+    path("alarm/", alarm_panel),
+    path('api/', include('apps.alarms.urls')),
 ]
