@@ -158,10 +158,10 @@ const ws = new WebSocket("ws://localhost:8001/ws/sensors/");
 const statusDiv = document.getElementById("status");
 const outputPre = document.getElementById("output");
 
-ws.onopen = () => statusDiv.innerText = "🟢 연결됨 (데이터 수신 중...)";
+ws.onopen = () => { if(statusDiv) statusDiv.innerText = "🟢 연결됨 (데이터 수신 중...)"; };
 ws.onclose = () => {
-    statusDiv.innerText = "🔴 연결 끊김";
-    statusDiv.style.color = "red";
+    if(statusDiv) statusDiv.innerText = "🔴 연결 끊김";
+    if(statusDiv) statusDiv.style.color = "red";
 };
 
 ws.onmessage = (event) => {
