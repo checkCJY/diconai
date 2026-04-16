@@ -1,5 +1,4 @@
 {% load static %}
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -10,36 +9,15 @@
 </head>
 <body>
 
-<header class="header">
-  <div class="header-left">
-    <button class="hamburger">☰</button>
-    <div class="logo-box">LOGO</div>
-    <div class="system-name">산재 예방 통합 관제 시스템</div>
-  </div>
-  <div class="header-center">
-    <div class="user-name">홍 길 동님</div>
-    <div class="user-role">환영합니다.</div>
-  </div>
-  <div class="header-right">
-    <div class="time-box">
-      <div>현재 시스템 시간 : <span id="clock"></span></div>
-      <div class="sub">마지막 갱신 시간 : <span id="lastUpdate"></span></div>
-    </div>
-    <div class="header-icons">
-      <button class="icon-btn">⟳</button>
-      <button class="icon-btn">🏠</button>
-      <button class="icon-btn">🔔<span class="badge">9</span></button>
-    </div>
-    <button class="logout-btn">로그아웃</button>
-  </div>
-</header>
+{% include 'header.html' %}
 
+<!-- ───────────────── 대시보드 본문 ──────────────── -->
 <div class="body-wrap">
 
   <!-- 상단 3컬럼 -->
   <div class="top-row">
 
-    <!-- 좌측: 8번 + 11번 -->
+    <!-- 좌측: 나의 안전확인 + 작업자 현황 -->
     <div class="col-left">
       <div class="panel">
         <div class="panel-title">나의 안전확인</div>
@@ -66,7 +44,7 @@
       </div>
     </div>
 
-    <!-- 가운데: 9번 맵 -->
+    <!-- 가운데: 실시간 모니터링 맵 -->
     <div class="col-mid">
       <div class="panel panel-map">
         <div class="panel-title">실시간 모니터링 <span class="more">+ 상세 보기</span></div>
@@ -88,29 +66,20 @@
       </div>
     </div>
 
-    <!-- 우측: 10번 이벤트 -->
+    <!-- 우측: 이벤트 현황 -->
     <div class="col-right">
       <div class="panel" style="flex:1;overflow:hidden;">
         <div class="panel-title">이벤트 현황 <span class="more">+ 상세 보기</span></div>
         <div class="event-item">
-          <div class="event-head">
-            <span><span class="dot danger"></span>홍길동 작업자</span>
-            <span class="sub">00:27</span>
-          </div>
+          <div class="event-head"><span><span class="dot danger"></span>홍길동 작업자</span><span class="sub">00:27</span></div>
           <div class="danger-text event-desc">작업 전 완전 확인 미완료</div>
         </div>
         <div class="event-item">
-          <div class="event-head">
-            <span><span class="dot danger"></span>유해가스 센서 1</span>
-            <span class="sub">00:30</span>
-          </div>
+          <div class="event-head"><span><span class="dot danger"></span>유해가스 센서 1</span><span class="sub">00:30</span></div>
           <div class="danger-text event-desc">산소 농도 정상 범위 이하로 저하</div>
         </div>
         <div class="event-item">
-          <div class="event-head">
-            <span><span class="dot caution"></span>주의 구역</span>
-            <span class="sub">00:25</span>
-          </div>
+          <div class="event-head"><span><span class="dot caution"></span>주의 구역</span><span class="sub">00:25</span></div>
           <div class="caution-text event-desc">스마트 파워 시스템 이상으로 인한 주의 구역 발생</div>
         </div>
         <div class="event-summary">
@@ -125,7 +94,7 @@
   <!-- 하단 4개 패널 -->
   <div class="bottom-row">
 
-    <!-- 12번 -->
+    <!-- 유해가스 현황 테이블 -->
     <div class="panel">
       <div class="panel-title">내 근처 유해가스 위험 현황 <span class="more">+ 상세 보기</span></div>
       <div class="sensor-tag">유해가스 1</div>
@@ -135,7 +104,7 @@
       </table>
     </div>
 
-    <!-- 13번 -->
+    <!-- AI 예측 — 유해가스 -->
     <div class="panel panel-chart">
       <div class="panel-title">AI 예측 — 내 근처 유해가스 위험 <span class="more">+ 상세 보기</span></div>
       <div class="ai-nav">
@@ -152,7 +121,7 @@
           <div class="scale-btns">
             <button class="scale-btn" id="gasZoomOut" title="범위 확대">−</button>
             <span class="scale-val" id="gasScaleVal">자동</span>
-            <button class="scale-btn" id="gasZoomIn" title="범위 축소">+</button>
+            <button class="scale-btn" id="gasZoomIn"  title="범위 축소">+</button>
             <button class="scale-btn scale-reset" id="gasReset" title="자동 복귀">↺</button>
           </div>
         </div>
@@ -160,7 +129,7 @@
       </div>
     </div>
 
-    <!-- 14번 -->
+    <!-- 스마트 전력 현황 -->
     <div class="panel">
       <div class="panel-title">스마트 전력 시스템 위험 현황 <span class="more">+ 상세 보기</span></div>
       <div class="sub">현재 전체 스마트 파워 전력 사용량</div>
@@ -177,7 +146,7 @@
       </table>
     </div>
 
-    <!-- 15번 -->
+    <!-- AI 예측 — 전력 -->
     <div class="panel panel-chart">
       <div class="panel-title">AI 예측 — 스마트 전력 시스템 위험 <span class="more">+ 상세 보기</span></div>
       <div class="ai-nav">
@@ -189,14 +158,16 @@
         <div class="eta-val" id="aiPowerEta">25 분 뒤</div>
       </div>
       <div class="sub">12시간 내 예상 최대 부하</div>
-      <div class="danger-text fw" id="aiPowerMaxLoad" style="font-size:14px;margin-bottom:4px;">450 kW <span style="font-size:11px;font-weight:400;">(정상 대비 110%)</span></div>
+      <div class="danger-text fw" id="aiPowerMaxLoad" style="font-size:14px;margin-bottom:4px;">
+        450 kW <span style="font-size:11px;font-weight:400;">(정상 대비 110%)</span>
+      </div>
       <div class="chart-wrap">
         <div class="chart-controls">
           <span class="sub">Y축 스케일</span>
           <div class="scale-btns">
             <button class="scale-btn" id="powerZoomOut" title="범위 확대">−</button>
             <span class="scale-val" id="powerScaleVal">자동</span>
-            <button class="scale-btn" id="powerZoomIn" title="범위 축소">+</button>
+            <button class="scale-btn" id="powerZoomIn"  title="범위 축소">+</button>
             <button class="scale-btn scale-reset" id="powerReset" title="자동 복귀">↺</button>
           </div>
         </div>
