@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 import environ
+from datetime import timedelta
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -117,6 +118,26 @@ AUTH_PASSWORD_VALIDATORS = [
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
 AUTH_USER_MODEL = "accounts.CustomUser"
+
+# ── Django REST Framework ──────────────────────────────────
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+}
+
+# ── Simple JWT ────────────────────────────────────────────
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(hours=8),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    "AUTH_HEADER_TYPES": ("Bearer",),
+}
+
+# ── 백오피스 URL (관리자 메뉴 이동) ───────────────────────
+ADMIN_BACKOFFICE_URL = env("ADMIN_BACKOFFICE_URL", default="/admin/")
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"

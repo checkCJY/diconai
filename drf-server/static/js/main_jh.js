@@ -478,12 +478,12 @@ function initWebSocket() {
   } catch {
     return;
   }
-
-ws.onopen = () => { if(statusDiv) statusDiv.innerText = "🟢 연결됨 (데이터 수신 중...)"; };
-ws.onclose = () => {
-    if(statusDiv) statusDiv.innerText = "🔴 연결 끊김";
-    if(statusDiv) statusDiv.style.color = "red";
-};
+  // 지혜님이 작성한 코드 시작
+  ws.onmessage = (event) => {
+    let data;
+    try { data = JSON.parse(event.data); }
+    catch { return; }
+  // 지혜님이 작성한 코드 끝
 
     // Panel 12: 유해가스 테이블
     const tbody = document.getElementById('gasTableBody');

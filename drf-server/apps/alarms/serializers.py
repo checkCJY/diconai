@@ -10,19 +10,19 @@ class AlarmRecordSerializer(serializers.ModelSerializer):
     class Meta:
         model = AlarmRecord
         fields = [
-            'id',
-            'alarm_level',
-            'alarm_type',
-            'gas_type',
-            'measured_value',
-            'threshold_value',
-            'status',
-            'is_active',
-            'sensor_name',
-            'worker_name',
-            'geofence_name',
-            'created_at',
-            'resolved_at',
+            "id",
+            "alarm_level",
+            "alarm_type",
+            "gas_type",
+            "measured_value",
+            "threshold_value",
+            "status",
+            "is_active",
+            "sensor_name",
+            "worker_name",
+            "geofence_name",
+            "created_at",
+            "resolved_at",
         ]
 
     def get_sensor_name(self, obj):

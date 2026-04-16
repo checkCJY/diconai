@@ -6,6 +6,7 @@
 <meta charset="UTF-8">
 <title>산재 예방 통합 관제 시스템</title>
 <link rel="stylesheet" href="{% static 'css/style.css' %}">
+<link rel="stylesheet" href="{% static 'css/CJY.css' %}">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 </head>
 <body>
@@ -48,20 +49,54 @@
         <div class="safety-item"><span>VR 교육</span><span class="todo">미완료</span></div>
         <button class="safety-btn">나의 안전 확인 바로가기</button>
       </div>
+      <!-- MN-04 작업자 현황 패널 -->
       <div class="panel">
-        <div class="panel-title">작업자 현황 <span class="more">+ 상세 보기</span></div>
-        <div class="donut-wrap">
-          <div class="donut">
-            <div class="donut-inner">
-              <div class="sub" style="font-size:7px;">현재 나의 상태</div>
-              <div class="donut-status">정상</div>
+        <div class="panel-title">
+          작업자 현황
+          <span class="more" id="mn04-btn-detail">+ 상세 보기</span>
+        </div>
+
+        <!-- B View: 작업자용 가로 상태 바 -->
+        <div id="mn04-view-worker" style="display:none;">
+          <div class="sub" style="margin-bottom:6px;">현재 나의 상태</div>
+          <div class="mn04-status-bar-wrap">
+            <div class="mn04-status-bar">
+              <div class="mn04-bar-section mn04-bar-normal">정상</div>
+              <div class="mn04-bar-section mn04-bar-warning">경고</div>
+              <div class="mn04-bar-section mn04-bar-danger">위험</div>
+            </div>
+            <div class="mn04-marker" id="mn04-marker" style="left:16%;color:#2d9e75;">▼</div>
+          </div>
+          <div class="mn04-status-text" id="mn04-status-text" style="color:#2d9e75;">--</div>
+          <div class="mn04-error" id="mn04-worker-error" style="display:none;"></div>
+        </div>
+
+        <!-- D View: 관리자용 KPI 카드 + 미니 비율 바 -->
+        <div id="mn04-view-admin" style="display:none;">
+          <div class="mn04-kpi-grid">
+            <div class="mn04-kpi-card mn04-kpi-total">
+              <div class="mn04-kpi-label">총원</div>
+              <div class="mn04-kpi-value" id="mn04-kpi-total">--</div>
+            </div>
+            <div class="mn04-kpi-card mn04-kpi-normal">
+              <div class="mn04-kpi-label">정상</div>
+              <div class="mn04-kpi-value" id="mn04-kpi-normal">--</div>
+            </div>
+            <div class="mn04-kpi-card mn04-kpi-warning">
+              <div class="mn04-kpi-label">경고</div>
+              <div class="mn04-kpi-value" id="mn04-kpi-warning">--</div>
+            </div>
+            <div class="mn04-kpi-card mn04-kpi-danger">
+              <div class="mn04-kpi-label">위험</div>
+              <div class="mn04-kpi-value" id="mn04-kpi-danger">--</div>
             </div>
           </div>
-          <div class="legend">
-            <div class="legend-item"><span class="dot danger"></span>위험</div>
-            <div class="legend-item"><span class="dot caution"></span>주의</div>
-            <div class="legend-item"><span class="dot safe"></span>정상</div>
+          <div class="mn04-ratio-bar" id="mn04-ratio-bar" style="display:none;">
+            <div class="mn04-ratio-normal"  id="mn04-ratio-normal"></div>
+            <div class="mn04-ratio-warning" id="mn04-ratio-warning"></div>
+            <div class="mn04-ratio-danger"  id="mn04-ratio-danger"></div>
           </div>
+          <div class="mn04-error" id="mn04-admin-error" style="display:none;"></div>
         </div>
       </div>
     </div>
@@ -207,6 +242,8 @@
   </div>
 </div>
 
-<script src="{% static 'js/main.js' %}"></script>
+<script src="{% static 'js/main.js' %}">
+</script>
+<script src="{% static 'js/CJY.js' %}"></script>
 </body>
 </html>

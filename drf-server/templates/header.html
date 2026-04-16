@@ -1,0 +1,69 @@
+<!-- ───────────────── SNB 오버레이 ───────────────── -->
+<div id="snbOverlay" class="snb-overlay"></div>
+
+<!-- ───────────────── SNB Drawer ─────────────────── -->
+<nav id="snbDrawer" class="snb-drawer" aria-label="사이드 메뉴">
+  <div class="snb-head">
+    <span class="snb-title">메뉴</span>
+    <button id="snbClose" class="snb-close-btn" aria-label="메뉴 닫기">✕</button>
+  </div>
+  <div id="snbMenu" class="snb-menu">
+    <!-- JS로 렌더링 -->
+  </div>
+  <div id="snbError" class="snb-error" style="display:none;">메뉴를 불러올 수 없습니다.</div>
+</nav>
+
+<!-- ───────────────── 헤더 (CM-01 / CM-02) ────────── -->
+<header class="header">
+  <!-- 좌측: 햄버거 + 로고 + 시스템명 -->
+  <div class="header-left">
+    <button id="hamburger" class="hamburger" aria-label="메뉴 열기">☰</button>
+    <a href="/" class="logo-link">
+      <div class="logo-box">LOGO</div>
+    </a>
+    <div class="system-name">산재 예방 통합 관제 시스템</div>
+  </div>
+
+  <!-- 가운데: 사용자 정보 + 관리자 메뉴 버튼 (CM-01 / CM-02) -->
+  <div class="header-center">
+    <div class="user-info">
+      <div class="user-name" id="headerUsername">-</div>
+      <div class="user-role" id="headerRole">-</div>
+    </div>
+    <!-- ④ 관리자 메뉴 버튼 — admin / superadmin 권한 시에만 노출 -->
+    <button id="btnAdmin" class="admin-menu-btn" title="관리자 백오피스" aria-label="관리자 메뉴" style="display:none;">
+      관리자 메뉴
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- 우측: 시간 + 아이콘 + 로그아웃 (CM-02) -->
+  <div class="header-right">
+    <div class="time-box">
+      <div>현재 시스템 시간 : <span id="clock"></span></div>
+      <div class="sub">최종 갱신 : <span id="lastUpdate">-</span></div>
+    </div>
+    <div class="header-icons">
+      <button id="btnRefresh" class="icon-btn" title="새로고침" aria-label="데이터 새로고침">⟳</button>
+      <button id="btnHome" class="icon-btn" title="홈" aria-label="홈으로 이동">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+        </svg>
+      </button>
+    </div>
+    <button id="btnLogout" class="logout-btn">로그아웃</button>
+  </div>
+</header>
+
+<!-- ───────────────── 로그아웃 확인 팝업 ────────── -->
+<div id="logoutModal" class="modal-backdrop" style="display:none;">
+  <div class="modal-box">
+    <p class="modal-msg">로그아웃 하시겠습니까?</p>
+    <div class="modal-btns">
+      <button id="logoutConfirm" class="modal-btn-ok">로그아웃</button>
+      <button id="logoutCancel"  class="modal-btn-cancel">취소</button>
+    </div>
+  </div>
+</div>
