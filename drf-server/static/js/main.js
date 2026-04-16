@@ -276,12 +276,11 @@ const Header = {
   },
 
   // ── 헤더에 사용자 정보 렌더링 (CM-01) ───────────────
-  renderUser(username, role) {
-    const roleLabel = { worker: '작업자', admin: '관리자', superadmin: '슈퍼관리자' };
+  renderUser(username) {
     const nameEl = document.getElementById('headerUsername');
     const roleEl = document.getElementById('headerRole');
-    if (nameEl) nameEl.textContent = username || '-';
-    if (roleEl) roleEl.textContent = roleLabel[role] || role || '-';
+    if (nameEl) nameEl.textContent = username ? `${username}님` : '-';
+    if (roleEl) roleEl.textContent = '환영합니다.';
   },
 
   // ── 관리자 버튼 노출 여부 ───────────────────────────

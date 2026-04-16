@@ -13,13 +13,29 @@ body{background:var(--bg);color:var(--text);font-family:'Malgun Gothic','맑은 
 .hamburger{background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;}
 .logo-box{width:56px;height:30px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:10px;}
 .system-name{font-size:14px;font-weight:700;}
-.header-center{text-align:center;}
+.header-center{display:flex;align-items:center;gap:16px;}
+.user-info{text-align:center;}
 .user-name{font-size:13px;font-weight:700;}
 .user-role{font-size:11px;color:var(--text2);}
+
+/* ④ 관리자 메뉴 버튼 */
+.admin-menu-btn{
+  display:inline-flex;align-items:center;gap:5px;
+  background:transparent;
+  border:1px solid var(--blue);
+  color:var(--blue);
+  padding:5px 12px;border-radius:5px;
+  font-size:12px;font-family:inherit;font-weight:600;
+  cursor:pointer;white-space:nowrap;
+  transition:background .15s,color .15s;
+}
+.admin-menu-btn:hover{background:var(--blue);color:#fff;}
+.admin-menu-btn svg{flex-shrink:0;}
 .header-right{display:flex;align-items:center;gap:16px;}
 .time-box{text-align:right;line-height:1.7;}
 .header-icons{display:flex;gap:10px;}
-.icon-btn{background:none;border:none;color:var(--text2);font-size:17px;cursor:pointer;position:relative;}
+.icon-btn{background:none;border:none;color:var(--text2);font-size:17px;cursor:pointer;position:relative;display:inline-flex;align-items:center;justify-content:center;}
+.icon-btn svg{display:block;}
 .badge{position:absolute;top:-4px;right:-6px;background:var(--danger);color:#fff;font-size:9px;width:13px;height:13px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
 .logout-btn{background:var(--accent);color:#fff;border:none;padding:5px 12px;border-radius:5px;cursor:pointer;font-size:12px;font-family:inherit;}
 
@@ -116,11 +132,18 @@ body{background:var(--bg);color:var(--text);font-family:'Malgun Gothic','맑은 
 .eta-box{background:rgba(248,81,73,.1);border:1px solid var(--danger);border-radius:5px;padding:5px 8px;margin-bottom:6px;}
 .eta-val{font-size:15px;font-weight:700;color:var(--danger);}
 
+/* ── 서브 페이지 공통 ─────────────────────────────────── */
+.page-wrap{padding:16px;}
+.page-header{margin-bottom:12px;}
+.breadcrumb{font-size:12px;color:var(--text2);}
+.checklist-panel{max-width:780px;}
+.checklist-tbl td:first-child{width:48px;text-align:center;color:var(--text2);}
+.checklist-tbl td:last-child{width:100px;}
+
 /* ── 로고 링크 ───────────────────────────────────────── */
 .logo-link{text-decoration:none;display:flex;align-items:center;}
 
-/* ── 헤더 관리자 버튼 ────────────────────────────────── */
-.icon-admin{color:var(--caution) !important;}
+/* ── 헤더 관리자 버튼 (.icon-admin 클래스는 미사용, .admin-menu-btn으로 대체) ── */
 
 /* ── SNB 오버레이 ────────────────────────────────────── */
 .snb-overlay{

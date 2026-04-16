@@ -10,7 +10,11 @@ def login_page(request):
 
 
 def dashboard_page(request):
-    return render(request, "dashboard.html")
+    return render(request, "dashboard_jh.html")
+
+
+def safety_checklist_page(request):
+    return render(request, "safety_checklist.html")
 
 
 urlpatterns = [
@@ -19,6 +23,7 @@ urlpatterns = [
     # HTML 페이지
     path("login/", login_page, name="login"),
     path("", dashboard_page, name="dashboard"),
+    path("safety/checklist/", safety_checklist_page, name="safety-checklist"),
     # API — 인증
     path("api/auth/", include("apps.accounts.urls")),
     # API — 메뉴 트리
