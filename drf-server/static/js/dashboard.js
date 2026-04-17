@@ -4,6 +4,9 @@
      main.js     (Auth / SNB / Menu / Header / Chart / WebSocket)
      CJY.js      (MN-04 작업자 현황 패널)
      dashboard_sh.html 인라인 스크립트 (Leaflet 실시간 모니터링 맵)
+
+   ※ 공통 유틸(pad / nowLabel / pushData / MAX_POINTS / levelLabel)은
+      util.js 에 정의되어 있습니다. 반드시 util.js 를 먼저 로드하세요.
    ========================================================== */
 
 'use strict';
@@ -153,7 +156,6 @@ const Header = {
     const tick = () => {
       if (!clockEl) return;
       const now = new Date();
-      const pad = n => String(n).padStart(2, '0');
       clockEl.textContent =
         `${now.getFullYear()}.${pad(now.getMonth() + 1)}.${pad(now.getDate())} ` +
         `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
@@ -165,9 +167,7 @@ const Header = {
   updateLastUpdated() {
     const el = document.getElementById('lastUpdate');
     if (!el) return;
-    const now = new Date();
-    const pad = n => String(n).padStart(2, '0');
-    el.textContent = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    el.textContent = nowLabel();
   },
 
   async handleRefresh() {
@@ -434,8 +434,6 @@ const GAS_INIT_DATA = [
   { name: 'NH3(암모니아)',          value: 22,   unit: 'ppm', level: 'safe'    },
   { name: 'VOC(휘발성유기화합물)',  value: 0.4,  unit: 'ppm', level: 'safe'    },
 ];
-const levelLabel = { danger: '위험', caution: '주의', safe: '정상' };
-
 (function renderGasTable() {
   const tbody = document.getElementById('gasTableBody');
   if (!tbody) return;
@@ -452,20 +450,7 @@ const levelLabel = { danger: '위험', caution: '주의', safe: '정상' };
 // ──────────────────────────────────────────────────────────
 // Chart.js 실시간 차트 (패널 13, 15)
 // ──────────────────────────────────────────────────────────
-const MAX_POINTS = 30;
-function nowLabel() {
-  const d = new Date(), pad = n => String(n).padStart(2, '0');
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-}
-function pushData(chart, label, ...values) {
-  chart.data.labels.push(label);
-  values.forEach((v, i) => chart.data.datasets[i].data.push(v));
-  if (chart.data.labels.length > MAX_POINTS) {
-    chart.data.labels.shift();
-    chart.data.datasets.forEach(ds => ds.data.shift());
-  }
-  chart.update('none');
-}
+// MAX_POINTS / nowLabel / pushData → util.js 참조
 
 const CHART_DEFAULTS = {
   animation: false, responsive: true, maintainAspectRatio: true,

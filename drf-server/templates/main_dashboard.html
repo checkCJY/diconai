@@ -4,8 +4,10 @@
 <head>
 <meta charset="UTF-8">
 <title>산재 예방 통합 관제 시스템</title>
-<!-- 통합 CSS (style.css + CJY.css + Leaflet 인라인 CSS 병합) -->
+<!-- 대시보드 공통 CSS (리셋 · 변수 · 레이아웃 · 패널 · 맵 · 차트 등) -->
 <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+<!-- 헤더 / SNB / 모달 / 스피너 CSS (header.html 컴포넌트와 쌍으로 관리) -->
+<link rel="stylesheet" href="{% static 'css/header.css' %}">
 <!-- Leaflet CSS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <!-- Chart.js -->
@@ -225,18 +227,23 @@
   </div>
 </div>
 
-<!-- CM-07 실시간 알림 팝업 -->
-<div id="alarm-popup" style="display:none;">
-  <div class="alarm-popup-header">
-    <span id="alarm-popup-level">🔴 위험</span>
-    <button id="alarm-popup-close">✕</button>
-  </div>
-  <div id="alarm-popup-message"></div>
-  <div id="alarm-popup-meta"></div>
-  <button id="alarm-popup-confirm">확인</button>
-</div>
+{% include 'alarm_popup.html' %}
 
-<!-- 통합 JS (Auth/SNB/Menu/Header/Map/Chart/WebSocket/MN-04/AlarmPopup) -->
-<script src="{% static 'js/dashboard.js' %}"></script>
+<!-- ① 공통 유틸 — 반드시 가장 먼저 로드 (pad / nowLabel / pushData / MAX_POINTS / levelLabel) -->
+<script src="{% static 'js/util.js' %}"></script>
+<!-- ② 독립 모듈 — util.js 만 의존 -->
+<script src="{% static 'js/auth.js' %}"></script>
+<script src="{% static 'js/alarm-popup.js' %}"></script>
+<script src="{% static 'js/gas-panel.js' %}"></script>
+<script src="{% static 'js/charts.js' %}"></script>
+<script src="{% static 'js/map-panel.js' %}"></script>
+<!-- ③ layout.js — auth.js, util.js 의존 -->
+<script src="{% static 'js/layout.js' %}"></script>
+<!-- ④ worker-panel.js — 독립 실행 (자체 fetch 사용) -->
+<script src="{% static 'js/worker-panel.js' %}"></script>
+<!-- ⑤ websocket.js — charts.js, map-panel.js, alarm-popup.js, util.js 의존 -->
+<script src="{% static 'js/websocket.js' %}"></script>
+<!-- ⑥ app.js — 모든 모듈 로드 후 마지막에 실행 -->
+<script src="{% static 'js/app.js' %}"></script>
 </body>
 </html>
