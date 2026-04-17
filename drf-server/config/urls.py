@@ -6,7 +6,7 @@ from apps.accounts.views import DashboardRefreshView, MenuView
 
 
 def login_page(request):
-    return render(request, "login.html")
+    return render(request, "auth/login.html")
 
 
 def main_dashboard(request):
@@ -14,24 +14,7 @@ def main_dashboard(request):
 
 
 def safety_checklist_page(request):
-    return render(request, "safety_checklist.html")
-
-
-def alarm_panel(request):
-    return render(request, "alarm_panel.html")
-
-
-# 기존 개별 대시보드 — 하위 호환용 (리팩토링 후에도 직접 접근 가능)
-def dashboard_jh(request):
-    return render(request, "dashboard_jh.html")
-
-
-def dashboard_sh(request):
-    return render(request, "dashboard_sh.html")
-
-
-def dashboard_cjy(request):
-    return render(request, "dashboard_CJY.html")
+    return render(request, "snb_details/safety_checklist.html")
 
 
 urlpatterns = [
@@ -41,15 +24,10 @@ urlpatterns = [
     path("", main_dashboard, name="main-dashboard"),
     path("dashboard/", main_dashboard, name="main-dashboard-alt"),
     path("login/", login_page, name="login"),
-    path("alarm/", alarm_panel, name="alarm-panel"),
-    # 기존 개별 대시보드 (하위 호환)
-    path("dashboard_jh/", dashboard_jh, name="dashboard-jh"),
-    path("dashboard_sh/", dashboard_sh, name="dashboard-sh"),
-    path("dashboard-cjy/", dashboard_cjy, name="dashboard-cjy"),
     path(
-        "dashboard_jh/safety/checklist/",
+        "safety/checklist/",
         safety_checklist_page,
-        name="safety-checklist-jh",
+        name="safety-checklist",
     ),
     # ── API ──────────────────────────────────────────────
     path("api/auth/", include("apps.accounts.urls")),

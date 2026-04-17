@@ -100,14 +100,16 @@ function initWebSocket() {
       // ── MN-02 맵 — 가스센서 A 실시간 반영 ──────────────
       MapPanel.updateGasSensorFromWS(data);
 
-      // ── CM-07 — 위험 발생 시 알림 팝업 ─────────────────
+      // ── CM-07 — 위험 발생 시 알림 팝업 + 이벤트 패널 추가 ─
       if (data.level === '위험') {
-        AlarmPopup.show({
+        const alarmData = {
           alarm_level: 'danger',
           message:     `CO: ${data.co}ppm / H₂S: ${data.h2s}ppm / O₂: ${data.o2}%`,
           sensor_name: data.device_id,
           timestamp:   data.timestamp,
-        });
+        };
+        AlarmPopup.show(alarmData);
+        EventPanel.addItem(alarmData);
       }
     };
 

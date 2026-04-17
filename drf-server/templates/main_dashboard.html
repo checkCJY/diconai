@@ -19,7 +19,7 @@
 </head>
 <body>
 
-{% include 'header.html' %}
+{% include 'components/header.html' %}
 
 <!-- ───────────────── 대시보드 본문 ───────────────── -->
 <div class="body-wrap">
@@ -36,7 +36,7 @@
         <div class="safety-item"><span>PPE 착용</span><span class="done">완료</span></div>
         <div class="safety-item"><span>안전 확인 체크리스트</span><span class="done">완료</span></div>
         <div class="safety-item"><span>VR 교육</span><span class="todo">미완료</span></div>
-        <button class="safety-btn">나의 안전 확인 바로가기</button>
+        <button class="safety-btn" onclick="location.href='/safety/checklist/'">나의 안전 확인 바로가기</button>
       </div>
 
       <!-- 패널 11 (MN-04): 작업자 현황 -->
@@ -119,21 +119,15 @@
     <div class="col-right">
       <div class="panel" style="flex:1;overflow:hidden;">
         <div class="panel-title">이벤트 현황 <span class="more">+ 상세 보기</span></div>
-        <div class="event-item">
-          <div class="event-head"><span><span class="dot danger"></span>홍길동 작업자</span><span class="sub">00:27</span></div>
-          <div class="danger-text event-desc">작업 전 완전 확인 미완료</div>
-        </div>
-        <div class="event-item">
-          <div class="event-head"><span><span class="dot danger"></span>유해가스 센서 1</span><span class="sub">00:30</span></div>
-          <div class="danger-text event-desc">산소 농도 정상 범위 이하로 저하</div>
-        </div>
-        <div class="event-item">
-          <div class="event-head"><span><span class="dot caution"></span>주의 구역</span><span class="sub">00:25</span></div>
-          <div class="caution-text event-desc">스마트 파워 시스템 이상으로 인한 주의 구역 발생</div>
-        </div>
         <div class="event-summary">
           최근 24시간 동안 발생한 이벤트 현황<br>
-          <span class="danger-text">위험 2건</span> / <span class="caution-text">주의 1건</span>
+          <span class="danger-text">위험 <span id="summary-danger">0</span>건</span>
+          / <span class="caution-text">주의 <span id="summary-warning">0</span>건</span>
+        </div>
+        <div id="event-list" style="overflow-y:auto;max-height:260px;">
+          <div id="event-empty" class="sub" style="text-align:center;padding:20px;">
+            현재 발생한 이벤트가 없습니다
+          </div>
         </div>
       </div>
     </div>
@@ -227,13 +221,14 @@
   </div>
 </div>
 
-{% include 'alarm_popup.html' %}
+{% include 'components/alarm_popup.html' %}
 
 <!-- ① 공통 유틸 — 반드시 가장 먼저 로드 (pad / nowLabel / pushData / MAX_POINTS / levelLabel) -->
 <script src="{% static 'js/refactors/util.js' %}"></script>
 <!-- ② 독립 모듈 — util.js 만 의존 -->
 <script src="{% static 'js/refactors/auth.js' %}"></script>
 <script src="{% static 'js/refactors/alarm-popup.js' %}"></script>
+<script src="{% static 'js/refactors/event-panel.js' %}"></script>
 <script src="{% static 'js/refactors/gas-panel.js' %}"></script>
 <script src="{% static 'js/refactors/charts.js' %}"></script>
 <script src="{% static 'js/refactors/map-panel.js' %}"></script>

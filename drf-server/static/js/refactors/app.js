@@ -32,6 +32,7 @@ async function initApp() {
   MapPanel.init();
   initWebSocket();
   AlarmPopup.init();
+  EventPanel.init();
 }
 
 initApp();
