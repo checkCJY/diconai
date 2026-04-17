@@ -189,8 +189,8 @@ cd fastapi-server && uvicorn websocket:app --port 8001 --reload
 
 ### [ 1 ] 라우팅 기본 동작
 
-- [ ] `http://localhost:8000/` 접속 시 `http://localhost:8000/dashboard/` 로 302 리다이렉트 되는지 확인
-- [ ] `http://localhost:8000/dashboard/` 에서 대시보드 페이지가 정상 렌더되는지 확인
+- [X] `http://localhost:8000/` 접속 시 `http://localhost:8000/dashboard/` 로 302 리다이렉트 되는지 확인
+- [X] `http://localhost:8000/dashboard/` 에서 대시보드 페이지가 정상 렌더되는지 확인
 - [ ] `http://localhost:8000/accounts/login/` 에서 로그인 페이지가 정상 렌더되는지 확인
 - [ ] `http://localhost:8000/dashboard/safety/checklist/` 에서 안전확인 페이지가 정상 렌더되는지 확인
 - [ ] 브라우저 콘솔에 404 / `ReferenceError` 가 없는지 확인

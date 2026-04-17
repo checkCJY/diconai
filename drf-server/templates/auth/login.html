@@ -167,7 +167,7 @@ body{
 (function () {
   // 이미 로그인 상태면 대시보드로
   if (localStorage.getItem('access_token')) {
-    window.location.href = '/dashboard_jh/';
+    window.location.href = '/dashboard/';
     return;
   }
 
@@ -276,7 +276,7 @@ body{
       localStorage.setItem('username',      data.username);
       localStorage.setItem('role',          data.role);
 
-      window.location.href = '/dashboard_jh/';
+      window.location.href = '/dashboard/';
     } catch {
       showServerError('서버에 연결할 수 없습니다.');
     } finally {
