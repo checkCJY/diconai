@@ -230,20 +230,20 @@
 {% include 'alarm_popup.html' %}
 
 <!-- ① 공통 유틸 — 반드시 가장 먼저 로드 (pad / nowLabel / pushData / MAX_POINTS / levelLabel) -->
-<script src="{% static 'js/util.js' %}"></script>
+<script src="{% static 'js/refactors/util.js' %}"></script>
 <!-- ② 독립 모듈 — util.js 만 의존 -->
-<script src="{% static 'js/auth.js' %}"></script>
-<script src="{% static 'js/alarm-popup.js' %}"></script>
-<script src="{% static 'js/gas-panel.js' %}"></script>
-<script src="{% static 'js/charts.js' %}"></script>
-<script src="{% static 'js/map-panel.js' %}"></script>
+<script src="{% static 'js/refactors/auth.js' %}"></script>
+<script src="{% static 'js/refactors/alarm-popup.js' %}"></script>
+<script src="{% static 'js/refactors/gas-panel.js' %}"></script>
+<script src="{% static 'js/refactors/charts.js' %}"></script>
+<script src="{% static 'js/refactors/map-panel.js' %}"></script>
 <!-- ③ layout.js — auth.js, util.js 의존 -->
-<script src="{% static 'js/layout.js' %}"></script>
+<script src="{% static 'js/refactors/layout.js' %}"></script>
 <!-- ④ worker-panel.js — 독립 실행 (자체 fetch 사용) -->
-<script src="{% static 'js/worker-panel.js' %}"></script>
+<script src="{% static 'js/refactors/worker-panel.js' %}"></script>
 <!-- ⑤ websocket.js — charts.js, map-panel.js, alarm-popup.js, util.js 의존 -->
-<script src="{% static 'js/websocket.js' %}"></script>
+<script src="{% static 'js/refactors/websocket.js' %}"></script>
 <!-- ⑥ app.js — 모든 모듈 로드 후 마지막에 실행 -->
-<script src="{% static 'js/app.js' %}"></script>
+<script src="{% static 'js/refactors/app.js' %}"></script>
 </body>
 </html>
