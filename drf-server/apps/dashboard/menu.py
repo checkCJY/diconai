@@ -9,7 +9,11 @@ _MENU_WORKER = [
         "label": "나의 안전확인",
         "icon": "shield",
         "children": [
-            {"id": "SNB-02", "label": "작업 전 안전 확인", "path": "/safety/checklist"},
+            {
+                "id": "SNB-02",
+                "label": "작업 전 안전 확인",
+                "path": "/safety/checklist/",
+            },
             {"id": "SNB-04", "label": "안전 확인 이력", "path": "/safety/history"},
         ],
     },

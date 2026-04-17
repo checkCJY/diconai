@@ -65,15 +65,30 @@
 </div>
 
 {% include 'components/alarm_popup.html' %}
+<!-- 공통 유틸 -->
 <script src="{% static 'js/refactors/util.js' %}"></script>
 <script src="{% static 'js/refactors/auth.js' %}"></script>
 <script src="{% static 'js/refactors/alarm-popup.js' %}"></script>
-<script src="{% static 'js/refactors/event-panel.js' %}"></script>
-<script src="{% static 'js/refactors/charts.js' %}"></script>
-<script src="{% static 'js/refactors/map-panel.js' %}"></script>
+<!-- SNB 메뉴 / 헤더 -->
 <script src="{% static 'js/refactors/layout.js' %}"></script>
-<script src="{% static 'js/refactors/worker-panel.js' %}"></script>
-<script src="{% static 'js/refactors/websocket.js' %}"></script>
-<script src="{% static 'js/refactors/app.js' %}"></script>
+<!-- 페이지 초기화 (대시보드 전용 모듈 제외) -->
+<script>
+(async function initPage() {
+  if (!Auth.getAccessToken()) { Auth.redirectLogin(); return; }
+  const user = await Auth.getMe();
+  if (!user) {
+    Header.renderUser(Auth.getUsername() || '-');
+    Menu.showError();
+  } else {
+    Header.renderUser(user.username);
+    Header.showAdminBtn(user.role);
+    Menu.render(user.menu_tree);
+  }
+  SNB.init();
+  Header.init();
+  Header.updateLastUpdated();
+  AlarmPopup.init();
+})();
+</script>
 </body>
 </html>

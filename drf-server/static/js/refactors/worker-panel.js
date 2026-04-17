@@ -87,10 +87,10 @@
     } catch { renderAdminError('데이터를 불러오지 못했습니다.'); }
   }
 
-  document.getElementById('mn04-btn-detail')?.addEventListener('click', () => { window.location.href = '/snb-09/'; });
+  document.getElementById('mn04-btn-detail')?.addEventListener('click', () => { window.location.href = '/monitoring/workers'; });
 
   function init() {
-    const isAdmin = (localStorage.getItem('user_type') || 'worker') === 'admin';
+    const isAdmin = (localStorage.getItem('role') || 'worker') === 'admin';
     if (isAdmin) {
       if (viewWorker) viewWorker.style.display = 'none';
       if (viewAdmin)  viewAdmin.style.display  = 'flex';

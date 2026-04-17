@@ -29,7 +29,7 @@ const Auth = {
 
   async getMe() {
     try {
-      const res = await this.apiFetch('/accounts/api/auth/me/');
+      const res = await this.apiFetch('/api/auth/me/');
       if (res.status === 401) { this.redirectLogin(); return null; }
       if (!res.ok)            { return null; }
       return await res.json();
