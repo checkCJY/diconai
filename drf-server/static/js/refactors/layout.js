@@ -135,7 +135,7 @@ const Header = {
     const btn = document.getElementById('btnRefresh');
     if (btn) btn.classList.add('spinning');
     try {
-      const res  = await Auth.apiFetch('/api/dashboard/refresh/');
+      const res  = await Auth.apiFetch('/dashboard/api/refresh/');
       if (res.status === 401) { Auth.redirectLogin(); return; }
       const data = await res.json();
       if (data.admin_url) {
@@ -152,8 +152,8 @@ const Header = {
   },
 
   handleHome() {
-    if (window.location.pathname === '/') { this.handleRefresh(); }
-    else { window.location.href = '/'; }
+    if (window.location.pathname === '/dashboard/') { this.handleRefresh(); }
+    else { window.location.href = '/dashboard/'; }
   },
 
   handleAdmin() { window.location.href = this.adminUrl || '/admin/'; },

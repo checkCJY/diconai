@@ -29,7 +29,7 @@ const Auth = {
 
   async getMe() {
     try {
-      const res = await this.apiFetch('/api/auth/me/');
+      const res = await this.apiFetch('/accounts/api/auth/me/');
       if (res.status === 401) { this.redirectLogin(); return null; }
       if (!res.ok)            { return null; }
       return await res.json();
@@ -40,6 +40,6 @@ const Auth = {
 
   redirectLogin() {
     this.clear();
-    window.location.href = '/login/';
+    window.location.href = '/accounts/login/';
   },
 };
