@@ -38,6 +38,11 @@ urlpatterns = [
     path("login/", login_page, name="login"),
     path("dashboard_jh/", dashboard_page, name="dashboard"),
     path("safety/checklist/", safety_checklist_page, name="safety-checklist"),
+    path(
+        "dashboard_jh/safety/checklist/",
+        safety_checklist_page,
+        name="safety-checklist-jh",
+    ),
     # API — 인증
     path("api/auth/", include("apps.accounts.urls")),
     # API — 메뉴 트리
