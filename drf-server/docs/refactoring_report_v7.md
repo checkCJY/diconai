@@ -191,15 +191,17 @@ cd fastapi-server && uvicorn websocket:app --port 8001 --reload
 
 - [X] `http://localhost:8000/` 접속 시 `http://localhost:8000/dashboard/` 로 302 리다이렉트 되는지 확인
 - [X] `http://localhost:8000/dashboard/` 에서 대시보드 페이지가 정상 렌더되는지 확인
-- [ ] `http://localhost:8000/accounts/login/` 에서 로그인 페이지가 정상 렌더되는지 확인
-- [ ] `http://localhost:8000/dashboard/safety/checklist/` 에서 안전확인 페이지가 정상 렌더되는지 확인
+- [X] `http://localhost:8000/accounts/login/` 에서 로그인 페이지가 정상 렌더되는지 확인
+- [X] `http://localhost:8000/dashboard/safety/checklist/` 에서 안전확인 페이지가 정상 렌더되는지 확인
 - [ ] 브라우저 콘솔에 404 / `ReferenceError` 가 없는지 확인
 
 ---
 
 ### [ 2 ] 인증 플로우 (accounts)
 
-- [ ] 로그인 폼 제출 → `POST /accounts/api/auth/login/` 200 응답 확인
+- 추가적으로 확인 필요함
+
+- [] 로그인 폼 제출 → `POST /accounts/api/auth/login/` 200 응답 확인
 - [ ] 응답의 `access_token` 이 `localStorage` 에 저장되는지 확인
 - [ ] 페이지 로드 시 `GET /accounts/api/auth/me/` 호출 및 200 응답 확인
 - [ ] 헤더에 로그인 유저명이 표시되는지 확인
@@ -210,10 +212,10 @@ cd fastapi-server && uvicorn websocket:app --port 8001 --reload
 
 ### [ 3 ] 대시보드 API (dashboard)
 
-- [ ] 새로고침 버튼 클릭 → `GET /dashboard/api/refresh/` 200 응답 확인
-- [ ] 관리자 계정으로 로그인 시 관리자 버튼이 표시되는지 확인
-- [ ] SNB 메뉴 `GET /dashboard/api/menu/` 호출 후 메뉴 트리가 렌더되는지 확인
-- [ ] 홈 버튼 클릭 시 `/dashboard/` 로 이동하는지 확인 (대시보드에서 클릭하면 새로고침)
+- [X] 새로고침 버튼 클릭 → `GET /dashboard/api/refresh/` 200 응답 확인
+- [-] 관리자 계정으로 로그인 시 관리자 버튼이 표시되는지 확인
+- [X] SNB 메뉴 `GET /dashboard/api/menu/` 호출 후 메뉴 트리가 렌더되는지 확인
+- [X] 홈 버튼 클릭 시 `/dashboard/` 로 이동하는지 확인 (대시보드에서 클릭하면 새로고침)
 
 ---
 
@@ -230,25 +232,25 @@ cd fastapi-server && uvicorn websocket:app --port 8001 --reload
 
 ### [ 5 ] WebSocket 실시간 연동
 
-- [ ] `ws://127.0.0.1:8001/ws/sensors/` 연결 후 wsStatus 배지 "● 실시간 연결" 확인
+- [X] `ws://127.0.0.1:8001/ws/sensors/` 연결 후 wsStatus 배지 "● 실시간 연결" 확인
 - [ ] 가스 데이터 수신 시 패널 12 테이블이 업데이트되는지 확인
-- [ ] `level === '위험'` 수신 시 알림 팝업 + 이벤트 목록에 항목이 추가되는지 확인
-- [ ] WS 연결 끊김 후 5초 내 자동 재연결되는지 확인
+- [X] `level === '위험'` 수신 시 알림 팝업 + 이벤트 목록에 항목이 추가되는지 확인
+- [X] WS 연결 끊김 후 5초 내 자동 재연결되는지 확인
 
 ---
 
 ### [ 6 ] SNB 사이드바
 
-- [ ] 햄버거 버튼 클릭 → SNB drawer 열림 확인
-- [ ] SNB 내 "작업 전 안전 확인" 클릭 → `/dashboard/safety/checklist/` 이동 확인
-- [ ] 안전확인 페이지의 "나의 안전 확인 바로가기" 버튼 → `/dashboard/safety/checklist/` 확인
-- [ ] 오버레이 클릭 / 닫기 버튼으로 SNB 닫힘 확인
+- [X] 햄버거 버튼 클릭 → SNB drawer 열림 확인
+- [X] SNB 내 "작업 전 안전 확인" 클릭 → `/dashboard/safety/checklist/` 이동 확인
+- [X] 안전확인 페이지의 "나의 안전 확인 바로가기" 버튼 → `/dashboard/safety/checklist/` 확인
+- [X] 오버레이 클릭 / 닫기 버튼으로 SNB 닫힘 확인
 
 ---
 
 ### [ 7 ] Django Admin
 
-- [ ] `http://localhost:8000/admin/` 접속 시 Django 관리자 페이지 정상 렌더 확인
+- [X] `http://localhost:8000/admin/` 접속 시 Django 관리자 페이지 정상 렌더 확인
 
 ---
 

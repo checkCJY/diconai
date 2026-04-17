@@ -12,7 +12,7 @@ _MENU_WORKER = [
             {
                 "id": "SNB-02",
                 "label": "작업 전 안전 확인",
-                "path": "/safety/checklist/",
+                "path": "/dashboard/safety/checklist/",
             },
             {"id": "SNB-04", "label": "안전 확인 이력", "path": "/safety/history"},
         ],
