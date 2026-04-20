@@ -1,1 +1,3 @@
-# from .geofence import Geofence
+from .geofence import Geofence
+
+__all__ = ["Geofence"]

@@ -66,7 +66,7 @@ class Event(models.Model):
         related_name="events_as_source",
     )
     source_geofence = models.ForeignKey(
-        "facilities.GeoFence",
+        "geofence.GeoFence",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

@@ -59,7 +59,7 @@ class AlarmRecord(models.Model):
         related_name="alarm_records",
     )
     geofence = models.ForeignKey(
-        "facilities.GeoFence",
+        "geofence.GeoFence",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
