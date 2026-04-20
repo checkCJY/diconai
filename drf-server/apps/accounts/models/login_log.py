@@ -18,41 +18,37 @@ class LoginLog(models.Model):
     """
 
     class LoginResult(models.TextChoices):
-        SUCCESS         = 'success',          '성공'
-        FAILED_PASSWORD = 'failed_password',  '비밀번호 오류'
-        FAILED_LOCKED   = 'failed_locked',    '계정 잠금'
-        FAILED_INACTIVE = 'failed_inactive',  '비활성 계정'
-        LOGOUT          = 'logout',           '로그아웃'
+        SUCCESS = "success", "성공"
+        FAILED_PASSWORD = "failed_password", "비밀번호 오류"
+        FAILED_LOCKED = "failed_locked", "계정 잠금"
+        FAILED_INACTIVE = "failed_inactive", "비활성 계정"
+        LOGOUT = "logout", "로그아웃"
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
-        null=True, blank=True,
-        related_name='login_logs',
-        verbose_name='사용자'
+        null=True,
+        blank=True,
+        related_name="login_logs",
+        verbose_name="사용자",
     )
     is_login = models.BooleanField(
-        default=False,
-        verbose_name='로그인 여부 (False=로그아웃)'
+        default=False, verbose_name="로그인 여부 (False=로그아웃)"
     )
     login_result = models.CharField(
-        max_length=20,
-        choices=LoginResult.choices,
-        verbose_name='로그인 결과'
+        max_length=20, choices=LoginResult.choices, verbose_name="로그인 결과"
     )
     ip_address = models.GenericIPAddressField(
-        null=True, blank=True,
-        verbose_name='접속 IP'
+        null=True, blank=True, verbose_name="접속 IP"
     )
     user_agent = models.CharField(
-        max_length=300,
-        blank=True, default='',
-        verbose_name='User-Agent'
+        max_length=300, blank=True, default="", verbose_name="User-Agent"
     )
     session_key = models.CharField(
         max_length=40,
-        blank=True, default='',
-        verbose_name='세션 키 (로그인-로그아웃 쌍 매칭용)'
+        blank=True,
+        default="",
+        verbose_name="세션 키 (로그인-로그아웃 쌍 매칭용)",
     )
     timestamp = models.DateTimeField(auto_now_add=True)
 
@@ -67,10 +63,12 @@ class LoginLog(models.Model):
         raise ValueError("LoginLog는 삭제할 수 없습니다. APPEND-ONLY 정책.")
 
     class Meta:
-        db_table = 'login_log'
+        db_table = "login_log"
         indexes = [
-            models.Index(fields=['user', '-timestamp'],         name='idx_login_user_time'),
-            models.Index(fields=['ip_address', '-timestamp'],   name='idx_login_ip_time'),
-            models.Index(fields=['login_result', '-timestamp'], name='idx_login_result_time'),
-            models.Index(fields=['-timestamp'],                 name='idx_login_time'),
+            models.Index(fields=["user", "-timestamp"], name="idx_login_user_time"),
+            models.Index(fields=["ip_address", "-timestamp"], name="idx_login_ip_time"),
+            models.Index(
+                fields=["login_result", "-timestamp"], name="idx_login_result_time"
+            ),
+            models.Index(fields=["-timestamp"], name="idx_login_time"),
         ]
