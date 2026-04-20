@@ -11,8 +11,8 @@
 // ──────────────────────────────────────────────────────────
 (function initMN04() {
   const POLL_MS            = 30_000;
-  const API_MY_STATUS      = '/alarms/api/my-status/';
-  const API_WORKER_SUMMARY = '/alarms/api/worker-summary/';
+  const API_MY_STATUS      = '/alerts/api/my-status/';
+  const API_WORKER_SUMMARY = '/alerts/api/worker-summary/';
 
   const STATUS_CONFIG = {
     normal:  { left: '16%', color: '#2d9e75', label: '정상' },
