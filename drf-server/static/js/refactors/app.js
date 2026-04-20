@@ -22,6 +22,9 @@ async function initApp() {
     Header.renderUser(user.username);
     Header.showAdminBtn(user.role);
     Menu.render(user.menu_tree);
+     // role을 localStorage에 저장
+    localStorage.setItem('role', user.role);
+
   }
 
   SNB.init();
