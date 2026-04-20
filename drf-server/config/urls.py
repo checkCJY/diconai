@@ -16,5 +16,5 @@ urlpatterns = [
         "api/auth/", include(auth_api_urlpatterns)
     ),  # API:  /api/auth/login/, /api/auth/me/
     path("dashboard/", include("apps.dashboard.urls")),
-    path("alarms/", include("apps.alarms.urls")),
+    # path("alarms/", include("apps.alarms.urls")),
 ]

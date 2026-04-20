@@ -61,7 +61,7 @@ class SafetyCheckItem(models.Model):
         indexes = [
             models.Index(
                 fields=["facility", "is_active", "order"],
-                name="idx_scitem_facility_active_order",
+                name="idx_scitem_fac_active_order",
             ),
         ]
 

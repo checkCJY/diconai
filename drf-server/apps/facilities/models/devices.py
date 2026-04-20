@@ -126,7 +126,7 @@ class PowerDevice(DeviceBase):
         indexes = [
             models.Index(
                 fields=["facility", "is_active"],
-                name="idx_power_device_facility_active",
+                name="idx_pwrdev_facility_active",
             ),
             models.Index(
                 fields=["status", "is_active"], name="idx_power_device_status"
