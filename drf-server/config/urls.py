@@ -5,6 +5,7 @@ from django.views.generic import RedirectView
 from apps.accounts.urls import api_urlpatterns as auth_api_urlpatterns
 from apps.accounts.urls import page_urlpatterns as auth_page_urlpatterns
 
+
 urlpatterns = [
     # ── 관리자 ───────────────────────────────────────────
     path("admin/", admin.site.urls),

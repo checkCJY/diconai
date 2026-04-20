@@ -1,0 +1,175 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="ko">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>사용자 관리 - 산재 예방 통합 관제 시스템</title>
+        <link rel="stylesheet" href="{% static 'css/admin.css' %}">
+    </head>
+    <body>
+        <div class="app-container">
+            <aside class="sidebar">
+                <div class="brand-logo">
+                    <span class="icon">로고</span>
+                </div>
+                <nav class="snb">
+                    <a href="#" class="active"><span class="icon">계정</span></a>
+                    <a href="#"><span class="icon">조직</span></a>
+                    <a href="#"><span class="icon">설비</span></a>
+                    <a href="#"><span class="icon">데이터</span></a>
+                    <a href="#"><span class="icon">로그</span></a>
+                    <a href="#"><span class="icon">공지사항</span></a>
+                    <a href="#"><span class="icon">이벤트</span></a>
+                    <a href="#"><span class="icon">안전 정책/기준 관리</span></a>
+                </nav>
+            </aside>
+            <div class="main-wrapper">
+                <header class="topbar">
+                    <div class="topbar-left">
+                        <h1 class="system-title">산재 예방 통합 관제 시스템</h1>
+                        <button class="btn-realtime">실시간 관제 홈</button>
+                    </div>
+                    <div class="topbar-right">
+                        <div class="admin-info">
+                            <span class="admin-name">홍길동 관리자</span>
+                            <span class="admin-email">super.admin@system.co.kr</span>
+                        </div>
+                        <button id="btnHome" class="icon-btn" title="홈" aria-label="홈으로 이동">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+                            </svg>
+                        </button>
+                        <div class="topbar-actions">
+                            <button class="btn-outline">로그아웃</button>
+                        </div>
+                    </div>
+                </header>
+                <main class="content">
+                    <section class="page-header">
+                        <div class="header-titles">
+                            <div class="breadcrumb">계정/권한 관리 &gt; 사용자 관리</div>
+                            <h2 class="page-title">사용자 관리</h2>
+                            <p class="page-desc">계정을 조회하고 등록, 수정, 삭제할 수 있습니다.</p>
+                        </div>
+                        <button class="btn-primary">사용자 등록</button>
+                    </section>
+                    <section class="filter-card">
+                        <div class="filter-inputs">
+                            <div class="input-group">
+                                <label>사용자명</label>
+                                <input type="text" placeholder="이름 입력">
+                            </div>
+                            <div class="input-group">
+                                <label>소속</label>
+                                <select><option>전체</option></select>
+                            </div>
+                            <div class="input-group">
+                                <label>직위</label>
+                                <select><option>전체</option></select>
+                            </div>
+                            <div class="input-group">
+                                <label>권한</label>
+                                <select><option>전체</option></select>
+                            </div>
+                            <div class="input-group">
+                                <label>계정 상태</label>
+                                <select><option>전체</option></select>
+                            </div>
+                        </div>
+                        <div class="filter-actions">
+                            <button class="btn-outline">초기화</button>
+                            <button class="btn-dark">검색</button>
+                        </div>
+                    </section>
+                    <section class="table-card">
+                        <div class="table-toolbar">
+                            <div class="toolbar-left">
+                                <span class="total-count">전체 사용자 <strong>128</strong>명</span>
+                                <button class="btn-danger" disabled>삭제</button>
+                                <button class="btn-warning" disabled>계정 잠금</button>
+                                <button class="btn-success" disabled>계정 잠금 해제</button>
+                            </div>
+                            <div class="toolbar-right">
+                                <select class="sort-select"><option>사용자명 오름차순</option></select>
+                            </div>
+                        </div>
+                        <div class="table-wrapper">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th><input type="checkbox"></th>
+                                        <th>사용자명</th>
+                                        <th>소속</th>
+                                        <th>직급</th>
+                                        <th>아이디</th>
+                                        <th>권한</th>
+                                        <th>계정 상태</th>
+                                        <th>연락처</th>
+                                        <th>최근 로그인</th>
+                                        <th>등록일</th>
+                                        <th>관리</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><input type="checkbox" checked></td>
+                                        <td>김관리</td>
+                                        <td>경영지원팀</td>
+                                        <td>과장</td>
+                                        <td>admin_kim</td>
+                                        <td><span class="badge badge-purple">관리자</span></td>
+                                        <td><span class="badge badge-green">사용</span></td>
+                                        <td>010-2222-1111</td>
+                                        <td>2026-03-30 08:45:00</td>
+                                        <td>2026-02-15</td>
+                                        <td><button class="btn-sm">수정</button></td>
+                                    </tr>
+                                    <tr>
+                                        <td><input type="checkbox"></td>
+                                        <td>박현장</td>
+                                        <td>영업팀</td>
+                                        <td>차장</td>
+                                        <td>field_mgr_01</td>
+                                        <td><span class="badge badge-purple">관리자</span></td>
+                                        <td><span class="badge badge-orange">잠금</span></td>
+                                        <td>010-3456-7821</td>
+                                        <td>2026-03-30 08:45:00</td>
+                                        <td>2026-02-21</td>
+                                        <td><button class="btn-sm">수정</button></td>
+                                    </tr>
+                                    <tr>
+                                        <td><input type="checkbox"></td>
+                                        <td>이작업</td>
+                                        <td>기술연구소</td>
+                                        <td>사원</td>
+                                        <td>worker_lee</td>
+                                        <td><span class="badge badge-gray">일반사용자</span></td>
+                                        <td><span class="badge badge-green">사용</span></td>
+                                        <td>010-7788-9900</td>
+                                        <td>2026-03-30 08:45:00</td>
+                                        <td>2026-03-01</td>
+                                        <td><button class="btn-sm">수정</button></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="table-footer">
+                            <span class="page-info">1 - 10 / 128</span>
+                            <div class="pagination">
+                                <button>&lt;</button>
+                                <button class="active">1</button>
+                                <button>2</button>
+                                <button>3</button>
+                                <button>4</button>
+                                <button>5</button>
+                                <button>&gt;</button>
+                            </div>
+                        </div>
+                    </section>
+                </main>
+            </div>
+        </div>
+    </body>
+</html>
