@@ -75,67 +75,106 @@ const MapPanel = {
       <div>위치: x:${w.x}, y:${w.y}</div>`;
   },
 
-  // ── Leaflet 초기화 ────────────────────────────────────
-  init() {
-    if (!window.L || !document.getElementById('map')) return;
+  // ── Leaflet 초기화 ──────────────────────────────────── (변경점  4/20)
+async init() {
+  if (!window.L || !document.getElementById('map')) return;
 
-    this.map = L.map('map', {
-      crs: L.CRS.Simple, minZoom: -2, maxZoom: 2,
-      zoomControl: false, dragging: false,
-      scrollWheelZoom: false, doubleClickZoom: false, touchZoom: false,
+  this.map = L.map('map', {
+    crs: L.CRS.Simple, minZoom: -2, maxZoom: 2,
+    zoomControl: false, dragging: false,
+    scrollWheelZoom: false, doubleClickZoom: false, touchZoom: false,
+  });
+
+  const bounds = [[0, 0], [600, 1300]];
+  const mapUrl = window.FACTORY_MAP_URL || '';
+  if (mapUrl) L.imageOverlay(mapUrl, bounds).addTo(this.map);
+  this.map.fitBounds(bounds);
+
+  this.layers = {
+    gas:      L.layerGroup().addTo(this.map),
+    power:    L.layerGroup().addTo(this.map),
+    geofence: L.layerGroup().addTo(this.map),
+    worker:   L.layerGroup().addTo(this.map),
+  };
+
+  await this._drawAll();       // ← await 추가
+  this._initTabFilter();
+  this._startWorkerAnimation();
+},
+
+async _drawAll() {
+  // 가스센서 — 더미 유지 (변경점 4/20)
+  this.DUMMY_GAS_SENSORS.forEach(s => {
+    const m = L.circleMarker([s.y, s.x], {
+      radius: 9, fillColor: this.riskColor(s.risk_level),
+      color: '#fff', weight: 1.5, fillOpacity: 0.9,
+    }).bindPopup(this.gasPopupHtml(s), { maxWidth: 220 });
+    m.addTo(this.layers.gas);
+    this.gasMarkers[s.device_id] = { marker: m, data: s };
+  });
+
+  // 전력 — 더미 유지
+  this.DUMMY_POWER_DEVICES.forEach(d => {
+    L.circleMarker([d.y, d.x], {
+      radius: 9, fillColor: this.riskColor(d.risk_level),
+      color: '#e3b341', weight: 2, fillOpacity: 0.85, dashArray: '4 2',
+    }).bindPopup(this.powerPopupHtml(d), { maxWidth: 220 }).addTo(this.layers.power);
+  });
+
+  // 지오펜스 — API 연동으로 교체
+  await this._loadGeofences();
+
+  // 작업자 — 더미 유지
+  this.DUMMY_WORKERS.forEach(w => {
+    const m = L.circleMarker([w.y, w.x], {
+      radius: 8, fillColor: '#58a6ff', color: '#fff', weight: 2, fillOpacity: 1,
+    }).bindPopup(this.workerPopupHtml(w), { maxWidth: 200 });
+    m.addTo(this.layers.worker);
+    this.workerMarkers[w.id] = { marker: m, data: w };
+  });
+},
+
+async _loadGeofences() { //변경점 (4/20)
+  try {
+    const token = Auth.getAccessToken();
+    const res = await fetch('/api/geofences/', {
+      headers: { 'Authorization': `Bearer ${token}` }
     });
 
-    const bounds = [[0, 0], [600, 1300]];
-    // FACTORY_MAP_URL은 main_dashboard.html 에서 window 전역으로 주입
-    const mapUrl = window.FACTORY_MAP_URL || '';
-    if (mapUrl) L.imageOverlay(mapUrl, bounds).addTo(this.map);
-    this.map.fitBounds(bounds);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-    this.layers = {
-      gas:      L.layerGroup().addTo(this.map),
-      power:    L.layerGroup().addTo(this.map),
-      geofence: L.layerGroup().addTo(this.map),
-      worker:   L.layerGroup().addTo(this.map),
-    };
+    const geofences = await res.json();
 
-    this._drawAll();
-    this._initTabFilter();
-    this._startWorkerAnimation();
-  },
+    // 기존 레이어 초기화
+    this.layers.geofence.clearLayers();
 
-  _drawAll() {
-    this.DUMMY_GAS_SENSORS.forEach(s => {
-      const m = L.circleMarker([s.y, s.x], {
-        radius: 9, fillColor: this.riskColor(s.risk_level),
-        color: '#fff', weight: 1.5, fillOpacity: 0.9,
-      }).bindPopup(this.gasPopupHtml(s), { maxWidth: 220 });
-      m.addTo(this.layers.gas);
-      this.gasMarkers[s.device_id] = { marker: m, data: s };
+    geofences.forEach(g => {
+      const latlngs = g.polygon.map(([x, y]) => [y, x]);
+      const color   = this.ZONE_COLOR[g.risk_level] || '#888';
+      L.polygon(latlngs, {
+        color, fillColor: color, fillOpacity: 0.15, weight: 2
+      })
+      .bindPopup(`
+        <div class='popup-title'>🚧 ${g.name}</div>
+        <div>위험도: ${g.risk_level}</div>
+        <div>${g.description || ''}</div>
+      `)
+      .addTo(this.layers.geofence);
     });
 
-    this.DUMMY_POWER_DEVICES.forEach(d => {
-      L.circleMarker([d.y, d.x], {
-        radius: 9, fillColor: this.riskColor(d.risk_level),
-        color: '#e3b341', weight: 2, fillOpacity: 0.85, dashArray: '4 2',
-      }).bindPopup(this.powerPopupHtml(d), { maxWidth: 220 }).addTo(this.layers.power);
-    });
-
+    console.log(`[MapPanel] 지오펜스 ${geofences.length}개 로드 완료`);
+  } catch (err) {
+    console.warn('[MapPanel] 지오펜스 로드 실패, 더미 데이터 사용:', err);
+    // API 실패 시 더미 데이터로 폴백
     this.DUMMY_GEOFENCES.forEach(g => {
       const latlngs = g.polygon.map(([x, y]) => [y, x]);
       const color   = this.ZONE_COLOR[g.zone_type] || '#888';
       L.polygon(latlngs, { color, fillColor: color, fillOpacity: 0.15, weight: 2 })
-       .bindPopup(`<div class='popup-title'>🚧 ${g.name}</div><div>유형: ${g.zone_type}</div>`)
+       .bindPopup(`<div class='popup-title'>🚧 ${g.name}</div>`)
        .addTo(this.layers.geofence);
     });
-
-    this.DUMMY_WORKERS.forEach(w => {
-      const m = L.circleMarker([w.y, w.x], {
-        radius: 8, fillColor: '#58a6ff', color: '#fff', weight: 2, fillOpacity: 1,
-      }).bindPopup(this.workerPopupHtml(w), { maxWidth: 200 });
-      m.addTo(this.layers.worker);
-      this.workerMarkers[w.id] = { marker: m, data: w };
-    });
-  },
+  }
+},
 
   _initTabFilter() {
     const TAB_LAYER_MAP = {

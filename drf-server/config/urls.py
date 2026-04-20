@@ -17,4 +17,5 @@ urlpatterns = [
     ),  # API:  /api/auth/login/, /api/auth/me/
     path("dashboard/", include("apps.dashboard.urls")),
     path("alerts/", include("apps.alerts.urls")),
+    path("api/", include("apps.geofence.urls")),
 ]
