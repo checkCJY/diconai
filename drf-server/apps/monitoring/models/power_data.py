@@ -1,6 +1,6 @@
 # monitoring/models/power_data.py
 from django.db import models
-from core.constants import RiskLevel
+from apps.core.constants import RiskLevel
 
 
 class PowerData(models.Model):

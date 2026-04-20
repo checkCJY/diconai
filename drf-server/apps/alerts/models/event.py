@@ -2,7 +2,7 @@
 from django.conf import settings
 from django.db import models
 
-from core.constants import AlarmType, EventStatus, RiskLevel
+from apps.core.constants import AlarmType, EventStatus, RiskLevel
 
 
 class Event(models.Model):

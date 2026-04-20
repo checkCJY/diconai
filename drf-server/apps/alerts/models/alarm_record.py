@@ -2,7 +2,7 @@
 from django.conf import settings
 from django.db import models
 
-from core.constants import AlarmType, RiskLevel, GasTypeChoices
+from apps.core.constants import AlarmType, RiskLevel, GasTypeChoices
 
 
 class AlarmRecord(models.Model):

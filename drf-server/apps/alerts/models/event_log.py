@@ -2,7 +2,7 @@
 from django.conf import settings
 from django.db import models
 
-from core.constants import EventStatus
+from apps.core.constants import EventStatus
 
 
 # `EventLog.objects.filter(...).delete()`를 실행할 경우 에러 없이 삭제되어 무결성 방지용.

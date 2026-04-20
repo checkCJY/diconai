@@ -2,7 +2,7 @@
 from django.conf import settings
 from django.db import models
 
-from core.constants import RiskLevel
+from apps.core.constants import RiskLevel
 
 
 class Notification(models.Model):

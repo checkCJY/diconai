@@ -5,7 +5,7 @@ from django.db import models
 from django.utils import timezone
 from datetime import timedelta
 
-from core.constants import UserType
+from apps.core.constants import UserType
 
 
 class CustomUser(AbstractUser):

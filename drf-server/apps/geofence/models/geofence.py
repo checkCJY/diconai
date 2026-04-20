@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
-from core.constants import RiskLevel
+from apps.core.constants import RiskLevel
 
 
 def validate_polygon(data):
