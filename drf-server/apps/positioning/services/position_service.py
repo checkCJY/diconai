@@ -1,7 +1,7 @@
 # positioning/services/position_service.py
 
 from django.db import transaction
-from positioning.models import WorkerPosition
+from apps.positioning.models import WorkerPosition
 from django.utils import timezone
 from datetime import timedelta
 
@@ -35,8 +35,8 @@ def handle_position_receive(
         "warning",
         "danger",
     ):
-        from alerts.services.event_service import create_alarm_and_event
-        from core.constants import AlarmType
+        from apps.alerts.services.event_service import create_alarm_and_event
+        from apps.core.constants import AlarmType
 
         create_alarm_and_event(
             facility_id=facility_id,

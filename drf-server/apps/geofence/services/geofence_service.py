@@ -1,7 +1,7 @@
 # geofence/services/geofence_service.py
 
 from django.db import transaction
-from geofence.models import GeoFence
+from apps.geofence.models import GeoFence
 
 
 @transaction.atomic
@@ -44,15 +44,15 @@ def update_polygon(
     geofence.save(update_fields=["polygon", "updated_at"])
 
     # positioning 앱에 캐시 재계산 요청
-    from positioning.services.position_service import (
+    from apps.positioning.services.position_service import (
         recalculate_worker_positions_for_facility,
     )
 
     recalculate_worker_positions_for_facility(geofence.facility_id)
 
     # 감사 로그
-    from core.services.audit_service import log_action
-    from core.models import SystemLog
+    from apps.core.services.audit_service import log_action
+    from apps.core.models import SystemLog
 
     log_action(
         actor_id=actor_user_id,

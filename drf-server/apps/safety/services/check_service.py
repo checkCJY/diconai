@@ -1,7 +1,7 @@
 # safety/services/check_service.py
 
 from django.db import transaction
-from safety.models import SafetyCheckItem, SafetyStatus
+from apps.safety.models import SafetyCheckItem, SafetyStatus
 
 
 @transaction.atomic

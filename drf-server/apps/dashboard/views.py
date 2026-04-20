@@ -45,6 +45,6 @@ class DashboardRefreshView(APIView):
 
     def get(self, request):
         data = {"last_updated": datetime.now().isoformat()}
-        if request.user.user_type in ("admin", "superadmin"):
+        if request.user.user_type in ("facility_admin", "super_admin"):
             data["admin_url"] = getattr(settings, "ADMIN_BACKOFFICE_URL", "/admin/")
         return Response(data)

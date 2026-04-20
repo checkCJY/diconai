@@ -1,6 +1,6 @@
 # notifications/selectors/unread_notifications.py
 
-from notifications.models import Notification
+from apps.notifications.models import Notification
 
 
 def get_unread_notifications_for_user(user, limit: int = 20):

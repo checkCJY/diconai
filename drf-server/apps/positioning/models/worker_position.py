@@ -88,7 +88,7 @@ class WorkerPosition(models.Model):
             self.current_geofence = None
             return
 
-        from geofence.selectors.geofence_candidates import (
+        from apps.geofence.selectors.geofence_candidates import (
             find_geofence_containing_point,
         )
 

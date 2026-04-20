@@ -175,7 +175,7 @@ const Header = {
   },
 
   showAdminBtn(role) {
-    if (role === 'admin' || role === 'superadmin') {
+    if (role === 'facility_admin' || role === 'super_admin') {
       const btn = document.getElementById('btnAdmin');
       if (btn) btn.style.display = '';
     }

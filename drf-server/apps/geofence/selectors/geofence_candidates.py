@@ -1,6 +1,6 @@
 # geofence/selectors/geofence_candidates.py
 
-from geofence.models import GeoFence
+from apps.geofence.models import GeoFence
 
 
 def find_geofence_containing_point(

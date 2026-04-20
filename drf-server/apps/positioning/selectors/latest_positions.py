@@ -1,7 +1,7 @@
 # positioning/selectors/latest_positions.py
 
 from django.db.models import Subquery, OuterRef
-from positioning.models import WorkerPosition
+from apps.positioning.models import WorkerPosition
 
 
 def get_latest_positions_per_worker(facility_id: int):

@@ -70,7 +70,7 @@ class WorkerSummaryView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        if request.user.user_type != "admin":
+        if request.user.user_type not in ("facility_admin", "super_admin"):
             raise PermissionDenied("접근 권한이 없습니다.")
 
         facility = request.user.facility

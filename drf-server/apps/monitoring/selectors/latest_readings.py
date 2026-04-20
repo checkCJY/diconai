@@ -1,7 +1,7 @@
 # monitoring/selectors/latest_readings.py
 
 from django.db.models import Subquery, OuterRef
-from monitoring.models import GasData
+from apps.monitoring.models import GasData
 
 
 def get_latest_gas_data_per_sensor(facility_id: int):

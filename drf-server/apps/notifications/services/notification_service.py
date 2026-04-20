@@ -1,9 +1,9 @@
 # notifications/services/notification_service.py
 
 from django.db import transaction
-from notifications.models import Notification
-from accounts.models import CustomUser
-from core.constants import RiskLevel
+from apps.notifications.models import Notification
+from apps.accounts.models import CustomUser
+from apps.core.constants import RiskLevel
 
 
 @transaction.atomic
