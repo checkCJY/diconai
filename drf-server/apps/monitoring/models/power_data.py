@@ -36,6 +36,16 @@ class PowerData(models.Model):
     measured_at = models.DateTimeField()
     received_at = models.DateTimeField(auto_now_add=True)
 
+    def __str__(self):
+        return f"ch{self.channel} {self.data_type} @ {self.measured_at}"
+
+    @property
+    def latency_seconds(self) -> float | None:
+        """통신 지연 시간(초)"""
+        if not self.measured_at or not self.received_at:
+            return None
+        return (self.received_at - self.measured_at).total_seconds()
+
     class Meta:
         db_table = "power_data"
         constraints = [
@@ -48,6 +58,10 @@ class PowerData(models.Model):
             models.Index(
                 fields=["power_device", "channel", "-measured_at"],
                 name="idx_pwr_device_ch_time",
+            ),
+            models.Index(
+                fields=["power_device", "channel", "data_type", "-measured_at"],
+                name="idx_pwr_device_ch_type_time",
             ),
             models.Index(fields=["-measured_at"], name="idx_pwr_time"),
             models.Index(
