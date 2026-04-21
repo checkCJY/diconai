@@ -126,7 +126,7 @@ const Header = {
   updateLastUpdated() {
     const el = document.getElementById('lastUpdate');
     if (!el) return;
-    el.textContent = nowLabel();
+    el.textContent = nowDateLabel();
   },
 
   async handleRefresh() {

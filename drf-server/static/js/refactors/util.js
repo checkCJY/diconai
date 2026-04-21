@@ -20,6 +20,13 @@ function nowLabel() {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
+/** 최종 갱신 표시용 현재 날짜+시각 문자열 (YYYY.MM.DD HH:MM:SS) */
+function nowDateLabel() {
+  const d = new Date();
+  return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} ` +
+         `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 /**
  * Chart.js 실시간 차트에 데이터 포인트 추가
  * 최대 포인트(MAX_POINTS) 초과 시 가장 오래된 항목을 앞에서 제거

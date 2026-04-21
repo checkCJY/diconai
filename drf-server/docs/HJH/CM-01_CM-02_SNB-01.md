@@ -688,3 +688,251 @@ X 버튼 클릭 → 입력값 삭제 + X 버튼 숨김 + 해당 필드 포커스
 [입력 중 / X 버튼 클릭]
   → 에러 메시지 자동 제거 + 빨간 테두리 제거
 ```
+
+---
+
+## 서버측 유효성 검사 추가 (2026-04-20)
+
+### 배경
+
+`login.html` 229번 줄에 클라이언트 유효성 검사 로직이 존재하지만, `LoginSerializer`와 `LoginView`에 동일한 서버측 검사가 없어 API를 직접 호출하면 규칙이 무시되는 문제가 있었습니다.
+
+### 변경 파일
+
+| 구분 | 파일 경로 | 변경 내용 |
+|------|-----------|-----------|
+| Backend | `apps/accounts/serializers.py` | `validate_username()` / `validate_password()` 추가 |
+| Backend | `apps/accounts/views.py` | 필드별 에러 응답 및 HTTP 상태코드 분리 |
+
+---
+
+### `apps/accounts/serializers.py` — 수정
+
+**추가된 유효성 검사 규칙**
+
+| 필드 | 조건 | 메시지 |
+|------|------|--------|
+| 아이디 | 영문/숫자 외 문자 포함 | 아이디는 영문 또는 숫자만 입력할 수 있습니다. |
+| 아이디 | 4자 미만 또는 20자 초과 | 아이디를 4~20자로 입력해주세요. |
+| 비밀번호 | 8자 미만 | 비밀번호를 8자 이상 입력해야 합니다. |
+| 비밀번호 | 영문·숫자·특수문자 중 2종류 미만 | 비밀번호는 영문, 숫자, 특수문자 중 2가지 이상을 포함해야 합니다. |
+
+**변경 상세**
+
+```python
+# 추가 전 — 필드 검사 없음, authenticate() 결과만 확인
+class LoginSerializer(serializers.Serializer):
+    username = serializers.CharField()
+    password = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        user = authenticate(...)
+        if not user:
+            raise serializers.ValidationError("아이디 또는 비밀번호가 올바르지 않습니다.")
+        ...
+
+# 추가 후 — 필드별 validate_* 메서드 추가
+def validate_username(self, value):
+    if not re.fullmatch(r"[a-zA-Z0-9]+", value):
+        raise serializers.ValidationError("아이디는 영문 또는 숫자만 입력할 수 있습니다.")
+    if not (4 <= len(value) <= 20):
+        raise serializers.ValidationError("아이디를 4~20자로 입력해주세요.")
+    return value
+
+def validate_password(self, value):
+    if len(value) < 8:
+        raise serializers.ValidationError("비밀번호를 8자 이상 입력해야 합니다.")
+    types = sum(
+        bool(pattern.search(value))
+        for pattern in [re.compile(r"[a-zA-Z]"), re.compile(r"[0-9]"), re.compile(r"[^a-zA-Z0-9]")]
+    )
+    if types < 2:
+        raise serializers.ValidationError("비밀번호는 영문, 숫자, 특수문자 중 2가지 이상을 포함해야 합니다.")
+    return value
+```
+
+---
+
+### `apps/accounts/views.py` — 수정
+
+**변경 상세**
+
+```python
+# 변경 전 — non_field_errors만 확인, 모든 오류에 401 반환
+if not serializer.is_valid():
+    errors = serializer.errors.get("non_field_errors", ["입력값을 확인해주세요."])
+    return Response({"error": errors[0]}, status=status.HTTP_401_UNAUTHORIZED)
+
+# 변경 후 — 필드별 오류와 인증 오류를 상태코드로 구분
+if not serializer.is_valid():
+    for field in ("username", "password", "non_field_errors"):
+        if field in serializer.errors:
+            return Response(
+                {"error": serializer.errors[field][0]},
+                status=status.HTTP_400_BAD_REQUEST
+                if field in ("username", "password")
+                else status.HTTP_401_UNAUTHORIZED,
+            )
+    return Response({"error": "입력값을 확인해주세요."}, status=status.HTTP_400_BAD_REQUEST)
+```
+
+**HTTP 상태코드 응답 규칙**
+
+| 오류 종류 | 상태코드 | 예시 |
+|-----------|----------|------|
+| 아이디/비밀번호 형식 오류 | `400 Bad Request` | 아이디를 4~20자로 입력해주세요. |
+| 인증 실패 (아이디·비밀번호 불일치) | `401 Unauthorized` | 아이디 또는 비밀번호가 올바르지 않습니다. |
+
+---
+
+### 동작 흐름 (서버측 추가 후)
+
+```
+[POST /api/auth/login/]
+  → validate_username() — 형식/길이 검사 → 실패 시 400 반환
+  → validate_password() — 길이/복잡도 검사 → 실패 시 400 반환
+  → validate()          — authenticate() 인증 → 실패 시 401 반환
+  → 성공: JWT 토큰 발급
+```
+
+---
+
+## 최종 갱신 시간 날짜 표시 추가 (2026-04-20)
+
+### 배경
+
+헤더의 현재 시스템 시간은 `YYYY.MM.DD HH:MM:SS` 형식으로 표시되는 반면,
+최종 갱신 시간은 `HH:MM:SS`만 표시되어 형식이 불일치하였습니다.
+
+### 변경 파일
+
+| 구분 | 파일 경로 | 변경 내용 |
+|------|-----------|-----------|
+| Frontend | `static/js/refactors/util.js` | `nowDateLabel()` 신규 추가 |
+| Frontend | `static/js/refactors/layout.js` | `updateLastUpdated()`에서 `nowDateLabel()` 사용 |
+
+### 변경 상세
+
+**`static/js/refactors/util.js`**
+
+```javascript
+// 기존 유지 — 차트 X축 라벨용 (HH:MM:SS)
+function nowLabel() {
+  const d = new Date();
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+// 신규 추가 — 최종 갱신 표시용 (YYYY.MM.DD HH:MM:SS)
+function nowDateLabel() {
+  const d = new Date();
+  return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} ` +
+         `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+```
+
+> `nowLabel()`을 수정하면 `websocket.js`의 차트 X축 라벨이 날짜까지 표시되어 깨지는 문제가 발생하므로
+> 함수를 분리하여 용도별로 사용합니다.
+
+**`static/js/refactors/layout.js` — `updateLastUpdated()` 수정**
+
+```javascript
+// 변경 전
+el.textContent = nowLabel();
+
+// 변경 후
+el.textContent = nowDateLabel();
+```
+
+**표시 결과 비교**
+
+| 항목 | 변경 전 | 변경 후 |
+|------|---------|---------|
+| 현재 시스템 시간 | `2026.04.20 16:01:36` | `2026.04.20 16:01:36` (유지) |
+| 최종 갱신 | `16:01:13` | `2026.04.20 16:01:13` |
+| 차트 X축 라벨 | `16:01:13` | `16:01:13` (유지) |
+
+---
+
+## 코드 품질 개선 (2026-04-20)
+
+### 배경
+
+코드 리뷰를 통해 발견된 중복 코드, 가독성 문제, 전역 오염 가능성을 개선하였습니다.
+
+### 변경 파일
+
+| 구분 | 파일 경로 | 변경 내용 |
+|------|-----------|-----------|
+| Backend | `apps/accounts/serializers.py` | 정규식 패턴 모듈 상수로 분리 |
+| Backend | `apps/accounts/views.py` | 에러 처리 로직 가독성 개선 |
+| Frontend | `static/css/login.css` | `body` → `body.login-page` 스코프 제한 |
+| Frontend | `templates/auth/login.html` | `<body class="login-page">` 추가 |
+
+---
+
+### 1. `apps/accounts/serializers.py` — `re.compile` 중복 생성 제거
+
+`validate_password()`가 호출될 때마다 정규식 패턴 3개를 매번 새로 컴파일하던 문제를 모듈 상단 상수로 분리하여 해결하였습니다.
+
+```python
+# 변경 전 — 호출마다 컴파일
+types = sum(
+    bool(pattern.search(value))
+    for pattern in [re.compile(r"[a-zA-Z]"), re.compile(r"[0-9]"), re.compile(r"[^a-zA-Z0-9]")]
+)
+
+# 변경 후 — 모듈 로드 시 1회만 컴파일
+_PWD_PATTERNS = [re.compile(r"[a-zA-Z]"), re.compile(r"[0-9]"), re.compile(r"[^a-zA-Z0-9]")]
+
+types = sum(bool(p.search(value)) for p in _PWD_PATTERNS)
+```
+
+---
+
+### 2. `apps/accounts/views.py` — 에러 처리 로직 가독성 개선
+
+`for` + 삼항연산자 조합을 필드 오류 / 인증 오류로 명시적으로 분리하였습니다.
+
+```python
+# 변경 전 — for loop + 삼항연산자 조합
+for field in ("username", "password", "non_field_errors"):
+    if field in serializer.errors:
+        return Response(
+            {"error": serializer.errors[field][0]},
+            status=status.HTTP_400_BAD_REQUEST
+            if field in ("username", "password")
+            else status.HTTP_401_UNAUTHORIZED,
+        )
+
+# 변경 후 — 상태코드별 명시적 분리
+errors = serializer.errors
+for field in ("username", "password"):
+    if field in errors:
+        return Response({"error": errors[field][0]}, status=status.HTTP_400_BAD_REQUEST)
+if "non_field_errors" in errors:
+    return Response({"error": errors["non_field_errors"][0]}, status=status.HTTP_401_UNAUTHORIZED)
+return Response({"error": "입력값을 확인해주세요."}, status=status.HTTP_400_BAD_REQUEST)
+```
+
+---
+
+### 3. `login.css` / `login.html` — body 전역 오염 방지
+
+`login.css`의 `body` 스타일이 다른 페이지에서 실수로 import될 경우 레이아웃을 깨뜨릴 수 있어 클래스 스코프로 제한하였습니다.
+
+```css
+/* 변경 전 */
+body { display:flex; align-items:center; justify-content:center; }
+
+/* 변경 후 */
+body.login-page { display:flex; align-items:center; justify-content:center; }
+```
+
+```html
+<!-- login.html body 태그 -->
+<!-- 변경 전 -->
+<body>
+
+<!-- 변경 후 -->
+<body class="login-page">
+```
