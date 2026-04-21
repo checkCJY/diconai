@@ -1,4 +1,5 @@
 # facilities/models/devices.py
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 from datetime import timedelta
@@ -120,6 +121,13 @@ class PowerDevice(DeviceBase):
 
     def __str__(self):
         return f"{self.device_name} ({self.device_id})"
+
+    def clean(self):
+        for ch_key, meta in self.channel_meta.items():
+            if not ch_key.isdigit() or not (1 <= int(ch_key) <= self.channel_count):
+                raise ValidationError(f"잘못된 채널 키: {ch_key}")
+            if "name" not in meta:
+                raise ValidationError(f"채널 {ch_key}에 'name' 필드가 없습니다.")
 
     class Meta:
         db_table = "power_device"
