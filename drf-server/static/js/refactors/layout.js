@@ -19,7 +19,6 @@ const SNB = {
 
   init() {
     document.getElementById('hamburger')?.addEventListener('click', () => this.toggle());
-    document.getElementById('snbClose') ?.addEventListener('click', () => this.close());
     this.overlay?.addEventListener('click', () => this.close());
   },
 };
@@ -126,7 +125,7 @@ const Header = {
   updateLastUpdated() {
     const el = document.getElementById('lastUpdate');
     if (!el) return;
-    el.textContent = nowLabel();
+    el.textContent = nowDateLabel();
   },
 
   async handleRefresh() {

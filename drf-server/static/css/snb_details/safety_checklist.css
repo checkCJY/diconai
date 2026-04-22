@@ -1,0 +1,46 @@
+/* ==========================================================
+   safety_checklist.css — 작업 전 안전 확인 체크리스트 페이지
+   ========================================================== */
+
+/* ── 페이지 레이아웃 ── */
+.checklist-page { display: flex; flex-direction: column; height: calc(100vh - 52px); overflow: hidden; padding: 20px 24px 0; box-sizing: border-box; }
+.page-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; }
+.page-title .title-date { font-size: 13px; font-weight: 400; color: var(--text2); margin-left: 12px; }
+
+/* ── 안내 배너 ── */
+.info-banner { display: flex; align-items: center; gap: 10px; background: #4a3a00; border: 1px solid #7a6000; border-radius: 6px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px; color: #f0c040; flex-shrink: 0; }
+.info-banner svg { flex-shrink: 0; }
+
+/* ── 체크리스트 스크롤 영역 ── */
+.checklist-scroll { flex: 1; overflow-y: auto; padding-right: 4px; margin-bottom: 0; }
+.checklist-section { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; overflow: hidden; }
+.section-title { font-size: 13px; font-weight: 700; padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+.section-error { font-size: 12px; color: var(--danger); font-weight: 400; display: none; }
+.section-error.show { display: inline; }
+
+/* ── 개별 체크 항목 ── */
+.check-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text2); cursor: pointer; transition: background .15s; }
+.check-item:last-child { border-bottom: none; }
+.check-item:hover { background: var(--bg3); }
+.check-item input[type="checkbox"] { margin-top: 2px; accent-color: var(--blue); width: 15px; height: 15px; flex-shrink: 0; cursor: pointer; }
+.check-item.checked { color: var(--text); }
+
+/* ── 하단 버튼 영역 ── */
+.checklist-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 0 20px; flex-shrink: 0; border-top: 1px solid var(--border); margin-top: 4px; }
+.btn-cancel { background: var(--bg3); color: var(--text); border: 1px solid var(--border); padding: 9px 24px; border-radius: 6px; font-size: 13px; font-family: inherit; cursor: pointer; }
+.btn-cancel:hover { border-color: var(--text2); }
+.btn-select-all { background: var(--bg3); color: var(--text2); border: 1px solid var(--border); padding: 9px 24px; border-radius: 6px; font-size: 13px; font-family: inherit; cursor: pointer; }
+.btn-select-all:hover { border-color: var(--text2); color: var(--text); }
+.btn-next { background: var(--bg3); color: var(--text2); border: 1px solid var(--border); padding: 9px 24px; border-radius: 6px; font-size: 13px; font-family: inherit; cursor: not-allowed; transition: background .2s, color .2s; }
+.btn-next.active { background: var(--blue); color: #fff; border-color: var(--blue); cursor: pointer; }
+.btn-next.active:hover { opacity: .9; }
+
+/* ── 완료 확인 모달 ── */
+.confirm-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 1000; align-items: center; justify-content: center; }
+.confirm-modal.show { display: flex; }
+.confirm-box { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 32px 40px; min-width: 300px; text-align: center; }
+.confirm-icon { margin-bottom: 8px; }
+.confirm-label { font-size: 12px; color: var(--text2); margin-bottom: 16px; }
+.confirm-msg { font-size: 16px; font-weight: 700; margin-bottom: 24px; }
+.confirm-btn { background: var(--blue); color: #fff; border: none; padding: 9px 32px; border-radius: 6px; font-size: 13px; font-family: inherit; cursor: pointer; }
+.confirm-btn:hover { opacity: .9; }

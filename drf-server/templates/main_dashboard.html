@@ -5,7 +5,9 @@
 <meta charset="UTF-8">
 <title>산재 예방 통합 관제 시스템</title>
 <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
-<link rel="stylesheet" href="{% static 'css/header.css' %}">
+<!-- 헤더 / SNB / 모달 / 스피너 CSS (header.html 컴포넌트와 쌍으로 관리) -->
+<link rel="stylesheet" href="{% static 'css/components/header.css' %}">
+<!-- Leaflet CSS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -23,8 +25,8 @@
       <div class="panel">
         <div class="panel-title">나의 안전확인</div>
         <div class="safety-item"><span>PPE 착용</span><span class="done">완료</span></div>
-        <div class="safety-item"><span>안전 확인 체크리스트</span><span class="done">완료</span></div>
-        <div class="safety-item"><span>VR 교육</span><span class="todo">미완료</span></div>
+        <div class="safety-item"><span>안전 확인 체크리스트</span><span id="safety-checklist-status" class="todo">미완료</span></div>
+        <div class="safety-item"><span>VR 교육</span><span id="safety-vr-status" class="todo">미완료</span></div>
         <button class="safety-btn" onclick="location.href='/dashboard/safety/checklist/'">나의 안전 확인 바로가기</button>
       </div>
 
