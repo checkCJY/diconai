@@ -5,9 +5,9 @@ def retire_gas_sensor(sensor_id: int, actor_user_id: int, reason: str = ""):
     """
     가스 센서 철거 처리 — 물리 삭제가 아닌 Soft Delete
     """
-    from facilities.models import GasSensor
-    from core.models import SystemLog
-    from core.services.audit_service import log_action
+    from apps.facilities.models import GasSensor
+    from apps.core.models import SystemLog
+    from apps.core.services.audit_service import log_action
 
     sensor = GasSensor.objects.get(pk=sensor_id)
     sensor.deactivate()

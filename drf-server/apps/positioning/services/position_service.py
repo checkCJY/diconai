@@ -37,7 +37,6 @@ def handle_position_receive(
         "warning",
         "danger",
     ):
-        # 4/22 app. < 이 부분 추가
         from apps.alerts.services.event_service import create_alarm_and_event
         from apps.core.constants import AlarmType
 

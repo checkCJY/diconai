@@ -8,7 +8,8 @@
    수신 페이로드 (fastapi-server/websocket.py 기준):
      co, h2s, o2, level, total_power_mw, power_change_pct,
      equipment[], ai_power_equipment, ai_eta_min,
-     ai_max_load_kw, ai_max_load_pct
+     ai_max_load_kw, ai_max_load_pct,
+     worker_positions{}  ← [추가] IoT 위치 수신 시 갱신되는 작업자 좌표 맵
    ========================================================== */
 
 'use strict';
@@ -99,6 +100,13 @@ function initWebSocket() {
 
       // ── MN-02 맵 — 가스센서 A 실시간 반영 ──────────────
       MapPanel.updateGasSensorFromWS(data);
+
+      // ── [추가] MN-02 맵 — 작업자 위치 실시간 반영 ───────
+      // worker_positions: { "worker_id": { x, y, facility_id, updated_at } }
+      // websocket.py의 /ws/position/ 수신 시 공유 상태가 갱신되어 포함됨
+      if (data.worker_positions && typeof MapPanel.updateWorkerPositions === 'function') {
+        MapPanel.updateWorkerPositions(data.worker_positions);
+      }
 
       // ── CM-07 — 위험 발생 시 알림 팝업 + 이벤트 패널 추가 ─
       if (data.level === '위험') {

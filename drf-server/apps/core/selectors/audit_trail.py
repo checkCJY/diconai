@@ -1,5 +1,5 @@
 # core/selectors/audit_trail.py
-from core.models import SystemLog
+from apps.core.models import SystemLog
 
 
 def get_audit_trail(target_model: str, target_id: str | int):

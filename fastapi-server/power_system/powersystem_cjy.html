@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>전력 시스템 — CJY 테스트</title>
+  <style>
+    body { font-family: monospace; background: #0f0f0f; color: #e0e0e0; padding: 24px; }
+    h2   { color: #4fc3f7; margin-bottom: 4px; }
+    .status { font-size: 13px; margin-bottom: 16px; }
+    .connected    { color: #66bb6a; }
+    .disconnected { color: #ef5350; }
+    .updated-at { font-size: 12px; color: #888; margin-bottom: 16px; }
+
+    table { border-collapse: collapse; width: 100%; margin-bottom: 32px; }
+    th { background: #1e1e2e; color: #90caf9; padding: 8px 12px; text-align: left; border-bottom: 1px solid #333; }
+    td { padding: 6px 12px; border-bottom: 1px solid #222; font-size: 13px; }
+    tr:hover td { background: #1a1a2e; }
+
+    .on  { color: #66bb6a; font-weight: bold; }
+    .off { color: #555; }
+    .err { color: #ef5350; }  /* value == -1 통신 불능 */
+  </style>
+</head>
+<body>
+
+<h2>전력 시스템 WebSocket 테스트</h2>
+<div class="status" id="wsStatus">● 연결 중...</div>
+<div class="updated-at" id="updatedAt">마지막 수신: —</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>CH</th>
+      <th>ON/OFF</th>
+      <th>전류 (A)</th>
+      <th>전압 (V)</th>
+      <th>전력 (W)</th>
+    </tr>
+  </thead>
+  <tbody id="powerTableBody"></tbody>
+</table>
+
+<script>
+  const statusEl  = document.getElementById('wsStatus');
+  const updatedEl = document.getElementById('updatedAt');
+  const tbody     = document.getElementById('powerTableBody');
+
+  function connect() {
+    const ws = new WebSocket('ws://localhost:8002/ws/power/');
+
+    ws.onopen = () => {
+      statusEl.textContent = '● 실시간 연결 (ws://localhost:8002/ws/power/)';
+      statusEl.className = 'status connected';
+    };
+
+    ws.onmessage = (e) => {
+      const data = JSON.parse(e.data);
+
+      // 마지막 수신 시각
+      updatedEl.textContent = `마지막 수신: ${data.updated_at ?? '데이터 미수신 (더미 센더 실행 필요)'}`;
+
+      // 16채널 테이블 렌더링
+      const rows = [];
+      for (let ch = 1; ch <= 16; ch++) {
+        const key     = String(ch);
+        const onoff   = data.onoff?.[key];
+        const current = data.current?.[ch] ?? data.current?.[key];
+        const voltage = data.voltage?.[ch] ?? data.voltage?.[key];
+        const watt    = data.watt?.[ch]    ?? data.watt?.[key];
+
+        const onoffCell    = onoff === undefined ? '—'
+                           : onoff ? `<span class="on">ON</span>` : `<span class="off">OFF</span>`;
+        const currentCell  = current === -1 ? `<span class="err">통신불능</span>` : (current ?? '—');
+        const voltageCell  = voltage === -1 ? `<span class="err">통신불능</span>` : (voltage ?? '—');
+        const wattCell     = watt    === -1 ? `<span class="err">통신불능</span>` : (watt    ?? '—');
+
+        rows.push(`
+          <tr>
+            <td>CH${ch}</td>
+            <td>${onoffCell}</td>
+            <td>${currentCell}</td>
+            <td>${voltageCell}</td>
+            <td>${wattCell}</td>
+          </tr>
+        `);
+      }
+      tbody.innerHTML = rows.join('');
+    };
+
+    ws.onerror = () => {
+      statusEl.textContent = '● 연결 오류 — port 8002 서버가 실행 중인지 확인하세요';
+      statusEl.className = 'status disconnected';
+    };
+
+    ws.onclose = () => {
+      statusEl.textContent = '● 연결 끊김 — 5초 후 재연결';
+      statusEl.className = 'status disconnected';
+      setTimeout(connect, 5000);
+    };
+  }
+
+  connect();
+</script>
+</body>
+</html>

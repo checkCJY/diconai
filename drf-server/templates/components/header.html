@@ -3,10 +3,6 @@
 
 <!-- ───────────────── SNB Drawer ─────────────────── -->
 <nav id="snbDrawer" class="snb-drawer" aria-label="사이드 메뉴">
-  <div class="snb-head">
-    <span class="snb-title">메뉴</span>
-    <button id="snbClose" class="snb-close-btn" aria-label="메뉴 닫기">✕</button>
-  </div>
   <div id="snbMenu" class="snb-menu">
     <!-- JS로 렌더링 -->
   </div>
@@ -22,13 +18,7 @@
       <div class="logo-box">LOGO</div>
     </a>
     <div class="system-name">산재 예방 통합 관제 시스템</div>
-  </div>
 
-  <!-- 가운데: 사용자 정보 + 관리자 메뉴 버튼 (CM-01 / CM-02) -->
-  <div class="header-center">
-    <div class="user-info">
-      <div class="user-name" id="headerUsername">-</div>
-    </div>
     <!-- ④ 관리자 메뉴 버튼 — admin / superadmin 권한 시에만 노출 -->
     <button id="btnAdmin" class="admin-menu-btn" title="관리자 백오피스" aria-label="관리자 메뉴" style="display:none;">
       관리자 메뉴
@@ -36,6 +26,13 @@
         <path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/>
       </svg>
     </button>
+  </div>
+
+  <!-- 가운데: 사용자 정보 + 관리자 메뉴 버튼 (CM-01 / CM-02) -->
+  <div class="header-center">
+    <div class="user-info">
+      <div class="user-name" id="headerUsername">-</div>
+    </div>
   </div>
 
   <!-- 우측: 시간 + 아이콘 + 로그아웃 (CM-02) -->
