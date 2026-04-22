@@ -41,8 +41,8 @@ logger = logging.getLogger(__name__)
 # FastAPI 엔드포인트
 # ============================================================
 
-FASTAPI_DEVICE_INFO_URL = "http://localhost:8000/api/sensors/info"
-FASTAPI_GAS_URL = "http://localhost:8000/api/sensors/gas"
+FASTAPI_DEVICE_INFO_URL = "http://localhost:8001/api/sensors/info"
+FASTAPI_GAS_URL = "http://localhost:8001/api/sensors/gas"
 
 
 # ============================================================
@@ -62,35 +62,36 @@ DANGER_EVENT_PROB = 0.1  # 10% 확률로 위험 이벤트 강제 생성
 # ============================================================
 
 GAS_NORMAL_RANGE: dict[str, tuple] = {
-    "co":  (0,    24),
-    "h2s": (0,    9),
-    "co2": (400,  999),
-    "o2":  (19.0, 21.0),
-    "lel": (0,    5),
-    "no2": (0.0,  2.9),
-    "so2": (0.0,  1.9),
-    "o3":  (0.0,  0.059),
-    "nh3": (0,    24),
-    "voc": (0.0,  0.49),
+    "co": (0, 24),
+    "h2s": (0, 9),
+    "co2": (400, 999),
+    "o2": (19.0, 21.0),
+    "lel": (0, 5),
+    "no2": (0.0, 2.9),
+    "so2": (0.0, 1.9),
+    "o3": (0.0, 0.059),
+    "nh3": (0, 24),
+    "voc": (0.0, 0.49),
 }
 
 GAS_DANGER_RANGE: dict[str, tuple] = {
-    "co":  (200,  300),
-    "h2s": (15,   50),
+    "co": (200, 300),
+    "h2s": (15, 50),
     "co2": (5000, 8000),
-    "o2":  (10.0, 15.0),
-    "lel": (10,   30),
-    "no2": (5.0,  10.0),
-    "so2": (5.0,  10.0),
-    "o3":  (0.12, 0.30),
-    "nh3": (35,   70),
-    "voc": (1.0,  2.0),
+    "o2": (10.0, 15.0),
+    "lel": (10, 30),
+    "no2": (5.0, 10.0),
+    "so2": (5.0, 10.0),
+    "o3": (0.12, 0.30),
+    "nh3": (35, 70),
+    "voc": (1.0, 2.0),
 }
 
 
 # ============================================================
 # 데이터 생성
 # ============================================================
+
 
 def _pick_value(gas: str, is_danger: bool) -> float | int:
     """정상/위험 구간에서 랜덤 측정값을 반환한다."""
@@ -141,6 +142,7 @@ def generate_gas_data(is_danger: bool = False) -> dict:
 # 전송
 # ============================================================
 
+
 def send_data(url: str, payload: dict, label: str) -> None:
     """JSON 페이로드를 지정 URL로 POST 전송한다."""
     try:
@@ -152,7 +154,10 @@ def send_data(url: str, payload: dict, label: str) -> None:
         )
         logger.info(
             "[%s] HTTP %s | status=%s | %s",
-            label, response.status_code, payload.get("status", "-"), payload,
+            label,
+            response.status_code,
+            payload.get("status", "-"),
+            payload,
         )
     except requests.exceptions.ConnectionError:
         logger.error("[%s] 연결 실패 — 서버 실행 여부 확인 (URL: %s)", label, url)
@@ -166,12 +171,16 @@ def send_data(url: str, payload: dict, label: str) -> None:
 # 메인 루프
 # ============================================================
 
+
 def run() -> None:
     """
     기기 정보를 1회 전송한 후 가스 데이터를 1초마다 반복 전송한다.
     Ctrl+C로 종료.
     """
-    logger.info("=== 더미 데이터 전송 시작 (위험 이벤트 확률: %d%%) ===", int(DANGER_EVENT_PROB * 100))
+    logger.info(
+        "=== 더미 데이터 전송 시작 (위험 이벤트 확률: %d%%) ===",
+        int(DANGER_EVENT_PROB * 100),
+    )
 
     # STEP 1. 기기 정보 1회
     send_data(FASTAPI_DEVICE_INFO_URL, generate_device_info(), "DEVICE_INFO")
