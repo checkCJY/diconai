@@ -4,33 +4,22 @@
 <head>
 <meta charset="UTF-8">
 <title>산재 예방 통합 관제 시스템</title>
-<!-- 대시보드 공통 CSS (리셋 · 변수 · 레이아웃 · 패널 · 맵 · 차트 등) -->
 <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
-<!-- 헤더 / SNB / 모달 / 스피너 CSS (header.html 컴포넌트와 쌍으로 관리) -->
 <link rel="stylesheet" href="{% static 'css/header.css' %}">
-<!-- Leaflet CSS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<!-- 공장 지도 SVG 경로 주입 (dashboard.js 에서 window.FACTORY_MAP_URL 로 참조) -->
 <script>window.FACTORY_MAP_URL = "{% static 'img/factory_map.svg' %}";</script>
 </head>
 <body>
 
 {% include 'components/header.html' %}
 
-<!-- ───────────────── 대시보드 본문 ───────────────── -->
 <div class="body-wrap">
-
-  <!-- ── 상단 3컬럼 ────────────────────────────────── -->
   <div class="top-row">
 
-    <!-- 좌측: 패널 8(나의 안전확인) + 패널 11(작업자 현황 MN-04) -->
+    <!-- 좌측 -->
     <div class="col-left">
-
-      <!-- 패널 8: 나의 안전확인 -->
       <div class="panel">
         <div class="panel-title">나의 안전확인</div>
         <div class="safety-item"><span>PPE 착용</span><span class="done">완료</span></div>
@@ -39,14 +28,11 @@
         <button class="safety-btn" onclick="location.href='/dashboard/safety/checklist/'">나의 안전 확인 바로가기</button>
       </div>
 
-      <!-- 패널 11 (MN-04): 작업자 현황 -->
       <div class="panel">
         <div class="panel-title">
           작업자 현황
           <span class="more" id="mn04-btn-detail">+ 상세 보기</span>
         </div>
-
-        <!-- B View: 작업자용 가로 상태 바 -->
         <div id="mn04-view-worker" style="display:none;">
           <div class="sub" style="margin-bottom:6px;">현재 나의 상태</div>
           <div class="mn04-status-bar-wrap">
@@ -60,8 +46,6 @@
           <div class="mn04-status-text" id="mn04-status-text" style="color:#2d9e75;">--</div>
           <div class="mn04-error" id="mn04-worker-error" style="display:none;"></div>
         </div>
-
-        <!-- D View: 관리자용 KPI 카드 + 미니 비율 바 -->
         <div id="mn04-view-admin" style="display:none;">
           <div class="mn04-kpi-grid">
             <div class="mn04-kpi-card mn04-kpi-total">
@@ -89,10 +73,9 @@
           <div class="mn04-error" id="mn04-admin-error" style="display:none;"></div>
         </div>
       </div>
-
     </div>
 
-    <!-- 가운데: 패널 9(MN-02) 실시간 모니터링 Leaflet 맵 -->
+    <!-- 가운데: 지도 -->
     <div class="col-mid">
       <div class="panel panel-map">
         <div class="panel-title">
@@ -109,13 +92,20 @@
           <button class="map-tab" data-layer="power">스마트 전력</button>
           <button class="map-tab" data-layer="location">위치센서</button>
         </div>
-        <div class="map-area" style="padding:0;">
+        <!-- 지도 영역 -->
+        <div class="map-area" style="padding:0; position:relative;">
           <div id="map"></div>
+          <!-- 관리자 전용 드로잉 버튼 -->
+          <div id="geofence-toolbar" style="display:none;">
+            <button id="btn-draw-geofence" class="geofence-draw-btn">✏️ 구역 그리기</button>
+            <button id="btn-draw-done" class="geofence-draw-btn" style="display:none;">✅ 완료</button>
+            <button id="btn-draw-cancel" class="geofence-cancel-btn" style="display:none;">❌ 취소</button>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- 우측: 패널 10 이벤트 현황 -->
+    <!-- 우측 -->
     <div class="col-right">
       <div class="panel" style="flex:1;overflow:hidden;">
         <div class="panel-title">이벤트 현황 <span class="more">+ 상세 보기</span></div>
@@ -134,10 +124,8 @@
 
   </div>
 
-  <!-- ── 하단 4개 패널 ──────────────────────────────── -->
+  <!-- 하단 4패널 -->
   <div class="bottom-row">
-
-    <!-- 패널 12: 유해가스 현황 테이블 -->
     <div class="panel">
       <div class="panel-title">내 근처 유해가스 위험 현황 <span class="more">+ 상세 보기</span></div>
       <div class="sensor-tag">유해가스 1</div>
@@ -147,7 +135,6 @@
       </table>
     </div>
 
-    <!-- 패널 13: AI 예측 — 유해가스 -->
     <div class="panel panel-chart">
       <div class="panel-title">AI 예측 — 내 근처 유해가스 위험 <span class="more">+ 상세 보기</span></div>
       <div class="ai-nav">
@@ -172,7 +159,6 @@
       </div>
     </div>
 
-    <!-- 패널 14: 스마트 전력 현황 -->
     <div class="panel">
       <div class="panel-title">스마트 전력 시스템 위험 현황 <span class="more">+ 상세 보기</span></div>
       <div class="sub">현재 전체 스마트 파워 전력 사용량</div>
@@ -189,7 +175,6 @@
       </table>
     </div>
 
-    <!-- 패널 15: AI 예측 — 전력 -->
     <div class="panel panel-chart">
       <div class="panel-title">AI 예측 — 스마트 전력 시스템 위험 <span class="more">+ 상세 보기</span></div>
       <div class="ai-nav">
@@ -217,28 +202,44 @@
         <canvas id="chartPower"></canvas>
       </div>
     </div>
-
   </div>
 </div>
 
 {% include 'components/alarm_popup.html' %}
 
-<!-- ① 공통 유틸 — 반드시 가장 먼저 로드 (pad / nowLabel / pushData / MAX_POINTS / levelLabel) -->
+<!-- 지오펜스 저장 폼 모달 -->
+<div id="geofence-modal" style="display:none;">
+  <div class="geofence-modal-box">
+    <div class="geofence-modal-title">🚧 위험구역 정보 입력</div>
+    <div class="geofence-modal-body">
+      <label>구역 이름</label>
+      <input type="text" id="geofence-name" placeholder="예: 위험구역 A">
+      <label>위험도</label>
+      <select id="geofence-risk">
+        <option value="danger">위험 🔴</option>
+        <option value="warning">주의 🟡</option>
+        <option value="normal">정상 🟢</option>
+      </select>
+      <label>설명 (선택)</label>
+      <input type="text" id="geofence-desc" placeholder="예: 화학물질 보관소">
+    </div>
+    <div class="geofence-modal-footer">
+      <button id="btn-geofence-save">저장</button>
+      <button id="btn-geofence-discard">버리기</button>
+    </div>
+  </div>
+</div>
+
 <script src="{% static 'js/refactors/util.js' %}"></script>
-<!-- ② 독립 모듈 — util.js 만 의존 -->
 <script src="{% static 'js/refactors/auth.js' %}"></script>
 <script src="{% static 'js/refactors/alarm-popup.js' %}"></script>
 <script src="{% static 'js/refactors/event-panel.js' %}"></script>
 <script src="{% static 'js/refactors/gas-panel.js' %}"></script>
 <script src="{% static 'js/refactors/charts.js' %}"></script>
 <script src="{% static 'js/refactors/map-panel.js' %}"></script>
-<!-- ③ layout.js — auth.js, util.js 의존 -->
 <script src="{% static 'js/refactors/layout.js' %}"></script>
-<!-- ④ worker-panel.js — 독립 실행 (자체 fetch 사용) -->
 <script src="{% static 'js/refactors/worker-panel.js' %}"></script>
-<!-- ⑤ websocket.js — charts.js, map-panel.js, alarm-popup.js, util.js 의존 -->
 <script src="{% static 'js/refactors/websocket.js' %}"></script>
-<!-- ⑥ app.js — 모든 모듈 로드 후 마지막에 실행 -->
 <script src="{% static 'js/refactors/app.js' %}"></script>
 </body>
 </html>
