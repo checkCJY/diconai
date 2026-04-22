@@ -1,5 +1,5 @@
 # facilities/services/threshold_service.py
-from core.constants import GasTypeChoices
+from apps.core.constants import GasTypeChoices
 
 LEGAL_THRESHOLDS = {
     GasTypeChoices.CO: {"limit": 30.0, "unit": "ppm"},

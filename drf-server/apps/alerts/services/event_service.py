@@ -1,8 +1,8 @@
 # alerts/services/event_service.py
 
 from django.db import transaction
-from alerts.models import Event, AlarmRecord, EventLog
-from core.constants import EventStatus, RiskLevel
+from apps.alerts.models import Event, AlarmRecord, EventLog
+from apps.core.constants import EventStatus, RiskLevel
 from django.utils import timezone
 
 

@@ -1,0 +1,49 @@
+/* ==========================================================
+   safety_vr.css — 작업 전 안전 확인 VR 교육 페이지
+   ========================================================== */
+
+/* ── 페이지 레이아웃 ── */
+.vr-page { display: flex; flex-direction: column; height: calc(100vh - 52px); overflow: hidden; padding: 20px 24px 0; box-sizing: border-box; }
+.page-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: baseline; gap: 12px; }
+.page-title .title-date { font-size: 13px; font-weight: 400; color: var(--text2); }
+
+/* ── 안내 배너 ── */
+.info-banner { display: flex; align-items: center; gap: 10px; background: #4a3a00; border: 1px solid #7a6000; border-radius: 6px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px; color: #f0c040; flex-shrink: 0; }
+
+/* ── 체크리스트 완료 카드 ── */
+.complete-card { display: flex; align-items: flex-start; gap: 12px; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 14px 18px; margin-bottom: 16px; flex-shrink: 0; }
+.complete-card .card-text .card-title { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+.complete-card .card-text .card-sub   { font-size: 12px; color: var(--text2); }
+
+/* ── 비디오 영역 ── */
+.video-wrap { flex: 1; display: flex; justify-content: center; align-items: flex-start; overflow: hidden; margin-bottom: 0; }
+.video-container { position: relative; width: 100%; max-width: 700px; background: #1a1d23; border-radius: 8px; overflow: hidden; aspect-ratio: 16/9; }
+.video-container video { width: 100%; height: 100%; display: block; }
+.play-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .2s; }
+.play-overlay:hover { background: rgba(0,0,0,.15); }
+.play-overlay.hidden { display: none; }
+.play-icon { width: 64px; height: 64px; opacity: .85; }
+
+/* ── 하단 버튼 ── */
+.vr-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 0 20px; flex-shrink: 0; border-top: 1px solid var(--border); margin-top: 8px; }
+.btn-prev { background: var(--bg3); color: var(--text); border: 1px solid var(--border); padding: 9px 24px; border-radius: 6px; font-size: 13px; font-family: inherit; cursor: pointer; }
+.btn-prev:hover { border-color: var(--text2); }
+.btn-done { background: var(--bg3); color: var(--text2); border: 1px solid var(--border); padding: 9px 24px; border-radius: 6px; font-size: 13px; font-family: inherit; cursor: not-allowed; transition: background .2s, color .2s; }
+.btn-done.active { background: var(--blue); color: #fff; border-color: var(--blue); cursor: pointer; }
+.btn-done.active:hover { opacity: .9; }
+
+/* ── 모달 공통 ── */
+.vr-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 1000; align-items: center; justify-content: center; }
+.vr-modal.show { display: flex; }
+.vr-modal-box { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 28px 36px; min-width: 280px; text-align: center; }
+.vr-modal-msg  { font-size: 14px; margin-bottom: 20px; line-height: 1.6; }
+.vr-modal-btns { display: flex; gap: 10px; justify-content: center; }
+.modal-btn-ok     { background: var(--blue); color: #fff; border: none; padding: 8px 24px; border-radius: 6px; font-size: 13px; font-family: inherit; cursor: pointer; }
+.modal-btn-ok:hover     { opacity: .9; }
+.modal-btn-cancel { background: var(--bg3); color: var(--text); border: 1px solid var(--border); padding: 8px 24px; border-radius: 6px; font-size: 13px; font-family: inherit; cursor: pointer; }
+.modal-btn-cancel:hover { border-color: var(--text2); }
+
+/* ── 완료 모달 ── */
+.done-modal-icon  { margin-bottom: 8px; }
+.done-modal-label { font-size: 12px; color: var(--text2); margin-bottom: 12px; }
+.done-modal-msg   { font-size: 16px; font-weight: 700; margin-bottom: 24px; }

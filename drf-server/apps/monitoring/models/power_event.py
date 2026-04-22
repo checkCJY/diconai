@@ -61,6 +61,9 @@ class PowerEvent(models.Model):
         verbose_name="이벤트 원인",
     )
 
+    # 장치 측정 시각 — PowerData.measured_at과 JOIN 기준 통일
+    # null=True: 0002 마이그레이션 이전 기존 row 호환
+    measured_at = models.DateTimeField(verbose_name="측정 시각")
     created_at = models.DateTimeField(auto_now_add=True)
 
     @staticmethod
@@ -105,6 +108,11 @@ class PowerEvent(models.Model):
             models.Index(
                 fields=["power_device", "-created_at"],
                 name="idx_power_event_device_time",
+            ),
+            # PowerData.measured_at과 시간 범위 JOIN 시 사용
+            models.Index(
+                fields=["power_device", "-measured_at"],
+                name="idx_pwr_evt_dev_meas",
             ),
             # trigger 인덱스 제거 — 실제 쿼리 패턴에 없음, write 비용만 증가
         ]

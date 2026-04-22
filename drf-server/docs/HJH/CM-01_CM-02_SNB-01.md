@@ -688,3 +688,691 @@ X 버튼 클릭 → 입력값 삭제 + X 버튼 숨김 + 해당 필드 포커스
 [입력 중 / X 버튼 클릭]
   → 에러 메시지 자동 제거 + 빨간 테두리 제거
 ```
+
+---
+
+## 서버측 유효성 검사 추가 (2026-04-20)
+
+### 배경
+
+`login.html` 229번 줄에 클라이언트 유효성 검사 로직이 존재하지만, `LoginSerializer`와 `LoginView`에 동일한 서버측 검사가 없어 API를 직접 호출하면 규칙이 무시되는 문제가 있었습니다.
+
+### 변경 파일
+
+| 구분 | 파일 경로 | 변경 내용 |
+|------|-----------|-----------|
+| Backend | `apps/accounts/serializers.py` | `validate_username()` / `validate_password()` 추가 |
+| Backend | `apps/accounts/views.py` | 필드별 에러 응답 및 HTTP 상태코드 분리 |
+
+---
+
+### `apps/accounts/serializers.py` — 수정
+
+**추가된 유효성 검사 규칙**
+
+| 필드 | 조건 | 메시지 |
+|------|------|--------|
+| 아이디 | 영문/숫자 외 문자 포함 | 아이디는 영문 또는 숫자만 입력할 수 있습니다. |
+| 아이디 | 4자 미만 또는 20자 초과 | 아이디를 4~20자로 입력해주세요. |
+| 비밀번호 | 8자 미만 | 비밀번호를 8자 이상 입력해야 합니다. |
+| 비밀번호 | 영문·숫자·특수문자 중 2종류 미만 | 비밀번호는 영문, 숫자, 특수문자 중 2가지 이상을 포함해야 합니다. |
+
+**변경 상세**
+
+```python
+# 추가 전 — 필드 검사 없음, authenticate() 결과만 확인
+class LoginSerializer(serializers.Serializer):
+    username = serializers.CharField()
+    password = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        user = authenticate(...)
+        if not user:
+            raise serializers.ValidationError("아이디 또는 비밀번호가 올바르지 않습니다.")
+        ...
+
+# 추가 후 — 필드별 validate_* 메서드 추가
+def validate_username(self, value):
+    if not re.fullmatch(r"[a-zA-Z0-9]+", value):
+        raise serializers.ValidationError("아이디는 영문 또는 숫자만 입력할 수 있습니다.")
+    if not (4 <= len(value) <= 20):
+        raise serializers.ValidationError("아이디를 4~20자로 입력해주세요.")
+    return value
+
+def validate_password(self, value):
+    if len(value) < 8:
+        raise serializers.ValidationError("비밀번호를 8자 이상 입력해야 합니다.")
+    types = sum(
+        bool(pattern.search(value))
+        for pattern in [re.compile(r"[a-zA-Z]"), re.compile(r"[0-9]"), re.compile(r"[^a-zA-Z0-9]")]
+    )
+    if types < 2:
+        raise serializers.ValidationError("비밀번호는 영문, 숫자, 특수문자 중 2가지 이상을 포함해야 합니다.")
+    return value
+```
+
+---
+
+### `apps/accounts/views.py` — 수정
+
+**변경 상세**
+
+```python
+# 변경 전 — non_field_errors만 확인, 모든 오류에 401 반환
+if not serializer.is_valid():
+    errors = serializer.errors.get("non_field_errors", ["입력값을 확인해주세요."])
+    return Response({"error": errors[0]}, status=status.HTTP_401_UNAUTHORIZED)
+
+# 변경 후 — 필드별 오류와 인증 오류를 상태코드로 구분
+if not serializer.is_valid():
+    for field in ("username", "password", "non_field_errors"):
+        if field in serializer.errors:
+            return Response(
+                {"error": serializer.errors[field][0]},
+                status=status.HTTP_400_BAD_REQUEST
+                if field in ("username", "password")
+                else status.HTTP_401_UNAUTHORIZED,
+            )
+    return Response({"error": "입력값을 확인해주세요."}, status=status.HTTP_400_BAD_REQUEST)
+```
+
+**HTTP 상태코드 응답 규칙**
+
+| 오류 종류 | 상태코드 | 예시 |
+|-----------|----------|------|
+| 아이디/비밀번호 형식 오류 | `400 Bad Request` | 아이디를 4~20자로 입력해주세요. |
+| 인증 실패 (아이디·비밀번호 불일치) | `401 Unauthorized` | 아이디 또는 비밀번호가 올바르지 않습니다. |
+
+---
+
+### 동작 흐름 (서버측 추가 후)
+
+```
+[POST /api/auth/login/]
+  → validate_username() — 형식/길이 검사 → 실패 시 400 반환
+  → validate_password() — 길이/복잡도 검사 → 실패 시 400 반환
+  → validate()          — authenticate() 인증 → 실패 시 401 반환
+  → 성공: JWT 토큰 발급
+```
+
+---
+
+## 최종 갱신 시간 날짜 표시 추가 (2026-04-20)
+
+### 배경
+
+헤더의 현재 시스템 시간은 `YYYY.MM.DD HH:MM:SS` 형식으로 표시되는 반면,
+최종 갱신 시간은 `HH:MM:SS`만 표시되어 형식이 불일치하였습니다.
+
+### 변경 파일
+
+| 구분 | 파일 경로 | 변경 내용 |
+|------|-----------|-----------|
+| Frontend | `static/js/refactors/util.js` | `nowDateLabel()` 신규 추가 |
+| Frontend | `static/js/refactors/layout.js` | `updateLastUpdated()`에서 `nowDateLabel()` 사용 |
+
+### 변경 상세
+
+**`static/js/refactors/util.js`**
+
+```javascript
+// 기존 유지 — 차트 X축 라벨용 (HH:MM:SS)
+function nowLabel() {
+  const d = new Date();
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+// 신규 추가 — 최종 갱신 표시용 (YYYY.MM.DD HH:MM:SS)
+function nowDateLabel() {
+  const d = new Date();
+  return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} ` +
+         `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+```
+
+> `nowLabel()`을 수정하면 `websocket.js`의 차트 X축 라벨이 날짜까지 표시되어 깨지는 문제가 발생하므로
+> 함수를 분리하여 용도별로 사용합니다.
+
+**`static/js/refactors/layout.js` — `updateLastUpdated()` 수정**
+
+```javascript
+// 변경 전
+el.textContent = nowLabel();
+
+// 변경 후
+el.textContent = nowDateLabel();
+```
+
+**표시 결과 비교**
+
+| 항목 | 변경 전 | 변경 후 |
+|------|---------|---------|
+| 현재 시스템 시간 | `2026.04.20 16:01:36` | `2026.04.20 16:01:36` (유지) |
+| 최종 갱신 | `16:01:13` | `2026.04.20 16:01:13` |
+| 차트 X축 라벨 | `16:01:13` | `16:01:13` (유지) |
+
+---
+
+## 코드 품질 개선 (2026-04-20)
+
+### 배경
+
+코드 리뷰를 통해 발견된 중복 코드, 가독성 문제, 전역 오염 가능성을 개선하였습니다.
+
+### 변경 파일
+
+| 구분 | 파일 경로 | 변경 내용 |
+|------|-----------|-----------|
+| Backend | `apps/accounts/serializers.py` | 정규식 패턴 모듈 상수로 분리 |
+| Backend | `apps/accounts/views.py` | 에러 처리 로직 가독성 개선 |
+| Frontend | `static/css/login.css` | `body` → `body.login-page` 스코프 제한 |
+| Frontend | `templates/auth/login.html` | `<body class="login-page">` 추가 |
+
+---
+
+### 1. `apps/accounts/serializers.py` — `re.compile` 중복 생성 제거
+
+`validate_password()`가 호출될 때마다 정규식 패턴 3개를 매번 새로 컴파일하던 문제를 모듈 상단 상수로 분리하여 해결하였습니다.
+
+```python
+# 변경 전 — 호출마다 컴파일
+types = sum(
+    bool(pattern.search(value))
+    for pattern in [re.compile(r"[a-zA-Z]"), re.compile(r"[0-9]"), re.compile(r"[^a-zA-Z0-9]")]
+)
+
+# 변경 후 — 모듈 로드 시 1회만 컴파일
+_PWD_PATTERNS = [re.compile(r"[a-zA-Z]"), re.compile(r"[0-9]"), re.compile(r"[^a-zA-Z0-9]")]
+
+types = sum(bool(p.search(value)) for p in _PWD_PATTERNS)
+```
+
+---
+
+### 2. `apps/accounts/views.py` — 에러 처리 로직 가독성 개선
+
+`for` + 삼항연산자 조합을 필드 오류 / 인증 오류로 명시적으로 분리하였습니다.
+
+```python
+# 변경 전 — for loop + 삼항연산자 조합
+for field in ("username", "password", "non_field_errors"):
+    if field in serializer.errors:
+        return Response(
+            {"error": serializer.errors[field][0]},
+            status=status.HTTP_400_BAD_REQUEST
+            if field in ("username", "password")
+            else status.HTTP_401_UNAUTHORIZED,
+        )
+
+# 변경 후 — 상태코드별 명시적 분리
+errors = serializer.errors
+for field in ("username", "password"):
+    if field in errors:
+        return Response({"error": errors[field][0]}, status=status.HTTP_400_BAD_REQUEST)
+if "non_field_errors" in errors:
+    return Response({"error": errors["non_field_errors"][0]}, status=status.HTTP_401_UNAUTHORIZED)
+return Response({"error": "입력값을 확인해주세요."}, status=status.HTTP_400_BAD_REQUEST)
+```
+
+---
+
+### 3. `login.css` / `login.html` — body 전역 오염 방지
+
+`login.css`의 `body` 스타일이 다른 페이지에서 실수로 import될 경우 레이아웃을 깨뜨릴 수 있어 클래스 스코프로 제한하였습니다.
+
+```css
+/* 변경 전 */
+body { display:flex; align-items:center; justify-content:center; }
+
+/* 변경 후 */
+body.login-page { display:flex; align-items:center; justify-content:center; }
+```
+
+```html
+<!-- login.html body 태그 -->
+<!-- 변경 전 -->
+<body>
+
+<!-- 변경 후 -->
+<body class="login-page">
+```
+
+---
+
+## 햄버거 버튼 토글 버그 수정 (2026-04-22)
+
+### 배경
+
+≡ 버튼 클릭 시 SNB가 열리지만, 열린 상태에서 ≡ 버튼을 다시 클릭해도 SNB가 닫히지 않는 문제가 있었습니다.
+닫으려면 Drawer 내부의 ✕ 버튼을 별도로 눌러야 했습니다.
+
+### 원인
+
+`.snb-overlay`가 `position: fixed; inset: 0; z-index: 800`으로 설정되어 화면 전체를 덮고 있었지만,
+`.header`에는 `position` 및 `z-index`가 없었습니다.
+그 결과 SNB가 열린 상태에서 overlay(z-index: 800)가 헤더 영역까지 덮어,
+≡ 버튼 클릭 이벤트가 버튼에 도달하지 못하고 toggle이 동작하지 않았습니다.
+
+### 변경 파일
+
+| 구분 | 파일 경로 | 변경 내용 |
+|------|-----------|-----------|
+| Frontend | `static/css/header.css` | `.header`에 `position: relative; z-index: 900;` 추가 |
+| Frontend | `static/css/header.css` | `.snb-drawer` `top: 0` → `top: 52px`, `height: 100vh` → `height: calc(100vh - 52px)` |
+| Frontend | `static/css/header.css` | `.snb-overlay` `inset: 0` → `top: 52px; left: 0; right: 0; bottom: 0` |
+
+### 변경 상세
+
+**`.header` — z-index 추가 (안전장치)**
+```css
+/* 변경 전 */
+.header {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--bg2); border-bottom: 1px solid var(--border);
+  padding: 0 14px; height: 52px; flex-shrink: 0;
+}
+
+/* 변경 후 */
+.header {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--bg2); border-bottom: 1px solid var(--border);
+  padding: 0 14px; height: 52px; flex-shrink: 0;
+  position: relative; z-index: 900;
+}
+```
+
+**`.snb-drawer` / `.snb-overlay` — 헤더 아래에서 열리도록 수정**
+```css
+/* 변경 전 */
+.snb-overlay { position: fixed; inset: 0; ... }
+.snb-drawer  { position: fixed; top: 0;    height: 100vh; ... }
+
+/* 변경 후 */
+.snb-overlay { position: fixed; top: 52px; left: 0; right: 0; bottom: 0; ... }
+.snb-drawer  { position: fixed; top: 52px; height: calc(100vh - 52px); ... }
+```
+
+> `style.css` → `header.css` 리팩토링 시 2026-04-17에 적용됐던 `top: 52px` 수정이 누락되어 재적용
+
+### z-index 우선순위 정리
+
+| 요소 | z-index |
+|------|---------|
+| `.header` | 900 |
+| `.snb-drawer` | 801 |
+| `.snb-overlay` | 800 |
+| `.modal-backdrop` | 1000 |
+
+### 동작 변경
+
+| 상황 | 변경 전 | 변경 후 |
+|------|---------|---------|
+| SNB 열린 상태 | drawer가 top:0 → 헤더 전체를 덮어 ≡ 버튼 접근 불가 | drawer가 top:52px → 헤더 아래에서 열려 ≡ 버튼 항상 노출 |
+| SNB 열린 상태에서 ≡ 재클릭 | 클릭 차단 → toggle 미동작, X 버튼으로만 닫기 가능 | toggle 정상 동작 → SNB 닫힘 |
+| overlay 클릭 | SNB 닫힘 | SNB 닫힘 (유지) |
+| ✕ 버튼 클릭 | SNB 닫힘 | SNB 닫힘 (유지) |
+
+---
+
+## SNB 메뉴 클릭 시 페이지 이동 구현 (2026-04-22)
+
+### 배경
+
+SNB 메뉴 항목에 `path`가 정의되어 있었으나 실제 URL이 등록되지 않아 클릭 시 404가 발생하였습니다.
+또한 메뉴 레이블 2개(`SNB-07`, `SNB-08`)가 기획서와 다르게 표시되고 있어 함께 수정하였습니다.
+
+### 변경 파일
+
+| 구분 | 파일 경로 | 변경 내용 |
+|------|-----------|-----------|
+| Backend | `apps/dashboard/menu.py` | 전체 메뉴 `path` `/dashboard/...` 경로로 통일, SNB-07·SNB-08 레이블 수정 |
+| Backend | `apps/dashboard/urls.py` | 6개 서브 페이지 URL 패턴 추가 |
+| Backend | `apps/dashboard/views.py` | 6개 서브 페이지 뷰 함수 추가 |
+| Frontend | `static/js/refactors/app-sub.js` | 서브 페이지 전용 초기화 JS 신규 생성 |
+| Frontend | `templates/snb_details/safety_history.html` | 신규 |
+| Frontend | `templates/snb_details/monitoring_realtime.html` | 신규 |
+| Frontend | `templates/snb_details/monitoring_gas.html` | 신규 |
+| Frontend | `templates/snb_details/monitoring_power.html` | 신규 |
+| Frontend | `templates/snb_details/monitoring_workers.html` | 신규 |
+| Frontend | `templates/snb_details/monitoring_events.html` | 신규 |
+
+### 메뉴 레이블 변경
+
+| ID | 변경 전 | 변경 후 |
+|----|---------|---------|
+| SNB-07 | 유해가스 현황 | 실시간/AI 예측 유해가스 현황 |
+| SNB-08 | 스마트전력 현황 | 실시간/AI 예측 스마트 전력 현황 |
+
+### 추가된 URL
+
+| URL | 뷰 함수 | 메뉴 ID |
+|-----|---------|---------|
+| `/dashboard/safety/history/` | `safety_history_page` | SNB-04 |
+| `/dashboard/monitoring/realtime/` | `monitoring_realtime_page` | SNB-06 |
+| `/dashboard/monitoring/gas/` | `monitoring_gas_page` | SNB-07 |
+| `/dashboard/monitoring/power/` | `monitoring_power_page` | SNB-08 |
+| `/dashboard/monitoring/workers/` | `monitoring_workers_page` | SNB-09 |
+| `/dashboard/monitoring/events/` | `monitoring_events_page` | SNB-10 |
+
+### `app-sub.js` 신규 생성
+
+메인 대시보드의 `app.js`는 `initCharts()`, `MapPanel.init()`, `initWebSocket()` 등 대시보드 전용 모듈을 호출합니다.
+서브 페이지에서는 해당 모듈 JS가 로드되지 않으므로, 헤더·SNB 초기화만 수행하는 `app-sub.js`를 별도로 생성하였습니다.
+
+```javascript
+// app-sub.js — 헤더 / SNB 초기화만 수행 (차트·WebSocket 제외)
+async function initApp() {
+  if (!Auth.getAccessToken()) { Auth.redirectLogin(); return; }
+  const user = await Auth.getMe();
+  if (!user) {
+    Header.renderUser(Auth.getUsername() || '-');
+    Menu.showError();
+  } else {
+    Header.renderUser(user.username);
+    Header.showAdminBtn(user.role);
+    Menu.render(user.menu_tree);
+  }
+  SNB.init();
+  Header.init();
+  Header.updateLastUpdated();
+}
+```
+
+각 서브 페이지 로드 순서:
+```html
+<script src="util.js"></script>
+<script src="auth.js"></script>
+<script src="layout.js"></script>
+<script src="app-sub.js"></script>
+```
+
+
+---
+
+## SNB "메뉴" 헤더 및 ✕ 버튼 제거 (2026-04-22)
+
+### 변경 파일
+
+| 구분 | 파일 경로 | 변경 내용 |
+|------|-----------|-----------|
+| Frontend | `templates/components/header.html` | `.snb-head` 블록("메뉴" 제목 + ✕ 버튼) 제거 |
+| Frontend | `static/js/refactors/layout.js` | `snbClose` 이벤트 리스너 제거 |
+
+### 변경 상세
+
+```html
+<!-- 변경 전 -->
+<nav id="snbDrawer" class="snb-drawer">
+  <div class="snb-head">
+    <span class="snb-title">메뉴</span>
+    <button id="snbClose" class="snb-close-btn">✕</button>
+  </div>
+  <div id="snbMenu" class="snb-menu">...</div>
+</nav>
+
+<!-- 변경 후 -->
+<nav id="snbDrawer" class="snb-drawer">
+  <div id="snbMenu" class="snb-menu">...</div>
+</nav>
+```
+
+---
+
+## 작업 전 안전 확인 체크리스트 페이지 구현 (2026-04-22)
+
+### 배경
+
+임시 더미 테이블로 구성된 기존 `safety_checklist.html`을 기획서 스펙에 맞게 전면 재구성하였습니다.
+
+### 변경 파일
+
+| 구분 | 파일 경로 | 변경 내용 |
+|------|-----------|-----------|
+| Frontend | `templates/snb_details/safety_checklist.html` | 전면 재구성 |
+
+### 구현 상세
+
+| 번호 | 요소 | 구현 내용 |
+|------|------|-----------|
+| ① | 화면 제목 | "작업 전 안전 확인 - 안전 확인 체크리스트" + 시스템 날짜 |
+| ② | 안내 배너 | 노란 배경(`#4a3a00`) + 경고 SVG 아이콘, `flex-shrink:0`으로 스크롤 시 고정 |
+| ③④ | 체크리스트 | 9개 섹션, 총 33개 항목 (`data-section` 속성으로 섹션 구분) |
+| ⑤ | 스크롤 | 체크리스트 영역만 `overflow-y: auto` 적용 |
+| ⑥ | 취소 버튼 | 전체 체크 초기화 + `/dashboard/` 이동 |
+| ⑦ | 다음 버튼 | 전체 항목 체크 완료 시 파란색 활성화, 클릭 시 완료 확인 모달 표시 후 `/dashboard/safety/vr/` 이동 |
+| ⑧ | 유효성 오류 | 미체크 섹션 제목 옆에 "모든 항목을 체크해 주세요." 표시 + 해당 섹션으로 자동 스크롤 |
+
+### 체크리스트 섹션 구성 (9개 섹션 / 33개 항목)
+
+| 섹션 | 항목 수 |
+|------|---------|
+| 1. 작업 구역 안전 확인 | 6개 |
+| 2. 배관 작업 안전 확인 | 5개 |
+| 3. 용접 및 화기 작업 확인 | 4개 |
+| 4. 고소 작업 확인 | 4개 |
+| 5. 설비 및 장비 확인 | 4개 |
+| 6. 가스 및 환경 위험 확인 | 4개 |
+| 7. 주변 작업자 안전 확인 | 2개 |
+| 8. 비상 대응 확인 | 3개 |
+| 9. 최종 확인 | 1개 |
+
+### 완료 확인 모달
+
+다음 버튼 클릭(전체 항목 체크 완료 상태) 시 모달을 띄운 뒤 확인 클릭 시 VR 교육 페이지로 이동합니다.
+
+```
+[다음 버튼 클릭]
+  → 미체크 항목 존재: 섹션별 오류 문구 표시 + 스크롤
+  → 전체 체크 완료: 완료 확인 모달 표시
+      → [확인] → /dashboard/safety/vr/ 이동
+```
+
+---
+
+## 작업 전 안전 확인 - VR 교육 페이지 구현 (2026-04-22)
+
+### 변경 파일
+
+| 구분 | 파일 경로 | 변경 내용 |
+|------|-----------|-----------|
+| Backend | `apps/dashboard/views.py` | `safety_vr_page` 뷰 함수 추가, `VRProgressView` API 추가 |
+| Backend | `apps/dashboard/urls.py` | `/dashboard/safety/vr/`, `/dashboard/api/vr-progress/` URL 추가 |
+| Frontend | `templates/snb_details/safety_vr.html` | 신규 생성 |
+
+### 구현 상세
+
+| 번호 | 요소 | 구현 내용 |
+|------|------|-----------|
+| ① | 페이지 타이틀 | "작업 전 안전 확인 - VR 교육" + 시스템 날짜 |
+| ② | 안내 배너 | 노란 배경 + 경고 아이콘, 고정 표시 |
+| ③ | 체크리스트 완료 카드 | 녹색 체크 아이콘 + "체크리스트 완료" + 안내 서브텍스트 |
+| ④ | 비디오 플레이어 | 중앙 재생 버튼 오버레이, 앞으로 건너뛰기 차단(`seeking` 이벤트), `visibilitychange`·`pagehide`로 이탈 시 위치 자동 저장 |
+| ⑤ | 이전 버튼 | "작업 전 안전 확인을 중단하시겠습니까?" 팝업 → 확인 시 위치 저장 후 대시보드 이동 |
+| ⑥ | 완료 버튼 | 영상 `ended` 이벤트 시 파란색 활성화, 클릭 시 완료 팝업 → 대시보드 이동 및 저장 위치 초기화 |
+
+### VR 진행 위치 저장 API
+
+| 항목 | 내용 |
+|------|------|
+| 엔드포인트 | `GET /dashboard/api/vr-progress/` — 저장된 시청 위치(초) 반환 |
+| 엔드포인트 | `POST /dashboard/api/vr-progress/` — 현재 시청 위치 저장 |
+| 저장 방식 | Django 세션 (`SESSION_KEY = "vr_safety_progress"`) |
+| 재진입 동작 | 페이지 로드 시 저장 위치 조회 → `video.currentTime` 설정하여 이어보기 |
+
+### 건너뛰기 방지 로직
+
+```javascript
+video.addEventListener('seeking', () => {
+  if (video.currentTime > maxReached + 0.5) {
+    video.currentTime = maxReached;  // 최대 시청 위치 이후로 seek 불가
+  }
+});
+```
+
+### 페이지 이동 흐름
+
+```
+체크리스트 완료 → [확인 모달] → VR 교육 페이지
+  ├─ 영상 시청 중 이탈(이전 버튼 / 브라우저 닫기)
+  │    → 시청 위치 저장 → 대시보드
+  │    → 재진입 시 저장 위치부터 자동 재생
+  └─ 영상 100% 완료
+       → 완료 버튼 활성화 → [완료 팝업] → 대시보드
+```
+
+---
+
+## 체크리스트 전체 선택 버튼 추가 (2026-04-22)
+
+### 배경
+
+개발 중 체크리스트 항목(33개)을 매번 직접 클릭해서 테스트하는 불편함을 해소하기 위해 전체 선택 버튼을 추가하였습니다.
+
+### 변경 파일
+
+| 구분 | 파일 경로 | 변경 내용 |
+|------|-----------|-----------|
+| Frontend | `templates/snb_details/safety_checklist.html` | 전체 선택 버튼 추가, 버튼 순서 변경 |
+| Frontend | `static/css/safety_checklist.css` | `.btn-select-all` 스타일 추가 |
+
+### 버튼 순서
+
+| 변경 전 | 변경 후 |
+|---------|---------|
+| 취소 / 다음 | 전체 선택 / 취소 / 다음 |
+
+### 전체 선택 동작
+
+```
+[전체 선택 클릭]
+  → 모든 체크박스 checked 처리
+  → 각 .check-item에 .checked 클래스 추가
+  → 섹션별 에러 문구 제거
+  → 다음 버튼 활성화
+```
+
+---
+
+## 나의 안전확인 패널 동적 연동 (2026-04-22)
+
+### 배경
+
+메인 대시보드의 "나의 안전확인" 패널(체크리스트, VR 교육)이 하드코딩되어 있어 실제 완료 여부와 무관하게 고정 표시되는 문제를 해결하였습니다.
+
+### 변경 파일
+
+| 구분 | 파일 경로 | 변경 내용 |
+|------|-----------|-----------|
+| Backend | `apps/dashboard/views.py` | `MySafetyStatusView` 추가 |
+| Backend | `apps/dashboard/urls.py` | `/dashboard/api/safety-status/` URL 추가 |
+| Frontend | `templates/main_dashboard.html` | 체크리스트·VR 상태 span에 ID 부여, 초기값 미완료로 변경 |
+| Frontend | `templates/snb_details/safety_checklist.html` | 확인 모달 버튼 클릭 시 완료 API 호출 추가 |
+| Frontend | `templates/snb_details/safety_vr.html` | 완료 모달 확인 시 완료 API 호출 추가 |
+| Frontend | `static/js/refactors/app.js` | `loadMySafetyStatus()` 추가 |
+
+### API 명세
+
+#### `GET /dashboard/api/safety-status/`
+
+오늘 날짜 기준 체크리스트·VR 교육 완료 여부 반환
+
+```json
+{
+  "checklist_done": true,
+  "vr_done": false
+}
+```
+
+#### `POST /dashboard/api/safety-status/`
+
+완료 항목을 세션에 저장
+
+```json
+{ "key": "checklist" }  // 또는 "vr"
+```
+
+### 완료 상태 저장 방식
+
+| 항목 | 저장 키 | 저장 값 |
+|------|---------|---------|
+| 안전 확인 체크리스트 | `safety_checklist_done_date` | 오늘 날짜 (YYYY-MM-DD) |
+| VR 교육 | `safety_vr_done_date` | 오늘 날짜 (YYYY-MM-DD) |
+
+- 날짜 기준으로 저장하므로 다음 날 자동으로 미완료로 초기화됨
+- PPE 착용은 별도 트래킹 시스템 미구현으로 항상 완료 표시 유지
+
+### 완료 흐름
+
+```
+[체크리스트 확인 버튼 클릭]
+  → POST /dashboard/api/safety-status/ { key: "checklist" }
+  → /dashboard/safety/vr/ 이동
+
+[VR 완료 모달 확인 버튼 클릭]
+  → POST /dashboard/api/safety-status/ { key: "vr" }
+  → /dashboard/ 이동
+
+[대시보드 로드]
+  → GET /dashboard/api/safety-status/
+  → checklist_done / vr_done 값으로 완료·미완료 텍스트 및 CSS 클래스 갱신
+```
+
+### 대시보드 패널 렌더링 변경
+
+| 항목 | 변경 전 | 변경 후 |
+|------|---------|---------|
+| 안전 확인 체크리스트 | `완료` 하드코딩 | API 응답에 따라 `완료` / `미완료` 동적 표시 |
+| VR 교육 | `미완료` 하드코딩 | API 응답에 따라 `완료` / `미완료` 동적 표시 |
+
+---
+
+## CSS 파일 구조 정리 (2026-04-22)
+
+### 배경
+
+`static/css/` 하위 CSS 파일이 모두 평면 구조로 나열되어 있어, 템플릿 폴더 구조(`templates/auth/`, `templates/components/`, `templates/snb_details/`)와 불일치하였습니다. 템플릿과 동일한 구조로 CSS를 재배치하였습니다.
+
+### 변경 전 / 후 구조
+
+**변경 전**
+```
+static/css/
+  dashboard.css
+  header.css
+  login.css
+  safety_checklist.css
+  safety_vr.css
+```
+
+**변경 후**
+```
+static/css/
+  dashboard.css
+  auth/
+    login.css
+  components/
+    header.css
+  snb_details/
+    safety_checklist.css
+    safety_vr.css
+```
+
+### 변경 파일
+
+| 구분 | 파일 경로 (변경 전) | 파일 경로 (변경 후) |
+|------|-------------------|-------------------|
+| CSS | `static/css/login.css` | `static/css/auth/login.css` |
+| CSS | `static/css/header.css` | `static/css/components/header.css` |
+| CSS | `static/css/safety_checklist.css` | `static/css/snb_details/safety_checklist.css` |
+| CSS | `static/css/safety_vr.css` | `static/css/snb_details/safety_vr.css` |
+
+### `{% static %}` 경로 수정 대상 HTML
+
+| 파일 | 수정된 경로 |
+|------|------------|
+| `templates/auth/login.html` | `css/login.css` → `css/auth/login.css` |
+| `templates/main_dashboard.html` | `css/header.css` → `css/components/header.css` |
+| `templates/components/header.html` | (해당 없음) |
+| `templates/snb_details/safety_checklist.html` | `css/header.css` → `css/components/header.css`<br>`css/safety_checklist.css` → `css/snb_details/safety_checklist.css` |
+| `templates/snb_details/safety_vr.html` | `css/header.css` → `css/components/header.css`<br>`css/safety_vr.css` → `css/snb_details/safety_vr.css` |
+| `templates/snb_details/safety_history.html` 외 모니터링 4개 | `css/header.css` → `css/components/header.css` |

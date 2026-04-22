@@ -1,6 +1,6 @@
 # facilities/selectors/active_devices.py
 
-from facilities.models import GasSensor, PowerDevice
+from apps.facilities.models import GasSensor, PowerDevice
 
 
 def get_active_devices_for_facility(facility_id: int):

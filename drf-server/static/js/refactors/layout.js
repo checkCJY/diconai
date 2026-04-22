@@ -19,7 +19,6 @@ const SNB = {
 
   init() {
     document.getElementById('hamburger')?.addEventListener('click', () => this.toggle());
-    document.getElementById('snbClose') ?.addEventListener('click', () => this.close());
     this.overlay?.addEventListener('click', () => this.close());
   },
 };
@@ -126,7 +125,7 @@ const Header = {
   updateLastUpdated() {
     const el = document.getElementById('lastUpdate');
     if (!el) return;
-    el.textContent = nowLabel();
+    el.textContent = nowDateLabel();
   },
 
   async handleRefresh() {
@@ -156,7 +155,7 @@ const Header = {
     else { window.location.href = '/dashboard/'; }
   },
 
-  handleAdmin() { window.location.href = this.adminUrl || '/admin/'; },
+  handleAdmin() { window.location.href = this.adminUrl || '/dashboard/admin/'; },
 
   initLogout() {
     const modal         = document.getElementById('logoutModal');
@@ -175,7 +174,7 @@ const Header = {
   },
 
   showAdminBtn(role) {
-    if (role === 'admin' || role === 'superadmin') {
+    if (role === 'facility_admin' || role === 'super_admin') {
       const btn = document.getElementById('btnAdmin');
       if (btn) btn.style.display = '';
     }

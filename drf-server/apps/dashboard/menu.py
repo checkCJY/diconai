@@ -14,7 +14,11 @@ _MENU_WORKER = [
                 "label": "작업 전 안전 확인",
                 "path": "/dashboard/safety/checklist/",
             },
-            {"id": "SNB-04", "label": "안전 확인 이력", "path": "/safety/history"},
+            {
+                "id": "SNB-04",
+                "label": "안전 확인 이력",
+                "path": "/dashboard/safety/history/",
+            },
         ],
     },
     {
@@ -25,12 +29,28 @@ _MENU_WORKER = [
             {
                 "id": "SNB-06",
                 "label": "실시간 모니터링",
-                "path": "/monitoring/realtime",
+                "path": "/dashboard/monitoring/realtime/",
             },
-            {"id": "SNB-07", "label": "유해가스 현황", "path": "/monitoring/gas"},
-            {"id": "SNB-08", "label": "스마트전력 현황", "path": "/monitoring/power"},
-            {"id": "SNB-09", "label": "작업자 현황", "path": "/monitoring/workers"},
-            {"id": "SNB-10", "label": "이벤트 현황", "path": "/monitoring/events"},
+            {
+                "id": "SNB-07",
+                "label": "실시간/AI 예측 유해가스 현황",
+                "path": "/dashboard/monitoring/gas/",
+            },
+            {
+                "id": "SNB-08",
+                "label": "실시간/AI 예측 스마트 전력 현황",
+                "path": "/dashboard/monitoring/power/",
+            },
+            {
+                "id": "SNB-09",
+                "label": "작업자 현황",
+                "path": "/dashboard/monitoring/workers/",
+            },
+            {
+                "id": "SNB-10",
+                "label": "이벤트 현황",
+                "path": "/dashboard/monitoring/events/",
+            },
         ],
     },
 ]

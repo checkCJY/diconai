@@ -72,7 +72,9 @@
 
   async function fetchWorkerStatus() {
     try {
-      const res = await fetch(API_MY_STATUS, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+      // Auth.apiFetch: Authorization: Bearer <JWT> 헤더 자동 포함 (auth.js)
+      const res = await Auth.apiFetch(API_MY_STATUS, { headers: { Accept: 'application/json' } });
+      if (res.status === 401) { Auth.redirectLogin(); return; }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       renderWorkerStatus((await res.json()).data);
     } catch { renderWorkerError('데이터를 불러오지 못했습니다.'); }
@@ -80,7 +82,9 @@
 
   async function fetchWorkerSummary() {
     try {
-      const res = await fetch(API_WORKER_SUMMARY, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+      // Auth.apiFetch: Authorization: Bearer <JWT> 헤더 자동 포함 (auth.js)
+      const res = await Auth.apiFetch(API_WORKER_SUMMARY, { headers: { Accept: 'application/json' } });
+      if (res.status === 401) { Auth.redirectLogin(); return; }
       if (res.status === 403) { renderAdminError('접근 권한이 없습니다.'); return; }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       renderAdminSummary((await res.json()).data);
@@ -89,8 +93,10 @@
 
   document.getElementById('mn04-btn-detail')?.addEventListener('click', () => { window.location.href = '/monitoring/workers'; });
 
+
   function init() {
-    const isAdmin = (localStorage.getItem('role') || 'worker') === 'admin';
+    const role = localStorage.getItem('role') || 'worker';
+    const isAdmin = role === 'facility_admin' || role === 'super_admin';
     if (isAdmin) {
       if (viewWorker) viewWorker.style.display = 'none';
       if (viewAdmin)  viewAdmin.style.display  = 'flex';

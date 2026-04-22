@@ -1,5 +1,5 @@
 # core/services/audit_service.py
-from core.models import SystemLog
+from apps.core.models import SystemLog
 
 
 def log_action(

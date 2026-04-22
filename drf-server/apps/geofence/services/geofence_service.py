@@ -50,7 +50,27 @@ def update_polygon(
     # )
     # recalculate_worker_positions_for_facility(geofence.facility_id)
 
+    # positioning 앱에 캐시 재계산 요청
+    from apps.positioning.services.position_service import (
+        recalculate_worker_positions_for_facility,
+    )
+
+    recalculate_worker_positions_for_facility(geofence.facility_id)
+
     # TODO: 4차에서 구현
     # from apps.core.services.audit_service import log_action
     # from apps.core.models import SystemLog
     # log_action(...)
+
+    # 감사 로그
+    from apps.core.services.audit_service import log_action
+    from apps.core.models import SystemLog
+
+    log_action(
+        actor_id=actor_user_id,
+        action_type=SystemLog.ActionType.GEOFENCE_UPDATE,
+        target_model="GeoFence",
+        target_id=geofence.pk,
+        new_value={"polygon": new_polygon},
+        description=f"지오펜스 '{geofence.name}' polygon 수정",
+    )
