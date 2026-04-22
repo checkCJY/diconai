@@ -9,3 +9,6 @@ deactivate
 ### FastAPI 실행 명령어
 uvicorn main:app --reload --port 8001
 uvicorn websocket:app --reload --port 8001
+
+### 더미데이터 들어오는것 확인
+.venv/bin/python legacy/test_schemas.py
