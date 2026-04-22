@@ -156,7 +156,7 @@ const Header = {
     else { window.location.href = '/dashboard/'; }
   },
 
-  handleAdmin() { window.location.href = this.adminUrl || '/admin/'; },
+  handleAdmin() { window.location.href = this.adminUrl || '/dashboard/admin/'; },
 
   initLogout() {
     const modal         = document.getElementById('logoutModal');
