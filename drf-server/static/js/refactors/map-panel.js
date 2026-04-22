@@ -338,24 +338,7 @@ const MapPanel = {
     });
   },
 
-  _startWorkerAnimation() {
-    setInterval(() => {
-      Object.values(this.workerMarkers).forEach(({ marker, data }) => {
-        if (data.movement_status !== 'moving') return;
-        const cur = marker.getLatLng();
-        let nx = cur.lng + data.dx + (Math.random() - 0.5) * 3;
-        let ny = cur.lat + data.dy + (Math.random() - 0.5) * 3;
-        if (nx <= 0 || nx >= 1290) data.dx *= -1;
-        if (ny <= 0 || ny >= 590)  data.dy *= -1;
-        nx = Math.max(0, Math.min(1290, nx));
-        ny = Math.max(0, Math.min(590,  ny));
-        marker.setLatLng([ny, nx]);
-        data.x = Math.round(nx);
-        data.y = Math.round(ny);
-        if (marker.isPopupOpen()) marker.setPopupContent(this.workerPopupHtml(data));
-      });
-    }, 1000);
-  },
+  _startWorkerAnimation() {},
 
   updateGasSensorFromWS(wsData) {
     const entry = this.gasMarkers['sensor_01'];
@@ -368,4 +351,19 @@ const MapPanel = {
     entry.data.o2  = wsData.o2;
     if (entry.marker.isPopupOpen()) entry.marker.setPopupContent(this.gasPopupHtml(entry.data));
   },
+  updateWorkerPositions(positions) {
+  positions.forEach(w => {
+    const entry = this.workerMarkers[w.worker_id];  // worker_id로 찾음
+    if (!entry) return;
+
+    entry.marker.setLatLng([w.y, w.x]);
+    entry.data.x = w.x;
+    entry.data.y = w.y;
+    entry.data.movement_status = w.movement_status;
+
+    if (entry.marker.isPopupOpen()) {
+      entry.marker.setPopupContent(this.workerPopupHtml(entry.data));
+    }
+  });
+},
 };

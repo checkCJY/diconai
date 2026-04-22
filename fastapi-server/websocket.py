@@ -3,8 +3,11 @@ import random
 from datetime import datetime
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
-app = FastAPI()
+# 4/22 추가
+from positioning.routers.position_router import router as positioning_router
 
+app = FastAPI()
+app.include_router(positioning_router)  # 4/22 추가
 
 EQUIPMENT_LIST = [
     {"name": "압연기", "base_mwh": 15.2, "base_temp": 125},
