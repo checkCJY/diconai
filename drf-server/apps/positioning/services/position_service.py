@@ -12,6 +12,7 @@ def handle_position_receive(
     facility_id: int,
     x: float,
     y: float,
+    movement_status: str,  # 파라미터 추가
     measured_at,
 ):
     """
@@ -23,6 +24,7 @@ def handle_position_receive(
         facility_id=facility_id,
         x=x,
         y=y,
+        movement_status=movement_status,  # 추가
         measured_at=measured_at,
     )
 

@@ -103,24 +103,3 @@
 </script>
 </body>
 </html>
-
-
-/*
-1. 테스트 서버 실행 중인지 확인 (port 8002)
-
-
-uvicorn power_system.websocket_test:app --reload --port 8002
-2. 더미 센더 실행 중인지 확인
-
-3. 파일 브라우저에서 직접 열기
-
-
-fastapi-server/power_system/powersystem_cjy.html
-열면 이런 테이블이 1초마다 갱신됩니다:
-
-CH	ON/OFF	전류 (A)	전압 (V)	전력 (W)
-CH1	ON	12.5	220.0	2750
-CH2	OFF	통신불능	0	0
-...
-통신불능은 value가 -1인 채널, 데이터 미수신은 더미 센더가 꺼진 상태입니다
-*/

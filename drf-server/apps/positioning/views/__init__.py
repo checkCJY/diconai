@@ -1,3 +1,3 @@
-from .position_receive import PositionReceiveView
+from .position_views import WorkerPositionReceiveView
 
-__all__ = ["PositionReceiveView"]
+__all__ = ["WorkerPositionReceiveView"]

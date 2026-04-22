@@ -22,7 +22,8 @@ from datetime import datetime, timezone
 import httpx
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
-app = FastAPI()
+# 4/22 추가
+from positioning.routers.position_router import router as positioning_router
 
 # ────────────────────────────────────────────────────────────
 # [추가] DRF 연동 설정 (position_forwarder.py 에서 이전)
@@ -30,6 +31,9 @@ app = FastAPI()
 DRF_BASE_URL = os.getenv("DRF_BASE_URL", "http://localhost:8000")
 DRF_SERVICE_TOKEN = os.getenv("DRF_SERVICE_TOKEN", "")
 POSITION_ENDPOINT = f"{DRF_BASE_URL}/positioning/api/receive/"
+
+app = FastAPI()
+app.include_router(positioning_router)  # 4/22 추가
 
 # [추가] 작업자 최신 위치 공유 상태 — { worker_id: { x, y, facility_id, updated_at } }
 # /ws/position/ 수신 시 갱신, /ws/sensors/ 송출 시 페이로드에 포함

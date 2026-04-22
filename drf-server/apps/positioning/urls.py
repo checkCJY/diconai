@@ -1,6 +1,7 @@
+# apps/positioning/urls.py
 from django.urls import path
-from apps.positioning.views import PositionReceiveView
+from apps.positioning.views import WorkerPositionReceiveView
 
 urlpatterns = [
-    path("api/receive/", PositionReceiveView.as_view(), name="position-receive"),
+    path("receive/", WorkerPositionReceiveView.as_view(), name="position-receive"),
 ]

@@ -74,11 +74,13 @@ class GeoFence(models.Model):
             prev_x, prev_y = vertices[prev_idx]
             crosses_ray_y = (curr_y > y) != (prev_y > y)
             if crosses_ray_y:
-                intersection_x = (prev_x - curr_x) * (y - curr_y) / (
-                    prev_y - curr_y
-                ) + curr_x
-            if crosses_ray_y and (x < intersection_x):
-                is_inside = not is_inside
+                denom = prev_y - curr_y
+                if denom == 0:
+                    prev_idx = curr_idx
+                    continue
+                intersection_x = (prev_x - curr_x) * (y - curr_y) / denom + curr_x
+                if x < intersection_x:
+                    is_inside = not is_inside
             prev_idx = curr_idx
         return is_inside
 

@@ -128,6 +128,29 @@ function initWebSocket() {
       setTimeout(connect, 5000);   // 5초 후 재연결
     };
   }
+  function connectPositions() {
+    let wsPos;
+    try {
+      wsPos = new WebSocket('ws://127.0.0.1:8001/ws/positions/');
+    } catch {
+      return;
+    }
+
+    wsPos.onmessage = (e) => {
+      let data;
+      try { data = JSON.parse(e.data); } catch { return; }
+
+      // 작업자 위치 실시간 업데이트
+      if (data.worker_positions) {
+        MapPanel.updateWorkerPositions(data.worker_positions);
+      }
+    };
+
+    wsPos.onclose = () => {
+      setTimeout(connectPositions, 5000); // 5초 후 재연결
+    };
+  }
 
   connect();
+  connectPositions();
 }
