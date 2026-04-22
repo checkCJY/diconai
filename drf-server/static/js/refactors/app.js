@@ -33,6 +33,27 @@ async function initApp() {
   initWebSocket();
   AlarmPopup.init();
   EventPanel.init();
+  loadMySafetyStatus();
+}
+
+async function loadMySafetyStatus() {
+  try {
+    const res = await fetch('/dashboard/api/safety-status/');
+    if (!res.ok) return;
+    const data = await res.json();
+
+    const checklistEl = document.getElementById('safety-checklist-status');
+    const vrEl        = document.getElementById('safety-vr-status');
+
+    if (checklistEl) {
+      checklistEl.textContent = data.checklist_done ? '완료' : '미완료';
+      checklistEl.className   = data.checklist_done ? 'done' : 'todo';
+    }
+    if (vrEl) {
+      vrEl.textContent = data.vr_done ? '완료' : '미완료';
+      vrEl.className   = data.vr_done ? 'done' : 'todo';
+    }
+  } catch { /* 실패 시 기본값(미완료) 유지 */ }
 }
 
 initApp();
