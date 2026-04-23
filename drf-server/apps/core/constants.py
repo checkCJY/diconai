@@ -63,6 +63,18 @@ class UserType(models.TextChoices):
     VIEWER = "viewer", "열람자"
 
 
+class SensorStatus(models.TextChoices):
+    """
+    센서 통신 상태 — PowerData.sensor_status 전용
+
+    ACTIVE      : 정상 측정 중
+    COMM_FAILURE: 통신 불능 (-1 수신, value=NULL 저장)
+    """
+
+    ACTIVE = "active", "정상"
+    COMM_FAILURE = "comm_failure", "통신 불능"
+
+
 class GasTypeChoices(models.TextChoices):
     """
     가스 종류 — 9종 유해가스 + LEL

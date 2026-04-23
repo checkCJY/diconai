@@ -149,9 +149,14 @@ class _PowerMeasurementBase(BaseModel):
     slave71: float = Field(ge=-1)
     slave72: float = Field(ge=-1)
 
-    def to_channel_values(self) -> dict[int, float]:
-        """채널 번호(1~16) → 측정값 매핑으로 변환. -1(통신 불능) 포함."""
-        return {SLAVE_TO_CHANNEL[key]: getattr(self, key) for key in SLAVE_KEYS}
+    def to_channel_values(self) -> dict[int, float | None]:
+        """채널 번호(1~16) → 측정값 매핑으로 변환. 통신 불능(-1)은 None으로 변환."""
+        return {
+            SLAVE_TO_CHANNEL[key]: None
+            if getattr(self, key) == -1
+            else getattr(self, key)
+            for key in SLAVE_KEYS
+        }
 
 
 # ============================================================

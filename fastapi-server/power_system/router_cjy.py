@@ -67,11 +67,16 @@ def _now_utc_iso() -> str:
 def _to_channel_list(payload) -> list[dict]:
     """
     채널값 딕셔너리 → DRF channels 리스트 변환.
-    risk_level은 NORMAL 고정 — 전력 임계치 미정의 (thresholds.py 구현 후 계산 로직 추가)
-    value == -1(통신 불능) 채널도 그대로 전달 — DRF에서 저장
+    통신 불능 채널(None): sensor_status='comm_failure', risk_level 미적용
+    정상 채널: sensor_status='active', risk_level='normal' 고정 (임계치 미정의)
     """
     return [
-        {"channel": ch, "value": val, "risk_level": "normal"}
+        {
+            "channel": ch,
+            "value": val,
+            "sensor_status": "comm_failure" if val is None else "active",
+            "risk_level": "normal",
+        }
         for ch, val in payload.to_channel_values().items()
     ]
 

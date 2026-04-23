@@ -1,0 +1,45 @@
+/* ==========================================================
+   dashboard_CJY.css — 전력 패널 UI 확장 스타일
+   적용 대상: main_dashboard_CJY.html
+   ========================================================== */
+
+/* ── 상세 보기 링크 ────────────────────────────────────────── */
+a.more {
+  text-decoration: none;
+}
+
+/* ── ON/OFF 배지 ───────────────────────────────────────────── */
+.brisk.on  { background: var(--safe);    color: #0d1117; }
+.brisk.off { background: #30363d;        color: var(--text2); }
+
+/* ── 오류/통신불능 배지 (gray) ────────────────────────────── */
+/* UI_Handling.md: 통신 장애/빈 데이터 → 모든 배지를 gray로 */
+.brisk.gray { background: #30363d; color: var(--text2); }
+
+/* ── 패널 상태 메시지 ─────────────────────────────────────── */
+/* UI_Handling.md: 패널 중앙에 오버레이 텍스트 */
+.panel-msg {
+  text-align: center;
+  padding: 12px 0;
+  color: var(--text2);
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+/* ── 스켈레톤 UI (Loading 상태) ───────────────────────────── */
+/* UI_Handling.md: 로딩 중 → 깜빡이는 회색 박스 */
+@keyframes skel-pulse {
+  0%, 100% { opacity: 0.4; }
+  50%       { opacity: 0.9; }
+}
+
+.skeleton {
+  display: inline-block;
+  background: #30363d;
+  border-radius: 3px;
+  animation: skel-pulse 1.4s ease-in-out infinite;
+}
+
+.skel-text  { width: 60px;  height: 10px; }
+.skel-sm    { width: 36px;  height: 10px; }
+.skel-badge { width: 28px;  height: 14px; border-radius: 3px; }

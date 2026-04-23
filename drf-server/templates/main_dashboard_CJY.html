@@ -1,0 +1,251 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>산재 예방 통합 관제 시스템</title>
+<link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+<link rel="stylesheet" href="{% static 'css/dashboard_CJY.css' %}">
+<!-- 헤더 / SNB / 모달 / 스피너 CSS (header.html 컴포넌트와 쌍으로 관리) -->
+<link rel="stylesheet" href="{% static 'css/components/header.css' %}">
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>window.FACTORY_MAP_URL = "{% static 'img/factory_map.svg' %}";</script>
+</head>
+<body>
+
+{% include 'components/header.html' %}
+
+<div class="body-wrap">
+  <div class="top-row">
+
+    <!-- 좌측 -->
+    <div class="col-left">
+      <div class="panel">
+        <div class="panel-title">나의 안전확인</div>
+        <div class="safety-item"><span>PPE 착용</span><span class="done">완료</span></div>
+        <div class="safety-item"><span>안전 확인 체크리스트</span><span id="safety-checklist-status" class="todo">미완료</span></div>
+        <div class="safety-item"><span>VR 교육</span><span id="safety-vr-status" class="todo">미완료</span></div>
+        <button class="safety-btn" onclick="location.href='/dashboard/safety/checklist/'">나의 안전 확인 바로가기</button>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">
+          작업자 현황
+          <span class="more" id="mn04-btn-detail">+ 상세 보기</span>
+        </div>
+        <div id="mn04-view-worker" style="display:none;">
+          <div class="sub" style="margin-bottom:6px;">현재 나의 상태</div>
+          <div class="mn04-status-bar-wrap">
+            <div class="mn04-status-bar">
+              <div class="mn04-bar-section mn04-bar-normal">정상</div>
+              <div class="mn04-bar-section mn04-bar-warning">경고</div>
+              <div class="mn04-bar-section mn04-bar-danger">위험</div>
+            </div>
+            <div class="mn04-marker" id="mn04-marker" style="left:16%;color:#2d9e75;">▼</div>
+          </div>
+          <div class="mn04-status-text" id="mn04-status-text" style="color:#2d9e75;">--</div>
+          <div class="mn04-error" id="mn04-worker-error" style="display:none;"></div>
+        </div>
+        <div id="mn04-view-admin" style="display:none;">
+          <div class="mn04-kpi-grid">
+            <div class="mn04-kpi-card mn04-kpi-total">
+              <div class="mn04-kpi-label">총원</div>
+              <div class="mn04-kpi-value" id="mn04-kpi-total">--</div>
+            </div>
+            <div class="mn04-kpi-card mn04-kpi-normal">
+              <div class="mn04-kpi-label">정상</div>
+              <div class="mn04-kpi-value" id="mn04-kpi-normal">--</div>
+            </div>
+            <div class="mn04-kpi-card mn04-kpi-warning">
+              <div class="mn04-kpi-label">경고</div>
+              <div class="mn04-kpi-value" id="mn04-kpi-warning">--</div>
+            </div>
+            <div class="mn04-kpi-card mn04-kpi-danger">
+              <div class="mn04-kpi-label">위험</div>
+              <div class="mn04-kpi-value" id="mn04-kpi-danger">--</div>
+            </div>
+          </div>
+          <div class="mn04-ratio-bar" id="mn04-ratio-bar" style="display:none;">
+            <div class="mn04-ratio-normal"  id="mn04-ratio-normal"></div>
+            <div class="mn04-ratio-warning" id="mn04-ratio-warning"></div>
+            <div class="mn04-ratio-danger"  id="mn04-ratio-danger"></div>
+          </div>
+          <div class="mn04-error" id="mn04-admin-error" style="display:none;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 가운데: 지도 -->
+    <div class="col-mid">
+      <div class="panel panel-map">
+        <div class="panel-title">
+          실시간 모니터링
+          <span id="wsStatus" class="ws-status">연결 중...</span>
+          <span class="more">+ 상세 보기</span>
+        </div>
+        <div class="map-tabs">
+          <button class="map-tab active" data-layer="all">전체</button>
+          <button class="map-tab" data-layer="worker">작업자</button>
+          <button class="map-tab" data-layer="geofence">위험구역</button>
+          <button class="map-tab" data-layer="gas">유해가스 센서</button>
+          <button class="map-tab" data-layer="facility">설비</button>
+          <button class="map-tab" data-layer="power">스마트 전력</button>
+          <button class="map-tab" data-layer="location">위치센서</button>
+        </div>
+        <!-- 지도 영역 -->
+        <div class="map-area" style="padding:0; position:relative;">
+          <div id="map"></div>
+          <!-- 관리자 전용 드로잉 버튼 -->
+          <div id="geofence-toolbar" style="display:none;">
+            <button id="btn-draw-geofence" class="geofence-draw-btn">✏️ 구역 그리기</button>
+            <button id="btn-draw-done" class="geofence-draw-btn" style="display:none;">✅ 완료</button>
+            <button id="btn-draw-cancel" class="geofence-cancel-btn" style="display:none;">❌ 취소</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 우측 -->
+    <div class="col-right">
+      <div class="panel" style="flex:1;overflow:hidden;">
+        <div class="panel-title">이벤트 현황 <span class="more">+ 상세 보기</span></div>
+        <div class="event-summary">
+          최근 24시간 동안 발생한 이벤트 현황<br>
+          <span class="danger-text">위험 <span id="summary-danger">0</span>건</span>
+          / <span class="caution-text">주의 <span id="summary-warning">0</span>건</span>
+        </div>
+        <div id="event-list" style="overflow-y:auto;max-height:260px;">
+          <div id="event-empty" class="sub" style="text-align:center;padding:20px;">
+            현재 발생한 이벤트가 없습니다
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 하단 4패널 -->
+  <div class="bottom-row">
+    <div class="panel">
+      <div class="panel-title">내 근처 유해가스 위험 현황 <span class="more">+ 상세 보기</span></div>
+      <div class="sensor-tag">유해가스 1</div>
+      <table class="tbl">
+        <thead><tr><th>가스 종류</th><th>현재 농도</th><th>측정 단위</th><th>위험도</th></tr></thead>
+        <tbody id="gasTableBody"></tbody>
+      </table>
+    </div>
+
+    <div class="panel panel-chart">
+      <div class="panel-title">AI 예측 — 내 근처 유해가스 위험 <span class="more">+ 상세 보기</span></div>
+      <div class="ai-nav">
+        <span id="aiGasName" class="caution-text fw">CO (일산화탄소)</span>
+        <span class="sub">◁ 1 / 3 ▷</span>
+      </div>
+      <div class="ai-vals">
+        <div><div class="sub">현재 농도</div><div id="aiCurrentVal" class="big caution-text">-- ppm</div></div>
+        <div><div class="sub">12시간 내 최대 예상 농도</div><div id="aiMaxVal" class="big danger-text">-- ppm</div></div>
+      </div>
+      <div class="chart-wrap">
+        <div class="chart-controls">
+          <span class="sub">Y축 스케일</span>
+          <div class="scale-btns">
+            <button class="scale-btn" id="gasZoomOut" title="범위 확대">−</button>
+            <span class="scale-val" id="gasScaleVal">자동</span>
+            <button class="scale-btn" id="gasZoomIn"  title="범위 축소">+</button>
+            <button class="scale-btn scale-reset" id="gasReset" title="자동 복귀">↺</button>
+          </div>
+        </div>
+        <canvas id="chartGas"></canvas>
+      </div>
+    </div>
+
+    <div class="panel" id="powerPanel">
+      <div class="panel-title">스마트 전력 시스템 위험 현황 <a href="http://127.0.0.1:8000/dashboard/monitoring/power/" class="more">+ 상세 보기</a></div>
+      <div class="sub">현재 전체 스마트 파워 전력 사용량</div>
+      <div class="power-total" id="powerTotal"><span class="skeleton skel-text"></span></div>
+      <div id="powerChangePct" style="font-size:11px;margin-bottom:4px;"><span class="skeleton skel-text skel-sm"></span></div>
+      <div id="powerPanelMsg" class="panel-msg" style="display:none;"></div>
+      <table class="tbl">
+        <thead>
+          <tr><th>설비명</th><th>전력(W)</th><th>전압(V)</th><th>전류(A)</th><th>ON/OFF</th><th>위험수치</th></tr>
+        </thead>
+        <tbody id="powerTableBody">
+          <tr><td><span class="skeleton skel-text"></span></td><td><span class="skeleton skel-text skel-sm"></span></td><td><span class="skeleton skel-text skel-sm"></span></td><td><span class="skeleton skel-text skel-sm"></span></td><td><span class="skeleton skel-badge"></span></td><td><span class="skeleton skel-badge"></span></td></tr>
+          <tr><td><span class="skeleton skel-text"></span></td><td><span class="skeleton skel-text skel-sm"></span></td><td><span class="skeleton skel-text skel-sm"></span></td><td><span class="skeleton skel-text skel-sm"></span></td><td><span class="skeleton skel-badge"></span></td><td><span class="skeleton skel-badge"></span></td></tr>
+          <tr><td><span class="skeleton skel-text"></span></td><td><span class="skeleton skel-text skel-sm"></span></td><td><span class="skeleton skel-text skel-sm"></span></td><td><span class="skeleton skel-text skel-sm"></span></td><td><span class="skeleton skel-badge"></span></td><td><span class="skeleton skel-badge"></span></td></tr>
+          <tr><td><span class="skeleton skel-text"></span></td><td><span class="skeleton skel-text skel-sm"></span></td><td><span class="skeleton skel-text skel-sm"></span></td><td><span class="skeleton skel-text skel-sm"></span></td><td><span class="skeleton skel-badge"></span></td><td><span class="skeleton skel-badge"></span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="panel panel-chart">
+      <div class="panel-title">AI 예측 — 스마트 전력 시스템 위험 <span class="more">+ 상세 보기</span></div>
+      <div class="ai-nav">
+        <span id="aiPowerEquipName" class="fw">압연기</span>
+        <span class="sub">◁ 1 / 20 ▷</span>
+      </div>
+      <div class="eta-box">
+        <div class="sub">위험 도달 예상 시간</div>
+        <div class="eta-val" id="aiPowerEta">25 분 뒤</div>
+      </div>
+      <div class="sub">12시간 내 예상 최대 부하</div>
+      <div class="danger-text fw" id="aiPowerMaxLoad" style="font-size:14px;margin-bottom:4px;">
+        450 kW <span style="font-size:11px;font-weight:400;">(정상 대비 110%)</span>
+      </div>
+      <div class="chart-wrap">
+        <div class="chart-controls">
+          <span class="sub">Y축 스케일</span>
+          <div class="scale-btns">
+            <button class="scale-btn" id="powerZoomOut" title="범위 확대">−</button>
+            <span class="scale-val" id="powerScaleVal">자동</span>
+            <button class="scale-btn" id="powerZoomIn"  title="범위 축소">+</button>
+            <button class="scale-btn scale-reset" id="powerReset" title="자동 복귀">↺</button>
+          </div>
+        </div>
+        <canvas id="chartPower"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% include 'components/alarm_popup.html' %}
+
+<!-- 지오펜스 저장 폼 모달 -->
+<div id="geofence-modal" style="display:none;">
+  <div class="geofence-modal-box">
+    <div class="geofence-modal-title">🚧 위험구역 정보 입력</div>
+    <div class="geofence-modal-body">
+      <label>구역 이름</label>
+      <input type="text" id="geofence-name" placeholder="예: 위험구역 A">
+      <label>위험도</label>
+      <select id="geofence-risk">
+        <option value="danger">위험 🔴</option>
+        <option value="warning">주의 🟡</option>
+        <option value="normal">정상 🟢</option>
+      </select>
+      <label>설명 (선택)</label>
+      <input type="text" id="geofence-desc" placeholder="예: 화학물질 보관소">
+    </div>
+    <div class="geofence-modal-footer">
+      <button id="btn-geofence-save">저장</button>
+      <button id="btn-geofence-discard">버리기</button>
+    </div>
+  </div>
+</div>
+
+<script src="{% static 'js/refactors/util.js' %}"></script>
+<script src="{% static 'js/refactors/auth.js' %}"></script>
+<script src="{% static 'js/refactors/alarm-popup.js' %}"></script>
+<script src="{% static 'js/refactors/event-panel.js' %}"></script>
+<script src="{% static 'js/refactors/gas-panel.js' %}"></script>
+<script src="{% static 'js/refactors/charts.js' %}"></script>
+<script src="{% static 'js/refactors/map-panel.js' %}"></script>
+<script src="{% static 'js/refactors/layout.js' %}"></script>
+<script src="{% static 'js/refactors/worker-panel.js' %}"></script>
+<script src="{% static 'js/refactors/websocket_CJY.js' %}"></script>
+<script src="{% static 'js/refactors/app.js' %}"></script>
+</body>
+</html>
