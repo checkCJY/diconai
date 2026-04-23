@@ -160,8 +160,8 @@ _geofences: [],
 
     this.map = L.map('map', {
       crs: L.CRS.Simple, minZoom: -2, maxZoom: 2,
-      zoomControl: false, dragging: false,
-      scrollWheelZoom: false, doubleClickZoom: false, touchZoom: false,
+      zoomControl: false, dragging: true,
+      scrollWheelZoom: true, doubleClickZoom: false, touchZoom: false,
     });
 
     const bounds = [[0, 0], [600, 1300]];

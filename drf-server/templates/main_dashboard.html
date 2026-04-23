@@ -93,6 +93,12 @@
           <button class="map-tab" data-layer="facility">설비</button>
           <button class="map-tab" data-layer="power">스마트 전력</button>
           <button class="map-tab" data-layer="location">위치센서</button>
+          <div style="margin-left:auto; display:flex; gap:4px;">
+            <!--확대 축소 버튼-->
+    <button onclick="MapPanel.map.zoomIn()" style="width:28px; height:28px; background:#21262d; color:#c9d1d9; border:1px solid #30363d; border-radius:4px; cursor:pointer;">+</button>
+    <button onclick="MapPanel.map.zoomOut()" style="width:28px; height:28px; background:#21262d; color:#c9d1d9; border:1px solid #30363d; border-radius:4px; cursor:pointer;">−</button>
+    <button onclick="MapPanel.map.fitBounds([[0,0],[600,1300]])" style="width:28px; height:28px; background:#21262d; color:#c9d1d9; border:1px solid #30363d; border-radius:4px; cursor:pointer; font-size:11px;">⌂</button>
+  </div><!--여기까지-->
         </div>
         <!-- 지도 영역 -->
         <div class="map-area" style="padding:0; position:relative;">
