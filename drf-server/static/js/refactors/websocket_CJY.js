@@ -18,6 +18,72 @@
 const _riskLabel = { normal: '정상', warning: '주의', danger: '위험' };
 const _riskClass = { normal: 'safe', warning: 'caution', danger: 'danger' };
 
+// ── AI 전력 패널 채널 네비게이션 상태 ────────────────────────
+let _aiPowerIdx     = 0;
+let _aiPowerPreds   = [];   // [{name, eta_min, max_load_val, max_load_unit, max_load_pct, risk_level}]
+const _aiPowerHist  = {};   // { idx: { labels: string[], data: number[] } }
+const _HIST_MAX     = 30;
+
+function _pushChannelHistory(idx, label, value) {
+  if (value == null) return;
+  if (!_aiPowerHist[idx]) _aiPowerHist[idx] = { labels: [], data: [] };
+  const h = _aiPowerHist[idx];
+  h.labels.push(label);
+  h.data.push(value);
+  if (h.labels.length > _HIST_MAX) { h.labels.shift(); h.data.shift(); }
+}
+
+function _switchPowerChart(idx) {
+  if (!powerChart || !_aiPowerHist[idx]) return;
+  const h = _aiPowerHist[idx];
+  powerChart.data.labels            = [...h.labels];
+  powerChart.data.datasets[0].data  = [...h.data];
+  powerChart.update('none');
+}
+
+function _renderAIPowerNav() {
+  if (_aiPowerPreds.length === 0) return;
+  const pred    = _aiPowerPreds[_aiPowerIdx];
+  const nameEl  = document.getElementById('aiPowerEquipName');
+  const etaEl   = document.getElementById('aiPowerEta');
+  const loadEl  = document.getElementById('aiPowerMaxLoad');
+  const countEl = document.getElementById('aiPowerNavCount');
+
+  if (nameEl) {
+    nameEl.textContent = pred.name;
+    const riskCls = pred.risk_level === 'danger' ? 'danger-text'
+                  : pred.risk_level === 'warning' ? 'caution-text' : '';
+    nameEl.className = `fw ai-equip-name ${riskCls}`.trim();
+  }
+  if (etaEl) etaEl.textContent = pred.eta_min != null ? `${pred.eta_min} 분 뒤` : '-';
+  if (loadEl) {
+    if (pred.max_load_val != null) {
+      const unit   = pred.max_load_unit || 'kW';
+      const pctStr = pred.max_load_pct != null
+        ? ` <span style="font-size:11px;font-weight:400;">(정상 대비 ${pred.max_load_pct}%)</span>`
+        : '';
+      loadEl.innerHTML = `${pred.max_load_val.toLocaleString()} ${unit}${pctStr}`;
+    } else {
+      loadEl.innerHTML = '-';
+    }
+  }
+  if (countEl) countEl.textContent = `${_aiPowerIdx + 1} / ${_aiPowerPreds.length}`;
+  _switchPowerChart(_aiPowerIdx);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('aiPowerPrev')?.addEventListener('click', () => {
+    if (_aiPowerPreds.length === 0) return;
+    _aiPowerIdx = (_aiPowerIdx - 1 + _aiPowerPreds.length) % _aiPowerPreds.length;
+    _renderAIPowerNav();
+  });
+  document.getElementById('aiPowerNext')?.addEventListener('click', () => {
+    if (_aiPowerPreds.length === 0) return;
+    _aiPowerIdx = (_aiPowerIdx + 1) % _aiPowerPreds.length;
+    _renderAIPowerNav();
+  });
+});
+
 // ── 전력 패널 단건 행 렌더링 ────────────────────────────────
 function _renderPowerRow(eq) {
   const isComm = eq.sensor_status === 'comm_failure';
@@ -36,7 +102,9 @@ function _renderPowerRow(eq) {
     ? '<span class="brisk gray">-</span>'
     : `<span class="brisk ${_riskClass[eq.risk_level] || 'safe'}">${_riskLabel[eq.risk_level] || '-'}</span>`;
 
-  return `<tr>
+  const rowClass = isComm ? '' : ` class="risk-row risk-${_riskClass[eq.risk_level] || 'safe'}"`;
+
+  return `<tr${rowClass}>
     <td>${eq.name}</td>
     <td>${watt}</td>
     <td>${voltage}</td>
@@ -87,7 +155,7 @@ function initWebSocket() {
   function connect() {
     let ws;
     try {
-      ws = new WebSocket('ws://127.0.0.1:8001/ws/sensors/');
+      ws = new WebSocket('ws://127.0.0.1:8002/ws/sensors/');
     } catch {
       setWsStatus('● 연결 불가', 'error');
       _setPowerPanelError('데이터를 불러올 수 없습니다.');
@@ -131,19 +199,20 @@ function initWebSocket() {
       const powerChangePct = document.getElementById('powerChangePct');
       const powerTableBody = document.getElementById('powerTableBody');
 
-      if (powerTotal && data.total_power_mw !== undefined)
-        powerTotal.textContent = `${data.total_power_mw.toLocaleString()} MW`;
+      if (powerTotal && data.total_power_kw !== undefined)
+        powerTotal.textContent = `${data.total_power_kw.toLocaleString()} kW`;
 
       if (powerChangePct && data.power_change_pct !== undefined) {
         const pct  = data.power_change_pct;
         const sign = pct >= 0 ? '▲ +' : '▼ ';
         powerChangePct.textContent = `기준 대비 ${sign}${pct}%`;
         powerChangePct.className   = pct >= 15 ? 'danger-text' : 'caution-text';
-        powerChangePct.style.cssText = 'font-size:11px;margin-bottom:4px;';
       }
 
       if (powerTableBody) {
-        if (!data.equipment || data.equipment.length === 0) {
+        if (data.power_loading) {
+          // 더미 센더 미수신 중 — 스켈레톤 유지 (에러 메시지 표시 안 함)
+        } else if (!data.equipment || data.equipment.length === 0) {
           // UI_Handling.md: Empty Data → 메시지 노출
           _setPowerPanelError('데이터가 존재하지 않습니다.');
         } else {
@@ -152,19 +221,63 @@ function initWebSocket() {
         }
       }
 
-      // ── 패널 15: AI 예측 — 전력 ────────────────────────
-      const aiPowerEquipName = document.getElementById('aiPowerEquipName');
-      const aiPowerEta       = document.getElementById('aiPowerEta');
-      const aiPowerMaxLoad   = document.getElementById('aiPowerMaxLoad');
-      if (aiPowerEquipName && data.ai_power_equipment) aiPowerEquipName.textContent = data.ai_power_equipment;
-      if (aiPowerEta       && data.ai_eta_min !== undefined) aiPowerEta.textContent = `${data.ai_eta_min} 분 뒤`;
-      if (aiPowerMaxLoad   && data.ai_max_load_kw !== undefined)
-        aiPowerMaxLoad.innerHTML = `${data.ai_max_load_kw.toLocaleString()} kW <span style="font-size:11px;font-weight:400;">(정상 대비 ${data.ai_max_load_pct}%)</span>`;
+      // ── 패널 15: AI 예측 — 전력 채널 네비게이션 ────────────
+      if (!data.power_loading) {
+        if (data.ai_predictions && data.ai_predictions.length > 0) {
+          // 서버가 채널별 배열을 보내는 경우 (index 0 = 전체)
+          _aiPowerPreds = data.ai_predictions;
+        } else if (data.equipment && data.equipment.length > 0) {
+          const overallRisk = data.equipment.some(e => e.risk_level === 'danger')  ? 'danger'
+                            : data.equipment.some(e => e.risk_level === 'warning') ? 'warning'
+                            : 'normal';
+          _aiPowerPreds = [
+            // index 0: 전체 사용량 (kW × 1.1)
+            {
+              name:          '전체 사용량',
+              eta_min:       data.ai_eta_min ?? null,
+              max_load_val:  data.total_power_kw != null ? Math.round(data.total_power_kw * 1.1 * 10) / 10 : null,
+              max_load_unit: 'kW',
+              max_load_pct:  data.power_change_pct ?? null,
+              risk_level:    overallRisk,
+            },
+            // index 1–16: 개별 채널 (W × 1.1)
+            ...data.equipment.map(eq => ({
+              name:          eq.name,
+              eta_min:       null,
+              max_load_val:  eq.watt != null ? Math.round(eq.watt * 1.1) : null,
+              max_load_unit: 'W',
+              max_load_pct:  null,
+              risk_level:    eq.risk_level || 'normal',
+            })),
+          ];
+        } else if (data.ai_power_equipment) {
+          _aiPowerPreds = [{
+            name:          data.ai_power_equipment,
+            eta_min:       data.ai_eta_min      ?? null,
+            max_load_val:  data.ai_max_load_kw  ?? null,
+            max_load_unit: 'kW',
+            max_load_pct:  data.ai_max_load_pct ?? null,
+            risk_level:    'danger',
+          }];
+        }
+        _renderAIPowerNav();
+      }
 
       // ── 차트 실시간 업데이트 ────────────────────────────
       const tick = nowLabel();
-      if (gasChart)   pushData(gasChart,   tick, data.co, Math.round(data.co * 1.5));
-      if (powerChart) pushData(powerChart, tick, data.ai_max_load_kw);
+      if (gasChart) pushData(gasChart, tick, data.co, Math.round(data.co * 1.5));
+      if (!data.power_loading) {
+        // index 0: 전체 사용량 히스토리 (kW × 1.1)
+        if (data.total_power_kw != null)
+          _pushChannelHistory(0, tick, Math.round(data.total_power_kw * 1.1 * 10) / 10);
+        // index 1–16: 개별 채널 히스토리 (W × 1.1)
+        if (data.equipment) {
+          data.equipment.forEach((eq, i) => {
+            if (eq.watt != null) _pushChannelHistory(i + 1, tick, Math.round(eq.watt * 1.1));
+          });
+        }
+        _switchPowerChart(_aiPowerIdx);
+      }
 
       // ── MN-02 맵 — 가스센서 + 작업자 위치 ───────────────
       MapPanel.updateGasSensorFromWS(data);
