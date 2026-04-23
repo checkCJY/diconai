@@ -51,7 +51,8 @@ class WorkerPositionReceiveView(APIView):
                     movement_status=item.get("movement_status", "moving"),
                     measured_at=item["measured_at"],
                 )
-                saved.append(pos.id)
+                if pos is not None:
+                    saved.append(pos.id)
             except Exception as e:
                 print(f"[positioning] 저장 오류: {e}")
 
