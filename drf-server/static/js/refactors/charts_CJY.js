@@ -6,9 +6,10 @@
          util.js (MAX_POINTS, nowLabel, pushData)
 
    [임계치 관리 — 2단계]
-     Phase A (현재): 채널별 서버 기준을 합산 환산한 고정값
-       주의 20 kW  = 8채널 × 2500 W  (_build_equipment warning 기준)
-       위험 28 kW  = 7채널 × 4000 W  (_build_equipment danger  기준)
+     Phase A (현재): 패널 기준 고정값
+       안전  0 ~ 2200 kW
+       주의  2200 ~ 2860 kW  (2200 × 1.3)
+       위험  2860 kW 이상
 
      Phase B (데이터 축적 후):
        페이로드에 threshold_warning_kw / threshold_danger_kw 추가 시
@@ -20,8 +21,8 @@
 
 // ── Phase A 고정 임계치 (kW) ───────────────────────────────
 // Phase B: 페이로드 수신 값으로 교체 → updatePowerThresholds() 참조
-const POWER_THRESHOLD_WARNING = 20;   // kW — 주의 하한
-const POWER_THRESHOLD_DANGER  = 28;   // kW — 위험 하한
+const POWER_THRESHOLD_WARNING = 2200;                                   // kW — 주의 하한 (안전 상한)
+const POWER_THRESHOLD_DANGER  = Math.round(2200 * 1.3);                 // kW — 초과 하한 (2860)
 
 // ──────────────────────────────────────────────────────────
 // Chart.js 공통 기본값
@@ -39,7 +40,7 @@ const POWER_CHART_Y_OPTS = {
   ticks: {
     color: '#666',
     font: { size: 9 },
-    stepSize: 10000,
+    stepSize: 1000,
     callback: value => value.toLocaleString(),
   },
   grid: { color: '#2a2a2a' },
@@ -168,7 +169,7 @@ function adjustYScale(key, chart, direction) {
     if (labelEl) labelEl.textContent = '자동';
   } else {
     const isPower = key === 'power';
-    const step    = isPower ? 10000 : 10;
+    const step    = isPower ? 1000 : 10;
     const current = scaleState[key] ?? chart.scales.y.max;
     const next    = direction > 0 ? current - step : current + step;
     scaleState[key] = Math.max(step, isPower ? Math.round(next / step) * step : Math.round(next));
