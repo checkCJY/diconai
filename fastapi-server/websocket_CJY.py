@@ -289,10 +289,21 @@ def _build_broadcast_payload() -> dict:
         random.uniform(18.0, 19.0) if is_danger else random.uniform(20.5, 21.0), 1
     )
 
-    # 전력 실제 데이터
-    equipment, total_kw = _build_equipment()
+    # 마지막 실제 데이터 수신으로부터 경과 시간 (초)
+    DATA_STALE_SEC = 8  # 더미 발신기 주기 3초 × 2.5 사이클
+    updated_at = power_latest.get("updated_at")
+    if updated_at is not None:
+        last_dt = datetime.fromisoformat(updated_at).replace(tzinfo=timezone.utc)
+        data_age_sec = (datetime.now(timezone.utc) - last_dt).total_seconds()
+    else:
+        data_age_sec = None
 
-    # power_latest 미수신 시 더미 유지 (UI 로딩 스켈레톤 → 데이터 수신 전까지)
+    data_stale = (data_age_sec is None) or (data_age_sec > DATA_STALE_SEC)
+
+    # 전력 실제 데이터 (stale이면 빈 equipment 반환으로 처리)
+    equipment, total_kw = _build_equipment() if not data_stale else ([], 0.0)
+
+    # power_latest 미수신 또는 stale 시 더미 유지 (UI 로딩 스켈레톤)
     if not equipment:
         total_power_kw = round(1200 + random.uniform(-50, 100))
         power_change_pct = 0.0
