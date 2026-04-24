@@ -1,4 +1,4 @@
-from datetime import datetime, date
+from datetime import date
 
 from django.conf import settings
 from django.shortcuts import render
@@ -127,7 +127,9 @@ class DashboardRefreshView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        data = {"last_updated": datetime.now().isoformat()}
+        data = {}
         if request.user.user_type in ("facility_admin", "super_admin"):
-            data["admin_url"] = getattr(settings, "ADMIN_BACKOFFICE_URL", "/admin/")
+            data["admin_url"] = getattr(
+                settings, "ADMIN_BACKOFFICE_URL", "/dashboard/admin/"
+            )
         return Response(data)

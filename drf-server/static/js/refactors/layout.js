@@ -143,7 +143,16 @@ const Header = {
         if (btnAdmin) btnAdmin.style.display = '';
       }
       this.updateLastUpdated();
-    } catch { /* 실패 시 수치 '-' 처리는 각 패널 담당 */ }
+      // H-2: 이벤트 패널 REST 재조회 (가스/전력/지도는 WebSocket 실시간, 작업자는 30s 폴링)
+      if (typeof EventPanel !== 'undefined') EventPanel.loadEventList();
+    } catch {
+      // M-2: 실패 시 버튼 시각적 피드백
+      if (btn) {
+        btn.style.color = 'var(--danger)';
+        btn.title = '새로고침 실패 — 잠시 후 다시 시도하세요';
+        setTimeout(() => { btn.style.color = ''; btn.title = '새로고침'; }, 3000);
+      }
+    }
     finally {
       this.isRefreshing = false;
       if (btn) btn.classList.remove('spinning');
@@ -165,12 +174,30 @@ const Header = {
 
     btnLogout    ?.addEventListener('click', () => { modal.style.display = 'flex'; });
     logoutCancel ?.addEventListener('click', () => { modal.style.display = 'none'; });
-    logoutConfirm?.addEventListener('click', () => { Auth.redirectLogin(); });
+    logoutConfirm?.addEventListener('click', async () => {
+      try {
+        await Auth.apiFetch('/api/auth/logout/', { method: 'POST' });
+      } finally {
+        Auth.redirectLogin();
+      }
+    });
+    // L-2: backdrop 클릭 시 팝업 닫기
+    modal?.addEventListener('click', (e) => {
+      if (e.target === modal) modal.style.display = 'none';
+    });
   },
 
-  renderUser(username) {
+  renderUser(username, role) {
     const nameEl = document.getElementById('headerUsername');
-    if (nameEl) nameEl.textContent = username ? `${username}님 환영합니다` : '-';
+    const roleEl = document.getElementById('headerRole');
+    const roleLabel = {
+      worker:         '작업자',
+      facility_admin: '공장관리자',
+      super_admin:    '슈퍼관리자',
+      viewer:         '열람자',
+    };
+    if (nameEl) nameEl.textContent = username ? `${username}님` : '-';
+    if (roleEl) roleEl.textContent = roleLabel[role] || '-';
   },
 
   showAdminBtn(role) {
@@ -188,3 +215,29 @@ const Header = {
     document.getElementById('btnAdmin')  ?.addEventListener('click', () => this.handleAdmin());
   },
 };
+
+
+// ──────────────────────────────────────────────────────────
+// CM-01 공통 초기화 — app.js(메인) / app-sub.js(서브 페이지) 공유
+// 의존: Auth, Header, Menu, SNB
+// ──────────────────────────────────────────────────────────
+async function initHeaderAndSNB() {
+  if (!Auth.getAccessToken()) { Auth.redirectLogin(); return null; }
+
+  const user = await Auth.getMe();
+  if (!user) {
+    Header.renderUser(Auth.getUsername() || '-');
+    Menu.showError();
+  } else {
+    Header.renderUser(user.username, user.role);
+    Header.showAdminBtn(user.role);
+    Menu.render(user.menu_tree);
+    if (user.admin_url) Header.adminUrl = user.admin_url;
+    localStorage.setItem('role', user.role);
+  }
+
+  SNB.init();
+  Header.init();
+  Header.updateLastUpdated();
+  return user;
+}
