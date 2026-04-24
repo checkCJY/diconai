@@ -12,24 +12,7 @@
 // 앱 초기화
 // ──────────────────────────────────────────────────────────
 async function initApp() {
-  if (!Auth.getAccessToken()) { Auth.redirectLogin(); return; }
-
-  const user = await Auth.getMe();
-  if (!user) {
-    Header.renderUser(Auth.getUsername() || '-');
-    Menu.showError();
-  } else {
-    Header.renderUser(user.username);
-    Header.showAdminBtn(user.role);
-    Menu.render(user.menu_tree);
-     // role을 localStorage에 저장
-    localStorage.setItem('role', user.role);
-
-  }
-
-  SNB.init();
-  Header.init();
-  Header.updateLastUpdated();
+  await initHeaderAndSNB();
 
   initCharts();
   MapPanel.init();

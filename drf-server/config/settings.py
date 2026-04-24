@@ -144,7 +144,7 @@ SIMPLE_JWT = {
 }
 
 # ── 백오피스 URL (관리자 메뉴 이동) ───────────────────────
-ADMIN_BACKOFFICE_URL = env("ADMIN_BACKOFFICE_URL", default="/admin/")
+ADMIN_BACKOFFICE_URL = env("ADMIN_BACKOFFICE_URL", default="/dashboard/admin/")
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"

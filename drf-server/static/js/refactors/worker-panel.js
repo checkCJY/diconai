@@ -91,7 +91,7 @@
     } catch { renderAdminError('데이터를 불러오지 못했습니다.'); }
   }
 
-  document.getElementById('mn04-btn-detail')?.addEventListener('click', () => { window.location.href = '/monitoring/workers'; });
+  document.getElementById('mn04-btn-detail')?.addEventListener('click', () => { window.location.href = '/dashboard/monitoring/workers/'; });
 
 
   function init() {

@@ -60,13 +60,15 @@ _MENU_ADMIN_EXTRA = {
     "label": "관리자 전용",
     "icon": "settings",
     "children": [
-        {"id": "SNB-05", "label": "전체 이력 현황", "path": "/admin-panel/history"},
+        # SNB-05 구현 시 전용 URL로 교체 필요
+        {"id": "SNB-05", "label": "전체 이력 현황", "path": "/dashboard/admin/"},
     ],
 }
 
 
 def get_menu_tree(role: str) -> list:
     menus = copy.deepcopy(_MENU_WORKER)
-    if role in ("admin", "superadmin"):
+    if role in ("facility_admin", "super_admin"):
         menus.append(copy.deepcopy(_MENU_ADMIN_EXTRA))
+    # viewer는 worker와 동일 메뉴 (읽기 전용 권한은 API 레벨에서 제어)
     return menus
