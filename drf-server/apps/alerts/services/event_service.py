@@ -5,6 +5,8 @@ from apps.alerts.models import Event, AlarmRecord, EventLog
 from apps.core.constants import EventStatus, RiskLevel
 from django.utils import timezone
 
+RISK_LEVELS = ["normal", "warning", "danger"]
+
 
 # 알람발생 시, Event 생성/병합 플로우
 @transaction.atomic
@@ -60,7 +62,7 @@ def create_alarm_and_event(
             # 시스템에 의한 자동 분리 로그 기록
             EventLog.objects.create(
                 event=active_event,
-                action=EventLog.Action.SYSTEM_RESOLVED,  # 또는 기획에 맞는 Action
+                action=EventLog.Action.RESOLVED,
                 previous_status=previous_status,
                 new_status=EventStatus.RESOLVED,
                 note="최대 병합 시간 초과로 인한 자동 분리 및 종료",
@@ -127,9 +129,6 @@ def create_alarm_and_event(
             new_status=EventStatus.ACTIVE,
         )
         return event, alarm  # 새 Event는 Notification 발송
-
-
-RISK_LEVELS = ["normal", "warning", "danger"]
 
 
 # 관리자 이벤트 확인 플로우
