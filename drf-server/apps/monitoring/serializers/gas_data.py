@@ -35,7 +35,10 @@ class GasDataCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         gas_data = GasData.objects.create(**validated_data)
-        # 마지막 수신 시각 갱신
         gas_data.gas_sensor.last_reading = gas_data.measured_at
         gas_data.gas_sensor.save(update_fields=["last_reading", "updated_at"])
+
+        from apps.monitoring.services.gas_alarm import trigger_gas_alarms
+        gas_data._alarms = trigger_gas_alarms(gas_data)
+
         return gas_data
