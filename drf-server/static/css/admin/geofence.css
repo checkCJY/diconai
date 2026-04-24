@@ -1,0 +1,97 @@
+/* admin/geofence.css — 위험구역 관리 페이지 전용 스타일 */
+
+/* 위험도 뱃지 */
+.badge-danger  { background: rgba(248, 81, 73, 0.15); color: #f85149; border: 1px solid #f85149; }
+.badge-warning { background: rgba(227, 179, 65, 0.15); color: #e3b341; border: 1px solid #e3b341; }
+.badge-normal  { background: rgba(63, 185, 80, 0.15); color: #3fb950; border: 1px solid #3fb950; }
+
+/* 빈 상태 */
+.empty-state {
+    text-align: center;
+    padding: 40px;
+    color: #6e7681;
+    font-size: 14px;
+}
+
+/* 모달 */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-container {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    width: 480px;
+    max-width: 90vw;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid #30363d;
+}
+
+.modal-header h3 {
+    font-size: 16px;
+    color: #c9d1d9;
+    margin: 0;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: #6e7681;
+    cursor: pointer;
+    font-size: 18px;
+}
+
+.modal-body {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.modal-body .input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.modal-body label {
+    font-size: 13px;
+    color: #8b949e;
+}
+
+.modal-body input,
+.modal-body select,
+.modal-body textarea {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    color: #c9d1d9;
+    padding: 8px 12px;
+    font-size: 14px;
+    outline: none;
+}
+
+.modal-body textarea { resize: vertical; }
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 16px 20px;
+    border-top: 1px solid #30363d;
+}
+
+.required { color: #f85149; }

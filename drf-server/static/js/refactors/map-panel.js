@@ -23,6 +23,65 @@ const MapPanel = {
   ZONE_COLOR:   { danger: '#f85149', warning: '#e3b341', normal: '#3fb950' },
 
   riskColor(level)    { return [this.STATUS_COLOR.normal, this.STATUS_COLOR.caution, this.STATUS_COLOR.danger][level] ?? this.STATUS_COLOR.normal; },
+
+  // SVG 커스텀 아이콘 생성
+_createWorkerIcon(color) {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="34" viewBox="0 0 28 34">
+      <!-- 핀 모양 배경 -->
+      <path d="M14 0 C6.268 0 0 6.268 0 14 C0 24.5 14 34 14 34 C14 34 28 24.5 28 14 C28 6.268 21.732 0 14 0Z"
+            fill="${color}" stroke="#fff" stroke-width="1.5"/>
+      <!-- 사람 아이콘 -->
+      <circle cx="14" cy="10" r="4" fill="#fff"/>
+      <path d="M6 24 C6 18 22 18 22 24" fill="#fff"/>
+    </svg>`;
+  return L.divIcon({
+    html: svg,
+    className: '',
+    iconSize: [28, 34],
+    iconAnchor: [14, 34],
+    popupAnchor: [0, -34],
+  });
+},
+
+_createGasIcon(color) {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 30 30">
+      <!-- 육각형 배경 -->
+      <polygon points="15,2 27,8.5 27,21.5 15,28 3,21.5 3,8.5"
+               fill="${color}" stroke="#fff" stroke-width="1.5"/>
+      <!-- 센서 물결 -->
+      <path d="M9 15 Q12 11 15 15 Q18 19 21 15" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="15" cy="15" r="2" fill="#fff"/>
+    </svg>`;
+  return L.divIcon({
+    html: svg,
+    className: '',
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+    popupAnchor: [0, -15],
+  });
+},
+
+_createPowerIcon(color) {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 30 30">
+      <!-- 다이아몬드 배경 -->
+      <rect x="3" y="3" width="24" height="24" rx="4"
+            fill="${color}" stroke="#fff" stroke-width="1.5"/>
+      <!-- 번개 모양 -->
+      <path d="M17 4 L10 16 L15 16 L13 26 L20 14 L15 14 Z"
+            fill="#fff"/>
+    </svg>`;
+  return L.divIcon({
+    html: svg,
+    className: '',
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+    popupAnchor: [0, -15],
+  });
+},
+
   levelToStatus(level){ return ['normal', 'caution', 'danger'][level] ?? 'normal'; },
 
   DUMMY_GAS_SENSORS: [
@@ -47,10 +106,10 @@ const MapPanel = {
   ],
 
   DUMMY_WORKERS: [
-    { id:1, name:'작업자 A', x:150, y:120, movement_status:'moving',     current_geofence:'위험구역 A', dx:4,  dy:2  },
-    { id:2, name:'작업자 B', x:600, y:350, movement_status:'moving',     current_geofence:null,         dx:-3, dy:4  },
-    { id:3, name:'작업자 C', x:950, y:200, movement_status:'stationary', current_geofence:'관리구역 C', dx:0,  dy:0  },
-    { id:4, name:'작업자 D', x:350, y:480, movement_status:'moving',     current_geofence:null,         dx:5,  dy:-3 },
+  { id:1, name:'작업자 A', x:150, y:120, movement_status:'moving', current_geofence:null },
+  { id:2, name:'작업자 B', x:600, y:350, movement_status:'moving', current_geofence:null },
+  { id:3, name:'작업자 C', x:950, y:200, movement_status:'stationary', current_geofence:null },
+  { id:4, name:'작업자 D', x:350, y:480, movement_status:'moving', current_geofence:null },
   ],
 
   gasPopupHtml(s) {
@@ -61,6 +120,26 @@ const MapPanel = {
       <div>상태: <span class='popup-status-${st}'>${label}</span></div>
       <div>CO: ${s.co} ppm &nbsp; H2S: ${s.h2s} ppm &nbsp; O2: ${s.o2}%</div>`;
   },
+
+  // 작업자 좌표가 polygon 내부인지 판별 (Ray Casting)
+_pointInPolygon(x, y, polygon) {
+  let inside = false;
+  const n = polygon.length;
+  let j = n - 1;
+  for (let i = 0; i < n; i++) {
+    const [xi, yi] = polygon[i];
+    const [xj, yj] = polygon[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+    j = i;
+  }
+  return inside;
+},
+
+// 현재 로드된 지오펜스 목록 (저장용)
+_geofences: [],
+
   powerPopupHtml(d) {
     const st    = this.levelToStatus(d.risk_level);
     const label = { normal:'정상', caution:'주의', danger:'위험' }[st];
@@ -81,8 +160,8 @@ const MapPanel = {
 
     this.map = L.map('map', {
       crs: L.CRS.Simple, minZoom: -2, maxZoom: 2,
-      zoomControl: false, dragging: false,
-      scrollWheelZoom: false, doubleClickZoom: false, touchZoom: false,
+      zoomControl: false, dragging: true,
+      scrollWheelZoom: true, doubleClickZoom: false, touchZoom: false,
     });
 
     const bounds = [[0, 0], [600, 1300]];
@@ -110,29 +189,31 @@ const MapPanel = {
 
   async _drawAll() {
     this.DUMMY_GAS_SENSORS.forEach(s => {
-      const m = L.circleMarker([s.y, s.x], {
-        radius: 9, fillColor: this.riskColor(s.risk_level),
-        color: '#fff', weight: 1.5, fillOpacity: 0.9,
-      }).bindPopup(this.gasPopupHtml(s), { maxWidth: 220 });
+      const color = this.riskColor(s.risk_level);
+      const m = L.marker([s.y, s.x], {
+      icon: this._createGasIcon(color)
+    }).bindPopup(this.gasPopupHtml(s), { maxWidth: 220 });
       m.addTo(this.layers.gas);
       this.gasMarkers[s.device_id] = { marker: m, data: s };
     });
 
+
     this.DUMMY_POWER_DEVICES.forEach(d => {
-      L.circleMarker([d.y, d.x], {
-        radius: 9, fillColor: this.riskColor(d.risk_level),
-        color: '#e3b341', weight: 2, fillOpacity: 0.85, dashArray: '4 2',
+      const color = this.riskColor(d.risk_level);
+      L.marker([d.y, d.x], {
+        icon: this._createPowerIcon(color)
       }).bindPopup(this.powerPopupHtml(d), { maxWidth: 220 }).addTo(this.layers.power);
     });
+
 
     await this._loadGeofences();
 
     this.DUMMY_WORKERS.forEach(w => {
-      const m = L.circleMarker([w.y, w.x], {
-        radius: 8, fillColor: '#58a6ff', color: '#fff', weight: 2, fillOpacity: 1,
-      }).bindPopup(this.workerPopupHtml(w), { maxWidth: 200 });
-      m.addTo(this.layers.worker);
-      this.workerMarkers[w.id] = { marker: m, data: w };
+      const m = L.marker([w.y, w.x], {
+        icon: this._createWorkerIcon('#58a6ff')
+    }).bindPopup(this.workerPopupHtml(w), { maxWidth: 200 });
+    m.addTo(this.layers.worker);
+    this.workerMarkers[w.id] = { marker: m, data: w };
     });
   },
 
@@ -146,6 +227,7 @@ const MapPanel = {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const geofences = await res.json();
+      this._geofences = geofences;
       this.layers.geofence.clearLayers();
 
       geofences.forEach(g => {
@@ -344,7 +426,7 @@ const MapPanel = {
     const entry = this.gasMarkers['sensor_01'];
     if (!entry) return;
     const level = wsData.level === '위험' ? 2 : 0;
-    entry.marker.setStyle({ fillColor: this.riskColor(level) });
+    entry.marker.setIcon(this._createGasIcon(this.riskColor(level)));
     entry.data.risk_level = level;
     entry.data.co  = wsData.co;
     entry.data.h2s = wsData.h2s;
@@ -360,6 +442,23 @@ const MapPanel = {
     entry.data.x = w.x;
     entry.data.y = w.y;
     entry.data.movement_status = w.movement_status;
+
+    let inGeofence = null;
+    for (const g of this._geofences) {
+      if (this._pointInPolygon(w.x, w.y, g.polygon)) {
+        inGeofence = g;
+        break;
+      }
+    }
+
+    if (inGeofence) {
+      const color = this.ZONE_COLOR[inGeofence.risk_level] || '#f85149';
+      entry.marker.setIcon(this._createWorkerIcon(color));
+      entry.data.current_geofence = inGeofence.name;
+    } else {
+      entry.marker.setIcon(this._createWorkerIcon('#58a6ff')); // 기본 파란색
+      entry.data.current_geofence = null;
+    }
 
     if (entry.marker.isPopupOpen()) {
       entry.marker.setPopupContent(this.workerPopupHtml(entry.data));
