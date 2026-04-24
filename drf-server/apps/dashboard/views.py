@@ -1,4 +1,4 @@
-from datetime import datetime, date
+from datetime import date
 
 from django.conf import settings
 from django.shortcuts import render
@@ -13,7 +13,7 @@ from .menu import get_menu_tree
 # HTML 페이지 뷰
 # ──────────────────────────────────────────────────────────
 def main_dashboard(request):
-    return render(request, "main_dashboard.html")
+    return render(request, "main_dashboard_CJY.html")  # 수정해야함 main_dashboard 로
 
 
 def main_dashboard_jhh(request):
@@ -131,7 +131,9 @@ class DashboardRefreshView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        data = {"last_updated": datetime.now().isoformat()}
+        data = {}
         if request.user.user_type in ("facility_admin", "super_admin"):
-            data["admin_url"] = getattr(settings, "ADMIN_BACKOFFICE_URL", "/admin/")
+            data["admin_url"] = getattr(
+                settings, "ADMIN_BACKOFFICE_URL", "/dashboard/admin/"
+            )
         return Response(data)

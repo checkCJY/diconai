@@ -6,18 +6,116 @@
 <title>실시간/AI 예측 스마트 전력 현황 — 산재 예방 통합 관제 시스템</title>
 <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
 <link rel="stylesheet" href="{% static 'css/components/header.css' %}">
+<link rel="stylesheet" href="{% static 'css/detail/power_system.css' %}">
+<!-- Chart.js 4.x -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<!-- chartjs-plugin-annotation 3.x -->
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
 </head>
 <body>
 
 {% include 'components/header.html' %}
 
 <div class="body-wrap page-wrap">
-  <div class="page-header">
-    <span class="breadcrumb">모니터링 &gt; 실시간/AI 예측 스마트 전력 현황</span>
-  </div>
-  <div class="panel">
-    <div class="panel-title">실시간/AI 예측 스마트 전력 현황</div>
-    <p class="sub" style="padding:16px;">준비 중입니다.</p>
+
+  <H1> 실시간/AI 예측 스마트 전력 현황 </H1><br>
+  <div class="power-wrap">
+
+    <!-- ❶ 좌측: 스마트 전력 위험 현황 -->
+    <div class="power-left">
+      <div class="panel" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+        <div class="panel-title">스마트 전력 위험 현황</div>
+
+        <!-- 위험/주의/정상 카운트 -->
+        <div class="risk-summary">
+          <span class="risk-badge"><span class="dot-sq danger"></span>위험 <strong id="cnt-danger">-</strong></span>
+          <span class="risk-badge"><span class="dot-sq caution"></span>주의 <strong id="cnt-caution">-</strong></span>
+          <span class="risk-badge"><span class="dot-sq safe"></span>정상 <strong id="cnt-safe">-</strong></span>
+        </div>
+
+        <!-- 설비 목록 -->
+        <div class="equip-scroll">
+          <table class="equip-table">
+            <thead>
+              <tr>
+                <th>선택</th>
+                <th>설비명</th>
+                <th>전력량</th>
+                <th>부하율(%)</th>
+                <th>사용 상태</th>
+                <th>위험도</th>
+              </tr>
+            </thead>
+            <tbody id="equip-tbody">
+              <tr>
+                <td><input type="checkbox" disabled></td>
+                <td>-</td>
+                <td>-</td>
+                <td><span class="status-badge safe">-</span></td>
+                <td>-</td>
+                <td><span class="status-badge safe">-</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- ❹ 재가동 버튼 -->
+        <button class="restart-btn" id="restart-btn" disabled>재가동</button>
+      </div>
+    </div>
+
+    <!-- ❷ 우측: 차트 영역 -->
+    <div class="power-right">
+
+      <!-- 탭 + 범례 -->
+      <div class="chart-header">
+        <div class="tab-group">
+          <button class="tab-btn active" id="tab-realtime">실시간 현황</button>
+          <button class="tab-btn" id="tab-ai">AI 예측</button>
+        </div>
+        <div class="chart-legend">
+          <span class="legend-item">
+            <span class="legend-line-sample" style="background:var(--caution);"></span>주의 임계치
+          </span>
+          <span class="legend-item">
+            <span class="legend-line-sample" style="background:var(--danger);"></span>위험 임계치
+          </span>
+          <span class="legend-item">
+            <span class="legend-area-sample" style="background:var(--caution);"></span>주의 범위
+          </span>
+          <span class="legend-item">
+            <span class="legend-area-sample" style="background:var(--danger);"></span>위험 범위
+          </span>
+        </div>
+      </div>
+
+      <!-- AI 예측 탭 공지 배너 (기본 숨김) -->
+      <div id="ai-notice-banner" style="display:none;">
+        <div class="ai-notice">
+          <span class="ai-notice-icon">🔬</span>
+          <span>
+            현재 AI 예측 모델 미연동 상태입니다.
+            아래 그래프는 <strong>실시간 현황 데이터</strong>로 대체 표시됩니다.
+            AI 예측 기능은 <strong>4차 프로젝트</strong>에서 구현 예정입니다.
+          </span>
+        </div>
+      </div>
+
+      <!-- ❷ 차트 카드 그리드 (JS 렌더링) -->
+      <div class="chart-grid" id="chart-grid"></div>
+
+      <!-- ❸ 하단 상태 바 -->
+      <div class="status-bar">
+        <span class="status-equip-tag">
+          <span class="equip-color-box"></span>
+          <span id="status-equip-name">-</span>
+        </span>
+        <span class="status-msg"       id="status-msg">-</span>
+        <span class="status-alert-msg" id="status-alert">-</span>
+        <span class="status-time"      id="status-time">--:--:--</span>
+      </div>
+
+    </div>
   </div>
 </div>
 
@@ -25,5 +123,8 @@
 <script src="{% static 'js/refactors/auth.js' %}"></script>
 <script src="{% static 'js/refactors/layout.js' %}"></script>
 <script src="{% static 'js/refactors/app-sub.js' %}"></script>
+<script src="{% static 'js/detail/ui-exception.js' %}"></script>
+<script src="{% static 'js/detail/power_system.js' %}"></script>
+<script src="{% static 'js/detail/websocket_power.js' %}"></script>
 </body>
 </html>

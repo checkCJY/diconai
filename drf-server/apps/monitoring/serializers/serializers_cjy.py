@@ -1,7 +1,7 @@
 # monitoring/serializers/serializers_cjy.py
 from rest_framework import serializers
 
-from apps.core.constants import RiskLevel
+from apps.core.constants import RiskLevel, SensorStatus
 from apps.facilities.models.devices import PowerDevice
 from apps.monitoring.models import PowerData, PowerEvent
 
@@ -60,7 +60,11 @@ class _ChannelEntrySerializer_cjy(serializers.Serializer):
     """PowerDataBulkIngestSerializer_cjy 내부용 채널 단건 시리얼라이저."""
 
     channel = serializers.IntegerField(min_value=1, max_value=16)
-    value = serializers.FloatField(min_value=-1)
+    value = serializers.FloatField(allow_null=True, required=False, default=None)
+    sensor_status = serializers.ChoiceField(
+        choices=SensorStatus.choices,
+        default=SensorStatus.ACTIVE,
+    )
     risk_level = serializers.ChoiceField(
         choices=RiskLevel.choices,
         default=RiskLevel.NORMAL,
@@ -81,7 +85,7 @@ class PowerDataBulkIngestSerializer_cjy(serializers.Serializer):
     처리:
       - device_id → PowerDevice FK 조회
       - 16채널 PowerData 일괄 생성 (bulk_create, uq 충돌 시 무시)
-      - value == -1 채널(통신 불능)도 저장 — 집계 쿼리에서 WHERE value != -1 필수
+      - 통신 불능 채널: value=None, sensor_status='comm_failure'로 저장
     """
 
     device_id = serializers.CharField(max_length=50)
@@ -97,6 +101,7 @@ class PowerDataBulkIngestSerializer_cjy(serializers.Serializer):
                 channel=ch["channel"],
                 data_type=validated_data["data_type"],
                 value=ch["value"],
+                sensor_status=ch["sensor_status"],
                 risk_level=ch["risk_level"],
                 measured_at=validated_data["measured_at"],
             )

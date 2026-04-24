@@ -39,6 +39,8 @@ app.include_router(positioning_router)  # 4/22 추가
 # /ws/position/ 수신 시 갱신, /ws/sensors/ 송출 시 페이로드에 포함
 worker_positions: dict[int, dict] = {}
 
+app = FastAPI()
+app.include_router(positioning_router)  # 4/22 추가
 
 # ────────────────────────────────────────────────────────────
 # [기존] 가스 / 전력 / AI 더미 데이터 생성

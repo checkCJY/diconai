@@ -34,10 +34,11 @@
         <label for="username">아이디</label>
         <div class="input-wrap">
           <input type="text" id="username" name="username"
-                 placeholder="아이디를 입력하세요" autocomplete="username" maxlength="20">
+                 placeholder="아이디를 입력하세요" autocomplete="username" maxlength="20"
+                 aria-describedby="usernameError">
           <button type="button" class="clear-btn" id="clearUsername">✕</button>
         </div>
-        <div class="field-error" id="usernameError"></div>
+        <div class="field-error" id="usernameError" role="alert"></div>
       </div>
 
       <!-- ④ 비밀번호 입력란 -->
@@ -45,10 +46,11 @@
         <label for="password">비밀번호</label>
         <div class="input-wrap">
           <input type="password" id="password" name="password"
-                 placeholder="비밀번호를 입력하세요" autocomplete="current-password">
+                 placeholder="비밀번호를 입력하세요" autocomplete="current-password" maxlength="100"
+                 aria-describedby="passwordError">
           <button type="button" class="clear-btn" id="clearPassword">✕</button>
         </div>
-        <div class="field-error" id="passwordError"></div>
+        <div class="field-error" id="passwordError" role="alert"></div>
       </div>
 
       <!-- ⑤ 로그인 버튼 -->
@@ -59,18 +61,47 @@
   <!-- ⑥ 로그인 관련 문의 문구 -->
   <div class="login-footer">
     로그인 관련 문의<br>
-    ○○부서 ○○○팀장 000-1234-5678
+    {{ contact_info }}
   </div>
 
 </div>
 
 <script>
 (function () {
-  // 이미 로그인 상태면 대시보드로
+  // 토큰이 있으면 유효성을 서버에서 확인 후 대시보드로 이동
+  // 단순 키 존재 체크는 만료 토큰도 통과시키므로 API로 검증
   if (localStorage.getItem('access_token')) {
-    window.location.href = '/dashboard/';
-    return;
+    fetch('/api/auth/me/', {
+      headers: { 'Authorization': 'Bearer ' + localStorage.getItem('access_token') },
+    })
+      .then(res => {
+        if (res.ok) {
+          window.location.href = '/dashboard/';
+        } else {
+          ['access_token', 'refresh_token', 'username', 'role']
+            .forEach(k => localStorage.removeItem(k));
+        }
+      })
+      .catch(() => { /* 네트워크 오류 — 로그인 화면 유지 */ });
   }
+
+  /* ── 에러 메시지 정의 (메시지 시트 분리) ── */
+  const MSG = {
+    username: {
+      required: '아이디를 입력해주세요.',
+      format:   '아이디는 영문 또는 숫자만 입력할 수 있습니다.',
+      length:   '아이디를 4~20자로 입력해주세요.',
+    },
+    password: {
+      required:  '비밀번호를 입력해주세요.',
+      minLength: '비밀번호를 8자 이상 입력해야 합니다.',
+      pattern:   '비밀번호는 영문, 숫자, 특수문자 중 2가지 이상을 포함해야 합니다.',
+    },
+    server: {
+      authFail:    '아이디 또는 비밀번호가 올바르지 않습니다.',
+      networkFail: '서버에 연결할 수 없습니다.',
+    },
+  };
 
   const form          = document.getElementById('loginForm');
   const btn           = document.getElementById('loginBtn');
@@ -82,7 +113,7 @@
   const usernameError = document.getElementById('usernameError');
   const passwordError = document.getElementById('passwordError');
 
-  /* ── ② X 버튼: 입력값 있을 때 표시, 클릭 시 삭제 ── */
+  /* ── X 버튼: 입력값 있을 때 표시, 클릭 시 삭제 ── */
   function syncClear(input, clearBtn) {
     clearBtn.classList.toggle('visible', input.value.length > 0);
   }
@@ -107,6 +138,18 @@
     clearFieldError(passwordInput, passwordError);
   });
 
+  /* ── blur: 값이 있을 때만 유효성 검사 (빈 값은 submit 시점에 처리) ── */
+  usernameInput.addEventListener('blur', () => {
+    if (!usernameInput.value) return;
+    const err = validateUsername(usernameInput.value.trim());
+    if (err) showFieldError(usernameInput, usernameError, err);
+  });
+  passwordInput.addEventListener('blur', () => {
+    if (!passwordInput.value) return;
+    const err = validatePassword(passwordInput.value);
+    if (err) showFieldError(passwordInput, passwordError, err);
+  });
+
   /* ── 필드 에러 표시 / 제거 ── */
   function showFieldError(input, errorEl, msg) {
     input.classList.add('error');
@@ -129,16 +172,16 @@
 
   /* ── 유효성 검사 ── */
   function validateUsername(val) {
-    if (!val)                           return '아이디를 입력해주세요.';
-    if (!/^[a-zA-Z0-9]+$/.test(val))   return '아이디는 영문 또는 숫자만 입력할 수 있습니다.';
-    if (val.length < 4 || val.length > 20) return '아이디를 4~20자로 입력해주세요.';
+    if (!val)                               return MSG.username.required;
+    if (!/^[a-zA-Z0-9]+$/.test(val))       return MSG.username.format;
+    if (val.length < 4 || val.length > 20) return MSG.username.length;
     return '';
   }
   function validatePassword(val) {
-    if (!val)              return '비밀번호를 입력해주세요.';
-    if (val.length < 8)   return '비밀번호를 8자 이상 입력해야 합니다.';
+    if (!val)           return MSG.password.required;
+    if (val.length < 8) return MSG.password.minLength;
     const types = [/[a-zA-Z]/, /[0-9]/, /[^a-zA-Z0-9]/].filter(r => r.test(val)).length;
-    if (types < 2)        return '비밀번호는 영문, 숫자, 특수문자 중 2가지 이상을 포함해야 합니다.';
+    if (types < 2)      return MSG.password.pattern;
     return '';
   }
 
@@ -149,7 +192,6 @@
     const username = usernameInput.value.trim();
     const password = passwordInput.value;
 
-    // 클라이언트 유효성 검사
     const uErr = validateUsername(username);
     const pErr = validatePassword(password);
     if (uErr) showFieldError(usernameInput, usernameError, uErr);
@@ -168,7 +210,7 @@
       const data = await res.json();
 
       if (!res.ok) {
-        showServerError(data.error || '아이디 또는 비밀번호가 올바르지 않습니다.');
+        showServerError(data.error || MSG.server.authFail);
         return;
       }
 
@@ -179,7 +221,7 @@
 
       window.location.href = '/dashboard/';
     } catch {
-      showServerError('서버에 연결할 수 없습니다.');
+      showServerError(MSG.server.networkFail);
     } finally {
       btn.disabled = false;
       btn.textContent = '로그인';

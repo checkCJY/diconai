@@ -1,6 +1,6 @@
 # monitoring/models/power_data.py
 from django.db import models
-from apps.core.constants import RiskLevel
+from apps.core.constants import RiskLevel, SensorStatus
 
 
 class PowerData(models.Model):
@@ -29,7 +29,13 @@ class PowerData(models.Model):
     data_type = models.CharField(
         max_length=20, choices=DataType.choices, verbose_name="측정 종류"
     )
-    value = models.FloatField(verbose_name="측정값")
+    value = models.FloatField(null=True, blank=True, verbose_name="측정값")
+    sensor_status = models.CharField(
+        max_length=20,
+        choices=SensorStatus.choices,
+        default=SensorStatus.ACTIVE,
+        verbose_name="센서 통신 상태",
+    )
     risk_level = models.CharField(
         max_length=10, choices=RiskLevel.choices, default=RiskLevel.NORMAL
     )
