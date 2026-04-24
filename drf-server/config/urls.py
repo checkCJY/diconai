@@ -19,4 +19,5 @@ urlpatterns = [
     path("api/", include("apps.geofence.urls")),
     path("api/positioning/", include("apps.positioning.urls")),
     path("api/monitoring/", include("apps.monitoring.urls")),
+    path("admin-panel/", include("apps.geofence.admin_urls")),
 ]
