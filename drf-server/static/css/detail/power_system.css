@@ -10,7 +10,7 @@
 
 /* ── 좌측 패널 ── */
 .power-left {
-  width: 300px;
+  width: 340px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -161,14 +161,33 @@
   opacity: 0.5;
 }
 
+/* ── AI 예측 탭 공지 배너 ── */
+.ai-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(31,111,235,0.12);
+  border: 1px solid rgba(88,166,255,0.3);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--text2);
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+.ai-notice strong { color: var(--blue); }
+.ai-notice-icon   { font-size: 14px; flex-shrink: 0; }
+
 /* ── 차트 카드 그리드 ── */
 .chart-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  grid-template-rows: repeat(2, 1fr);
+  /* 2행이 화면에 꽉 차도록: 전체 높이에서 헤더·상태바·여백 제거 후 2등분 */
+  grid-auto-rows: calc((100vh - 260px) / 2);
   gap: 8px;
   flex: 1;
-  overflow: hidden;
+  overflow-y: auto;
+  align-content: start;
 }
 .chart-card {
   background: var(--bg2);
@@ -238,3 +257,12 @@
 .status-msg       { color: var(--text2); }
 .status-alert-msg { color: var(--danger); font-weight: 700; }
 .status-time      { margin-left: auto; color: var(--text2); font-family: monospace; }
+
+/* ── 설비 테이블 위험도 행 배경색 ── */
+tr.danger-row  { background: rgba(220, 38, 38, 0.55); }
+tr.danger-row  td { color: #fecaca; font-weight: 600; }
+tr.danger-row:hover  { background: rgba(220, 38, 38, 0.75); }
+
+tr.caution-row { background: rgba(202, 138, 4, 0.45); }
+tr.caution-row td { color: #fef08a; font-weight: 600; }
+tr.caution-row:hover { background: rgba(202, 138, 4, 0.65); }

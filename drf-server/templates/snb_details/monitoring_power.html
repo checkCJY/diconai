@@ -17,12 +17,8 @@
 {% include 'components/header.html' %}
 
 <div class="body-wrap page-wrap">
-  <div class="page-header">
-    <span class="breadcrumb">모니터링 &gt; 실시간/AI 예측 스마트 전력 현황</span>
-  </div>
 
-  <div class="panel-title" style="padding:0 0 8px 0;">실시간/AI 예측 스마트 전력 현황</div>
-
+  <H1> 실시간/AI 예측 스마트 전력 현황 </H1><br>
   <div class="power-wrap">
 
     <!-- ❶ 좌측: 스마트 전력 위험 현황 -->
@@ -44,9 +40,9 @@
               <tr>
                 <th>선택</th>
                 <th>설비명</th>
+                <th>전력량</th>
                 <th>부하율(%)</th>
-                <th>연결 상태</th>
-                <th>온도(°C)</th>
+                <th>사용 상태</th>
                 <th>위험도</th>
               </tr>
             </thead>
@@ -93,7 +89,19 @@
         </div>
       </div>
 
-      <!-- ❷ 차트 카드 그리드 (8개, JS 렌더링) -->
+      <!-- AI 예측 탭 공지 배너 (기본 숨김) -->
+      <div id="ai-notice-banner" style="display:none;">
+        <div class="ai-notice">
+          <span class="ai-notice-icon">🔬</span>
+          <span>
+            현재 AI 예측 모델 미연동 상태입니다.
+            아래 그래프는 <strong>실시간 현황 데이터</strong>로 대체 표시됩니다.
+            AI 예측 기능은 <strong>4차 프로젝트</strong>에서 구현 예정입니다.
+          </span>
+        </div>
+      </div>
+
+      <!-- ❷ 차트 카드 그리드 (JS 렌더링) -->
       <div class="chart-grid" id="chart-grid"></div>
 
       <!-- ❸ 하단 상태 바 -->
@@ -115,6 +123,8 @@
 <script src="{% static 'js/refactors/auth.js' %}"></script>
 <script src="{% static 'js/refactors/layout.js' %}"></script>
 <script src="{% static 'js/refactors/app-sub.js' %}"></script>
+<script src="{% static 'js/detail/ui-exception.js' %}"></script>
 <script src="{% static 'js/detail/power_system.js' %}"></script>
+<script src="{% static 'js/detail/websocket_power.js' %}"></script>
 </body>
 </html>

@@ -205,22 +205,24 @@ a.more {
 
 /* ── risk-level별 행 배경색 ─────────────────────────────── */
 .risk-row.risk-danger {
-  background: rgba(180, 40, 40, 0.75);
+  background: rgba(220, 38, 38, 0.55);
 }
 .risk-row.risk-danger td {
-  color: #f0c0c0;
+  color: #fecaca;
+  font-weight: 600;
 }
 .risk-row.risk-caution {
-  background: rgba(180, 100, 20, 0.75);
+  background: rgba(202, 138, 4, 0.45);
 }
 .risk-row.risk-caution td {
-  color: #f5d9b0;
+  color: #fef08a;
+  font-weight: 600;
 }
 .risk-row.risk-safe {
-  background: rgba(30, 40, 55, 0.6);
+  background: transparent;
 }
 
 /* 위험/주의 행 hover 시 살짝 밝게 */
-.risk-row.risk-danger:hover  { background: rgba(200, 50, 50, 0.85); }
-.risk-row.risk-caution:hover { background: rgba(200, 115, 30, 0.85); }
-.risk-row.risk-safe:hover    { background: rgba(40, 55, 75, 0.8); }
+.risk-row.risk-danger:hover  { background: rgba(220, 38, 38, 0.75); }
+.risk-row.risk-caution:hover { background: rgba(202, 138, 4, 0.65); }
+.risk-row.risk-safe:hover    { background: rgba(40, 55, 75, 0.5); }

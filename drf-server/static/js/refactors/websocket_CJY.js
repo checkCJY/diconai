@@ -154,6 +154,7 @@ function initWebSocket() {
 
   function connect() {
     let ws;
+
     try {
       ws = new WebSocket('ws://127.0.0.1:8002/ws/sensors/');
     } catch {

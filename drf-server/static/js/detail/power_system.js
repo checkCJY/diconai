@@ -3,11 +3,11 @@
    의존: Chart.js 4.x, chartjs-plugin-annotation 3.x
    ────────────────────────────────────────────────────────── */
 
-/* ── Phase A 임계치 고정값 (단위: kW) ── */
+/* ── Phase A 임계치 고정값 (단위: W) ── */
 const THRESHOLD = {
-  caution: 2200,          // 안전 → 주의 경계
-  danger:  2860,          // 주의 → 위험 경계  (2200 × 1.3)
-  maxY:    3500,          // Y축 최대값
+  caution: 2200,          // 안전 → 주의 경계 (W)
+  danger:  2860,          // 주의 → 위험 경계 (W, 2200 × 1.3)
+  maxY:    3500,          // Y축 기본 최대값 (W)
 };
 
 /* ── 색상 팔레트 (CSS 변수와 동일) ── */
@@ -30,10 +30,11 @@ const chartInstances = {};
 /* ────────────────────────────────────────────
    유틸
 ────────────────────────────────────────────── */
-function getStatus(kw) {
-  if (kw === null || kw === undefined) return 'safe';
-  if (kw >= THRESHOLD.danger)  return 'danger';
-  if (kw >= THRESHOLD.caution) return 'caution';
+/* watt(W) 기준 상태 계산 — 서버 risk_level 없을 때만 사용 */
+function getStatus(watt) {
+  if (watt === null || watt === undefined) return 'safe';
+  if (watt >= THRESHOLD.danger)  return 'danger';
+  if (watt >= THRESHOLD.caution) return 'caution';
   return 'safe';
 }
 
@@ -43,21 +44,21 @@ function getBarColor(status) {
 
 /* ────────────────────────────────────────────
    Chart.js 막대 그래프 생성
-   - annotation 플러그인으로 주의/위험 임계치 점선 표시
-   - 주의/위험 범위는 배경 annotation box로 표시
+   @param canvasId  - canvas 요소 id
+   @param watt      - 전력값 (W 단위, null이면 빈 차트)
+   @param status    - 'danger'|'caution'|'safe' (서버 risk_level 기반)
+   @param maxY      - Y축 최대값 (W, 미전달 시 THRESHOLD.maxY)
 ────────────────────────────────────────────── */
-function createBarChart(canvasId, kw) {
+function createBarChart(canvasId, watt, status = 'safe', maxY = THRESHOLD.maxY) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
 
-  /* 기존 차트 파괴 */
   if (chartInstances[canvasId]) {
     chartInstances[canvasId].destroy();
   }
 
-  const status   = getStatus(kw);
   const barColor = getBarColor(status);
-  const barValue = kw ?? 0;
+  const barValue = watt ?? 0;
 
   const chart = new Chart(canvas, {
     type: 'bar',
@@ -80,32 +81,42 @@ function createBarChart(canvasId, kw) {
       plugins: {
         legend: { display: false },
         tooltip: {
+          backgroundColor: 'rgba(22,27,34,0.95)',
+          borderColor:     'rgba(48,54,61,0.9)',
+          borderWidth:     1,
+          padding:         10,
+          titleColor:      '#8b949e',
+          titleFont:       { size: 10 },
+          bodyColor:       '#e6edf3',
+          bodyFont:        { size: 11 },
+          bodySpacing:     5,
+          displayColors:   false,
           callbacks: {
-            label: (ctx) =>
-              kw !== null && kw !== undefined
-                ? ` ${kw.toLocaleString()} kW`
-                : ' 데이터 없음',
+            title: () => '',
+            label: () => {
+              if (watt === null || watt === undefined) return ' 데이터 없음';
+              return [
+                `현재 사용 전력량   ${(watt / 1000).toFixed(2)} kW`,
+              ];
+            },
           },
         },
         annotation: {
           annotations: {
-            /* 위험 범위 배경 박스 */
             dangerBox: {
-              type:        'box',
-              yMin:        THRESHOLD.danger,
-              yMax:        THRESHOLD.maxY,
+              type:            'box',
+              yMin:            THRESHOLD.danger,
+              yMax:            maxY,
               backgroundColor: COLOR.dangerBg,
-              borderWidth: 0,
+              borderWidth:     0,
             },
-            /* 주의 범위 배경 박스 */
             cautionBox: {
-              type:        'box',
-              yMin:        THRESHOLD.caution,
-              yMax:        THRESHOLD.danger,
+              type:            'box',
+              yMin:            THRESHOLD.caution,
+              yMax:            THRESHOLD.danger,
               backgroundColor: COLOR.cautionBg,
-              borderWidth: 0,
+              borderWidth:     0,
             },
-            /* 위험 임계치 점선 */
             dangerLine: {
               type:        'line',
               yMin:        THRESHOLD.danger,
@@ -113,11 +124,8 @@ function createBarChart(canvasId, kw) {
               borderColor: COLOR.danger,
               borderWidth: 1,
               borderDash:  [4, 3],
-              label: {
-                display:    false,
-              },
+              label: { display: false },
             },
-            /* 주의 임계치 점선 */
             cautionLine: {
               type:        'line',
               yMin:        THRESHOLD.caution,
@@ -125,9 +133,7 @@ function createBarChart(canvasId, kw) {
               borderColor: COLOR.caution,
               borderWidth: 1,
               borderDash:  [4, 3],
-              label: {
-                display:    false,
-              },
+              label: { display: false },
             },
           },
         },
@@ -140,7 +146,7 @@ function createBarChart(canvasId, kw) {
         },
         y: {
           min:  0,
-          max:  THRESHOLD.maxY,
+          max:  maxY,
           grid:   { color: COLOR.gridLine },
           ticks:  {
             color:    COLOR.tickText,
@@ -161,8 +167,8 @@ function createBarChart(canvasId, kw) {
    카드 DOM 생성
 ────────────────────────────────────────────── */
 function buildCard(index, equipData) {
-  const kw     = equipData?.power ?? null;
-  const status = getStatus(kw);
+  /* status: 서버 risk_level 우선, 없으면 watt 기준 계산 */
+  const status = equipData?.status ?? getStatus(equipData?.watt ?? null);
   const label  = equipData?.name ?? `설비 ${index + 1}`;
 
   const borderClass = {
@@ -190,54 +196,71 @@ function buildCard(index, equipData) {
 
 /* ────────────────────────────────────────────
    그리드 전체 렌더
-   equipList: [{ name, power }, ...] 길이 최대 8
+   equipList: [{ name, watt(W), status }, ...]
 ────────────────────────────────────────────── */
 function renderGrid(equipList = []) {
   const grid = document.getElementById('chart-grid');
   grid.innerHTML = '';
 
-  const SLOT_COUNT = 8;
-  for (let i = 0; i < SLOT_COUNT; i++) {
+  const count = equipList.length || 8;
+
+  /* 전체 중 최대 watt 기준 Y축 최대값 계산
+     - THRESHOLD.maxY 이상 보장 (임계치 라인이 항상 보이도록)
+     - 실제 최대값이 더 크면 10% 여유 추가 후 올림 */
+  const maxWatt = Math.max(...equipList.map(e => e.watt ?? 0), 0);
+  const dynamicMaxY = maxWatt > THRESHOLD.maxY
+    ? Math.ceil(maxWatt * 1.1 / 100) * 100
+    : THRESHOLD.maxY;
+
+  for (let i = 0; i < count; i++) {
     const data = equipList[i] ?? null;
     const card = buildCard(i, data);
     grid.appendChild(card);
   }
 
   /* 차트는 DOM 삽입 후 생성 */
-  for (let i = 0; i < SLOT_COUNT; i++) {
-    const kw = equipList[i]?.power ?? null;
-    createBarChart(`canvas-${i}`, kw);
+  for (let i = 0; i < count; i++) {
+    const eq = equipList[i];
+    createBarChart(`canvas-${i}`, eq?.watt ?? null, eq?.status ?? 'safe', dynamicMaxY);
   }
 }
 
 /* ────────────────────────────────────────────
    탭 전환
 ────────────────────────────────────────────── */
+
+/* 마지막으로 수신한 실시간 equipment 캐시 (AI 탭에서 대체 표시용) */
+let _lastEquipCache = [];
+
 function switchTab(tab) {
   activeTab = tab;
   document.getElementById('tab-realtime').classList.toggle('active', tab === 'realtime');
   document.getElementById('tab-ai').classList.toggle('active',       tab === 'ai');
 
-  if (tab === 'realtime') {
-    loadRealtimeData();
-  } else {
-    loadAiData();
+  const banner = document.getElementById('ai-notice-banner');
+  if (banner) banner.style.display = tab === 'ai' ? 'block' : 'none';
+
+  if (tab === 'ai') {
+    /* AI 모델 미연동 — 실시간 캐시 데이터로 대체 표시
+       TODO (4차 프로젝트): AI 예측 API 연동으로 교체 */
+    renderGrid(_lastEquipCache);
   }
 }
 
 /* ────────────────────────────────────────────
-   데이터 로드 (스텁 — 실제 API 연동 시 교체)
+   데이터 로드 (WebSocket 연동은 websocket_power.js)
 ────────────────────────────────────────────── */
 function loadRealtimeData() {
-  /* TODO: WebSocket 또는 REST API 연동 */
   renderGrid([]);
   updateStatusBar(null);
 }
 
-function loadAiData() {
-  /* TODO: AI 예측 API 연동 */
-  renderGrid([]);
-  updateStatusBar(null);
+/* 외부(websocket_power.js)에서 실시간 데이터 수신 시 호출 */
+function updateRealtimeGrid(equipList) {
+  _lastEquipCache = equipList;
+  if (activeTab === 'realtime') {
+    renderGrid(equipList);
+  }
 }
 
 /* ────────────────────────────────────────────
