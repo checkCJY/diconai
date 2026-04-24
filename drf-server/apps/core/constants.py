@@ -73,8 +73,6 @@ class SensorStatus(models.TextChoices):
 
     ACTIVE = "active", "정상"
     COMM_FAILURE = "comm_failure", "통신 불능"
-    # 로그인 화면 문의처 — 운영 연락처로 변경 필요
-    CONTACT_INFO = "담당 관리자에게 문의하세요."
 
 
 class GasTypeChoices(models.TextChoices):
@@ -96,3 +94,7 @@ class GasTypeChoices(models.TextChoices):
     NH3 = "nh3", "NH3 (암모니아)"
     VOC = "voc", "VOC (휘발성유기화합물)"
     LEL = "lel", "LEL (폭발하한계)"
+
+
+# 로그인 화면 문의처 — 운영 연락처로 변경 필요
+CONTACT_INFO = "담당 관리자에게 문의하세요."
