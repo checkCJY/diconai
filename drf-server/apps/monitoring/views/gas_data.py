@@ -8,7 +8,7 @@ from apps.monitoring.serializers import GasDataCreateSerializer
 class GasDataCreateView(APIView):
     """
     POST /api/monitoring/gas/
-    FastAPI로부터 가스 측정값을 수신하여 DB에 저장한다.
+    FastAPI로부터 가스 측정값을 수신하여 DB에 저장하고 알람을 생성한다.
     """
 
     authentication_classes = []
@@ -18,7 +18,8 @@ class GasDataCreateView(APIView):
         serializer = GasDataCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         gas_data = serializer.save()
+        alarms = getattr(gas_data, "_alarms", [])
         return Response(
-            {"id": gas_data.id, "received": True},
+            {"id": gas_data.id, "received": True, "alarms": alarms},
             status=status.HTTP_201_CREATED,
         )
