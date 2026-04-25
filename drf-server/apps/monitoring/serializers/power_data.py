@@ -1,4 +1,4 @@
-# monitoring/serializers/serializers_cjy.py
+# monitoring/serializers/power_data.py
 from rest_framework import serializers
 
 from apps.core.constants import RiskLevel, SensorStatus
@@ -6,7 +6,7 @@ from apps.facilities.models.devices import PowerDevice
 from apps.monitoring.models import PowerData, PowerEvent
 
 
-class PowerEventIngestSerializer_cjy(serializers.Serializer):
+class PowerEventIngestSerializer(serializers.Serializer):
     """
     FastAPI → DRF: PowerEvent 수신 시리얼라이저 (ON/OFF 스냅샷)
 
@@ -56,8 +56,8 @@ class PowerEventIngestSerializer_cjy(serializers.Serializer):
         )
 
 
-class _ChannelEntrySerializer_cjy(serializers.Serializer):
-    """PowerDataBulkIngestSerializer_cjy 내부용 채널 단건 시리얼라이저."""
+class _ChannelEntrySerializer(serializers.Serializer):
+    """PowerDataBulkIngestSerializer 내부용 채널 단건 시리얼라이저."""
 
     channel = serializers.IntegerField(min_value=1, max_value=16)
     value = serializers.FloatField(allow_null=True, required=False, default=None)
@@ -71,7 +71,7 @@ class _ChannelEntrySerializer_cjy(serializers.Serializer):
     )
 
 
-class PowerDataBulkIngestSerializer_cjy(serializers.Serializer):
+class PowerDataBulkIngestSerializer(serializers.Serializer):
     """
     FastAPI → DRF: PowerData 16채널 일괄 수신 시리얼라이저 (전류/전압/전력)
 
@@ -91,7 +91,7 @@ class PowerDataBulkIngestSerializer_cjy(serializers.Serializer):
     device_id = serializers.CharField(max_length=50)
     measured_at = serializers.DateTimeField()
     data_type = serializers.ChoiceField(choices=PowerData.DataType.choices)
-    channels = _ChannelEntrySerializer_cjy(many=True)
+    channels = _ChannelEntrySerializer(many=True)
 
     def create(self, validated_data):
         device = PowerDevice.objects.get(device_id=validated_data["device_id"])

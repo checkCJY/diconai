@@ -1,16 +1,16 @@
-# monitoring/views/views_cjy.py
+# monitoring/views/power_data.py
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.monitoring.serializers.serializers_cjy import (
-    PowerDataBulkIngestSerializer_cjy,
-    PowerEventIngestSerializer_cjy,
+from apps.monitoring.serializers.power_data import (
+    PowerDataBulkIngestSerializer,
+    PowerEventIngestSerializer,
 )
 
 
-class PowerEventIngestView_cjy(APIView):
+class PowerEventIngestView(APIView):
     """
     POST /monitoring/api/power/event/
 
@@ -22,13 +22,13 @@ class PowerEventIngestView_cjy(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        s = PowerEventIngestSerializer_cjy(data=request.data)
+        s = PowerEventIngestSerializer(data=request.data)
         s.is_valid(raise_exception=True)
         event = s.save()
         return Response({"id": event.id}, status=status.HTTP_201_CREATED)
 
 
-class PowerDataBulkIngestView_cjy(APIView):
+class PowerDataBulkIngestView(APIView):
     """
     POST /monitoring/api/power/data/
 
@@ -40,7 +40,7 @@ class PowerDataBulkIngestView_cjy(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        s = PowerDataBulkIngestSerializer_cjy(data=request.data)
+        s = PowerDataBulkIngestSerializer(data=request.data)
         s.is_valid(raise_exception=True)
         rows = s.save()
         return Response({"created": len(rows)}, status=status.HTTP_201_CREATED)
