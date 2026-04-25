@@ -1,0 +1,25 @@
+<!-- 패널 12: 유해가스 현황 -->
+<div class="panel">
+  <div class="panel-title">내 근처 유해가스 위험 현황 <span class="more">+ 상세 보기</span></div>
+  <div class="sensor-tag">유해가스 1</div>
+  <table class="tbl">
+    <thead><tr><th>가스 종류</th><th>현재 농도</th><th>측정 단위</th><th>위험도</th></tr></thead>
+    <tbody id="gasTableBody"></tbody>
+  </table>
+</div>
+
+<!-- 패널 13: AI 예측 — 유해가스 -->
+<div class="panel panel-chart">
+  <div class="panel-title">AI 예측 — 내 근처 유해가스 위험 <span class="more">+ 상세 보기</span></div>
+  <div class="ai-nav">
+    <span id="aiGasName" class="caution-text fw">CO (일산화탄소)</span>
+    <span class="sub">◁ 1 / 3 ▷</span>
+  </div>
+  <div class="ai-vals">
+    <div><div class="sub">현재 농도</div><div id="aiCurrentVal" class="big caution-text">-- ppm</div></div>
+    <div><div class="sub">12시간 내 최대 예상 농도</div><div id="aiMaxVal" class="big danger-text">-- ppm</div></div>
+  </div>
+  <div class="chart-wrap">
+    <canvas id="chartGas"></canvas>
+  </div>
+</div>

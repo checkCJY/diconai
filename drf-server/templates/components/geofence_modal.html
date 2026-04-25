@@ -1,0 +1,22 @@
+<!-- 지오펜스 저장 폼 모달 -->
+<div id="geofence-modal" style="display:none;">
+  <div class="geofence-modal-box">
+    <div class="geofence-modal-title">🚧 위험구역 정보 입력</div>
+    <div class="geofence-modal-body">
+      <label>구역 이름</label>
+      <input type="text" id="geofence-name" placeholder="예: 위험구역 A">
+      <label>위험도</label>
+      <select id="geofence-risk">
+        <option value="danger">위험 🔴</option>
+        <option value="warning">주의 🟡</option>
+        <option value="normal">정상 🟢</option>
+      </select>
+      <label>설명 (선택)</label>
+      <input type="text" id="geofence-desc" placeholder="예: 화학물질 보관소">
+    </div>
+    <div class="geofence-modal-footer">
+      <button id="btn-geofence-save">저장</button>
+      <button id="btn-geofence-discard">버리기</button>
+    </div>
+  </div>
+</div>

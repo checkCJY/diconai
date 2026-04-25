@@ -1,0 +1,16 @@
+<!-- 우측: 이벤트 현황 -->
+<div class="col-right">
+  <div class="panel" style="flex:1;overflow:hidden;">
+    <div class="panel-title">이벤트 현황 <span class="more">+ 상세 보기</span></div>
+    <div class="event-summary">
+      최근 24시간 동안 발생한 이벤트 현황<br>
+      <span class="danger-text">위험 <span id="summary-danger">0</span>건</span>
+      / <span class="caution-text">주의 <span id="summary-warning">0</span>건</span>
+    </div>
+    <div id="event-list" style="overflow-y:auto;max-height:260px;">
+      <div id="event-empty" class="sub" style="text-align:center;padding:20px;">
+        현재 발생한 이벤트가 없습니다
+      </div>
+    </div>
+  </div>
+</div>
