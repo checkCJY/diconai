@@ -19,6 +19,7 @@ const AlarmPopup = {
     if (!this.isOpen) this._process();
   },
 
+  // ── 큐에서 데이터를 꺼내 팝업 DOM을 채우고 10초 후 자동으로 닫는다. ─
   _process() {
     if (this.queue.length === 0) { this.isOpen = false; return; }
     this.isOpen    = true;

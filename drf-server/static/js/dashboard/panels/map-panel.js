@@ -22,6 +22,7 @@ const MapPanel = {
   STATUS_COLOR: { normal: '#3fb950', caution: '#e3b341', danger: '#f85149' },
   ZONE_COLOR:   { danger: '#f85149', warning: '#e3b341', normal: '#3fb950' },
 
+  // ── 위험도 레벨(0 정상·1 주의·2 위험)을 색상 코드로 변환한다. ──────
   riskColor(level)    { return [this.STATUS_COLOR.normal, this.STATUS_COLOR.caution, this.STATUS_COLOR.danger][level] ?? this.STATUS_COLOR.normal; },
 
   // SVG 커스텀 아이콘 생성
@@ -82,6 +83,7 @@ _createPowerIcon(color) {
   });
 },
 
+  // ── 위험도 레벨(0·1·2)을 상태 문자열(normal·caution·danger)로 변환한다. ─
   levelToStatus(level){ return ['normal', 'caution', 'danger'][level] ?? 'normal'; },
 
   DUMMY_GAS_SENSORS: [
@@ -155,6 +157,7 @@ _geofences: [],
       <div>위치: x:${w.x}, y:${w.y}</div>`;
   },
 
+  // ── Leaflet 지도를 초기화하고 마커·레이어·탭 필터·드로잉 기능을 등록한다. ─
   async init() {
     if (!window.L || !document.getElementById('map')) return;
 
@@ -187,6 +190,7 @@ _geofences: [],
     }
   },
 
+  // ── 가스센서·전력설비·지오펜스·작업자 마커를 지도에 일괄 그린다. ──────
   async _drawAll() {
     this.DUMMY_GAS_SENSORS.forEach(s => {
       const color = this.riskColor(s.risk_level);

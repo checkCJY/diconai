@@ -22,6 +22,9 @@ async function initApp() {
   loadMySafetyStatus();
 }
 
+// ──────────────────────────────────────────────────────────
+// 나의 안전확인 완료 여부 조회 및 상태 텍스트 갱신
+// ──────────────────────────────────────────────────────────
 async function loadMySafetyStatus() {
   try {
     const res = await fetch('/dashboard/api/safety-status/');

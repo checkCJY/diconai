@@ -39,6 +39,7 @@
   function clearErr(el)     { if (!el) return; el.textContent = '';  el.style.display = 'none'; }
   function setKpi(el, v)    { if (el) el.textContent = v; }
 
+  // ── 나의 상태 API 응답으로 상태 바 마커 위치와 텍스트를 갱신한다. ──────
   function renderWorkerStatus(data) {
     clearErr(elWorkerErr);
     const cfg = STATUS_CONFIG[data.status || 'normal'] || STATUS_CONFIG.normal;
@@ -51,6 +52,7 @@
     showErr(elWorkerErr, msg);
   }
 
+  // ── 작업자 요약 API 응답으로 총원·정상·경고·위험 KPI 카드와 비율 바를 갱신한다. ─
   function renderAdminSummary(data) {
     clearErr(elAdminErr);
     const total = data.total_count ?? 0, normal = data.normal_count ?? 0,
@@ -94,6 +96,7 @@
   document.getElementById('mn04-btn-detail')?.addEventListener('click', () => { window.location.href = '/dashboard/monitoring/workers/'; });
 
 
+  // ── role에 따라 작업자 뷰 또는 관리자 뷰를 표시하고 30초 폴링을 시작한다. ─
   function init() {
     const role = localStorage.getItem('role') || 'worker';
     const isAdmin = role === 'facility_admin' || role === 'super_admin';

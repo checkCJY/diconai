@@ -1,5 +1,7 @@
 <!-- 좌측: 나의 안전확인 + 작업자 현황 -->
 <div class="col-left">
+
+  <!-- ── 패널: 나의 안전확인 ──────────────────────────────── -->
   <div class="panel">
     <div class="panel-title">나의 안전확인</div>
     <div class="safety-item"><span>PPE 착용</span><span class="done">완료</span></div>
@@ -8,11 +10,13 @@
     <button class="safety-btn" onclick="location.href='/dashboard/safety/checklist/'">나의 안전 확인 바로가기</button>
   </div>
 
+  <!-- ── 패널: 작업자 현황 (작업자 뷰 / 관리자 뷰 분기) ──── -->
   <div class="panel">
     <div class="panel-title">
       작업자 현황
       <span class="more" id="mn04-btn-detail">+ 상세 보기</span>
     </div>
+    <!-- 작업자 뷰: 나의 상태 바 -->
     <div id="mn04-view-worker" style="display:none;">
       <div class="sub" style="margin-bottom:6px;">현재 나의 상태</div>
       <div class="mn04-status-bar-wrap">
@@ -26,6 +30,7 @@
       <div class="mn04-status-text" id="mn04-status-text" style="color:#2d9e75;">--</div>
       <div class="mn04-error" id="mn04-worker-error" style="display:none;"></div>
     </div>
+    <!-- 관리자 뷰: 총원·정상·경고·위험 KPI 카드 -->
     <div id="mn04-view-admin" style="display:none;">
       <div class="mn04-kpi-grid">
         <div class="mn04-kpi-card mn04-kpi-total">

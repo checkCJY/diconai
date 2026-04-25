@@ -6,9 +6,13 @@ source .venv/bin/activate
 deactivate
 
 
-### FastAPI 실행 명령어
-uvicorn main:app --reload --port 8001
-uvicorn websocket:app --reload --port 8001
+# 리팩토링 이후 명령어
 
-### 더미데이터 들어오는것 확인
-.venv/bin/python legacy/test_schemas.py
+## 서버실행
+uvicorn app:app --reload --port 8001
+
+## 더미 데이터 전송 (터미널 하나당 더미 데이터 한개씩)
+##### 가스 / 전력 순서
+
+python -m dummies.gas_dummy
+python -m dummies.power_dummy
