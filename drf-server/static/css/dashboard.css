@@ -1,0 +1,548 @@
+/* ==========================================================
+   dashboard.css — 산재 예방 통합 관제 시스템
+   통합 출처: style.css + CJY.css + dashboard_sh.html 인라인 CSS
+             + dashboard_CJY.css (전력 패널 UI 확장 스타일 병합)
+
+   ※ 헤더 / SNB / 로그아웃 모달 / 스피너 스타일은
+      header.css 로 분리되었습니다.
+   ========================================================== */
+
+/* ── 리셋 & CSS 변수 ─────────────────────────────────────── */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #0d1117; --bg2: #161b22; --bg3: #1c2128;
+  --border: #30363d; --text: #e6edf3; --text2: #8b949e;
+  --danger: #f85149; --caution: #e3b341; --safe: #3fb950;
+  --blue: #58a6ff; --accent: #1f6feb;
+}
+body {
+  background: var(--bg); color: var(--text);
+  font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;
+  font-size: 12px; height: 100vh;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+
+/* ── 바디 레이아웃 ───────────────────────────────────────── */
+.body-wrap {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 6px; flex: 1; overflow: hidden;
+  height: calc(100vh - 52px);
+}
+.top-row    { display: flex; gap: 6px; flex: 1; overflow: hidden; min-height: 0; }
+.col-left   { display: flex; flex-direction: column; gap: 6px; width: 260px; flex-shrink: 0; }
+.col-mid    { flex: 1; display: flex; flex-direction: column; }
+.col-right  { width: 280px; flex-shrink: 0; display: flex; flex-direction: column; }
+.bottom-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; height: 320px; flex-shrink: 0; }
+
+/* ── 공통 패널 ───────────────────────────────────────────── */
+.panel {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 12px; overflow: hidden;
+}
+.panel-title {
+  font-size: 12px; font-weight: 700; margin-bottom: 8px;
+  display: flex; justify-content: space-between; align-items: center;
+  white-space: nowrap; overflow: hidden;
+}
+.more    { color: var(--blue); font-size: 11px; cursor: pointer; font-weight: 400; flex-shrink: 0; margin-left: 4px; }
+.sub     { font-size: 11px; color: var(--text2); }
+.fw      { font-weight: 700; }
+.danger-text  { color: var(--danger); }
+.caution-text { color: var(--caution); }
+.safe-text    { color: var(--safe); }
+
+/* ── 패널 8: 나의 안전확인 ───────────────────────────────── */
+.safety-item { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.safety-item:last-of-type { border-bottom: none; }
+.done { color: var(--safe); font-weight: 700; }
+.todo { color: var(--danger); font-weight: 700; }
+.safety-btn {
+  width: 100%; margin-top: 8px; background: var(--bg3);
+  border: 1px solid var(--border); color: var(--text);
+  padding: 7px; border-radius: 5px; cursor: pointer;
+  font-size: 12px; font-family: inherit;
+}
+
+/* ── 패널 11(구): 도넛 차트형 작업자 현황 (dashboard_jh / dashboard_sh 호환) ── */
+.donut-wrap  { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+.donut       { width: 80px; height: 80px; border-radius: 50%; flex-shrink: 0; background: conic-gradient(var(--danger) 0% 10%, var(--caution) 10% 25%, var(--safe) 25% 100%); display: flex; align-items: center; justify-content: center; }
+.donut-inner { width: 54px; height: 54px; background: var(--bg2); border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.donut-status { font-size: 12px; font-weight: 700; color: var(--safe); }
+.legend      { display: flex; flex-direction: column; gap: 6px; }
+.legend-item { display: flex; align-items: center; gap: 6px; }
+.dot         { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.dot.danger  { background: var(--danger); }
+.dot.caution { background: var(--caution); }
+.dot.safe    { background: var(--safe); }
+
+/* ── 패널 9: 실시간 모니터링 맵 ─────────────────────────── */
+.panel-map  { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.map-tabs   { display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; }
+.map-tab    { padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; background: var(--bg3); border: 1px solid var(--border); color: var(--text2); font-family: inherit; }
+.map-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.map-area   { flex: 1; background: #1a2332; border: 1px solid var(--border); border-radius: 6px; position: relative; overflow: hidden; min-height: 0; padding: 0; }
+.map-grid   { position: absolute; inset: 0; background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 40px 40px; opacity: .3; }
+
+/* ── Leaflet 맵 컨테이너 ────────────────────────────────── */
+#map {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  background: #1c2128;
+  border-radius: 4px;
+}
+.leaflet-popup-content-wrapper {
+  background: #1c2128; color: #e6edf3;
+  border: 1px solid #30363d; border-radius: 6px;
+  font-size: 11px; font-family: 'Malgun Gothic', sans-serif;
+}
+.leaflet-popup-tip           { background: #1c2128; }
+.leaflet-popup-content       { margin: 8px 12px; line-height: 1.8; }
+.popup-title                 { font-weight: 700; font-size: 12px; margin-bottom: 4px; color: #58a6ff; }
+.popup-status-normal         { color: #3fb950; }
+.popup-status-caution        { color: #e3b341; }
+.popup-status-danger         { color: #f85149; }
+
+/* ── WebSocket 연결 상태 배지 ───────────────────────────── */
+.ws-status {
+  font-size: 10px; padding: 2px 6px; border-radius: 4px;
+  margin-left: 8px; background: #30363d; color: #8b949e;
+}
+.ws-status.connected { background: #0d3822; color: #3fb950; }
+.ws-status.error     { background: #3d1a1a; color: #f85149; }
+
+/* ── 패널 10: 이벤트 현황 ───────────────────────────────── */
+.event-item    { padding: 7px 0; border-bottom: 1px solid var(--border); }
+.event-head    { display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 12px; margin-bottom: 3px; }
+.event-desc    { font-size: 11px; padding-left: 13px; }
+.event-summary { margin-top: 8px; padding: 7px; background: var(--bg3); border-radius: 5px; font-size: 11px; color: var(--text2); line-height: 1.8; }
+
+/* ── 공통 테이블 ────────────────────────────────────────── */
+.tbl          { width: 100%; border-collapse: collapse; font-size: 11px; }
+.tbl th       { color: var(--text2); font-weight: 500; padding: 2px 3px; text-align: left; border-bottom: 1px solid var(--border); }
+.tbl td       { padding: 2px 3px; }
+.gas-row.danger  { background: rgba(248, 81, 73, .12); }
+.gas-row.caution { background: rgba(227, 179, 65, .12); }
+.brisk        { padding: 1px 5px; border-radius: 3px; font-size: 10px; font-weight: 700; }
+.brisk.danger  { background: var(--danger); color: #fff; }
+.brisk.caution { background: var(--caution); color: #0d1117; }
+.brisk.safe    { background: var(--safe); color: #0d1117; }
+
+/* ── 패널 12: 유해가스 현황 ─────────────────────────────── */
+.sensor-tag {
+  display: inline-block; background: var(--bg3);
+  border: 1px solid var(--blue); color: var(--blue);
+  font-size: 10px; padding: 1px 7px; border-radius: 10px; margin-bottom: 6px;
+}
+
+/* ── 패널 13, 15: AI 예측 차트 ──────────────────────────── */
+.ai-nav    { display: flex; justify-content: space-between; margin-bottom: 6px; }
+.ai-vals   { display: flex; gap: 14px; margin-bottom: 6px; }
+.big       { font-size: 18px; font-weight: 700; }
+.panel-chart { display: flex; flex-direction: column; }
+.chart-wrap  { display: flex; flex-direction: column; flex: 1; min-height: 0; margin-top: 4px; background: var(--bg3); border-radius: 5px; padding: 6px; }
+.chart-controls { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; margin-bottom: 4px; }
+.scale-btns { display: flex; align-items: center; gap: 3px; }
+.scale-btn  { background: var(--bg2); border: 1px solid var(--border); color: var(--text); width: 20px; height: 20px; border-radius: 3px; cursor: pointer; font-size: 13px; line-height: 1; display: flex; align-items: center; justify-content: center; padding: 0; font-family: inherit; }
+.scale-btn:hover  { border-color: var(--blue); color: var(--blue); }
+.scale-btn.scale-reset { font-size: 11px; }
+.scale-val  { font-size: 10px; color: var(--text2); min-width: 42px; text-align: center; background: var(--bg2); border: 1px solid var(--border); border-radius: 3px; height: 20px; display: flex; align-items: center; justify-content: center; padding: 0 4px; }
+.chart-wrap canvas { flex: 1; min-height: 0; width: 100% !important; }
+
+/* ── 패널 14: 전력 현황 ─────────────────────────────────── */
+.power-total { font-size: 20px; font-weight: 700; margin: 2px 0; }
+
+/* ── 패널 15: AI 예측 전력 ETA ──────────────────────────── */
+.eta-box { background: rgba(248, 81, 73, .1); border: 1px solid var(--danger); border-radius: 5px; padding: 5px 8px; margin-bottom: 6px; }
+.eta-val { font-size: 15px; font-weight: 700; color: var(--danger); }
+
+/* ================================================================
+   전력 패널 UI 확장 스타일 (dashboard_CJY.css 병합)
+================================================================ */
+
+/* ── 전력 패널 제목 크기 오버라이드 ──────────────────────── */
+#powerPanel .panel-title {
+  font-size: 14px;
+}
+
+/* ── 상세 보기 링크 ────────────────────────────────────────── */
+a.more {
+  text-decoration: none;
+}
+
+/* ── AI 패널 총 전력 요약 바 ───────────────────────────────── */
+.power-summary-bar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text2);
+  margin-bottom: 6px;
+}
+.power-summary-bar .fw   { color: var(--text1, #e6edf3); }
+.power-summary-bar .pipe { color: #30363d; }
+
+/* ── ON/OFF 배지 ───────────────────────────────────────────── */
+.brisk.on  { background: var(--safe);    color: #0d1117; }
+.brisk.off { background: #30363d;        color: var(--text2); }
+
+/* ── 오류/통신불능 배지 (gray) ────────────────────────────── */
+.brisk.gray { background: #30363d; color: var(--text2); }
+
+/* ── 패널 상태 메시지 ─────────────────────────────────────── */
+.panel-msg {
+  text-align: center;
+  padding: 12px 0;
+  color: var(--text2);
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+/* ── 스켈레톤 UI (Loading 상태) ───────────────────────────── */
+@keyframes skel-pulse {
+  0%, 100% { opacity: 0.4; }
+  50%       { opacity: 0.9; }
+}
+.skeleton {
+  display: inline-block;
+  background: #30363d;
+  border-radius: 3px;
+  animation: skel-pulse 1.4s ease-in-out infinite;
+}
+.skel-text  { width: 60px;  height: 10px; }
+.skel-sm    { width: 36px;  height: 10px; }
+.skel-badge { width: 28px;  height: 14px; border-radius: 3px; }
+
+/* ── 전력 KPI 박스 (총 전력 사용량 표시 영역) ─────────────── */
+.power-kpi-box {
+  background: rgba(255,255,255,0.04);
+  border-left: 3px solid var(--blue, #58a6ff);
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+}
+.power-kpi-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* ── AI 예측 패널 KPI 박스 ──────────────────────────────── */
+.ai-kpi-box {
+  background: rgba(255,255,255,0.04);
+  border-left: 3px solid var(--blue, #58a6ff);
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+}
+
+/* ── ai-nav: 장비명 + 방향 버튼 ─────────────────────────── */
+.ai-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.ai-equip-name {
+  font-size: 18px;
+  border-left: 3px solid var(--danger, #f85149);
+  padding-left: 8px;
+  line-height: 1.2;
+}
+.ai-nav-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ai-nav-btn {
+  background: transparent;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  color: var(--text1, #e6edf3);
+  width: 26px;
+  height: 26px;
+  cursor: pointer;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+.ai-nav-btn:hover { background: rgba(255, 255, 255, 0.1); }
+
+.ai-kpi-row {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 0;
+}
+.ai-kpi-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+.ai-kpi-divider {
+  width: 1px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 0 10px;
+  align-self: stretch;
+}
+.ai-kpi-right { text-align: right; }
+
+/* powerChangePct: 큰 숫자 오른쪽 하단 정렬 */
+.power-kpi-row #powerChangePct {
+  font-size: 11px;
+  padding-bottom: 3px;
+  white-space: nowrap;
+}
+
+/* ── 전력 테이블 스크롤 래퍼 ──────────────────────────────── */
+.tbl-scroll {
+  overflow-y: auto;
+  max-height: 220px;
+  border-radius: 10px;
+  overflow: hidden;
+  overflow-y: auto;
+}
+.tbl-scroll::-webkit-scrollbar       { width: 4px; }
+.tbl-scroll::-webkit-scrollbar-track { background: transparent; }
+.tbl-scroll::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
+
+/* thead 고정 — 스크롤 시 컬럼 헤더 유지 */
+#powerPanel .tbl thead th {
+  position: sticky;
+  top: 0;
+  background: #1c2128;
+  z-index: 1;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--text2, #8b949e);
+  font-weight: 500;
+}
+#powerPanel .tbl {
+  width: 100%;
+  border-collapse: collapse;
+  border-radius: 10px;
+  overflow: hidden;
+}
+#powerPanel .tbl td {
+  padding: 8px 10px;
+  font-size: 12px;
+  color: #e6edf3;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+#powerPanel .tbl tbody tr:last-child td { border-bottom: none; }
+
+/* ── risk-level별 행 배경색 ─────────────────────────────── */
+.risk-row.risk-danger  { background: rgba(220, 38, 38, 0.55); }
+.risk-row.risk-danger td  { color: #fecaca; font-weight: 600; }
+.risk-row.risk-caution { background: rgba(202, 138, 4, 0.45); }
+.risk-row.risk-caution td { color: #fef08a; font-weight: 600; }
+.risk-row.risk-safe    { background: transparent; }
+.risk-row.risk-danger:hover  { background: rgba(220, 38, 38, 0.75); }
+.risk-row.risk-caution:hover { background: rgba(202, 138, 4, 0.65); }
+.risk-row.risk-safe:hover    { background: rgba(40, 55, 75, 0.5); }
+
+/* ================================================================
+   MN-04 작업자 현황 패널 (출처: CJY.css)
+   작업자 뷰(B View) + 관리자 뷰(D View)
+================================================================ */
+
+/* ── 공통 ── */
+.mn04-error { font-size: 11px; color: var(--danger); margin-top: 6px; text-align: center; }
+
+/* ── 작업자 뷰 (B View): 가로 상태 바 ── */
+#mn04-view-worker { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+
+.mn04-status-bar-wrap { position: relative; padding-bottom: 18px; }
+.mn04-status-bar      { display: flex; height: 18px; border-radius: 6px; overflow: hidden; }
+.mn04-bar-section     { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: rgba(255, 255, 255, 0.85); }
+.mn04-bar-normal      { background: #2d9e75; }
+.mn04-bar-warning     { background: #ef9f27; }
+.mn04-bar-danger      { background: #e24b4a; }
+.mn04-marker          { position: absolute; bottom: 0; transform: translateX(-50%); font-size: 14px; line-height: 1; transition: left 0.4s ease; }
+.mn04-status-text     { text-align: center; font-size: 13px; font-weight: 700; }
+
+/* ── 관리자 뷰 (D View): KPI 카드 + 미니 비율 바 ── */
+#mn04-view-admin { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+
+.mn04-kpi-grid    { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.mn04-kpi-card    { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; text-align: center; }
+.mn04-kpi-label   { font-size: 10px; color: var(--text2); margin-bottom: 2px; }
+.mn04-kpi-value   { font-size: 20px; font-weight: 700; line-height: 1.2; }
+
+.mn04-kpi-total   { border-color: var(--border); }
+.mn04-kpi-total   .mn04-kpi-value { color: var(--text); }
+.mn04-kpi-normal  { border-color: #2d9e75; }
+.mn04-kpi-normal  .mn04-kpi-value { color: #2d9e75; }
+.mn04-kpi-warning { border-color: #ef9f27; }
+.mn04-kpi-warning .mn04-kpi-value { color: #ef9f27; }
+.mn04-kpi-danger  { background: #FCEBEB; border-color: #F7C1C1; }
+.mn04-kpi-danger  .mn04-kpi-label { color: #A32D2D; }
+.mn04-kpi-danger  .mn04-kpi-value { color: #A32D2D; font-size: 26px; }
+
+.mn04-ratio-bar     { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--bg3); }
+.mn04-ratio-normal  { background: #2d9e75; }
+.mn04-ratio-warning { background: #ef9f27; }
+.mn04-ratio-danger  { background: #e24b4a; }
+
+/* ── CM-07 실시간 알림 팝업 ──────────────────────────────── */
+#alarm-popup {
+  position: fixed; top: 70px; right: 20px;
+  z-index: 1100;
+  width: 320px; border-radius: 8px; padding: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .4);
+  background: #1e1e2e; border-left: 4px solid var(--danger);
+  transition: border-left-color .2s;
+}
+.alarm-popup-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 8px;
+}
+#alarm-popup-level  { font-weight: 700; font-size: 13px; color: var(--danger); }
+#alarm-popup-close  { background: none; border: none; color: var(--text2); cursor: pointer; font-size: 16px; padding: 0; }
+#alarm-popup-message { font-size: 13px; color: var(--text); margin-bottom: 8px; }
+#alarm-popup-meta    { font-size: 11px; color: var(--text2); margin-bottom: 12px; }
+#alarm-popup-confirm {
+  width: 100%; padding: 6px; border: 1px solid var(--border);
+  background: none; color: var(--text2); border-radius: 4px;
+  cursor: pointer; font-size: 12px; font-family: inherit;
+}
+#alarm-popup-confirm:hover { border-color: var(--text); color: var(--text); }
+
+/* ── 서브 페이지 공통 ────────────────────────────────────── */
+.page-wrap        { padding: 16px; }
+.page-header      { margin-bottom: 12px; }
+.breadcrumb       { font-size: 12px; color: var(--text2); }
+.checklist-panel  { max-width: 780px; }
+.checklist-tbl td:first-child { width: 48px; text-align: center; color: var(--text2); }
+.checklist-tbl td:last-child  { width: 100px; }
+
+/* ── 지오펜스 드로잉 UI ─────────────────────────────── */
+
+/* 드로잉 툴바 — 지도 우상단에 고정 */
+#geofence-toolbar {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
+  display: flex;
+  gap: 6px;
+}
+
+.geofence-draw-btn {
+  background: #1f6feb;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  transition: background 0.2s;
+}
+.geofence-draw-btn:hover { background: #388bfd; }
+
+.geofence-cancel-btn {
+  background: #3d1f1f;
+  color: #f85149;
+  border: 1px solid #f85149;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  transition: background 0.2s;
+}
+.geofence-cancel-btn:hover { background: #5a2020; }
+
+/* 지오펜스 저장 모달 — 화면 중앙 */
+#geofence-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.geofence-modal-box {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  padding: 24px;
+  width: 320px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+}
+
+.geofence-modal-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #e6edf3;
+  margin-bottom: 16px;
+}
+
+.geofence-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.geofence-modal-body label {
+  font-size: 11px;
+  color: #8b949e;
+  margin-bottom: 2px;
+}
+
+.geofence-modal-body input,
+.geofence-modal-body select {
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #e6edf3;
+  padding: 6px 10px;
+  font-size: 13px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.geofence-modal-body input:focus,
+.geofence-modal-body select:focus {
+  outline: none;
+  border-color: #1f6feb;
+}
+
+.geofence-modal-footer {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  justify-content: flex-end;
+}
+
+.geofence-modal-footer button {
+  border: none;
+  border-radius: 6px;
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#btn-geofence-save {
+  background: #1f6feb;
+  color: #fff;
+}
+#btn-geofence-save:hover { background: #388bfd; }
+
+#btn-geofence-discard {
+  background: #21262d;
+  color: #8b949e;
+  border: 1px solid #30363d !important;
+}
+#btn-geofence-discard:hover { background: #30363d; }

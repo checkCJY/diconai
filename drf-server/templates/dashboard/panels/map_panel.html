@@ -1,0 +1,33 @@
+<!-- 가운데: 실시간 모니터링 지도 -->
+<div class="col-mid">
+  <div class="panel panel-map">
+    <div class="panel-title">
+      실시간 모니터링
+      <span id="wsStatus" class="ws-status">연결 중...</span>
+      <span class="more">+ 상세 보기</span>
+    </div>
+    <div class="map-tabs">
+      <button class="map-tab active" data-layer="all">전체</button>
+      <button class="map-tab" data-layer="worker">작업자</button>
+      <button class="map-tab" data-layer="geofence">위험구역</button>
+      <button class="map-tab" data-layer="gas">유해가스 센서</button>
+      <button class="map-tab" data-layer="facility">설비</button>
+      <button class="map-tab" data-layer="power">스마트 전력</button>
+      <button class="map-tab" data-layer="location">위치센서</button>
+      <div style="margin-left:auto; display:flex; gap:4px;">
+        <button onclick="MapPanel.map.zoomIn()"  style="width:28px; height:28px; background:#21262d; color:#c9d1d9; border:1px solid #30363d; border-radius:4px; cursor:pointer;">+</button>
+        <button onclick="MapPanel.map.zoomOut()" style="width:28px; height:28px; background:#21262d; color:#c9d1d9; border:1px solid #30363d; border-radius:4px; cursor:pointer;">−</button>
+        <button onclick="MapPanel.map.fitBounds([[0,0],[600,1300]])" style="width:28px; height:28px; background:#21262d; color:#c9d1d9; border:1px solid #30363d; border-radius:4px; cursor:pointer; font-size:11px;">⌂</button>
+      </div>
+    </div>
+    <div class="map-area" style="padding:0; position:relative;">
+      <div id="map"></div>
+      <!-- 관리자 전용 드로잉 버튼 -->
+      <div id="geofence-toolbar" style="display:none;">
+        <button id="btn-draw-geofence" class="geofence-draw-btn">✏️ 구역 그리기</button>
+        <button id="btn-draw-done" class="geofence-draw-btn" style="display:none;">✅ 완료</button>
+        <button id="btn-draw-cancel" class="geofence-cancel-btn" style="display:none;">❌ 취소</button>
+      </div>
+    </div>
+  </div>
+</div>

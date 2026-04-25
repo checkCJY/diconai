@@ -1,0 +1,233 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>로그인 — 산재 예방 통합 관제 플랫폼</title>
+<link rel="stylesheet" href="{% static 'css/auth/login.css' %}">
+</head>
+<body class="login-page">
+<div class="login-wrap">
+
+  <!-- 로고 + 플랫폼명 -->
+  <div class="login-logo">
+    <div class="logo-box">
+      <div class="logo-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="#1155a6">
+          <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
+        </svg>
+      </div>
+      <span class="logo-text">로고</span>
+    </div>
+    <div class="system-name">산재 예방 통합 관제 플랫폼</div>
+  </div>
+
+  <!-- ④ 흰색 카드 -->
+  <div class="login-card">
+    <form id="loginForm">
+      <!-- 서버 오류 -->
+      <div id="serverError" class="server-error"></div>
+
+      <!-- ④ 아이디 입력란 -->
+      <div class="form-group">
+        <label for="username">아이디</label>
+        <div class="input-wrap">
+          <input type="text" id="username" name="username"
+                 placeholder="아이디를 입력하세요" autocomplete="username" maxlength="20"
+                 aria-describedby="usernameError">
+          <button type="button" class="clear-btn" id="clearUsername">✕</button>
+        </div>
+        <div class="field-error" id="usernameError" role="alert"></div>
+      </div>
+
+      <!-- ④ 비밀번호 입력란 -->
+      <div class="form-group">
+        <label for="password">비밀번호</label>
+        <div class="input-wrap">
+          <input type="password" id="password" name="password"
+                 placeholder="비밀번호를 입력하세요" autocomplete="current-password" maxlength="100"
+                 aria-describedby="passwordError">
+          <button type="button" class="clear-btn" id="clearPassword">✕</button>
+        </div>
+        <div class="field-error" id="passwordError" role="alert"></div>
+      </div>
+
+      <!-- ⑤ 로그인 버튼 -->
+      <button type="submit" class="login-btn" id="loginBtn">로그인</button>
+    </form>
+  </div>
+
+  <!-- ⑥ 로그인 관련 문의 문구 -->
+  <div class="login-footer">
+    로그인 관련 문의<br>
+    {{ contact_info }}
+  </div>
+
+</div>
+
+<script>
+(function () {
+  // 토큰이 있으면 유효성을 서버에서 확인 후 대시보드로 이동
+  // 단순 키 존재 체크는 만료 토큰도 통과시키므로 API로 검증
+  if (localStorage.getItem('access_token')) {
+    fetch('/api/auth/me/', {
+      headers: { 'Authorization': 'Bearer ' + localStorage.getItem('access_token') },
+    })
+      .then(res => {
+        if (res.ok) {
+          window.location.href = '/dashboard/';
+        } else {
+          ['access_token', 'refresh_token', 'username', 'role']
+            .forEach(k => localStorage.removeItem(k));
+        }
+      })
+      .catch(() => { /* 네트워크 오류 — 로그인 화면 유지 */ });
+  }
+
+  /* ── 에러 메시지 정의 (메시지 시트 분리) ── */
+  const MSG = {
+    username: {
+      required: '아이디를 입력해주세요.',
+      format:   '아이디는 영문 또는 숫자만 입력할 수 있습니다.',
+      length:   '아이디를 4~20자로 입력해주세요.',
+    },
+    password: {
+      required:  '비밀번호를 입력해주세요.',
+      minLength: '비밀번호를 8자 이상 입력해야 합니다.',
+      pattern:   '비밀번호는 영문, 숫자, 특수문자 중 2가지 이상을 포함해야 합니다.',
+    },
+    server: {
+      authFail:    '아이디 또는 비밀번호가 올바르지 않습니다.',
+      networkFail: '서버에 연결할 수 없습니다.',
+    },
+  };
+
+  const form          = document.getElementById('loginForm');
+  const btn           = document.getElementById('loginBtn');
+  const serverErrEl   = document.getElementById('serverError');
+  const usernameInput = document.getElementById('username');
+  const passwordInput = document.getElementById('password');
+  const clearUsername = document.getElementById('clearUsername');
+  const clearPassword = document.getElementById('clearPassword');
+  const usernameError = document.getElementById('usernameError');
+  const passwordError = document.getElementById('passwordError');
+
+  /* ── X 버튼: 입력값 있을 때 표시, 클릭 시 삭제 ── */
+  function syncClear(input, clearBtn) {
+    clearBtn.classList.toggle('visible', input.value.length > 0);
+  }
+  usernameInput.addEventListener('input', () => {
+    syncClear(usernameInput, clearUsername);
+    clearFieldError(usernameInput, usernameError);
+  });
+  passwordInput.addEventListener('input', () => {
+    syncClear(passwordInput, clearPassword);
+    clearFieldError(passwordInput, passwordError);
+  });
+  clearUsername.addEventListener('click', () => {
+    usernameInput.value = '';
+    clearUsername.classList.remove('visible');
+    usernameInput.focus();
+    clearFieldError(usernameInput, usernameError);
+  });
+  clearPassword.addEventListener('click', () => {
+    passwordInput.value = '';
+    clearPassword.classList.remove('visible');
+    passwordInput.focus();
+    clearFieldError(passwordInput, passwordError);
+  });
+
+  /* ── blur: 값이 있을 때만 유효성 검사 (빈 값은 submit 시점에 처리) ── */
+  usernameInput.addEventListener('blur', () => {
+    if (!usernameInput.value) return;
+    const err = validateUsername(usernameInput.value.trim());
+    if (err) showFieldError(usernameInput, usernameError, err);
+  });
+  passwordInput.addEventListener('blur', () => {
+    if (!passwordInput.value) return;
+    const err = validatePassword(passwordInput.value);
+    if (err) showFieldError(passwordInput, passwordError, err);
+  });
+
+  /* ── 필드 에러 표시 / 제거 ── */
+  function showFieldError(input, errorEl, msg) {
+    input.classList.add('error');
+    errorEl.textContent = msg;
+    errorEl.classList.add('show');
+  }
+  function clearFieldError(input, errorEl) {
+    input.classList.remove('error');
+    errorEl.classList.remove('show');
+  }
+
+  /* ── 서버 에러 ── */
+  function showServerError(msg) {
+    serverErrEl.textContent = msg;
+    serverErrEl.classList.add('show');
+  }
+  function clearServerError() {
+    serverErrEl.classList.remove('show');
+  }
+
+  /* ── 유효성 검사 ── */
+  function validateUsername(val) {
+    if (!val)                               return MSG.username.required;
+    if (!/^[a-zA-Z0-9]+$/.test(val))       return MSG.username.format;
+    if (val.length < 4 || val.length > 20) return MSG.username.length;
+    return '';
+  }
+  function validatePassword(val) {
+    if (!val)           return MSG.password.required;
+    if (val.length < 8) return MSG.password.minLength;
+    const types = [/[a-zA-Z]/, /[0-9]/, /[^a-zA-Z0-9]/].filter(r => r.test(val)).length;
+    if (types < 2)      return MSG.password.pattern;
+    return '';
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearServerError();
+
+    const username = usernameInput.value.trim();
+    const password = passwordInput.value;
+
+    const uErr = validateUsername(username);
+    const pErr = validatePassword(password);
+    if (uErr) showFieldError(usernameInput, usernameError, uErr);
+    if (pErr) showFieldError(passwordInput, passwordError, pErr);
+    if (uErr || pErr) return;
+
+    btn.disabled = true;
+    btn.textContent = '로그인 중...';
+
+    try {
+      const res = await fetch('/api/auth/login/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        showServerError(data.error || MSG.server.authFail);
+        return;
+      }
+
+      localStorage.setItem('access_token',  data.access);
+      localStorage.setItem('refresh_token', data.refresh);
+      localStorage.setItem('username',      data.username);
+      localStorage.setItem('role',          data.role);
+
+      window.location.href = '/dashboard/';
+    } catch {
+      showServerError(MSG.server.networkFail);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '로그인';
+    }
+  });
+})();
+</script>
+</body>
+</html>

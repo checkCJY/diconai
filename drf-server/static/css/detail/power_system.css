@@ -1,0 +1,268 @@
+/* ── 전력 현황 페이지 전용 스타일 ── */
+
+/* ── 전체 레이아웃 ── */
+.power-wrap {
+  display: flex;
+  gap: 10px;
+  height: calc(100vh - 110px);
+  overflow: hidden;
+}
+
+/* ── 좌측 패널 ── */
+.power-left {
+  width: 340px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.risk-summary {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+.risk-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.risk-badge strong {
+  font-weight: 700;
+}
+.dot-sq {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.dot-sq.danger  { background: var(--danger); }
+.dot-sq.caution { background: var(--caution); }
+.dot-sq.safe    { background: var(--safe); }
+
+/* ── 설비 테이블 ── */
+.equip-scroll {
+  flex: 1;
+  overflow-y: auto;
+}
+.equip-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.equip-table th {
+  color: var(--text2);
+  padding: 4px;
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  background: var(--bg2);
+  z-index: 1;
+}
+.equip-table td {
+  padding: 5px 4px;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.equip-table tr:last-child td { border-bottom: none; }
+.equip-table tr.selected td   { background: rgba(88,166,255,0.08); }
+
+.status-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.status-badge.danger  { background: rgba(248,81,73,0.2);  color: var(--danger); }
+.status-badge.caution { background: rgba(227,179,65,0.2); color: var(--caution); }
+.status-badge.safe    { background: rgba(63,185,80,0.2);  color: var(--safe); }
+
+/* ── 재가동 버튼 ── */
+.restart-btn {
+  width: 100%;
+  padding: 7px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  margin-top: 8px;
+  flex-shrink: 0;
+}
+.restart-btn:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); }
+.restart-btn:disabled              { opacity: 0.4; cursor: not-allowed; }
+
+/* ── 우측 패널 ── */
+.power-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── 탭 + 범례 헤더 ── */
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+.tab-group {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.tab-btn {
+  padding: 5px 18px;
+  background: var(--bg3);
+  border: none;
+  border-right: 1px solid var(--border);
+  color: var(--text2);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.tab-btn:last-child { border-right: none; }
+.tab-btn.active     { background: var(--accent); color: #fff; }
+
+.chart-legend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 11px;
+  color: var(--text2);
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.legend-line-sample {
+  width: 18px;
+  height: 2px;
+  display: inline-block;
+  border-radius: 1px;
+}
+.legend-area-sample {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  display: inline-block;
+  opacity: 0.5;
+}
+
+/* ── AI 예측 탭 공지 배너 ── */
+.ai-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(31,111,235,0.12);
+  border: 1px solid rgba(88,166,255,0.3);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--text2);
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+.ai-notice strong { color: var(--blue); }
+.ai-notice-icon   { font-size: 14px; flex-shrink: 0; }
+
+/* ── 차트 카드 그리드 ── */
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  /* 2행이 화면에 꽉 차도록: 전체 높이에서 헤더·상태바·여백 제거 후 2등분 */
+  grid-auto-rows: calc((100vh - 260px) / 2);
+  gap: 8px;
+  flex: 1;
+  overflow-y: auto;
+  align-content: start;
+}
+.chart-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.chart-card.border-danger  { border-color: var(--danger); }
+.chart-card.border-caution { border-color: var(--caution); }
+.chart-card.border-selected { border-color: var(--blue); }
+
+.card-title {
+  font-size: 11px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.card-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.card-status-dot.danger  { background: var(--danger); }
+.card-status-dot.caution { background: var(--caution); }
+.card-status-dot.safe    { background: var(--safe); }
+
+.card-chart-wrap {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+}
+
+/* ── 하단 상태 바 ── */
+.status-bar {
+  height: 32px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 12px;
+  font-size: 11px;
+  margin-top: 8px;
+  flex-shrink: 0;
+}
+.status-equip-tag {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.equip-color-box {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  border: 1px solid var(--border);
+  background: var(--bg3);
+}
+.status-msg       { color: var(--text2); }
+.status-alert-msg { color: var(--danger); font-weight: 700; }
+.status-time      { margin-left: auto; color: var(--text2); font-family: monospace; }
+
+/* ── 설비 테이블 위험도 행 배경색 ── */
+tr.danger-row  { background: rgba(220, 38, 38, 0.55); }
+tr.danger-row  td { color: #fecaca; font-weight: 600; }
+tr.danger-row:hover  { background: rgba(220, 38, 38, 0.75); }
+
+tr.caution-row { background: rgba(202, 138, 4, 0.45); }
+tr.caution-row td { color: #fef08a; font-weight: 600; }
+tr.caution-row:hover { background: rgba(202, 138, 4, 0.65); }

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/user/AppData/Roaming/Code/logs/**)",
+      "Bash(code --install-extension rangav.vscode-thunder-client --install-extension eamodio.gitlens --install-extension batisteo.vscode-django --install-extension ms-azuretools.vscode-docker)",
+      "Bash(\"C:/Users/user/AppData/Local/Programs/Microsoft VS Code/Code.exe\" --install-extension rangav.vscode-thunder-client)",
+      "Bash(\"C:/Users/user/AppData/Local/Programs/Microsoft VS Code/Code.exe\" --install-extension eamodio.gitlens)",
+      "Bash(\"C:/Users/user/AppData/Local/Programs/Microsoft VS Code/Code.exe\" --install-extension batisteo.vscode-django)",
+      "Bash(\"C:/Users/user/AppData/Local/Programs/Microsoft VS Code/Code.exe\" --install-extension ms-azuretools.vscode-docker)",
+      "Bash(wait)"
+    ]
+  }
+}

@@ -1,0 +1,56 @@
+<!-- 패널 14: 전력 현황 -->
+<div class="panel" id="powerPanel">
+  <div class="panel-title">스마트 전력 시스템 위험 현황 <a href="/dashboard/monitoring/power/" class="more">+ 상세 보기</a></div>
+  <div class="power-kpi-box">
+    <div class="sub">현재 전체 스마트 파워 전력 사용량</div>
+    <div class="power-kpi-row">
+      <div class="power-total" id="powerTotal"><span class="skeleton skel-text"></span></div>
+      <div id="powerChangePct"><span class="skeleton skel-text skel-sm"></span></div>
+    </div>
+  </div>
+  <div id="powerPanelMsg" class="panel-msg" style="display:none;"></div>
+  <div class="tbl-scroll">
+    <table class="tbl">
+      <thead>
+        <tr><th>설비명</th><th>전력(W)</th><th>전압(V)</th><th>전류(A)</th><th>ON/OFF</th><th>위험수치</th></tr>
+      </thead>
+      <tbody id="powerTableBody">
+        <tr><td><span class="skeleton skel-text"></span></td><td><span class="skeleton skel-text skel-sm"></span></td><td><span class="skeleton skel-text skel-sm"></span></td><td><span class="skeleton skel-text skel-sm"></span></td><td><span class="skeleton skel-badge"></span></td><td><span class="skeleton skel-badge"></span></td></tr>
+        <tr><td><span class="skeleton skel-text"></span></td><td><span class="skeleton skel-text skel-sm"></span></td><td><span class="skeleton skel-text skel-sm"></span></td><td><span class="skeleton skel-text skel-sm"></span></td><td><span class="skeleton skel-badge"></span></td><td><span class="skeleton skel-badge"></span></td></tr>
+        <tr><td><span class="skeleton skel-text"></span></td><td><span class="skeleton skel-text skel-sm"></span></td><td><span class="skeleton skel-text skel-sm"></span></td><td><span class="skeleton skel-text skel-sm"></span></td><td><span class="skeleton skel-badge"></span></td><td><span class="skeleton skel-badge"></span></td></tr>
+        <tr><td><span class="skeleton skel-text"></span></td><td><span class="skeleton skel-text skel-sm"></span></td><td><span class="skeleton skel-text skel-sm"></span></td><td><span class="skeleton skel-text skel-sm"></span></td><td><span class="skeleton skel-badge"></span></td><td><span class="skeleton skel-badge"></span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 패널 15: AI 예측 — 전력 -->
+<div class="panel panel-chart">
+  <div class="panel-title">AI 예측 — 스마트 전력 시스템 위험 <a href="/dashboard/monitoring/power/" class="more">+ 상세 보기</a></div>
+  <div class="ai-nav">
+    <span id="aiPowerEquipName" class="fw ai-equip-name danger-text">압연기</span>
+    <div class="ai-nav-ctrl">
+      <button class="ai-nav-btn" id="aiPowerPrev">&#9664;</button>
+      <span class="sub" id="aiPowerNavCount">1 / 16</span>
+      <button class="ai-nav-btn" id="aiPowerNext">&#9654;</button>
+    </div>
+  </div>
+  <div class="ai-kpi-box">
+    <div class="ai-kpi-row">
+      <div class="ai-kpi-item">
+        <div class="sub">위험 도달 예상 시간</div>
+        <div class="eta-val" id="aiPowerEta">25 분 뒤</div>
+      </div>
+      <div class="ai-kpi-divider"></div>
+      <div class="ai-kpi-item ai-kpi-right">
+        <div class="sub">12시간 내 예상 최대 부하</div>
+        <div class="danger-text fw" id="aiPowerMaxLoad" style="font-size:14px;">
+          450 kW <span style="font-size:11px;font-weight:400;">(정상 대비 110%)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="chart-wrap">
+    <canvas id="chartPower"></canvas>
+  </div>
+</div>

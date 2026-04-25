@@ -1,0 +1,29 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>이벤트 현황 — 산재 예방 통합 관제 시스템</title>
+<link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+<link rel="stylesheet" href="{% static 'css/components/header.css' %}">
+</head>
+<body>
+
+{% include 'components/header.html' %}
+
+<div class="body-wrap page-wrap">
+  <div class="page-header">
+    <span class="breadcrumb">모니터링 &gt; 이벤트 현황</span>
+  </div>
+  <div class="panel">
+    <div class="panel-title">이벤트 현황</div>
+    <p class="sub" style="padding:16px;">준비 중입니다.</p>
+  </div>
+</div>
+
+<script src="{% static 'js/shared/util.js' %}"></script>
+<script src="{% static 'js/shared/auth.js' %}"></script>
+<script src="{% static 'js/shared/layout.js' %}"></script>
+<script src="{% static 'js/shared/app-sub.js' %}"></script>
+</body>
+</html>

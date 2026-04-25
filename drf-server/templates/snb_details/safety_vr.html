@@ -1,0 +1,208 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>VR 교육 — 산재 예방 통합 관제 시스템</title>
+<link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+<link rel="stylesheet" href="{% static 'css/components/header.css' %}">
+<link rel="stylesheet" href="{% static 'css/snb_details/safety_vr.css' %}">
+</head>
+<body>
+
+{% include 'components/header.html' %}
+
+<div class="vr-page">
+
+  <!-- ① 페이지 타이틀 -->
+  <div class="page-title">
+    작업 전 안전 확인 - VR 교육
+    <span class="title-date" id="vrDate"></span>
+  </div>
+
+  <!-- ② 안내 배너 -->
+  <div class="info-banner">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="#f0c040" aria-hidden="true">
+      <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+    </svg>
+    VR 교육까지 완료되어야 교육 이수가 완료 가능합니다.
+  </div>
+
+  <!-- ③ 체크리스트 완료 카드 -->
+  <div class="complete-card">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;margin-top:1px;">
+      <circle cx="12" cy="12" r="11" stroke="#2d9e75" stroke-width="1.5"/>
+      <path d="M7 12.5l3.5 3.5 6.5-7" stroke="#2d9e75" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div class="card-text">
+      <div class="card-title">체크리스트 완료</div>
+      <div class="card-sub">모든 안전 확인 체크리스트가 완료되었습니다. 비상 안전 VR 교육 영상을 시청해주세요.</div>
+    </div>
+  </div>
+
+  <!-- ④ VR 교육 플레이어 -->
+  <div class="video-wrap">
+    <div class="video-container">
+      <!-- 실제 영상 파일 경로로 교체하세요 -->
+      <video id="vrVideo" preload="metadata">
+        <source src="{% static 'video/safety_vr.mp4' %}" type="video/mp4">
+      </video>
+      <div class="play-overlay" id="playOverlay">
+        <svg class="play-icon" viewBox="0 0 64 64" fill="none">
+          <circle cx="32" cy="32" r="31" stroke="rgba(255,255,255,0.7)" stroke-width="2"/>
+          <path d="M26 20l20 12-20 12V20z" fill="rgba(255,255,255,0.85)"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑤⑥ 하단 버튼 -->
+  <div class="vr-footer">
+    <button class="btn-prev" id="btnPrev">이전</button>
+    <button class="btn-done" id="btnDone">완료</button>
+  </div>
+
+</div>
+
+<!-- ⑤ 이전 확인 모달 -->
+<div class="vr-modal" id="prevModal">
+  <div class="vr-modal-box">
+    <div class="vr-modal-msg">작업 전 안전 확인을 중단하시겠습니까?<br><span style="font-size:12px;color:var(--text2);">시청 위치가 저장되어 다음 접속 시 이어볼 수 있습니다.</span></div>
+    <div class="vr-modal-btns">
+      <button class="modal-btn-cancel" id="prevModalCancel">취소</button>
+      <button class="modal-btn-ok"     id="prevModalOk">확인</button>
+    </div>
+  </div>
+</div>
+
+<!-- ⑥ 완료 모달 -->
+<div class="vr-modal" id="doneModal">
+  <div class="vr-modal-box">
+    <div class="done-modal-icon">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="11" stroke="#2d9e75" stroke-width="1.5"/>
+        <path d="M7 12.5l3.5 3.5 6.5-7" stroke="#2d9e75" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="done-modal-label">작업 전 안전 확인</div>
+    <div class="done-modal-msg">작업 전 안전 확인이 완료되었습니다.</div>
+    <button class="modal-btn-ok" id="doneModalOk">확인</button>
+  </div>
+</div>
+
+<script src="{% static 'js/shared/util.js' %}"></script>
+<script src="{% static 'js/shared/auth.js' %}"></script>
+<script src="{% static 'js/shared/layout.js' %}"></script>
+<script src="{% static 'js/shared/app-sub.js' %}"></script>
+<script>
+(function () {
+  const PROGRESS_API = '/dashboard/api/vr-progress/';
+
+  /* ① 날짜 */
+  const d = new Date();
+  document.getElementById('vrDate').textContent =
+    `${d.getFullYear()} / ${pad(d.getMonth()+1)} / ${pad(d.getDate())}`;
+
+  const video       = document.getElementById('vrVideo');
+  const playOverlay = document.getElementById('playOverlay');
+  const btnDone     = document.getElementById('btnDone');
+  let maxReached    = 0;   // 최대 시청 위치 (skip 방지용)
+  let saveBeacon    = false;
+
+  /* 저장된 시청 위치 불러오기 */
+  fetch(PROGRESS_API, { headers: { 'Authorization': 'Bearer ' + Auth.getAccessToken() } })
+    .then(r => r.json())
+    .then(data => {
+      if (data.position > 0) {
+        video.currentTime = data.position;
+        maxReached = data.position;
+      }
+    })
+    .catch(() => {});
+
+  /* 재생 버튼 오버레이 */
+  playOverlay.addEventListener('click', () => {
+    video.play();
+    playOverlay.classList.add('hidden');
+  });
+
+  video.addEventListener('pause', () => {
+    if (!video.ended) playOverlay.classList.remove('hidden');
+  });
+
+  video.addEventListener('play', () => {
+    playOverlay.classList.add('hidden');
+  });
+
+  /* ④ 진행 바 seekbar 금지 — 앞으로 건너뛰기 방지 */
+  video.addEventListener('seeking', () => {
+    if (video.currentTime > maxReached + 0.5) {
+      video.currentTime = maxReached;
+    }
+  });
+
+  /* 최대 시청 위치 갱신 */
+  video.addEventListener('timeupdate', () => {
+    if (video.currentTime > maxReached) maxReached = video.currentTime;
+  });
+
+  /* ⑥ 영상 100% 완료 시 완료 버튼 활성화 */
+  video.addEventListener('ended', () => {
+    btnDone.classList.add('active');
+    playOverlay.classList.remove('hidden');
+    saveProgress(video.duration);
+  });
+
+  /* 시청 위치 서버 저장 */
+  function saveProgress(position) {
+    const token = Auth.getAccessToken();
+    navigator.sendBeacon(PROGRESS_API + '?_method=POST',
+      new Blob([JSON.stringify({ position })], { type: 'application/json' })
+    );
+    /* sendBeacon은 커스텀 헤더 불가 — fallback으로 fetch 사용 */
+    fetch(PROGRESS_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ position }),
+      keepalive: true,
+    }).catch(() => {});
+  }
+
+  /* ④ 페이지 이탈 시 시청 위치 저장 */
+  window.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') saveProgress(video.currentTime);
+  });
+  window.addEventListener('pagehide', () => saveProgress(video.currentTime));
+
+  /* ⑤ 이전 버튼 */
+  document.getElementById('btnPrev').addEventListener('click', () => {
+    video.pause();
+    document.getElementById('prevModal').classList.add('show');
+  });
+  document.getElementById('prevModalCancel').addEventListener('click', () => {
+    document.getElementById('prevModal').classList.remove('show');
+    if (!video.ended) video.play();
+  });
+  document.getElementById('prevModalOk').addEventListener('click', () => {
+    saveProgress(video.currentTime);
+    window.location.href = '/dashboard/';
+  });
+
+  /* ⑥ 완료 버튼 */
+  btnDone.addEventListener('click', () => {
+    if (!btnDone.classList.contains('active')) return;
+    document.getElementById('doneModal').classList.add('show');
+  });
+  document.getElementById('doneModalOk').addEventListener('click', async () => {
+    saveProgress(0);
+    await fetch('/dashboard/api/safety-status/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'vr' }),
+    }).catch(() => {});
+    window.location.href = '/dashboard/';
+  });
+})();
+</script>
+</body>
+</html>

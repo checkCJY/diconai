@@ -1,14 +1,19 @@
 from django.contrib import admin
-from django.urls import path
-from django.shortcuts import render
-
-
-# 작동확인용
-def dashboard(request):
-    return render(request, "dashboard.html")
+from django.urls import include, path
+from django.views.generic import RedirectView
+from apps.accounts.urls import api_urlpatterns as auth_api_urlpatterns
+from apps.accounts.urls import page_urlpatterns as auth_page_urlpatterns
 
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("", dashboard),
+    path("", RedirectView.as_view(url="/dashboard/", permanent=False)),
+    path("accounts/", include(auth_page_urlpatterns)),
+    path("api/auth/", include(auth_api_urlpatterns)),
+    path("dashboard/", include("apps.dashboard.urls")),
+    path("alerts/", include("apps.alerts.urls")),
+    path("api/", include("apps.geofence.urls")),
+    path("api/positioning/", include("apps.positioning.urls")),
+    path("api/monitoring/", include("apps.monitoring.urls")),
+    path("admin-panel/", include("apps.geofence.admin_urls")),
 ]

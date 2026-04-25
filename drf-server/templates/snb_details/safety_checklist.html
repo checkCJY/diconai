@@ -1,0 +1,234 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>작업 전 안전 확인 — 산재 예방 통합 관제 시스템</title>
+<link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+<link rel="stylesheet" href="{% static 'css/components/header.css' %}">
+<link rel="stylesheet" href="{% static 'css/snb_details/safety_checklist.css' %}">
+</head>
+<body>
+
+{% include 'components/header.html' %}
+
+<div class="checklist-page">
+
+  <!-- ① 화면 제목 -->
+  <div class="page-title">
+    작업 전 안전 확인 - 안전 확인 체크리스트
+    <span class="title-date" id="checklistDate"></span>
+  </div>
+
+  <!-- ② 안내 배너 (고정) -->
+  <div class="info-banner">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="#f0c040" aria-hidden="true">
+      <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+    </svg>
+    체크리스트를 읽고 반드시 항목에 대한 안전을 확인 후 체크하세요. 모든 항목이 체크되어야 VR 교육으로 넘어갈 수 있습니다.
+  </div>
+
+  <!-- ③ 체크리스트 스크롤 영역 -->
+  <div class="checklist-scroll" id="checklistScroll">
+
+    <div class="checklist-section">
+      <div class="section-title">
+        1. 작업 구역 안전 확인
+        <span class="section-error" id="err-1">모든 항목을 체크해 주세요.</span>
+      </div>
+      <label class="check-item"><input type="checkbox" data-section="1"> 작업 구역 내 위험구역 표시 및 출입 통제 상태를 확인하였다.</label>
+      <label class="check-item"><input type="checkbox" data-section="1"> 작업 구역 바닥 상태(미끄럼, 철편, 자재 등)가 안전한 것을 확인하였다.</label>
+      <label class="check-item"><input type="checkbox" data-section="1"> 작업 구역 내 낙하물 위험이 없는 것을 확인하였다.</label>
+      <label class="check-item"><input type="checkbox" data-section="1"> 작업 구역 내 작업 통로 및 이동 동선이 확보되어 있는 것을 확인하였다.</label>
+      <label class="check-item"><input type="checkbox" data-section="1"> 작업 구역 주변에서 크레인 또는 중장비 작업 여부를 확인하였다.</label>
+      <label class="check-item"><input type="checkbox" data-section="1"> 작업 구역 주변 고소 작업이 진행 중인지 확인하였다.</label>
+    </div>
+
+    <div class="checklist-section">
+      <div class="section-title">
+        2. 배관 작업 안전 확인
+        <span class="section-error" id="err-2">모든 항목을 체크해 주세요.</span>
+      </div>
+      <label class="check-item"><input type="checkbox" data-section="2"> 작업 대상 배관의 압력 상태를 확인하였다.</label>
+      <label class="check-item"><input type="checkbox" data-section="2"> 작업 대상 배관 내 가스 또는 유체 잔존 여부를 확인하였다.</label>
+      <label class="check-item"><input type="checkbox" data-section="2"> 배관 차단 밸브 상태를 확인하였다.</label>
+      <label class="check-item"><input type="checkbox" data-section="2"> 배관 작업 구역의 누출 위험이 없는 것을 확인하였다.</label>
+      <label class="check-item"><input type="checkbox" data-section="2"> 배관 작업 구역의 환기 상태를 확인하였다.</label>
+    </div>
+
+    <div class="checklist-section">
+      <div class="section-title">
+        3. 용접 및 화기 작업 확인
+        <span class="section-error" id="err-3">모든 항목을 체크해 주세요.</span>
+      </div>
+      <label class="check-item"><input type="checkbox" data-section="3"> 용접 및 화기 작업 허가서를 확인하였다.</label>
+      <label class="check-item"><input type="checkbox" data-section="3"> 화기 작업 주변 인화성 물질이 없는 것을 확인하였다.</label>
+      <label class="check-item"><input type="checkbox" data-section="3"> 화재 감시자가 배치되어 있는 것을 확인하였다.</label>
+      <label class="check-item"><input type="checkbox" data-section="3"> 소화기 및 화재 대응 장비 위치를 확인하였다.</label>
+    </div>
+
+    <div class="checklist-section">
+      <div class="section-title">
+        4. 고소 작업 확인
+        <span class="section-error" id="err-4">모든 항목을 체크해 주세요.</span>
+      </div>
+      <label class="check-item"><input type="checkbox" data-section="4"> 고소 작업 발판 및 작업대 상태를 확인하였다.</label>
+      <label class="check-item"><input type="checkbox" data-section="4"> 작업 발판이 고정되어 있는 것을 확인하였다.</label>
+      <label class="check-item"><input type="checkbox" data-section="4"> 낙하물 방지 조치가 되어 있는 것을 확인하였다.</label>
+      <label class="check-item"><input type="checkbox" data-section="4"> 작업 구역 하부 접근 통제가 되어 있는 것을 확인하였다.</label>
+    </div>
+
+    <div class="checklist-section">
+      <div class="section-title">
+        5. 설비 및 장비 확인
+        <span class="section-error" id="err-5">모든 항목을 체크해 주세요.</span>
+      </div>
+      <label class="check-item"><input type="checkbox" data-section="5"> 사용 장비(그라인더, 절단기, 용접기 등) 이상 여부를 확인하였다.</label>
+      <label class="check-item"><input type="checkbox" data-section="5"> 전기 케이블 및 장비 전원 상태를 확인하였다.</label>
+      <label class="check-item"><input type="checkbox" data-section="5"> 이동 장비(지게차, 크레인 등) 작업 반경을 확인하였다.</label>
+      <label class="check-item"><input type="checkbox" data-section="5"> 장비 작업 반경 내 접근 위험 요소가 없는 것을 확인하였다.</label>
+    </div>
+
+    <div class="checklist-section">
+      <div class="section-title">
+        6. 가스 및 환경 위험 확인
+        <span class="section-error" id="err-6">모든 항목을 체크해 주세요.</span>
+      </div>
+      <label class="check-item"><input type="checkbox" data-section="6"> 작업 구역 가스 감지 시스템 상태를 확인하였다.</label>
+      <label class="check-item"><input type="checkbox" data-section="6"> 가스 누출 경고 또는 알림이 없는 것을 확인하였다.</label>
+      <label class="check-item"><input type="checkbox" data-section="6"> 작업 구역 환기 상태를 확인하였다.</label>
+      <label class="check-item"><input type="checkbox" data-section="6"> 밀폐 공간 작업 여부를 확인하였다.</label>
+    </div>
+
+    <div class="checklist-section">
+      <div class="section-title">
+        7. 주변 작업자 안전 확인
+        <span class="section-error" id="err-7">모든 항목을 체크해 주세요.</span>
+      </div>
+      <label class="check-item"><input type="checkbox" data-section="7"> 주변 작업자와 작업 구역이 중복되지 않는 것을 확인하였다.</label>
+      <label class="check-item"><input type="checkbox" data-section="7"> 협착 및 충돌 위험이 없는 작업 동선을 확보하였다.</label>
+    </div>
+
+    <div class="checklist-section">
+      <div class="section-title">
+        8. 비상 대응 확인
+        <span class="section-error" id="err-8">모든 항목을 체크해 주세요.</span>
+      </div>
+      <label class="check-item"><input type="checkbox" data-section="8"> 비상 대피 경로를 확인하였다.</label>
+      <label class="check-item"><input type="checkbox" data-section="8"> 비상 상황 발생 시 대응 절차를 인지하였다.</label>
+      <label class="check-item"><input type="checkbox" data-section="8"> 응급 장비 및 비상 연락 체계를 확인하였다.</label>
+    </div>
+
+    <div class="checklist-section">
+      <div class="section-title">
+        9. 최종 확인
+        <span class="section-error" id="err-9">모든 항목을 체크해 주세요.</span>
+      </div>
+      <label class="check-item"><input type="checkbox" data-section="9"> 작업 전 안전 상태를 모두 확인하였으며 안전 절차를 준수하여 작업을 진행하겠습니다.</label>
+    </div>
+
+  </div>
+
+  <!-- ⑥⑦ 하단 버튼 -->
+  <div class="checklist-footer">
+    <button class="btn-select-all" id="btnSelectAll">전체 선택</button>
+    <button class="btn-cancel" id="btnCancel">취소</button>
+    <button class="btn-next" id="btnNext">다음</button>
+  </div>
+
+</div>
+
+<!-- 완료 확인 모달 -->
+<div class="confirm-modal" id="confirmModal">
+  <div class="confirm-box">
+    <div class="confirm-icon">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="11" stroke="#2d9e75" stroke-width="1.5"/>
+        <path d="M7 12.5l3.5 3.5 6.5-7" stroke="#2d9e75" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="confirm-label">작업 전 안전 확인</div>
+    <div class="confirm-msg">모든 안전 점검을 완료하였습니다.</div>
+    <button class="confirm-btn" id="btnConfirm">확인</button>
+  </div>
+</div>
+
+<script src="{% static 'js/shared/util.js' %}"></script>
+<script src="{% static 'js/shared/auth.js' %}"></script>
+<script src="{% static 'js/shared/layout.js' %}"></script>
+<script src="{% static 'js/shared/app-sub.js' %}"></script>
+<script>
+(function () {
+  /* ① 날짜 표시 */
+  const d = new Date();
+  document.getElementById('checklistDate').textContent =
+    `${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())}`;
+
+  const allBoxes = document.querySelectorAll('.checklist-scroll input[type="checkbox"]');
+  const btnNext  = document.getElementById('btnNext');
+
+  /* 전체 체크 여부 확인 → 다음 버튼 활성화 */
+  function syncNextBtn() {
+    const allChecked = [...allBoxes].every(cb => cb.checked);
+    btnNext.classList.toggle('active', allChecked);
+  }
+
+  /* 체크 상태 변경 시 라벨 색 갱신 */
+  allBoxes.forEach(cb => {
+    cb.addEventListener('change', function () {
+      this.closest('.check-item').classList.toggle('checked', this.checked);
+      syncNextBtn();
+    });
+  });
+
+  /* 전체 선택 버튼 */
+  document.getElementById('btnSelectAll').addEventListener('click', () => {
+    allBoxes.forEach(cb => {
+      cb.checked = true;
+      cb.closest('.check-item').classList.add('checked');
+    });
+    document.querySelectorAll('.section-error').forEach(el => el.classList.remove('show'));
+    syncNextBtn();
+  });
+
+  /* ⑥ 취소 버튼 — 전체 초기화 후 대시보드 이동 */
+  document.getElementById('btnCancel').addEventListener('click', () => {
+    allBoxes.forEach(cb => {
+      cb.checked = false;
+      cb.closest('.check-item').classList.remove('checked');
+    });
+    document.querySelectorAll('.section-error').forEach(el => el.classList.remove('show'));
+    syncNextBtn();
+    window.location.href = '/dashboard/';
+  });
+
+  /* ⑦ 다음 버튼 — 유효성 검사 후 이동 */
+  btnNext.addEventListener('click', () => {
+    if (!btnNext.classList.contains('active')) {
+      /* ⑧ 미체크 섹션에 오류 문구 표시 */
+      for (let s = 1; s <= 9; s++) {
+        const boxes   = document.querySelectorAll(`input[data-section="${s}"]`);
+        const allDone = [...boxes].every(cb => cb.checked);
+        const errEl   = document.getElementById(`err-${s}`);
+        if (errEl) errEl.classList.toggle('show', !allDone);
+      }
+      /* 첫 번째 미체크 섹션으로 스크롤 */
+      const firstErr = document.querySelector('.section-error.show');
+      if (firstErr) firstErr.closest('.checklist-section').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    document.getElementById('confirmModal').classList.add('show');
+  });
+
+  document.getElementById('btnConfirm').addEventListener('click', async () => {
+    await fetch('/dashboard/api/safety-status/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'checklist' }),
+    }).catch(() => {});
+    window.location.href = '/dashboard/safety/vr/';
+  });
+})();
+</script>
+</body>
+</html>
