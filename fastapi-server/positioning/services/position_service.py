@@ -1,10 +1,11 @@
 # fastapi-server/positioning/services/position_service.py
+import os
 import random
 import httpx
 from datetime import datetime, timezone
 from positioning.schemas.position import WorkerPositionSchema
 
-DRF_BASE_URL = "http://127.0.0.1:8000"
+DRF_BASE_URL = os.getenv("DRF_BASE_URL", "http://127.0.0.1:8000")
 
 # 더미 작업자 목록 (초기 위치 + 이동 방향)
 DUMMY_WORKERS = [
@@ -105,7 +106,11 @@ async def save_positions_to_drf(positions: list[WorkerPositionSchema]):
             if res.status_code != 201:
                 print(f"[positioning] DRF 저장 실패: {res.status_code} {res.text}")
             else:
-                print(f"[positioning] DRF 저장 완료: {len(payload)}명")
+                body = res.json()
+                saved = body.get("saved", 0)
+                print(
+                    f"[positioning] 전송: {len(payload)}명, 저장: {saved}명 (지오펜스 근접 시만 저장)"
+                )
 
     except Exception as e:
         print(f"[positioning] DRF 저장 오류: {e}")

@@ -23,6 +23,7 @@ class SensorLocation(BaseModel):
 # 기기 정보 (부팅 시 1회)  →  POST /api/sensors/info
 # ============================================================
 
+
 class DeviceInfoPayload(BaseModel):
     """
     기기 부팅 시 1회 전송하는 식별 정보.
@@ -43,6 +44,7 @@ class DeviceInfoPayload(BaseModel):
 # ============================================================
 # 기기 환경 데이터 (1초마다)  →  POST /api/sensors/gas
 # ============================================================
+
 
 class GasDataPayload(BaseModel):
     """
@@ -69,7 +71,9 @@ class GasDataPayload(BaseModel):
     co: float = Field(ge=0)
     co2: float = Field(ge=0)
     h2s: float = Field(ge=0)
-    lel: float = Field(ge=0, le=100, description="폭발하한계 (%) — 임계치 미정의, 수집만 함")
+    lel: float = Field(
+        ge=0, le=100, description="폭발하한계 (%) — 임계치 미정의, 수집만 함"
+    )
     no2: float = Field(ge=0)
     so2: float = Field(ge=0)
     o3: float = Field(ge=0)
@@ -91,9 +95,15 @@ class GasDataPayload(BaseModel):
     def recalculate_status(self) -> "GasDataPayload":
         """수신된 가스값으로 status를 서버에서 직접 재계산한다."""
         gas_values = {
-            "o2": self.o2, "co": self.co, "co2": self.co2,
-            "h2s": self.h2s, "lel": self.lel, "no2": self.no2,
-            "so2": self.so2, "o3": self.o3, "nh3": self.nh3,
+            "o2": self.o2,
+            "co": self.co,
+            "co2": self.co2,
+            "h2s": self.h2s,
+            "lel": self.lel,
+            "no2": self.no2,
+            "so2": self.so2,
+            "o3": self.o3,
+            "nh3": self.nh3,
             "voc": self.voc,
         }
         self.status = calculate_gas_status(gas_values)
