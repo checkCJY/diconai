@@ -1,4 +1,13 @@
-# websocket/services/broadcast.py — 브로드캐스트 페이로드 조립
+# websocket/services/broadcast.py — WebSocket 브로드캐스트 페이로드 조립
+#
+# /ws/sensors/ 에서 1초마다 브라우저로 전송하는 통합 페이로드를 조립한다.
+# websocket/state.py의 공유 상태를 읽어 아래 데이터를 하나의 dict로 합친다.
+#   - 전력: build_equipment()로 16채널 설비 현황 + 총 전력(kW) + 증감률
+#   - 가스: latest_gas_snapshot (가스 측정값 + 가스별 위험도)
+#   - 알람: active_alarms (송출 후 즉시 비워 중복 전달 방지)
+#   - 위치: worker_positions (IoT 장비로부터 갱신된 작업자 좌표)
+#
+# 전력 데이터가 8초 이상 수신되지 않으면 stale로 판단해 더미 전력값을 사용한다.
 import random
 from datetime import datetime, timezone
 
@@ -10,12 +19,19 @@ from websocket.state import (
     worker_positions,
 )
 
-_prev_total_kw: float | None = None
-
-DATA_STALE_SEC = 8
+_prev_total_kw: float | None = None  # 직전 총 전력값 — 증감률 계산용
+DATA_STALE_SEC = 8  # 전력 데이터 갱신 없이 이 시간이 지나면 더미값으로 대체
 
 
 def build_broadcast_payload() -> dict:
+    """
+    /ws/sensors/ 틱마다 브라우저로 전송할 통합 페이로드를 조립해 반환한다.
+
+    전력 데이터가 stale(8초 초과)이면 equipment를 빈 리스트로 처리하고
+    power_loading: True 플래그를 포함해 브라우저가 로딩 스켈레톤을 유지하도록 한다.
+    active_alarms는 송출 직후 clear해 다음 틱에 중복 전달되지 않도록 한다.
+    ai_* 필드는 현재 더미값으로, 실제 AI 모델 연동 시 교체 예정이다.
+    """
     global _prev_total_kw
 
     is_danger = random.random() < 0.1

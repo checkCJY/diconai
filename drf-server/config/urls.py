@@ -12,8 +12,6 @@ urlpatterns = [
     path("api/auth/", include(auth_api_urlpatterns)),
     path("dashboard/", include("apps.dashboard.urls")),
     path("alerts/", include("apps.alerts.urls")),
-    path("positioning/", include("apps.positioning.urls")),
-    path("monitoring/", include("apps.monitoring.urls")),
     path("api/", include("apps.geofence.urls")),
     path("api/positioning/", include("apps.positioning.urls")),
     path("api/monitoring/", include("apps.monitoring.urls")),

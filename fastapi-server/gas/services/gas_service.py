@@ -1,4 +1,11 @@
-# gas/services/gas_service.py — 가스 데이터 DRF 전송 + 공유 상태 갱신
+# gas/services/gas_service.py — 가스 데이터 처리 서비스
+#
+# 가스 센서 수신 데이터의 비즈니스 로직을 담당한다.
+#   1. DRF에 측정값을 저장한다.
+#   2. DRF 응답에서 알람 목록을 꺼내 active_alarms에 추가한다.
+#   3. latest_gas_snapshot을 갱신해 다음 WebSocket 틱에 브라우저로 전달한다.
+#
+# HTTP Push(/internal/*) 없이 websocket/state.py를 직접 갱신하는 방식을 사용한다.
 import logging
 
 import httpx
@@ -15,6 +22,11 @@ DRF_GAS_URL = f"{settings.DRF_BASE_URL}/api/monitoring/gas/"
 
 
 async def _forward_to_drf(drf_payload: dict) -> dict:
+    """
+    DRF 가스 저장 엔드포인트에 측정값을 전달하고 응답을 반환한다.
+    연결 실패·타임아웃·4xx 오류 시 적절한 HTTPException을 발생시켜
+    센서 장비에 오류 응답을 반환한다.
+    """
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.post(DRF_GAS_URL, json=drf_payload)
@@ -34,11 +46,12 @@ async def _forward_to_drf(drf_payload: dict) -> dict:
 
 async def process_gas_data(payload: GasDataPayload) -> dict:
     """
-    가스 데이터 처리 흐름:
-      1. DRF에 측정값 저장
-      2. 공유 상태 직접 갱신 (HTTP Push 없음)
-         - latest_gas_snapshot: 브로드캐스트 페이로드에 spread
-         - active_alarms: 다음 WS 틱에 포함 후 소비
+    가스 데이터 수신 후 전체 처리 흐름을 조율한다.
+
+    1. 가스별 위험도(individual_risks)를 계산한다.
+    2. DRF에 측정값과 위험도를 저장하고 알람 목록을 받는다.
+    3. latest_gas_snapshot을 갱신해 WebSocket 브로드캐스트에 포함시킨다.
+    4. 새 알람이 있으면 active_alarms에 추가해 다음 WS 틱에 브라우저로 전달한다.
     """
     gas_values = {
         "o2": payload.o2,
@@ -73,7 +86,6 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
     drf_data = await _forward_to_drf(drf_payload)
     alarms = drf_data.get("alarms", [])
 
-    # 공유 상태 직접 갱신 (websocket/state.py)
     gas_snapshot = {
         "co": payload.co,
         "h2s": payload.h2s,

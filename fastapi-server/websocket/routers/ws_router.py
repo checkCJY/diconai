@@ -1,4 +1,9 @@
-# websocket/routers/ws_router.py — WebSocket 엔드포인트
+# websocket/routers/ws_router.py — 브라우저/IoT WebSocket 엔드포인트
+#
+# 두 가지 WebSocket 연결을 처리한다.
+#   WS /ws/sensors/  : 브라우저 연결. 1초마다 통합 페이로드(가스+전력+알람+작업자 위치)를 송출한다.
+#   WS /ws/position/ : IoT 위치 장비 연결. 위치 데이터를 수신해 DRF에 저장하고
+#                      worker_positions 공유 상태를 갱신한다.
 import asyncio
 from datetime import datetime, timezone
 
@@ -15,6 +20,12 @@ router = APIRouter()
 
 
 async def _forward_to_drf(payload: dict) -> dict:
+    """
+    IoT 장비로부터 수신한 위치 데이터를 DRF에 저장한다.
+
+    성공 시 {"status": "ok", ...DRF 응답} 을 반환하고,
+    타임아웃·예외 발생 시 {"status": "error", "message": ...} 를 반환한다.
+    """
     headers = {"Content-Type": "application/json"}
     if settings.DRF_SERVICE_TOKEN:
         headers["Authorization"] = f"Bearer {settings.DRF_SERVICE_TOKEN}"
@@ -35,6 +46,12 @@ async def _forward_to_drf(payload: dict) -> dict:
 
 @router.websocket("/ws/sensors/")
 async def sensor_stream(websocket: WebSocket):
+    """
+    브라우저용 실시간 통합 데이터 스트림.
+
+    1초마다 build_broadcast_payload()로 조립한 페이로드를 전송한다.
+    페이로드에는 가스 측정값·위험도, 전력 설비 현황, 알람 목록, 작업자 위치가 포함된다.
+    """
     await websocket.accept()
     print("[ws/sensors] 브라우저 연결됨")
     try:
@@ -47,6 +64,14 @@ async def sensor_stream(websocket: WebSocket):
 
 @router.websocket("/ws/position/")
 async def position_stream(websocket: WebSocket):
+    """
+    IoT 위치 장비용 수신 스트림.
+
+    장비로부터 worker_id, facility_id, x, y 를 수신해 DRF에 저장하고
+    worker_positions 공유 상태를 갱신한다.
+    갱신된 위치는 /ws/sensors/ 다음 틱에 브라우저로 전달된다.
+    필수 필드가 누락된 경우 에러 응답을 반환하고 다음 수신을 계속 대기한다.
+    """
     await websocket.accept()
     print("[ws/position] IoT 디바이스 연결됨")
     try:
