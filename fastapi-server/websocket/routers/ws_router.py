@@ -1,25 +1,23 @@
 # websocket/routers/ws_router.py — WebSocket 엔드포인트
 import asyncio
-import os
 from datetime import datetime, timezone
 
 import httpx
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from core.config import settings
 from websocket.services.broadcast import build_broadcast_payload
 from websocket.state import worker_positions
 
-DRF_BASE_URL = os.getenv("DRF_BASE_URL", "http://localhost:8000")
-DRF_SERVICE_TOKEN = os.getenv("DRF_SERVICE_TOKEN", "")
-POSITION_ENDPOINT = f"{DRF_BASE_URL}/positioning/api/receive/"
+POSITION_ENDPOINT = f"{settings.DRF_BASE_URL}/api/positioning/receive/"
 
 router = APIRouter()
 
 
 async def _forward_to_drf(payload: dict) -> dict:
     headers = {"Content-Type": "application/json"}
-    if DRF_SERVICE_TOKEN:
-        headers["Authorization"] = f"Bearer {DRF_SERVICE_TOKEN}"
+    if settings.DRF_SERVICE_TOKEN:
+        headers["Authorization"] = f"Bearer {settings.DRF_SERVICE_TOKEN}"
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             res = await client.post(POSITION_ENDPOINT, json=payload, headers=headers)

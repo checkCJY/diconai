@@ -1,11 +1,10 @@
 # fastapi-server/positioning/services/position_service.py
-import os
 import random
 import httpx
 from datetime import datetime, timezone
 from positioning.schemas.position import WorkerPositionSchema
 
-DRF_BASE_URL = os.getenv("DRF_BASE_URL", "http://127.0.0.1:8000")
+from core.config import settings
 
 # 더미 작업자 목록 (초기 위치 + 이동 방향)
 DUMMY_WORKERS = [
@@ -99,7 +98,7 @@ async def save_positions_to_drf(positions: list[WorkerPositionSchema]):
 
         async with httpx.AsyncClient() as client:
             res = await client.post(
-                f"{DRF_BASE_URL}/api/positioning/receive/",
+                f"{settings.DRF_BASE_URL}/api/positioning/receive/",
                 json=payload,
                 timeout=5.0,
             )

@@ -1,15 +1,13 @@
 # power/services/power_service.py — 전력 공유 상태 갱신 + DRF 전송 헬퍼
-import os
 from datetime import datetime, timezone
 
 import httpx
 
+from core.config import settings
 from websocket.state import power_latest
 
-DRF_BASE_URL = os.getenv("DRF_BASE_URL", "http://localhost:8000")
-DRF_SERVICE_TOKEN = os.getenv("DRF_SERVICE_TOKEN", "")
-DRF_POWER_EVENT_URL = f"{DRF_BASE_URL}/monitoring/api/power/event/"
-DRF_POWER_DATA_URL = f"{DRF_BASE_URL}/monitoring/api/power/data/"
+DRF_POWER_EVENT_URL = f"{settings.DRF_BASE_URL}/api/monitoring/power/event/"
+DRF_POWER_DATA_URL = f"{settings.DRF_BASE_URL}/api/monitoring/power/data/"
 
 # 채널 → 설비명 매핑 (운영 시 DRF PowerDevice.channel_meta 조회로 교체)
 CHANNEL_TO_DEVICE: dict[int, str] = {
@@ -38,8 +36,8 @@ def now_utc_iso() -> str:
 
 def auth_headers() -> dict:
     headers = {"Content-Type": "application/json"}
-    if DRF_SERVICE_TOKEN:
-        headers["Authorization"] = f"Bearer {DRF_SERVICE_TOKEN}"
+    if settings.DRF_SERVICE_TOKEN:
+        headers["Authorization"] = f"Bearer {settings.DRF_SERVICE_TOKEN}"
     return headers
 
 
