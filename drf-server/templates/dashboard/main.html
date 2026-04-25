@@ -1,0 +1,48 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>산재 예방 통합 관제 시스템</title>
+<link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+<link rel="stylesheet" href="{% static 'css/components/header.css' %}">
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>window.FACTORY_MAP_URL = "{% static 'img/factory_map.svg' %}";</script>
+</head>
+<body>
+
+{% include 'components/header.html' %}
+
+<div class="body-wrap">
+  <div class="top-row">
+    {% include 'dashboard/panels/safety_panel.html' %}
+    {% include 'dashboard/panels/map_panel.html' %}
+    {% include 'dashboard/panels/event_panel.html' %}
+  </div>
+
+  <div class="bottom-row">
+    {% include 'dashboard/panels/gas_panel.html' %}
+    {% include 'dashboard/panels/power_panel.html' %}
+  </div>
+</div>
+
+{% include 'components/alarm_popup.html' %}
+{% include 'components/geofence_modal.html' %}
+
+<script src="{% static 'js/shared/util.js' %}"></script>
+<script src="{% static 'js/shared/auth.js' %}"></script>
+<script src="{% static 'js/shared/alarm-popup.js' %}"></script>
+<script src="{% static 'js/dashboard/panels/event-panel.js' %}"></script>
+<script src="{% static 'js/dashboard/panels/gas-panel.js' %}"></script>
+<script src="{% static 'js/dashboard/charts.js' %}"></script>
+<script src="{% static 'js/dashboard/panels/map-panel.js' %}"></script>
+<script src="{% static 'js/shared/layout.js' %}"></script>
+<script src="{% static 'js/dashboard/panels/worker-panel.js' %}"></script>
+<script src="{% static 'js/dashboard/websocket.js' %}"></script>
+<script src="{% static 'js/dashboard/app.js' %}"></script>
+</body>
+</html>
