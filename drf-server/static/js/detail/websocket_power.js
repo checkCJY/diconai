@@ -18,7 +18,7 @@
 
 'use strict';
 
-const WS_URL = 'ws://127.0.0.1:8002/ws/sensors/';
+const WS_URL = 'ws://127.0.0.1:8001/ws/sensors/';
 
 /* ────────────────────────────────────────────
    페이로드 → renderGrid 인자 변환

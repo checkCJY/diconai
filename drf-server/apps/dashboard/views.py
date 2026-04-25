@@ -13,11 +13,7 @@ from .menu import get_menu_tree
 # HTML 페이지 뷰
 # ──────────────────────────────────────────────────────────
 def main_dashboard(request):
-    return render(request, "main_dashboard_CJY.html")  # 수정해야함 main_dashboard 로
-
-
-def main_dashboard_jhh(request):
-    return render(request, "main_dashboard_jhh.html")
+    return render(request, "main_dashboard.html")
 
 
 def safety_checklist_page(request):
