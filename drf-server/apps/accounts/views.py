@@ -110,7 +110,7 @@ class MeView(APIView):
         }
         if user.user_type in ("facility_admin", "super_admin"):
             data["admin_url"] = getattr(
-                settings, "ADMIN_BACKOFFICE_URL", "/dashboard/admin/"
+                settings, "ADMIN_BACKOFFICE_URL", "/admin-panel/accounts-management/"
             )
         return Response(data)
 
