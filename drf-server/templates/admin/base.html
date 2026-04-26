@@ -1,0 +1,63 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}관리자{% endblock %} - 산재 예방 통합 관제 시스템</title>
+    <link rel="stylesheet" href="{% static 'css/admin.css' %}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+<div class="app-container">
+
+    <aside class="sidebar">
+        <div class="brand-logo"><span class="icon">로고</span></div>
+        <nav class="snb">
+            <a href="/admin-panel/accounts-management/" {% if active_nav == 'account' %}class="active"{% endif %}><span class="icon">계정</span></a>
+            <a href="#" {% if active_nav == 'org' %}class="active"{% endif %}><span class="icon">조직</span></a>
+            <a href="#" {% if active_nav == 'equipment' %}class="active"{% endif %}><span class="icon">설비</span></a>
+            <a href="/admin-panel/geofence/" {% if active_nav == 'geofence' %}class="active"{% endif %}><span class="icon">지도/구역</span></a>
+            <a href="#" {% if active_nav == 'data' %}class="active"{% endif %}><span class="icon">데이터</span></a>
+            <a href="#" {% if active_nav == 'log' %}class="active"{% endif %}><span class="icon">로그</span></a>
+            <a href="#" {% if active_nav == 'notice' %}class="active"{% endif %}><span class="icon">공지사항</span></a>
+            <a href="#" {% if active_nav == 'event' %}class="active"{% endif %}><span class="icon">이벤트</span></a>
+            <a href="#" {% if active_nav == 'policy' %}class="active"{% endif %}><span class="icon">안전 정책/기준 관리</span></a>
+        </nav>
+    </aside>
+
+    <div class="main-wrapper">
+
+        <header class="topbar">
+            <div class="topbar-left">
+                <h1 class="system-title">산재 예방 통합 관제 시스템</h1>
+                <button class="btn-realtime" onclick="location.href='/dashboard/'">실시간 관제 홈</button>
+            </div>
+            <div class="topbar-right">
+                <div class="admin-info">
+                    <span id="adminName" class="admin-name"></span>
+                    <span id="adminRole" class="admin-email"></span>
+                </div>
+                <button id="btnHome" class="icon-btn" title="홈" aria-label="홈으로 이동">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+                    </svg>
+                </button>
+                <div class="topbar-actions">
+                    <button id="btnLogout" class="btn-outline">로그아웃</button>
+                </div>
+            </div>
+        </header>
+
+        <main class="content">
+            {% block content %}{% endblock %}
+        </main>
+
+    </div>
+</div>
+
+<script src="{% static 'js/shared/auth.js' %}"></script>
+<script src="{% static 'js/admin/main.js' %}"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

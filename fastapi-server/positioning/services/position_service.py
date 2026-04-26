@@ -121,11 +121,9 @@ async def save_positions_to_drf(positions: list[WorkerPositionSchema]):
             if res.status_code != 201:
                 print(f"[positioning] DRF 저장 실패: {res.status_code} {res.text}")
             else:
-                body = res.json()
-                saved = body.get("saved", 0)
-                print(
-                    f"[positioning] 전송: {len(payload)}명, 저장: {saved}명 (지오펜스 근접 시만 저장)"
-                )
+                saved = res.json().get("saved", 0)
+                if saved > 0:
+                    print(f"[positioning] 전송: {len(payload)}명, 저장: {saved}명")
 
     except Exception as e:
         print(f"[positioning] DRF 저장 오류: {e}")

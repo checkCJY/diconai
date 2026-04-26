@@ -61,7 +61,11 @@ _MENU_ADMIN_EXTRA = {
     "icon": "settings",
     "children": [
         # SNB-05 구현 시 전용 URL로 교체 필요
-        {"id": "SNB-05", "label": "전체 이력 현황", "path": "/dashboard/admin/"},
+        {
+            "id": "SNB-05",
+            "label": "전체 이력 현황",
+            "path": "/admin-panel/accounts-management/",
+        },
     ],
 }
 

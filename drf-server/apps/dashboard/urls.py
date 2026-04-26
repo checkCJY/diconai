@@ -1,13 +1,11 @@
 from django.urls import path
 
 from . import views
-from django.views.generic import TemplateView
 
 urlpatterns = [
     # ── HTML 페이지 ──────────────────────────────────────
     path("", views.main_dashboard, name="main-dashboard"),
     path("safety/checklist/", views.safety_checklist_page, name="safety-checklist"),
-    path("admin/", TemplateView.as_view(template_name="admin/main.html")),
     path("safety/history/", views.safety_history_page, name="safety-history"),
     path("safety/vr/", views.safety_vr_page, name="safety-vr"),
     path("api/vr-progress/", views.VRProgressView.as_view(), name="vr-progress"),
