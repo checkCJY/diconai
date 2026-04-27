@@ -113,7 +113,14 @@
         <span class="page-info" id="pageInfo">0 - 0 / 0</span>
         <div class="pagination" id="pagination"></div>
     </div>
+
 </section>
+
+{% include 'admin_panel/accounts/_modal_create.html' %}
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/admin/accounts.css' %}">
 {% endblock %}
 
 {% block extra_js %}

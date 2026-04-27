@@ -41,6 +41,7 @@ const AccountsAdmin = {
 
   async init() {
     this._bindEvents();
+    this._bindCreateModal();
     await this.fetchList();
   },
 
@@ -261,10 +262,245 @@ const AccountsAdmin = {
     }
   },
 
-  // ── 모달 (등록 / 수정) ── 추후 구현 ─────────────────────
+  // ── 사용자 등록 모달 ──────────────────────────────────────
 
   _openCreateModal() {
-    alert('사용자 등록 모달 — 추후 구현 예정');
+    this._resetCreateForm();
+    document.getElementById('createUserModal').style.display = 'flex';
+  },
+
+  _closeCreateModal() {
+    document.getElementById('createUserModal').style.display = 'none';
+  },
+
+  _bindCreateModal() {
+    document.getElementById('btnCreateClose').addEventListener('click', () => this._closeCreateModal());
+    document.getElementById('btnCreateCancel').addEventListener('click', () => this._closeCreateModal());
+    document.getElementById('btnCreateSubmit').addEventListener('click', () => this._submitCreateForm());
+  },
+
+  _resetCreateForm() {
+    ['createName', 'createUsername', 'createPassword', 'createPasswordConfirm', 'createEmail', 'createPhone'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    ['createDepartment', 'createUserType', 'createPosition', 'createStatus'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    document.querySelectorAll('#createUserModal .field-error').forEach(el => {
+      el.textContent = '';
+      el.classList.remove('visible');
+    });
+    document.querySelectorAll('#createUserModal .is-error').forEach(el => {
+      el.classList.remove('is-error');
+    });
+  },
+
+  _validateCreateForm() {
+    let valid = true;
+
+    const setError = (fieldId, errId, msg) => {
+      const field = document.getElementById(fieldId);
+      const err = document.getElementById(errId);
+      if (msg) {
+        field.classList.add('is-error');
+        err.textContent = msg;
+        err.classList.add('visible');
+        valid = false;
+      } else {
+        field.classList.remove('is-error');
+        err.textContent = '';
+        err.classList.remove('visible');
+      }
+    };
+
+    // 사용자명
+    const nameTrimmed = document.getElementById('createName').value.trim();
+    if (!nameTrimmed) {
+      setError('createName', 'errName', '사용자명을 입력해 주세요.');
+    } else if (nameTrimmed.length < 2) {
+      setError('createName', 'errName', '사용자명을 2자 이상 입력해 주세요.');
+    } else if (nameTrimmed.length > 20) {
+      setError('createName', 'errName', '사용자명은 20자 이하로 입력해 주세요.');
+    } else if (!/^[가-힣a-zA-Z0-9]+$/.test(nameTrimmed)) {
+      setError('createName', 'errName', '사용자명은 한글, 영문, 숫자만 입력할 수 있습니다.');
+    } else {
+      setError('createName', 'errName', null);
+    }
+
+    // 아이디
+    const username = document.getElementById('createUsername').value;
+    if (!username) {
+      setError('createUsername', 'errUsername', '아이디를 입력해 주세요.');
+    } else if (/\s/.test(username)) {
+      setError('createUsername', 'errUsername', '아이디에는 공백을 입력할 수 없습니다.');
+    } else if (!/^[a-zA-Z0-9]+$/.test(username)) {
+      setError('createUsername', 'errUsername', '아이디는 영문 또는 숫자만 입력할 수 있습니다.');
+    } else if (username.length < 4) {
+      setError('createUsername', 'errUsername', '아이디를 4자 이상 입력해 주세요.');
+    } else if (username.length > 20) {
+      setError('createUsername', 'errUsername', '아이디는 20자 이하로 입력해 주세요.');
+    } else {
+      setError('createUsername', 'errUsername', null);
+    }
+
+    // 비밀번호
+    const password = document.getElementById('createPassword').value;
+    if (!password) {
+      setError('createPassword', 'errPassword', '비밀번호를 입력해 주세요.');
+    } else if (/\s/.test(password)) {
+      setError('createPassword', 'errPassword', '비밀번호에는 공백을 입력할 수 없습니다.');
+    } else if (password.length < 8) {
+      setError('createPassword', 'errPassword', '비밀번호는 8자 이상 입력해 주세요.');
+    } else if (password.length > 20) {
+      setError('createPassword', 'errPassword', '비밀번호는 20자 이하로 입력해 주세요.');
+    } else {
+      const hasAlpha = /[a-zA-Z]/.test(password);
+      const hasDigit = /[0-9]/.test(password);
+      const hasSpecial = /[^a-zA-Z0-9]/.test(password);
+      if ([hasAlpha, hasDigit, hasSpecial].filter(Boolean).length < 2) {
+        setError('createPassword', 'errPassword', '비밀번호는 영문, 숫자, 특수문자 중 2가지 이상을 포함해 주세요.');
+      } else {
+        setError('createPassword', 'errPassword', null);
+      }
+    }
+
+    // 비밀번호 확인
+    const passwordConfirm = document.getElementById('createPasswordConfirm').value;
+    if (!passwordConfirm) {
+      setError('createPasswordConfirm', 'errPasswordConfirm', '비밀번호 확인을 입력해 주세요.');
+    } else if (passwordConfirm !== password) {
+      setError('createPasswordConfirm', 'errPasswordConfirm', '비밀번호가 일치하지 않습니다.');
+    } else {
+      setError('createPasswordConfirm', 'errPasswordConfirm', null);
+    }
+
+    // 소속
+    const department = document.getElementById('createDepartment').value;
+    if (!department) {
+      setError('createDepartment', 'errDepartment', '소속을 선택해 주세요.');
+    } else {
+      setError('createDepartment', 'errDepartment', null);
+    }
+
+    // 권한
+    const userType = document.getElementById('createUserType').value;
+    if (!userType) {
+      setError('createUserType', 'errUserType', '권한을 선택해 주세요.');
+    } else {
+      setError('createUserType', 'errUserType', null);
+    }
+
+    // 계정 상태
+    const accountStatus = document.getElementById('createStatus').value;
+    if (!accountStatus) {
+      setError('createStatus', 'errStatus', '계정 상태를 선택해 주세요.');
+    } else {
+      setError('createStatus', 'errStatus', null);
+    }
+
+    // 이메일 (입력 시에만 형식 검증)
+    const email = document.getElementById('createEmail').value.trim();
+    if (email) {
+      if (email.length > 100) {
+        setError('createEmail', 'errEmail', '이메일은 100자 이하로 입력해 주세요.');
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        setError('createEmail', 'errEmail', '이메일 형식이 올바르지 않습니다.');
+      } else {
+        setError('createEmail', 'errEmail', null);
+      }
+    } else {
+      setError('createEmail', 'errEmail', null);
+    }
+
+    // 연락처 (입력 시에만 형식 검증)
+    const phone = document.getElementById('createPhone').value.trim();
+    if (phone) {
+      if (/[^0-9\-]/.test(phone)) {
+        setError('createPhone', 'errPhone', '연락처는 숫자만 입력할 수 있습니다.');
+      } else {
+        const digits = phone.replace(/-/g, '');
+        if (digits.length !== 10 && digits.length !== 11) {
+          setError('createPhone', 'errPhone', '연락처를 정확히 입력해 주세요.');
+        } else if (!/^0\d{1,2}-?\d{3,4}-?\d{4}$/.test(phone)) {
+          setError('createPhone', 'errPhone', '연락처 형식이 올바르지 않습니다.');
+        } else {
+          setError('createPhone', 'errPhone', null);
+        }
+      }
+    } else {
+      setError('createPhone', 'errPhone', null);
+    }
+
+    return valid;
+  },
+
+  async _submitCreateForm() {
+    if (!this._validateCreateForm()) return;
+
+    const payload = {
+      name: document.getElementById('createName').value.trim(),
+      username: document.getElementById('createUsername').value,
+      password: document.getElementById('createPassword').value,
+      department: parseInt(document.getElementById('createDepartment').value),
+      user_type: document.getElementById('createUserType').value,
+      status: document.getElementById('createStatus').value,
+    };
+
+    const position = document.getElementById('createPosition').value;
+    if (position) payload.position = parseInt(position);
+
+    const email = document.getElementById('createEmail').value.trim();
+    if (email) payload.email = email;
+
+    const phone = document.getElementById('createPhone').value.trim();
+    if (phone) payload.phone = phone.replace(/-/g, '');
+
+    const token = Auth.getAccessToken();
+    const submitBtn = document.getElementById('btnCreateSubmit');
+    submitBtn.disabled = true;
+
+    try {
+      const res = await fetch('/api/admin/accounts/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.status === 201) {
+        this._closeCreateModal();
+        await this.fetchList();
+        return;
+      }
+
+      if (res.status === 400) {
+        const errors = await res.json();
+        const errUsername = document.getElementById('errUsername');
+        const errUsernameField = document.getElementById('createUsername');
+        if (errors.username) {
+          errUsernameField.classList.add('is-error');
+          errUsername.textContent = Array.isArray(errors.username) ? errors.username[0] : errors.username;
+          errUsername.classList.add('visible');
+        }
+        if (errors.password) {
+          const errPw = document.getElementById('errPassword');
+          const errPwField = document.getElementById('createPassword');
+          errPwField.classList.add('is-error');
+          errPw.textContent = Array.isArray(errors.password) ? errors.password[0] : errors.password;
+          errPw.classList.add('visible');
+        }
+        return;
+      }
+
+      throw new Error(`HTTP ${res.status}`);
+    } catch (e) {
+      console.error('[AccountsAdmin] 사용자 등록 실패:', e);
+      alert('사용자 등록에 실패했습니다. 다시 시도해 주세요.');
+    } finally {
+      submitBtn.disabled = false;
+    }
   },
 
   _openEditModal(id) {

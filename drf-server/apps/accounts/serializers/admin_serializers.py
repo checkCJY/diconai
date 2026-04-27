@@ -1,7 +1,10 @@
 import re
 
 from django.contrib.auth import get_user_model
+from django.utils import timezone
+from datetime import timedelta
 from rest_framework import serializers
+from rest_framework.validators import UniqueValidator
 
 User = get_user_model()
 
@@ -51,21 +54,42 @@ class AccountsAdminListSerializer(serializers.ModelSerializer):
 class AccountsAdminCreateSerializer(serializers.ModelSerializer):
     """사용자 등록용"""
 
-    password = serializers.CharField(write_only=True, min_length=8, max_length=16)
+    username = serializers.CharField(
+        validators=[
+            UniqueValidator(
+                queryset=User.objects.all(),
+                message="이미 사용 중인 아이디입니다.",
+            )
+        ]
+    )
+    password = serializers.CharField(write_only=True, min_length=8, max_length=20)
+    status = serializers.ChoiceField(
+        choices=["active", "locked", "inactive"],
+        write_only=True,
+        required=True,
+    )
 
     def validate_password(self, value):
+        if " " in value:
+            raise serializers.ValidationError("비밀번호에는 공백을 입력할 수 없습니다.")
         types = sum(bool(p.search(value)) for p in _PWD_PATTERNS)
         if types < 2:
             raise serializers.ValidationError(
-                "8~16자의 영문, 숫자, 특수문자를 조합하여 입력해 주세요."
+                "비밀번호는 영문, 숫자, 특수문자 중 2가지 이상을 포함해 주세요."
             )
         return value
 
     def create(self, validated_data):
         password = validated_data.pop("password")
+        status = validated_data.pop("status")
         user = User(**validated_data)
         user.set_password(password)
+        if status == "inactive":
+            user.is_active = False
         user.save()
+        if status == "locked":
+            user.account_locked_until = timezone.now() + timedelta(days=36500)
+            user.save(update_fields=["account_locked_until"])
         return user
 
     class Meta:
@@ -74,10 +98,12 @@ class AccountsAdminCreateSerializer(serializers.ModelSerializer):
             "username",
             "password",
             "name",
+            "email",
             "department",
             "position",
             "user_type",
             "phone",
+            "status",
         ]
 
 
