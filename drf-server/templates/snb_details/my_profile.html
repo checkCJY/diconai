@@ -1,0 +1,113 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>내 정보 확인 — 산재 예방 통합 관제 시스템</title>
+<link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+<link rel="stylesheet" href="{% static 'css/components/header.css' %}">
+<link rel="stylesheet" href="{% static 'css/snb_details/my_profile.css' %}">
+</head>
+<body>
+
+{% include 'components/header.html' %}
+
+<div class="profile-page">
+
+  <div class="page-title">내 정보 확인</div>
+
+  <div class="profile-card">
+    <div class="profile-card-header">
+      <span class="card-label">내 정보</span>
+      <button class="btn-password" id="btnPassword">비밀번호 변경</button>
+    </div>
+
+    <div class="profile-grid">
+      <div class="profile-row">
+        <span class="profile-label">이름</span>
+        <span class="profile-value" id="profileName">-</span>
+        <span class="profile-label">이메일</span>
+        <span class="profile-value" id="profileEmail">-</span>
+      </div>
+      <div class="profile-row">
+        <span class="profile-label">ID</span>
+        <span class="profile-value" id="profileUsername">-</span>
+        <span class="profile-label">연락처</span>
+        <span class="profile-value" id="profilePhone">-</span>
+      </div>
+      <div class="profile-row">
+        <span class="profile-label">소속 공장</span>
+        <span class="profile-value" id="profileFacility">-</span>
+        <span class="profile-label">소속 부서</span>
+        <span class="profile-value" id="profileDepartment">-</span>
+      </div>
+      <div class="profile-row profile-row--single">
+        <span class="profile-label">직급</span>
+        <span class="profile-value" id="profilePosition">-</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── 비밀번호 변경 모달 ── -->
+<div id="pwdModal" class="modal-backdrop" style="display:none;">
+  <div class="modal-box pwd-modal-box">
+    <div class="pwd-modal-title">비밀번호 변경</div>
+    <hr class="pwd-divider">
+
+    <div class="pwd-field">
+      <label class="pwd-label">현재 비밀번호</label>
+      <p class="pwd-hint" id="hintCurrent">본인 확인을 위해 현재 사용 중인 비밀번호를 입력해 주세요.</p>
+      <div class="pwd-input-wrap">
+        <input type="password" id="inputCurrent" class="pwd-input" autocomplete="current-password">
+        <button type="button" class="pwd-clear" id="clearCurrent">✕</button>
+      </div>
+    </div>
+
+    <div class="pwd-field">
+      <label class="pwd-label">신규 비밀번호</label>
+      <p class="pwd-hint" id="hintNew">영문, 숫자, 특수문자 조합으로 8~16자 이내로 입력해 주세요.</p>
+      <div class="pwd-input-wrap">
+        <input type="password" id="inputNew" class="pwd-input" autocomplete="new-password">
+        <button type="button" class="pwd-clear" id="clearNew">✕</button>
+      </div>
+    </div>
+
+    <div class="pwd-field">
+      <label class="pwd-label">비밀번호 확인</label>
+      <p class="pwd-hint" id="hintConfirm">위에서 입력한 신규 비밀번호를 다시 한번 입력해 주세요.</p>
+      <div class="pwd-input-wrap">
+        <input type="password" id="inputConfirm" class="pwd-input" autocomplete="new-password">
+        <button type="button" class="pwd-clear" id="clearConfirm">✕</button>
+      </div>
+    </div>
+
+    <div class="pwd-footer">
+      <button class="modal-btn-cancel" id="btnPwdCancel">취소</button>
+      <button class="modal-btn-blue" id="btnPwdSubmit">변경 완료</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 비밀번호 변경 완료 모달 ── -->
+<div id="pwdSuccessModal" class="modal-backdrop" style="display:none;">
+  <div class="modal-box" style="min-width:280px;">
+    <div class="modal-icon modal-icon--success">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="4 13 9 18 20 7"/>
+      </svg>
+    </div>
+    <div class="modal-label">비밀번호 변경</div>
+    <p class="modal-msg-lg">비밀번호가 변경되었습니다.</p>
+    <button class="modal-btn-blue" id="btnPwdSuccessOk">확인</button>
+  </div>
+</div>
+
+<script src="{% static 'js/shared/util.js' %}"></script>
+<script src="{% static 'js/shared/auth.js' %}"></script>
+<script src="{% static 'js/shared/layout.js' %}"></script>
+<script src="{% static 'js/shared/app-sub.js' %}"></script>
+<script src="{% static 'js/detail/my_profile.js' %}"></script>
+</body>
+</html>

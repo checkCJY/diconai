@@ -19,6 +19,12 @@ page_urlpatterns = [
 api_urlpatterns = [
     path("login/", views.LoginView.as_view(), name="api-login"),
     path("me/", views.MeView.as_view(), name="api-me"),
+    path("profile/", views.MyProfileView.as_view(), name="api-profile"),
+    path(
+        "password/change/",
+        views.PasswordChangeView.as_view(),
+        name="api-password-change",
+    ),
     path("logout/", views.LogoutView.as_view(), name="api-logout"),
     path("token/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
 ]
