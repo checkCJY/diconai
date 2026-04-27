@@ -180,6 +180,7 @@ _geofences: [],
     };
 
     await this._drawAll();
+    this.setMarkersDisconnected();
     this._initTabFilter();
     this._startWorkerAnimation();
 
@@ -430,6 +431,18 @@ _geofences: [],
   },
 
   _startWorkerAnimation() {},
+
+  // 통신 장애 시 모든 작업자·가스 마커를 반투명으로 전환한다.
+  setMarkersDisconnected() {
+    Object.values(this.workerMarkers).forEach(({ marker }) => marker.setOpacity(0.5));
+    Object.values(this.gasMarkers).forEach(({ marker }) => marker.setOpacity(0.5));
+  },
+
+  // 연결 복구 시 마커 투명도를 원래대로 복원한다.
+  setMarkersConnected() {
+    Object.values(this.workerMarkers).forEach(({ marker }) => marker.setOpacity(1));
+    Object.values(this.gasMarkers).forEach(({ marker }) => marker.setOpacity(1));
+  },
 
   updateGasSensorFromWS(wsData) {
     const entry = this.gasMarkers['sensor_01'];
