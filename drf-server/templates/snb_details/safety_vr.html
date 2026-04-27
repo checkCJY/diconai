@@ -194,11 +194,19 @@
     document.getElementById('doneModal').classList.add('show');
   });
   document.getElementById('doneModalOk').addEventListener('click', async () => {
-    saveProgress(0);
+    /* VR 완료 상태를 먼저 저장하고, 이후 진행 위치를 초기화한다.
+       순서를 지키지 않으면 keepalive fetch와 세션 경쟁이 발생해
+       vr_done_date 키가 덮어쓰여 '미완료'로 표시되는 버그가 생긴다. */
     await fetch('/dashboard/api/safety-status/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key: 'vr' }),
+    }).catch(() => {});
+    await fetch(PROGRESS_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + Auth.getAccessToken() },
+      body: JSON.stringify({ position: 0 }),
+      keepalive: true,
     }).catch(() => {});
     window.location.href = '/dashboard/';
   });
