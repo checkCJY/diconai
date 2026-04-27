@@ -11,7 +11,7 @@
         <h2 class="page-title">사용자 관리</h2>
         <p class="page-desc">계정을 조회하고 등록, 수정, 삭제할 수 있습니다.</p>
     </div>
-    <button class="btn-primary">사용자 등록</button>
+    <button class="btn-primary" id="btnAddUser">사용자 등록</button>
 </section>
 
 <!-- 검색 필터 -->
@@ -19,28 +19,49 @@
     <div class="filter-inputs">
         <div class="input-group">
             <label>사용자명</label>
-            <input type="text" placeholder="이름 입력">
+            <input type="text" id="filterName" placeholder="이름 입력">
         </div>
         <div class="input-group">
             <label>소속</label>
-            <select><option>전체</option></select>
+            <select id="filterDepartment">
+                <option value="">전체</option>
+                {% for dept in departments %}
+                <option value="{{ dept.id }}">{{ dept.name }}</option>
+                {% endfor %}
+            </select>
         </div>
         <div class="input-group">
             <label>직위</label>
-            <select><option>전체</option></select>
+            <select id="filterPosition">
+                <option value="">전체</option>
+                {% for pos in positions %}
+                <option value="{{ pos.id }}">{{ pos.name }}</option>
+                {% endfor %}
+            </select>
         </div>
         <div class="input-group">
             <label>권한</label>
-            <select><option>전체</option></select>
+            <select id="filterUserType">
+                <option value="">전체</option>
+                <option value="super_admin">슈퍼관리자</option>
+                <option value="facility_admin">관리자</option>
+                <option value="worker">일반사용자</option>
+                <option value="viewer">열람자</option>
+            </select>
         </div>
         <div class="input-group">
             <label>계정 상태</label>
-            <select><option>전체</option></select>
+            <select id="filterStatus">
+                <option value="">전체</option>
+                <option value="active">사용</option>
+                <option value="locked">잠금</option>
+                <option value="inactive">비활성</option>
+            </select>
         </div>
     </div>
     <div class="filter-actions">
-        <button class="btn-outline">초기화</button>
-        <button class="btn-dark">검색</button>
+        <button class="btn-outline" id="btnReset">초기화</button>
+        <button class="btn-dark" id="btnSearch">검색</button>
     </div>
 </section>
 
@@ -48,13 +69,18 @@
 <section class="table-card">
     <div class="table-toolbar">
         <div class="toolbar-left">
-            <span class="total-count">전체 사용자 <strong>128</strong>명</span>
-            <button class="btn-danger" disabled>삭제</button>
-            <button class="btn-warning" disabled>계정 잠금</button>
-            <button class="btn-success" disabled>계정 잠금 해제</button>
+            <span class="total-count">전체 사용자 <strong id="totalCount">0</strong>명</span>
+            <button class="btn-danger" id="btnDelete" disabled>삭제</button>
+            <button class="btn-warning" id="btnLock" disabled>계정 잠금</button>
+            <button class="btn-success" id="btnUnlock" disabled>계정 잠금 해제</button>
         </div>
         <div class="toolbar-right">
-            <select class="sort-select"><option>사용자명 오름차순</option></select>
+            <select class="sort-select" id="sortSelect">
+                <option value="name_asc">사용자명 오름차순</option>
+                <option value="name_desc">사용자명 내림차순</option>
+                <option value="date_desc">등록일 최신순</option>
+                <option value="date_asc">등록일 오래된순</option>
+            </select>
         </div>
     </div>
 
@@ -62,7 +88,7 @@
         <table>
             <thead>
                 <tr>
-                    <th><input type="checkbox"></th>
+                    <th><input type="checkbox" id="checkAll"></th>
                     <th>사용자명</th>
                     <th>소속</th>
                     <th>직급</th>
@@ -75,61 +101,21 @@
                     <th>관리</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="accountsTableBody">
                 <tr>
-                    <td><input type="checkbox" checked></td>
-                    <td>김관리</td>
-                    <td>경영지원팀</td>
-                    <td>과장</td>
-                    <td>admin_kim</td>
-                    <td><span class="badge badge-purple">관리자</span></td>
-                    <td><span class="badge badge-green">사용</span></td>
-                    <td>010-2222-1111</td>
-                    <td>2026-03-30 08:45:00</td>
-                    <td>2026-02-15</td>
-                    <td><button class="btn-sm">수정</button></td>
-                </tr>
-                <tr>
-                    <td><input type="checkbox"></td>
-                    <td>박현장</td>
-                    <td>영업팀</td>
-                    <td>차장</td>
-                    <td>field_mgr_01</td>
-                    <td><span class="badge badge-purple">관리자</span></td>
-                    <td><span class="badge badge-orange">잠금</span></td>
-                    <td>010-3456-7821</td>
-                    <td>2026-03-30 08:45:00</td>
-                    <td>2026-02-21</td>
-                    <td><button class="btn-sm">수정</button></td>
-                </tr>
-                <tr>
-                    <td><input type="checkbox"></td>
-                    <td>이작업</td>
-                    <td>기술연구소</td>
-                    <td>사원</td>
-                    <td>worker_lee</td>
-                    <td><span class="badge badge-gray">일반사용자</span></td>
-                    <td><span class="badge badge-green">사용</span></td>
-                    <td>010-7788-9900</td>
-                    <td>2026-03-30 08:45:00</td>
-                    <td>2026-03-01</td>
-                    <td><button class="btn-sm">수정</button></td>
+                    <td colspan="11" class="empty-state">데이터를 불러오는 중...</td>
                 </tr>
             </tbody>
         </table>
     </div>
 
     <div class="table-footer">
-        <span class="page-info">1 - 10 / 128</span>
-        <div class="pagination">
-            <button>&lt;</button>
-            <button class="active">1</button>
-            <button>2</button>
-            <button>3</button>
-            <button>4</button>
-            <button>5</button>
-            <button>&gt;</button>
-        </div>
+        <span class="page-info" id="pageInfo">0 - 0 / 0</span>
+        <div class="pagination" id="pagination"></div>
     </div>
 </section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/admin/accounts/accounts.js' %}"></script>
 {% endblock %}

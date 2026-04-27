@@ -1,3 +1,13 @@
+"""
+apps/accounts/views/auth_views.py
+
+인증 관련 API 뷰 모음.
+로그인, 로그아웃, 내 정보 조회, 비밀번호 변경 등
+일반 사용자(비관리자 포함)가 사용하는 인증 흐름을 처리한다.
+
+URL 프리픽스: /api/auth/
+"""
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from rest_framework import status
@@ -6,22 +16,32 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models.login_log import LoginLog
-from .serializers import LoginSerializer, MyProfileSerializer, PasswordChangeSerializer
+from apps.accounts.models.login_log import LoginLog
+from apps.accounts.serializers import (
+    LoginSerializer,
+    MyProfileSerializer,
+    PasswordChangeSerializer,
+)
 from apps.dashboard.menu import get_menu_tree
 
 
 def _get_client_ip(request):
+    """X-Forwarded-For 헤더 우선, 없으면 REMOTE_ADDR 반환."""
     x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
     if x_forwarded_for:
         return x_forwarded_for.split(",")[0].strip()
     return request.META.get("REMOTE_ADDR")
 
 
-# ──────────────────────────────────────────────────────────
-# POST /api/auth/login/
-# ──────────────────────────────────────────────────────────
 class LoginView(APIView):
+    """
+    POST /api/auth/login/
+
+    아이디/비밀번호 인증 후 JWT(access + refresh) 발급.
+    - 계정 잠금·비활성 상태 사전 검사
+    - 실패 시 LoginLog 기록, 성공 시 실패 카운터 초기화
+    """
+
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -90,10 +110,14 @@ class LoginView(APIView):
         )
 
 
-# ──────────────────────────────────────────────────────────
-# GET /api/auth/me/
-# ──────────────────────────────────────────────────────────
 class MeView(APIView):
+    """
+    GET /api/auth/me/
+
+    현재 로그인한 사용자의 기본 정보 및 메뉴 트리 반환.
+    관리자(facility_admin, super_admin)에게는 admin_url도 포함.
+    """
+
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -115,10 +139,14 @@ class MeView(APIView):
         return Response(data)
 
 
-# ──────────────────────────────────────────────────────────
-# GET /api/auth/profile/
-# ──────────────────────────────────────────────────────────
 class MyProfileView(APIView):
+    """
+    GET /api/auth/profile/
+
+    현재 로그인한 사용자의 상세 프로필 반환.
+    부서·직급·공장 FK를 select_related로 한 번에 조회.
+    """
+
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -130,10 +158,14 @@ class MyProfileView(APIView):
         return Response(MyProfileSerializer(user).data)
 
 
-# ──────────────────────────────────────────────────────────
-# POST /api/auth/password/change/
-# ──────────────────────────────────────────────────────────
 class PasswordChangeView(APIView):
+    """
+    POST /api/auth/password/change/
+
+    현재 비밀번호 확인 후 새 비밀번호로 변경.
+    유효성 검사(길이·복잡도·현재비밀번호 동일 여부)는 PasswordChangeSerializer에서 처리.
+    """
+
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -147,10 +179,14 @@ class PasswordChangeView(APIView):
         return Response({"ok": True})
 
 
-# ──────────────────────────────────────────────────────────
-# POST /api/auth/logout/
-# ──────────────────────────────────────────────────────────
 class LogoutView(APIView):
+    """
+    POST /api/auth/logout/
+
+    로그아웃 이력을 LoginLog에 기록하고 세션을 초기화.
+    JWT는 stateless이므로 클라이언트에서 토큰을 직접 폐기해야 한다.
+    """
+
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
