@@ -184,7 +184,7 @@ _geofences: [],
     this._startWorkerAnimation();
 
     const role = Auth.getRole();
-    if (role === 'admin') {
+    if (role === 'super_admin' || role === 'facility_admin') {
       document.getElementById('geofence-toolbar').style.display = 'flex';
       this._initDrawing();
     }

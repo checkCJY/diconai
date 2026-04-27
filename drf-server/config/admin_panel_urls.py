@@ -6,7 +6,7 @@ urlpatterns = [
     path(
         "accounts-management/",
         TemplateView.as_view(
-            template_name="admin/accounts/accounts_main.html",
+            template_name="admin_panel/accounts/accounts_main.html",
             extra_context={"active_nav": "account"},
         ),
         name="admin-accounts-page",

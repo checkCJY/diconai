@@ -5,6 +5,7 @@ from . import views
 urlpatterns = [
     # ── HTML 페이지 ──────────────────────────────────────
     path("", views.main_dashboard, name="main-dashboard"),
+    path("profile/", views.my_profile_page, name="my-profile"),
     path("safety/checklist/", views.safety_checklist_page, name="safety-checklist"),
     path("safety/history/", views.safety_history_page, name="safety-history"),
     path("safety/vr/", views.safety_vr_page, name="safety-vr"),
