@@ -107,15 +107,105 @@ class AccountsAdminCreateSerializer(serializers.ModelSerializer):
         ]
 
 
+class AccountsAdminDetailSerializer(serializers.ModelSerializer):
+    """사용자 상세 조회용 — 수정 모달 pre-fill에 필요한 FK ID 포함"""
+
+    department_id = serializers.SerializerMethodField()
+    department_name = serializers.SerializerMethodField()
+    position_id = serializers.SerializerMethodField()
+    position_name = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+
+    def get_department_id(self, obj):
+        return obj.department_id
+
+    def get_department_name(self, obj):
+        return obj.department.name if obj.department else None
+
+    def get_position_id(self, obj):
+        return obj.position_id
+
+    def get_position_name(self, obj):
+        return obj.position.name if obj.position else None
+
+    def get_status(self, obj):
+        if not obj.is_active:
+            return "inactive"
+        if obj.is_locked:
+            return "locked"
+        return "active"
+
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "name",
+            "username",
+            "email",
+            "department_id",
+            "department_name",
+            "position_id",
+            "position_name",
+            "user_type",
+            "phone",
+            "status",
+        ]
+
+
 class AccountsAdminUpdateSerializer(serializers.ModelSerializer):
-    """사용자 수정용 (비밀번호 제외)"""
+    """사용자 수정용"""
+
+    password = serializers.CharField(
+        write_only=True, required=False, min_length=8, max_length=20
+    )
+    status = serializers.ChoiceField(
+        choices=["active", "locked", "inactive"],
+        write_only=True,
+        required=False,
+    )
+
+    def validate_password(self, value):
+        if " " in value:
+            raise serializers.ValidationError("비밀번호에는 공백을 입력할 수 없습니다.")
+        types = sum(bool(p.search(value)) for p in _PWD_PATTERNS)
+        if types < 2:
+            raise serializers.ValidationError(
+                "비밀번호는 영문, 숫자, 특수문자 중 2가지 이상을 포함해 주세요."
+            )
+        return value
+
+    def update(self, instance, validated_data):
+        password = validated_data.pop("password", None)
+        status_val = validated_data.pop("status", None)
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        if password:
+            instance.set_password(password)
+
+        if status_val == "active":
+            instance.is_active = True
+            instance.account_locked_until = None
+            instance.failed_login_count = 0
+        elif status_val == "inactive":
+            instance.is_active = False
+            instance.deactivated_at = timezone.now()
+        elif status_val == "locked":
+            instance.is_active = True
+            instance.account_locked_until = timezone.now() + timedelta(days=36500)
+
+        instance.save()
+        return instance
 
     class Meta:
         model = User
         fields = [
             "name",
+            "email",
             "department",
             "position",
-            "user_type",
             "phone",
+            "password",
+            "status",
         ]

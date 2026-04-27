@@ -5,6 +5,7 @@ from .auth_serializers import (
 )
 from .admin_serializers import (
     AccountsAdminListSerializer,
+    AccountsAdminDetailSerializer,
     AccountsAdminCreateSerializer,
     AccountsAdminUpdateSerializer,
 )
@@ -14,6 +15,7 @@ __all__ = [
     "MyProfileSerializer",
     "PasswordChangeSerializer",
     "AccountsAdminListSerializer",
+    "AccountsAdminDetailSerializer",
     "AccountsAdminCreateSerializer",
     "AccountsAdminUpdateSerializer",
 ]

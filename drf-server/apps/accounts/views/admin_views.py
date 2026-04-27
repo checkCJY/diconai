@@ -10,12 +10,13 @@ URL 프리픽스: /api/admin/accounts/
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.permissions import IsSuperAdmin
 from apps.accounts.serializers import (
     AccountsAdminCreateSerializer,
+    AccountsAdminDetailSerializer,
     AccountsAdminListSerializer,
     AccountsAdminUpdateSerializer,
 )
@@ -40,7 +41,7 @@ class AccountsAdminListView(APIView):
     - page_size  : 페이지 크기 (기본 10, 최대 100)
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsSuperAdmin]
 
     def get(self, request):
         """필터·정렬·페이지네이션이 적용된 사용자 목록을 반환한다."""
@@ -102,7 +103,7 @@ class AccountsAdminDetailView(APIView):
        CustomUser.deactivate()를 호출해 is_active=False 처리한다.
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsSuperAdmin]
 
     def _get_user(self, pk):
         """pk로 사용자를 조회한다. 없으면 None 반환."""
@@ -119,7 +120,7 @@ class AccountsAdminDetailView(APIView):
                 {"error": "사용자를 찾을 수 없습니다."},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        return Response(AccountsAdminListSerializer(user).data)
+        return Response(AccountsAdminDetailSerializer(user).data)
 
     def patch(self, request, pk):
         """사용자 정보(이름·부서·직급·권한·연락처)를 부분 수정한다."""
@@ -163,7 +164,7 @@ class AccountsAdminLockView(APIView):
     비활성(is_active=False) 계정에는 적용 불가.
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsSuperAdmin]
 
     def _get_user(self, pk):
         """활성 사용자만 조회한다. 비활성이면 None 반환."""

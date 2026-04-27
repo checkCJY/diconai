@@ -37,11 +37,39 @@ const AccountsAdmin = {
   STATUS_LABEL: { active: '사용', locked: '잠금', inactive: '비활성' },
   STATUS_BADGE: { active: 'badge-green', locked: 'badge-orange', inactive: 'badge-gray' },
 
+  // ── 접근 권한 없음 팝업 ───────────────────────────────────
+
+  _showAccessDenied() {
+    const existing = document.getElementById('accessDeniedModal');
+    if (existing) { existing.style.display = 'flex'; return; }
+
+    const el = document.createElement('div');
+    el.id = 'accessDeniedModal';
+    el.className = 'modal-overlay';
+    el.innerHTML = `
+      <div class="modal-container" style="width:400px; text-align:center;">
+        <div class="modal-body" style="padding:32px 24px; gap:12px;">
+          <div style="font-size:36px;">🔒</div>
+          <h3 style="font-size:16px; color:#c9d1d9; margin:0;">접근 권한이 없습니다</h3>
+          <p style="font-size:13px; color:#6e7681; margin:0;">
+            이 페이지는 슈퍼관리자만 접근할 수 있습니다.
+          </p>
+          <button class="btn-primary" id="btnAccessDeniedConfirm"
+            style="margin-top:8px; width:100%;">대시보드로 이동</button>
+        </div>
+      </div>`;
+    document.body.appendChild(el);
+    document.getElementById('btnAccessDeniedConfirm').addEventListener('click', () => {
+      window.location.href = '/dashboard/';
+    });
+  },
+
   // ── 초기화 ────────────────────────────────────────────────
 
   async init() {
     this._bindEvents();
     this._bindCreateModal();
+    this._bindEditModal();
     await this.fetchList();
   },
 
@@ -114,6 +142,8 @@ const AccountsAdmin = {
       const res = await fetch(`/api/admin/accounts/?${params}`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
+
+      if (res.status === 403) { this._showAccessDenied(); return; }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const data = await res.json();
@@ -403,7 +433,7 @@ const AccountsAdmin = {
     if (email) {
       if (email.length > 100) {
         setError('createEmail', 'errEmail', '이메일은 100자 이하로 입력해 주세요.');
-      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      } else if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email)) {
         setError('createEmail', 'errEmail', '이메일 형식이 올바르지 않습니다.');
       } else {
         setError('createEmail', 'errEmail', null);
@@ -475,6 +505,8 @@ const AccountsAdmin = {
         return;
       }
 
+      if (res.status === 403) { this._showAccessDenied(); return; }
+
       if (res.status === 400) {
         const errors = await res.json();
         const errUsername = document.getElementById('errUsername');
@@ -503,8 +535,246 @@ const AccountsAdmin = {
     }
   },
 
-  _openEditModal(id) {
-    alert(`사용자 수정 모달 (id: ${id}) — 추후 구현 예정`);
+  // ── 사용자 수정 모달 ──────────────────────────────────────
+
+  async _openEditModal(id) {
+    this._resetEditForm();
+    document.getElementById('editUserModal').style.display = 'flex';
+    document.getElementById('btnEditSubmit').disabled = true;
+
+    try {
+      const token = Auth.getAccessToken();
+      const res = await fetch(`/api/admin/accounts/${id}/`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const user = await res.json();
+      document.getElementById('editUserId').value = user.id;
+      document.getElementById('editName').value = user.name || '';
+      document.getElementById('editUsername').value = user.username || '';
+      document.getElementById('editEmail').value = user.email || '';
+      document.getElementById('editPhone').value = user.phone ? this._formatPhone(user.phone) : '';
+      document.getElementById('editDepartment').value = user.department_id || '';
+      document.getElementById('editPosition').value = user.position_id || '';
+      document.getElementById('editStatus').value = user.status || '';
+      document.getElementById('btnEditSubmit').disabled = false;
+    } catch (e) {
+      console.error('[AccountsAdmin] 사용자 정보 로드 실패:', e);
+      alert('사용자 정보를 불러오지 못했습니다.');
+      this._closeEditModal();
+    }
+  },
+
+  _closeEditModal() {
+    document.getElementById('editUserModal').style.display = 'none';
+  },
+
+  _bindEditModal() {
+    document.getElementById('btnEditClose').addEventListener('click', () => this._closeEditModal());
+    document.getElementById('btnEditCancel').addEventListener('click', () => this._closeEditModal());
+    document.getElementById('btnEditSubmit').addEventListener('click', () => this._submitEditForm());
+    document.getElementById('btnPasswordReset').addEventListener('click', () => this._resetPassword());
+  },
+
+  _resetEditForm() {
+    ['editName', 'editUsername', 'editEmail', 'editPhone'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    ['editDepartment', 'editPosition', 'editStatus'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('editUserId').value = '';
+    document.querySelectorAll('#editUserModal .field-error').forEach(el => {
+      el.textContent = '';
+      el.classList.remove('visible');
+    });
+    document.querySelectorAll('#editUserModal .is-error').forEach(el => {
+      el.classList.remove('is-error');
+    });
+    const resetBtn = document.getElementById('btnPasswordReset');
+    resetBtn.textContent = '비밀번호 초기화';
+    resetBtn.disabled = false;
+  },
+
+  _validateEditForm() {
+    let valid = true;
+
+    const setError = (fieldId, errId, msg) => {
+      const field = document.getElementById(fieldId);
+      const err = document.getElementById(errId);
+      if (msg) {
+        field.classList.add('is-error');
+        err.textContent = msg;
+        err.classList.add('visible');
+        valid = false;
+      } else {
+        field.classList.remove('is-error');
+        err.textContent = '';
+        err.classList.remove('visible');
+      }
+    };
+
+    // 사용자명
+    const nameTrimmed = document.getElementById('editName').value.trim();
+    if (!nameTrimmed) {
+      setError('editName', 'editErrName', '사용자명을 입력해 주세요.');
+    } else if (nameTrimmed.length < 2) {
+      setError('editName', 'editErrName', '사용자명을 2자 이상 입력해 주세요.');
+    } else if (nameTrimmed.length > 20) {
+      setError('editName', 'editErrName', '사용자명은 20자 이하로 입력해 주세요.');
+    } else if (!/^[가-힣a-zA-Z0-9]+$/.test(nameTrimmed)) {
+      setError('editName', 'editErrName', '사용자명은 한글, 영문, 숫자만 입력할 수 있습니다.');
+    } else {
+      setError('editName', 'editErrName', null);
+    }
+
+    // 소속
+    if (!document.getElementById('editDepartment').value) {
+      setError('editDepartment', 'editErrDepartment', '소속을 선택해 주세요.');
+    } else {
+      setError('editDepartment', 'editErrDepartment', null);
+    }
+
+    // 계정 상태
+    if (!document.getElementById('editStatus').value) {
+      setError('editStatus', 'editErrStatus', '계정 상태를 선택해 주세요.');
+    } else {
+      setError('editStatus', 'editErrStatus', null);
+    }
+
+    // 이메일 (입력 시에만 형식 검증)
+    const email = document.getElementById('editEmail').value.trim();
+    if (email) {
+      if (email.length > 100) {
+        setError('editEmail', 'editErrEmail', '이메일은 100자 이하로 입력해 주세요.');
+      } else if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email)) {
+        setError('editEmail', 'editErrEmail', '이메일 형식이 올바르지 않습니다.');
+      } else {
+        setError('editEmail', 'editErrEmail', null);
+      }
+    } else {
+      setError('editEmail', 'editErrEmail', null);
+    }
+
+    // 연락처 (입력 시에만 형식 검증)
+    const phone = document.getElementById('editPhone').value.trim();
+    if (phone) {
+      if (/[^0-9\-]/.test(phone)) {
+        setError('editPhone', 'editErrPhone', '연락처는 숫자만 입력할 수 있습니다.');
+      } else {
+        const digits = phone.replace(/-/g, '');
+        if (digits.length !== 10 && digits.length !== 11) {
+          setError('editPhone', 'editErrPhone', '연락처를 정확히 입력해 주세요.');
+        } else if (!/^0\d{1,2}-?\d{3,4}-?\d{4}$/.test(phone)) {
+          setError('editPhone', 'editErrPhone', '연락처 형식이 올바르지 않습니다.');
+        } else {
+          setError('editPhone', 'editErrPhone', null);
+        }
+      }
+    } else {
+      setError('editPhone', 'editErrPhone', null);
+    }
+
+    return valid;
+  },
+
+  async _submitEditForm() {
+    if (!this._validateEditForm()) return;
+
+    const id = document.getElementById('editUserId').value;
+    const payload = {
+      name: document.getElementById('editName').value.trim(),
+      department: parseInt(document.getElementById('editDepartment').value),
+      status: document.getElementById('editStatus').value,
+    };
+
+    const position = document.getElementById('editPosition').value;
+    if (position) payload.position = parseInt(position);
+
+    const email = document.getElementById('editEmail').value.trim();
+    if (email) payload.email = email;
+
+    const phone = document.getElementById('editPhone').value.trim();
+    if (phone) payload.phone = phone.replace(/-/g, '');
+
+    const token = Auth.getAccessToken();
+    const submitBtn = document.getElementById('btnEditSubmit');
+    submitBtn.disabled = true;
+
+    try {
+      const res = await fetch(`/api/admin/accounts/${id}/`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        this._closeEditModal();
+        await this.fetchList();
+        return;
+      }
+
+      if (res.status === 403) { this._showAccessDenied(); return; }
+
+      if (res.status === 400) {
+        const errors = await res.json();
+        if (errors.name) {
+          const el = document.getElementById('editErrName');
+          document.getElementById('editName').classList.add('is-error');
+          el.textContent = Array.isArray(errors.name) ? errors.name[0] : errors.name;
+          el.classList.add('visible');
+        }
+        return;
+      }
+
+      throw new Error(`HTTP ${res.status}`);
+    } catch (e) {
+      console.error('[AccountsAdmin] 사용자 수정 실패:', e);
+      alert('사용자 정보 수정에 실패했습니다. 다시 시도해 주세요.');
+    } finally {
+      submitBtn.disabled = false;
+    }
+  },
+
+  async _resetPassword() {
+    const id = document.getElementById('editUserId').value;
+    if (!confirm('비밀번호를 초기화하시겠습니까?\n초기화 비밀번호: 테스트123!')) return;
+
+    const token = Auth.getAccessToken();
+    const resetBtn = document.getElementById('btnPasswordReset');
+    resetBtn.disabled = true;
+
+    try {
+      const res = await fetch(`/api/admin/accounts/${id}/`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ password: 'xptmxm123!' }),
+      });
+
+      if (res.ok) {
+        resetBtn.textContent = '초기화 완료';
+        setTimeout(() => {
+          resetBtn.textContent = '비밀번호 초기화';
+          resetBtn.disabled = false;
+        }, 2000);
+      } else if (res.status === 403) {
+        this._showAccessDenied();
+      } else {
+        alert('비밀번호 초기화에 실패했습니다.');
+        resetBtn.disabled = false;
+      }
+    } catch (e) {
+      console.error('[AccountsAdmin] 비밀번호 초기화 실패:', e);
+      alert('비밀번호 초기화에 실패했습니다.');
+      resetBtn.disabled = false;
+    }
   },
 };
 

@@ -125,6 +125,55 @@
 
 .required { color: #f85149; }
 
+/* ── 그리드 전체 너비 스팬 ──────────────────────────────────── */
+
+.col-span-2 { grid-column: 1 / -1; }
+
+/* ── 비밀번호 초기화 행 ─────────────────────────────────────── */
+
+.password-reset-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.password-reset-row input {
+    flex: 1;
+}
+
+.btn-outline-sm {
+    background: none;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    color: #8b949e;
+    padding: 7px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color 0.15s, color 0.15s;
+    flex-shrink: 0;
+}
+
+.btn-outline-sm:hover {
+    border-color: #388bfd;
+    color: #388bfd;
+}
+
+.btn-outline-sm:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+/* ── read-only 필드 ─────────────────────────────────────── */
+
+.form-field input:disabled,
+.form-field input[readonly] {
+    background: #0d1117;
+    color: #484f58;
+    cursor: default;
+    border-color: #21262d;
+}
+
 /* ── 모달 푸터 ───────────────────────────────────────────── */
 
 .modal-footer {
