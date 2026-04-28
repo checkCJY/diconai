@@ -139,3 +139,29 @@ class SafetyStatus(models.Model):
                 fields=["check_item", "is_checked"], name="idx_safety_item_checked"
             ),
         ]
+
+
+# ──────────────────────────────────────────────────────────
+# [4차 예정] DailySafetyRecord — 나중에 모델 변경 시 사용할 예정
+# SafetyStatus UNIQUE(worker, check_item) 제약 해소 후 일별 이력 추적에 활용
+# ──────────────────────────────────────────────────────────
+# class DailySafetyRecord(models.Model):
+#     worker = models.ForeignKey(
+#         settings.AUTH_USER_MODEL,
+#         on_delete=models.SET_NULL,
+#         null=True,
+#         blank=True,
+#         related_name="daily_safety_records",
+#     )
+#     date = models.DateField(verbose_name="확인 날짜")
+#     checklist_done = models.BooleanField(default=False, verbose_name="체크리스트 완료")
+#     vr_done = models.BooleanField(default=False, verbose_name="VR 교육 완료")
+#     created_at = models.DateTimeField(auto_now_add=True)
+#     updated_at = models.DateTimeField(auto_now=True)
+#
+#     class Meta:
+#         db_table = "daily_safety_record"
+#         unique_together = [("worker", "date")]
+#         indexes = [
+#             models.Index(fields=["worker", "-date"], name="idx_dsr_worker_date"),
+#         ]

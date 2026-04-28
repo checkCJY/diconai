@@ -1,0 +1,160 @@
+/* ==========================================================
+   safety_history.css — 안전 확인 이력 (월간 캘린더)
+   ========================================================== */
+
+/* ── 페이지 레이아웃 ── */
+.history-page { padding: 20px 24px; box-sizing: border-box; }
+.page-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; }
+.page-title .title-date { font-size: 13px; font-weight: 400; color: var(--text2); margin-left: 12px; }
+
+/* ── 탭 ── */
+.history-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+.history-tab { padding: 9px 20px; font-size: 13px; font-weight: 500; color: var(--text2); cursor: pointer; border: 1px solid transparent; border-bottom: none; border-radius: 6px 6px 0 0; margin-bottom: -1px; background: none; font-family: inherit; transition: color .15s; }
+.history-tab:hover { color: var(--text); }
+.history-tab.active { color: var(--text); background: var(--bg2); border-color: var(--border); border-bottom-color: var(--bg2); }
+
+/* ── 컨트롤 바 (월 이동 + 버튼) ── */
+.history-controls { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.month-nav { display: flex; align-items: center; gap: 12px; }
+.month-nav-btn { background: var(--bg3); border: 1px solid var(--border); color: var(--text); width: 28px; height: 28px; border-radius: 4px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px; transition: background .15s; }
+.month-nav-btn:hover { background: var(--bg2); border-color: var(--text2); }
+.month-label { font-size: 14px; font-weight: 600; min-width: 90px; text-align: center; }
+.history-actions { display: flex; gap: 8px; }
+.btn-download, .btn-print { display: flex; align-items: center; gap: 6px; background: var(--bg3); border: 1px solid var(--border); color: var(--text2); padding: 6px 14px; border-radius: 5px; font-size: 12px; font-family: inherit; cursor: pointer; transition: color .15s, border-color .15s; }
+.btn-download:hover, .btn-print:hover { color: var(--text); border-color: var(--text2); }
+
+/* ── 캘린더 패널 ── */
+.calendar-panel { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+
+/* ── 요일 헤더 ── */
+.cal-header { display: grid; grid-template-columns: repeat(7, 1fr); border-bottom: 1px solid var(--border); }
+.cal-dow { padding: 8px 0; text-align: center; font-size: 11px; font-weight: 600; color: var(--text2); }
+.cal-dow.sun { color: #f85149; }
+.cal-dow.sat { color: var(--blue); }
+
+/* ── 날짜 그리드 ── */
+.cal-body { display: grid; grid-template-columns: repeat(7, 1fr); }
+.cal-cell { min-height: 90px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 6px 7px; box-sizing: border-box; vertical-align: top; }
+.cal-cell:nth-child(7n) { border-right: none; }
+.cal-cell.other-month { opacity: .35; }
+.cal-cell.today .cal-day-num { background: var(--blue); color: #fff; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; }
+
+/* ── 날짜 숫자 ── */
+.cal-day-num { font-size: 12px; font-weight: 600; margin-bottom: 5px; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; }
+.cal-cell.sun .cal-day-num { color: #f85149; }
+.cal-cell.sat .cal-day-num { color: var(--blue); }
+
+/* ── 지표 행 ── */
+.cal-indicators { display: flex; flex-direction: column; gap: 3px; }
+.cal-indicator { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--text2); white-space: nowrap; }
+.cal-indicator .ic { font-size: 11px; font-weight: 700; flex-shrink: 0; }
+.ic-done { color: var(--safe); }
+.ic-undone { color: var(--danger); }
+.ic-na { color: var(--text2); opacity: .5; }
+
+/* ── 범례 ── */
+.cal-legend { display: flex; justify-content: flex-end; align-items: center; gap: 16px; padding: 10px 14px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text2); }
+.legend-item { display: flex; align-items: center; gap: 4px; }
+.legend-icon-done { color: var(--safe); font-weight: 700; }
+.legend-icon-undone { color: var(--danger); font-weight: 700; }
+
+/* ── 빈 탭 안내 ── */
+.tab-placeholder { padding: 48px; text-align: center; color: var(--text2); font-size: 13px; }
+
+/* ── 나의 안전 확인 — 작업자 이름 표시 ── */
+.my-worker-label { font-size: 13px; font-weight: 600; color: var(--text2); margin-bottom: 10px; }
+.my-worker-label span { color: var(--text); }
+
+/* ── 전체 이력 현황 — 2열 레이아웃 ── */
+.all-history-layout { display: flex; gap: 14px; height: calc(100vh - 190px); min-height: 500px; }
+
+/* 좌측: 작업자 리스트 패널 */
+.worker-list-panel { width: 340px; flex-shrink: 0; display: flex; flex-direction: column; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.wlp-header { padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 600; }
+.wlp-filters { display: flex; gap: 7px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.wlp-select { flex: 1; background: var(--bg3); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 11px; padding: 5px 8px; font-family: inherit; }
+.wlp-search-wrap { flex: 1; display: flex; align-items: center; gap: 5px; background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; padding: 0 8px; }
+.wlp-search-wrap input { background: none; border: none; outline: none; color: var(--text); font-size: 11px; font-family: inherit; width: 100%; padding: 5px 0; }
+.wlp-search-wrap svg { color: var(--text2); flex-shrink: 0; }
+
+/* 작업자 테이블 */
+.wlp-table-wrap { flex: 1; overflow-y: auto; }
+.wlp-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.wlp-table th { position: sticky; top: 0; background: var(--bg3); padding: 7px 10px; text-align: left; color: var(--text2); font-weight: 600; border-bottom: 1px solid var(--border); }
+.wlp-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); color: var(--text2); }
+.wlp-table tr:last-child td { border-bottom: none; }
+.wlp-table tr.worker-row { cursor: pointer; }
+.wlp-table tr.worker-row:hover td { background: var(--bg3); color: var(--text); }
+.wlp-table tr.worker-row.selected td { background: rgba(88,166,255,.08); color: var(--text); }
+.wlp-table tr.worker-row.selected { outline: 1px solid var(--blue); }
+.wlp-cb { width: 14px; height: 14px; accent-color: var(--blue); cursor: pointer; }
+.badge-present  { color: var(--safe);   font-weight: 600; }
+.badge-absent   { color: var(--text2);  }
+
+/* 하단 컨트롤 */
+.wlp-footer { padding: 10px 14px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+.wlp-footer .btn-download,
+.wlp-footer .btn-print { opacity: .4; pointer-events: none; }
+.wlp-footer .btn-download.active,
+.wlp-footer .btn-print.active { opacity: 1; pointer-events: auto; }
+
+/* 우측: 캘린더 상세 패널 */
+.worker-detail-panel { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.wdp-title { font-size: 13px; font-weight: 600; margin-bottom: 10px; color: var(--text2); min-height: 20px; }
+.wdp-title span { color: var(--text); }
+.wdp-controls { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+
+/* 빈 상태 — 캘린더 바디 중앙 안내 */
+.cal-body-all { min-height: 300px; }
+.cal-no-selection {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; font-weight: 600; color: var(--text2);
+  line-height: 1.7; text-align: center;
+  padding: 60px 0;
+}
+
+/* ── 인쇄 스타일 ── */
+@media print {
+  /* 캘린더 외 모든 요소 숨김 */
+  body > *:not(.body-wrap) { display: none !important; }
+  .body-wrap { padding: 0 !important; margin: 0 !important; }
+  .history-page { padding: 0 !important; }
+  .page-title,
+  .history-tabs,
+  .history-controls,
+  .wdp-controls,
+  .my-worker-label,
+  .worker-list-panel,
+  .wdp-title,
+  .wdp-empty,
+  .tab-placeholder,
+  .history-actions { display: none !important; }
+
+  /* 인쇄 탭 선택: my → 나의 캘린더만, all → 전체 이력 캘린더만 */
+  body[data-print-tab="my"]  #tabAllHistory { display: none !important; }
+  body[data-print-tab="my"]  #tabMyHistory  { display: block !important; }
+  body[data-print-tab="all"] #tabMyHistory  { display: none !important; }
+  body[data-print-tab="all"] #tabAllHistory { display: block !important; }
+
+  /* 전체 이력 탭 캘린더 영역 레이아웃 정리 */
+  .all-history-layout { display: block !important; }
+  .worker-detail-panel { display: block !important; width: 100% !important; }
+  #wdpContent { display: block !important; }
+  #tabAllHistory #wdpEmpty { display: none !important; }
+
+  /* 인쇄용 캘린더 스타일 */
+  .calendar-panel { border: 1px solid #ccc !important; page-break-inside: avoid; }
+  .cal-cell { min-height: 80px; background: #fff !important; }
+  .cal-header { background: #f5f5f5 !important; }
+  body, .cal-indicator, .cal-day-num, .cal-dow, .cal-legend { color: #000 !important; background: #fff !important; }
+  .cal-dow.sun, .cal-cell.sun .cal-day-num { color: #cc0000 !important; }
+  .cal-dow.sat, .cal-cell.sat .cal-day-num { color: #1a6fc4 !important; }
+  .ic-done   { color: #2a9d2a !important; }
+  .ic-undone { color: #cc0000 !important; }
+  .ic-na     { color: #999 !important; }
+  .cal-cell.today .cal-day-num { background: #1a6fc4 !important; color: #fff !important; }
+  .cal-legend { border-top: 1px solid #ccc !important; }
+  .legend-icon-done   { color: #2a9d2a !important; }
+  .legend-icon-undone { color: #cc0000 !important; }
+}
