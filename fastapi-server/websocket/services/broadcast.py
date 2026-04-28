@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from power.services.power_service import build_equipment
 from websocket.state import (
     active_alarms,
+    gas_latest,
     latest_gas_snapshot,
     power_latest,
     worker_positions,
@@ -46,6 +47,15 @@ def build_broadcast_payload() -> dict:
     data_stale = (data_age_sec is None) or (data_age_sec > DATA_STALE_SEC)
     equipment, total_kw = build_equipment() if not data_stale else ([], 0.0)
 
+    # 가스 데이터 stale 판단 (전력과 동일 기준)
+    gas_updated_at = gas_latest.get("updated_at")
+    if gas_updated_at is not None:
+        gas_last_dt = datetime.fromisoformat(gas_updated_at).replace(tzinfo=timezone.utc)
+        gas_age_sec = (datetime.now(timezone.utc) - gas_last_dt).total_seconds()
+    else:
+        gas_age_sec = None
+    gas_stale = (gas_age_sec is None) or (gas_age_sec > DATA_STALE_SEC)
+
     if not equipment:
         total_power_kw = round(1200 + random.uniform(-50, 100))
         power_change_pct = 0.0
@@ -72,13 +82,14 @@ def build_broadcast_payload() -> dict:
         "power_change_pct": power_change_pct,
         "equipment": equipment,
         "power_loading": len(equipment) == 0,
+        "gas_loading": gas_stale,
         "ai_power_equipment": ai_power_equipment,
         "ai_eta_min": ai_eta_min,
         "ai_max_load_kw": ai_max_load_kw,
         "ai_max_load_pct": ai_max_load_pct,
         "worker_positions": dict(worker_positions),
         "alarms": list(active_alarms),
-        **latest_gas_snapshot,
+        **(latest_gas_snapshot if not gas_stale else {}),
     }
     active_alarms.clear()
     return payload

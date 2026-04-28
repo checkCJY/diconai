@@ -11,6 +11,9 @@ active_alarms: list[dict] = []
 # 최신 가스 측정 스냅샷 — gas_service가 갱신, broadcast가 페이로드에 spread
 latest_gas_snapshot: dict = {}
 
+# 가스 스냅샷 최종 갱신 시각 — broadcast의 stale 판단에 사용
+gas_latest: dict = {"updated_at": None}
+
 # 전력 최신값 — power_service가 갱신, broadcast가 equipment[] 조립에 사용
 power_latest: dict = {
     "onoff": {},
