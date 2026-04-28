@@ -1,0 +1,363 @@
+/* ── 실시간 모니터링 상세 페이지 전용 스타일 ── */
+
+/* ── 전체 페이지 레이아웃 ── */
+.rt-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+}
+
+/* ── 페이지 헤더 ── */
+.rt-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px 8px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+}
+.rt-page-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.rt-back {
+  color: var(--text2);
+  text-decoration: none;
+  font-size: 16px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+.rt-back:hover { background: var(--bg3); }
+.rt-page-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+}
+.rt-page-desc {
+  font-size: 11px;
+  color: var(--text2);
+  margin-top: 2px;
+}
+
+/* ── 탭바 ── */
+.rt-tabbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 16px;
+  flex-shrink: 0;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  gap: 8px;
+}
+.rt-tabs {
+  display: flex;
+  gap: 4px;
+}
+.rt-tab-actions {
+  display: flex;
+  gap: 4px;
+}
+.rt-action-btn {
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  color: var(--text2);
+  font-size: 11px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.rt-action-btn:hover {
+  background: var(--bg2);
+  color: var(--text);
+  border-color: var(--blue);
+}
+
+/* ── 맵 컨테이너 (오버레이 기준점) ── */
+.rt-map-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+  background: #1a2332;
+}
+#map {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  background: #1c2128;
+}
+
+/* ── 공통 오버레이 패널 ── */
+.rt-overlay {
+  position: absolute;
+  background: rgba(22, 27, 34, 0.92);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  z-index: 500;
+  backdrop-filter: blur(4px);
+  font-size: 11px;
+  color: var(--text);
+  min-width: 160px;
+}
+
+/* ── 좌측 오버레이 ── */
+.rt-left {
+  top: 12px;
+  left: 12px;
+  width: 190px;
+}
+
+/* ── 우측 오버레이 ── */
+.rt-right {
+  top: 12px;
+  right: 12px;
+  width: 240px;
+}
+
+/* ── 좌하단 오버레이 ── */
+.rt-bottom-left {
+  bottom: 12px;
+  left: 12px;
+  width: 240px;
+}
+
+/* ── 우하단 오버레이 ── */
+.rt-bottom-right {
+  bottom: 12px;
+  right: 12px;
+  width: 220px;
+}
+
+/* ── 오버레이 내부 공통 ── */
+.rt-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+.rt-section-sub {
+  font-size: 10px;
+  color: var(--text2);
+  margin-bottom: 8px;
+}
+.rt-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 10px 0;
+}
+
+/* ── 지도 제어: 드롭다운/버튼 ── */
+.rt-control-row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.rt-select {
+  flex: 1;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.rt-focus-btn {
+  flex: 1;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.rt-icon-btn {
+  width: 28px;
+  height: 28px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 4px;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+}
+
+/* ── 레이어 토글 ── */
+.rt-layer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rt-layer-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.rt-layer-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.rt-layer-name {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text2);
+}
+.rt-toggle {
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: none;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  min-width: 34px;
+}
+.rt-toggle.on {
+  background: #0d3822;
+  color: #3fb950;
+}
+.rt-toggle.off {
+  background: #30363d;
+  color: var(--text2);
+}
+
+/* ── AI 예측 타임라인 ── */
+.rt-timeline-wrap {
+  margin-bottom: 8px;
+}
+.rt-timeline-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--text2);
+  margin-bottom: 4px;
+}
+.rt-timeline-bar {
+  margin-bottom: 4px;
+}
+.rt-timeline-track {
+  position: relative;
+  height: 6px;
+  background: var(--bg3);
+  border-radius: 3px;
+  margin-bottom: 4px;
+}
+.rt-timeline-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 50%;
+  background: linear-gradient(90deg, var(--accent), var(--caution));
+  border-radius: 3px;
+}
+.rt-timeline-thumb {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 14px;
+  height: 14px;
+  background: var(--caution);
+  border: 2px solid #fff;
+  border-radius: 50%;
+}
+.rt-timeline-ticks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--text2);
+}
+.rt-timeline-badge {
+  display: inline-block;
+  background: var(--caution);
+  color: #0d1117;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-top: 4px;
+}
+.rt-ai-notice {
+  font-size: 10px;
+  color: var(--text2);
+  background: var(--bg3);
+  border-radius: 4px;
+  padding: 6px 8px;
+  line-height: 1.6;
+}
+
+/* ── 실시간 이벤트 ── */
+.rt-event-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+.rt-event-list::-webkit-scrollbar { width: 3px; }
+.rt-event-list::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
+
+.rt-event-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(48,54,61,0.5);
+}
+.rt-event-item:last-child { border-bottom: none; }
+.rt-event-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.rt-event-item.danger .rt-event-dot  { background: var(--danger); }
+.rt-event-item.caution .rt-event-dot { background: var(--caution); }
+.rt-event-item.safe .rt-event-dot    { background: var(--safe); }
+.rt-event-item.danger  { color: var(--danger); }
+.rt-event-item.caution { color: var(--caution); }
+.rt-event-item.safe    { color: var(--safe); }
+
+/* ── 지도 범례 ── */
+.rt-legend-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+  margin-top: 6px;
+}
+.rt-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--text2);
+}
+.rt-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}

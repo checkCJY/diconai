@@ -13,7 +13,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 
 
 class GeoFenceAdminPageView(LoginRequiredMixin, TemplateView):
-    template_name = "admin/geofence/geofence_list.html"
+    template_name = "admin_panel/geofence/geofence_list.html"
     extra_context = {"active_nav": "geofence"}
 
 

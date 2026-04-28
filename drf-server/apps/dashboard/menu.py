@@ -6,9 +6,14 @@ import copy
 _MENU_WORKER = [
     {
         "id": "safety",
-        "label": "나의 안전확인",
+        "label": "나의 정보 확인",
         "icon": "shield",
         "children": [
+            {
+                "id": "SNB-01",
+                "label": "나의 프로필",
+                "path": "/dashboard/profile/",
+            },
             {
                 "id": "SNB-02",
                 "label": "작업 전 안전 확인",

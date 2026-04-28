@@ -16,6 +16,10 @@ def main_dashboard(request):
     return render(request, "dashboard/main.html")
 
 
+def my_profile_page(request):
+    return render(request, "snb_details/my_profile.html")
+
+
 def safety_checklist_page(request):
     return render(request, "snb_details/safety_checklist.html")
 

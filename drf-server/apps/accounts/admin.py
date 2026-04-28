@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from apps.accounts.models import CustomUser, LoginLog
+from apps.accounts.models import CustomUser, Department, LoginLog, Position
 
 
 @admin.register(CustomUser)
@@ -22,7 +22,10 @@ class CustomUserAdmin(UserAdmin):
             "추가 정보",
             {
                 "fields": (
+                    "name",
                     "user_type",
+                    "department",
+                    "position",
                     "facility",
                     "phone",
                     "failed_login_count",
@@ -32,6 +35,34 @@ class CustomUserAdmin(UserAdmin):
             },
         ),
     )
+    add_fieldsets = UserAdmin.add_fieldsets + (
+        (
+            "추가 정보",
+            {
+                "fields": (
+                    "name",
+                    "email",
+                    "user_type",
+                    "department",
+                    "position",
+                    "facility",
+                    "phone",
+                )
+            },
+        ),
+    )
+
+
+@admin.register(Department)
+class DepartmentAdmin(admin.ModelAdmin):
+    list_display = ("name", "code", "is_active")
+    ordering = ("code",)
+
+
+@admin.register(Position)
+class PositionAdmin(admin.ModelAdmin):
+    list_display = ("name", "level", "category", "is_active")
+    ordering = ("level",)
 
 
 @admin.register(LoginLog)

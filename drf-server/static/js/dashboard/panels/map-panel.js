@@ -180,11 +180,12 @@ _geofences: [],
     };
 
     await this._drawAll();
+    this.setMarkersDisconnected();
     this._initTabFilter();
     this._startWorkerAnimation();
 
     const role = Auth.getRole();
-    if (role === 'admin') {
+    if (role === 'super_admin' || role === 'facility_admin') {
       document.getElementById('geofence-toolbar').style.display = 'flex';
       this._initDrawing();
     }
@@ -234,21 +235,26 @@ _geofences: [],
       this._geofences = geofences;
       this.layers.geofence.clearLayers();
 
+      const role    = Auth.getRole();
+      const isAdmin = role === 'super_admin' || role === 'facility_admin';
+
       geofences.forEach(g => {
         const latlngs = g.polygon.map(([x, y]) => [y, x]);
         const color   = this.ZONE_COLOR[g.risk_level] || '#888';
         const layer   = L.polygon(latlngs, {
           color, fillColor: color, fillOpacity: 0.15, weight: 2
         });
-        const popupContent = `
-          <div class='popup-title'>🚧 ${g.name}</div>
-          <div>위험도: ${g.risk_level}</div>
-          <div>${g.description || ''}</div>
+        const deleteBtn = isAdmin ? `
           <button
             onclick="MapPanel.deleteGeofence(${g.id})"
             style="margin-top:8px; background:#f85149; color:#fff; border:none; border-radius:4px; padding:4px 10px; cursor:pointer; font-size:12px;">
             🗑️ 삭제
-          </button>
+          </button>` : '';
+        const popupContent = `
+          <div class='popup-title'>🚧 ${g.name}</div>
+          <div>위험도: ${g.risk_level}</div>
+          <div>${g.description || ''}</div>
+          ${deleteBtn}
         `;
         layer.bindPopup(popupContent, { maxWidth: 220 }).addTo(this.layers.geofence);
       });
@@ -304,8 +310,8 @@ _geofences: [],
     });
 
     btnDone.addEventListener('click', () => {
-      if (this.drawPoints.length < 3) {
-        alert('최소 3개 이상의 점을 찍어주세요.');
+      if (this.drawPoints.length < 4) {
+        alert('최소 4개 이상의 점을 찍어주세요 (사각형 이상).');
         return;
       }
       document.getElementById('geofence-modal').style.display = 'flex';
@@ -332,7 +338,7 @@ _geofences: [],
         color: '#1f6feb', weight: 2, dashArray: '5 5'
       }).addTo(this.map);
 
-      if (this.drawPoints.length >= 3) {
+      if (this.drawPoints.length >= 4) {
         if (this.drawPolygon) this.map.removeLayer(this.drawPolygon);
         this.drawPolygon = L.polygon(latlngs, {
           color: '#1f6feb', fillColor: '#1f6feb', fillOpacity: 0.1, weight: 2
@@ -425,6 +431,18 @@ _geofences: [],
   },
 
   _startWorkerAnimation() {},
+
+  // 통신 장애 시 모든 작업자·가스 마커를 반투명으로 전환한다.
+  setMarkersDisconnected() {
+    Object.values(this.workerMarkers).forEach(({ marker }) => marker.setOpacity(0.5));
+    Object.values(this.gasMarkers).forEach(({ marker }) => marker.setOpacity(0.5));
+  },
+
+  // 연결 복구 시 마커 투명도를 원래대로 복원한다.
+  setMarkersConnected() {
+    Object.values(this.workerMarkers).forEach(({ marker }) => marker.setOpacity(1));
+    Object.values(this.gasMarkers).forEach(({ marker }) => marker.setOpacity(1));
+  },
 
   updateGasSensorFromWS(wsData) {
     const entry = this.gasMarkers['sensor_01'];

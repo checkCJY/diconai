@@ -32,11 +32,33 @@ class CustomUser(AbstractUser):
         regex=r"^\+?1?\d{9,15}$", message="전화번호 형식이 올바르지 않습니다."
     )
 
+    name = models.CharField(
+        max_length=30,
+        blank=True,
+        default="",
+        verbose_name="실명",
+    )
     user_type = models.CharField(
         max_length=20,
         choices=UserType.choices,
         default=UserType.WORKER,
         verbose_name="사용자 유형",
+    )
+    department = models.ForeignKey(
+        "accounts.Department",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="users",
+        verbose_name="소속 부서",
+    )
+    position = models.ForeignKey(
+        "accounts.Position",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="users",
+        verbose_name="직급",
     )
     facility = models.ForeignKey(
         "facilities.Facility",

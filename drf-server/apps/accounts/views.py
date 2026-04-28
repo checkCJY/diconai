@@ -7,7 +7,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models.login_log import LoginLog
-from .serializers import LoginSerializer
+from .serializers import LoginSerializer, MyProfileSerializer, PasswordChangeSerializer
 from apps.dashboard.menu import get_menu_tree
 
 
@@ -113,6 +113,38 @@ class MeView(APIView):
                 settings, "ADMIN_BACKOFFICE_URL", "/admin-panel/accounts-management/"
             )
         return Response(data)
+
+
+# ──────────────────────────────────────────────────────────
+# GET /api/auth/profile/
+# ──────────────────────────────────────────────────────────
+class MyProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = (
+            get_user_model()
+            .objects.select_related("department", "position", "facility")
+            .get(pk=request.user.pk)
+        )
+        return Response(MyProfileSerializer(user).data)
+
+
+# ──────────────────────────────────────────────────────────
+# POST /api/auth/password/change/
+# ──────────────────────────────────────────────────────────
+class PasswordChangeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = PasswordChangeSerializer(
+            data=request.data, context={"request": request}
+        )
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        request.user.set_password(serializer.validated_data["new_password"])
+        request.user.save(update_fields=["password", "updated_at"])
+        return Response({"ok": True})
 
 
 # ──────────────────────────────────────────────────────────
