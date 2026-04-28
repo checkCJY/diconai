@@ -52,14 +52,14 @@ class UserType(models.TextChoices):
     사용자 유형 — accounts.CustomUser 전용
 
     - SUPER_ADMIN    : 전체 공장 관리 (facility=NULL 허용)
-    - FACILITY_ADMIN : 소속 공장만 관리
-    - WORKER         : 현장 작업자
-    - VIEWER         : 읽기 전용 (감사)
+    - FACILITY_ADMIN : 소속 공장 관리자
+    - WORKER         : 내부 직원 (백오피스·현장)
+    - VIEWER         : 열람 전용 — 외부 방문자 (견학객, 파견 점검자 등)
     """
 
     SUPER_ADMIN = "super_admin", "슈퍼관리자"
-    FACILITY_ADMIN = "facility_admin", "공장관리자"
-    WORKER = "worker", "작업자"
+    FACILITY_ADMIN = "facility_admin", "관리자"
+    WORKER = "worker", "일반사용자"
     VIEWER = "viewer", "열람자"
 
 

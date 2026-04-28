@@ -42,3 +42,4 @@ class GasDataCreateSerializer(serializers.ModelSerializer):
         gas_data._alarms = trigger_gas_alarms(gas_data)
 
         return gas_data
+    

@@ -57,10 +57,29 @@
 <!-- ───────────────── 로그아웃 확인 팝업 ────────── -->
 <div id="logoutModal" class="modal-backdrop" style="display:none;">
   <div class="modal-box">
-    <p class="modal-msg">로그아웃 하시겠습니까?</p>
+    <div class="modal-icon modal-icon--warn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="4" x2="12" y2="15"/>
+        <circle cx="12" cy="19.5" r="0.8" fill="currentColor" stroke="none"/>
+      </svg>
+    </div>
+    <p class="modal-msg-lg">로그아웃 하시겠습니까?</p>
     <div class="modal-btns">
       <button id="logoutConfirm" class="modal-btn-ok">로그아웃</button>
       <button id="logoutCancel"  class="modal-btn-cancel">취소</button>
     </div>
+  </div>
+</div>
+
+<!-- ───────────────── 로그아웃 완료 팝업 ────────── -->
+<div id="logoutSuccessModal" class="modal-backdrop" style="display:none;">
+  <div class="modal-box">
+    <div class="modal-icon modal-icon--success">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="4 13 9 18 20 7"/>
+      </svg>
+    </div>
+    <p class="modal-msg-lg">로그아웃 되었습니다.</p>
+    <button id="logoutSuccessOk" class="modal-btn-blue">확 인</button>
   </div>
 </div>

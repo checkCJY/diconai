@@ -16,6 +16,10 @@ def main_dashboard(request):
     return render(request, "dashboard/main.html")
 
 
+def my_profile_page(request):
+    return render(request, "snb_details/my_profile.html")
+
+
 def safety_checklist_page(request):
     return render(request, "snb_details/safety_checklist.html")
 
@@ -46,6 +50,10 @@ def monitoring_workers_page(request):
 
 def monitoring_events_page(request):
     return render(request, "snb_details/monitoring_events.html")
+
+
+def monitoring_event_detail_page(request, event_id):
+    return render(request, "snb_details/event_detail.html", {"event_id": event_id})
 
 
 # ──────────────────────────────────────────────────────────

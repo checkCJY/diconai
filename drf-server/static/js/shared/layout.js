@@ -170,10 +170,12 @@ const Header = {
   handleAdmin() { window.location.href = this.adminUrl || '/admin-panel/accounts-management/'; },
 
   initLogout() {
-    const modal         = document.getElementById('logoutModal');
-    const btnLogout     = document.getElementById('btnLogout');
-    const logoutConfirm = document.getElementById('logoutConfirm');
-    const logoutCancel  = document.getElementById('logoutCancel');
+    const modal           = document.getElementById('logoutModal');
+    const successModal    = document.getElementById('logoutSuccessModal');
+    const btnLogout       = document.getElementById('btnLogout');
+    const logoutConfirm   = document.getElementById('logoutConfirm');
+    const logoutCancel    = document.getElementById('logoutCancel');
+    const logoutSuccessOk = document.getElementById('logoutSuccessOk');
 
     btnLogout    ?.addEventListener('click', () => { modal.style.display = 'flex'; });
     logoutCancel ?.addEventListener('click', () => { modal.style.display = 'none'; });
@@ -181,9 +183,11 @@ const Header = {
       try {
         await Auth.apiFetch('/api/auth/logout/', { method: 'POST' });
       } finally {
-        Auth.redirectLogin();
+        modal.style.display = 'none';
+        successModal.style.display = 'flex';
       }
     });
+    logoutSuccessOk?.addEventListener('click', () => { Auth.redirectLogin(); });
     // L-2: backdrop 클릭 시 팝업 닫기
     modal?.addEventListener('click', (e) => {
       if (e.target === modal) modal.style.display = 'none';

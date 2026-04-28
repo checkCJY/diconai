@@ -1,0 +1,272 @@
+/* event_monitoring.css — 이벤트 현황 / 이벤트 상세 */
+
+/* ── 목록 헤더 ── */
+.event-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(48,54,61,0.6);
+}
+
+.event-filter-tabs { display: flex; gap: 8px; }
+
+.filter-tab {
+  padding: 6px 16px;
+  border-radius: 6px;
+  border: 1px solid rgba(48,54,61,0.8);
+  background: transparent;
+  color: var(--text2);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.filter-tab.active {
+  background: rgba(56,139,253,0.15);
+  border-color: rgba(56,139,253,0.5);
+  color: #58a6ff;
+}
+
+.tab-count {
+  display: inline-block;
+  background: rgba(56,139,253,0.2);
+  border-radius: 10px;
+  padding: 1px 7px;
+  font-size: 11px;
+  margin-left: 4px;
+}
+
+/* ── 이벤트 테이블 ── */
+.event-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.event-table th {
+  background: rgba(48,54,61,0.5);
+  color: var(--text2);
+  font-weight: 500;
+  padding: 10px 14px;
+  text-align: left;
+}
+
+.event-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(48,54,61,0.4);
+  color: var(--text1);
+  cursor: pointer;
+}
+
+.event-table tr:hover td { background: rgba(48,54,61,0.3); }
+.event-table tr.resolved td { opacity: 0.5; }
+
+.empty-row { text-align: center; color: var(--text2); padding: 24px !important; }
+
+/* ── 상태 뱃지 ── */
+.status-badge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.status-badge.danger  { background: rgba(248,81,73,0.15);  color: var(--danger); }
+.status-badge.warning { background: rgba(227,179,65,0.15); color: var(--caution); }
+.status-badge.normal  { background: rgba(63,185,80,0.15);  color: var(--safe); }
+.status-badge.gray    { background: rgba(139,148,158,0.15); color: var(--text2); }
+.status-badge.blue    { background: rgba(56,139,253,0.15);  color: #58a6ff; }
+
+/* ── 상세 — 요약 카드 ── */
+.event-summary-card {
+  margin-bottom: 16px;
+}
+
+.summary-badges { display: flex; gap: 8px; margin-bottom: 8px; }
+
+.summary-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text1);
+  margin-bottom: 10px;
+}
+
+.summary-meta {
+  display: flex;
+  gap: 24px;
+  font-size: 13px;
+  color: var(--text2);
+}
+
+.summary-meta strong { color: var(--text1); }
+
+/* ── 상세 — 2열 레이아웃 ── */
+.detail-wrap {
+  display: flex;
+  gap: 16px;
+}
+
+.detail-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.detail-right {
+  width: 320px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.detail-section {
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(48,54,61,0.4);
+}
+
+.detail-section:last-child { border-bottom: none; }
+
+.detail-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text2);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.detail-value {
+  font-size: 13px;
+  color: var(--text1);
+  line-height: 1.6;
+}
+
+/* ── 조치 상태 변경 ── */
+.status-change-desc {
+  font-size: 12px;
+  color: var(--text2);
+  margin-bottom: 12px;
+}
+
+.status-btn-group {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.status-btn {
+  flex: 1;
+  padding: 9px;
+  border-radius: 6px;
+  border: 1px solid rgba(48,54,61,0.8);
+  background: rgba(48,54,61,0.3);
+  color: var(--text2);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.status-btn.selected {
+  background: rgba(227,179,65,0.15);
+  border-color: var(--caution);
+  color: var(--caution);
+}
+
+.status-btn.active-btn.selected {
+  background: rgba(63,185,80,0.15);
+  border-color: var(--safe);
+  color: var(--safe);
+}
+
+.change-btn {
+  width: 100%;
+  padding: 10px;
+  border-radius: 6px;
+  border: none;
+  background: rgba(56,139,253,0.8);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s;
+}
+
+.change-btn:hover { background: rgba(56,139,253,1); }
+.change-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── 연관 모니터링 ── */
+.monitor-list { display: flex; flex-direction: column; gap: 8px; }
+
+.monitor-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text2);
+  padding: 8px 10px;
+  background: rgba(48,54,61,0.3);
+  border-radius: 6px;
+}
+
+/* ── 확인 버튼 ── */
+.confirm-btn {
+  padding: 10px 32px;
+  border-radius: 6px;
+  border: none;
+  background: rgba(56,139,253,0.8);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ── 모달 ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal {
+  background: #161b22;
+  border: 1px solid rgba(48,54,61,0.9);
+  border-radius: 12px;
+  padding: 32px 28px;
+  width: 340px;
+  text-align: center;
+}
+
+.modal-icon { font-size: 32px; margin-bottom: 12px; }
+.modal-title { font-size: 15px; font-weight: 700; color: var(--text1); margin-bottom: 12px; }
+.modal-body { font-size: 14px; color: var(--text1); line-height: 1.6; margin-bottom: 24px; }
+.modal-body strong { color: var(--caution); }
+
+.modal-btns { display: flex; gap: 10px; }
+
+.modal-btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(48,54,61,0.8);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.modal-btn.cancel {
+  background: rgba(48,54,61,0.4);
+  color: var(--text1);
+}
+
+.modal-btn.confirm {
+  background: rgba(56,139,253,0.85);
+  border-color: transparent;
+  color: #fff;
+}
