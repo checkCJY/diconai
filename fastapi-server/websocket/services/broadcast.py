@@ -88,8 +88,8 @@ def build_broadcast_payload() -> dict:
         "ai_max_load_kw": ai_max_load_kw,
         "ai_max_load_pct": ai_max_load_pct,
         "worker_positions": dict(worker_positions),
-        "alarms": list(active_alarms),
+        "alarms": list(active_alarms)[:5],
         **(latest_gas_snapshot if not gas_stale else {}),
     }
-    active_alarms.clear()
+    del active_alarms[:5]
     return payload

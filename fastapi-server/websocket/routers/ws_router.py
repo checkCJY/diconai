@@ -49,7 +49,7 @@ async def sensor_stream(websocket: WebSocket):
     """
     브라우저용 실시간 통합 데이터 스트림.
 
-    1초마다 build_broadcast_payload()로 조립한 페이로드를 전송한다.
+    10초마다 build_broadcast_payload()로 조립한 페이로드를 전송한다.
     페이로드에는 가스 측정값·위험도, 전력 설비 현황, 알람 목록, 작업자 위치가 포함된다.
     """
     await websocket.accept()
@@ -57,7 +57,7 @@ async def sensor_stream(websocket: WebSocket):
     try:
         while True:
             await websocket.send_json(build_broadcast_payload())
-            await asyncio.sleep(1)
+            await asyncio.sleep(10)
     except WebSocketDisconnect:
         print("[ws/sensors] 브라우저 연결 종료")
 

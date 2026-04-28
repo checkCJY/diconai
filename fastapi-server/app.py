@@ -5,6 +5,7 @@
 from fastapi import FastAPI
 
 from gas.routers.gas_router import router as gas_router
+from internal.routers.alarm_router import router as internal_alarm_router
 from positioning.routers.position_router import router as positioning_router
 from power.routers.power_router import router as power_router
 from websocket.routers.ws_router import router as ws_router
@@ -15,6 +16,7 @@ app.include_router(gas_router)
 app.include_router(power_router)
 app.include_router(positioning_router)
 app.include_router(ws_router)
+app.include_router(internal_alarm_router)  # Celery → WS 브리지 (localhost 전용)
 
 
 @app.get("/health/")

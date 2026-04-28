@@ -1,0 +1,44 @@
+# internal/routers/alarm_router.py — Celery → FastAPI WebSocket 브리지
+#
+# Celery 태스크(DRF 컨텍스트)가 알람을 생성한 뒤 이 엔드포인트를 호출해
+# FastAPI의 active_alarms 큐에 추가한다.
+# 다음 WebSocket 브로드캐스트 틱(1초)에 브라우저로 전달된다.
+#
+# 보안: 127.0.0.1 (localhost)에서만 호출 가능.
+
+from typing import Any
+
+from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel
+
+from websocket.state import active_alarms
+
+router = APIRouter(prefix="/internal")
+
+
+class AlarmPayload(BaseModel):
+    model_config = {"extra": "allow"}  # 필드가 추가되어도 유연하게 수용
+
+    alarm_type: str
+    gas_type: str
+    risk_level: str
+    source_label: str
+    summary: str
+    is_new_event: bool
+    event_id: int | None = None
+    measured_value: float | None = None
+    threshold_value: float | None = None
+
+
+@router.post("/alarms/push/")
+async def push_alarm(request: Request, alarm: AlarmPayload):
+    """Celery 태스크에서 WebSocket 브로드캐스트 큐에 알람을 추가한다.
+
+    localhost 전용 — 외부 접근 시 403 반환.
+    """
+    client_host = request.client.host if request.client else ""
+    if client_host not in ("127.0.0.1", "::1", "localhost"):
+        raise HTTPException(status_code=403, detail="내부 전용 엔드포인트입니다.")
+
+    active_alarms.append(alarm.model_dump(exclude_none=True))
+    return {"ok": True}
