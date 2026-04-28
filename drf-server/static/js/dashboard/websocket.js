@@ -180,6 +180,7 @@ function initWebSocket() {
     ws.onopen = () => {
       setWsStatus('● 실시간 연결', 'connected');
       _clearPowerPanelMsg();
+      MapPanel.setMarkersConnected();
     };
 
     ws.onmessage = (e) => {
@@ -330,12 +331,14 @@ function initWebSocket() {
     ws.onerror = () => {
       setWsStatus('● 연결 오류', 'error');
       _setPowerPanelError('데이터를 불러올 수 없습니다.');
+      MapPanel.setMarkersDisconnected();
     };
 
     // 연결 끊김 시 3초 후 재연결을 시도한다.
     ws.onclose = () => {
       setWsStatus('● 연결 끊김', 'error');
       _setPowerPanelError('데이터를 불러올 수 없습니다.');
+      MapPanel.setMarkersDisconnected();
       setTimeout(connect, 3000);
     };
   }
