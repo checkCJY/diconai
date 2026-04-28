@@ -180,7 +180,7 @@ function renderGasGrid(gasData = {}) {
 
   GAS_KEYS.forEach(gas => {
     const value = gasData[gas] ?? null;
-    const risk  = gasData[`${gas}_risk`] ?? getRiskFromData(gas, value, null);
+    const risk  = _normalizeRisk(gasData[`${gas}_risk`]) || getRiskFromData(gas, value, null);
     const card  = buildGasCard(gas, value, risk);
     grid.appendChild(card);
   });
@@ -188,7 +188,7 @@ function renderGasGrid(gasData = {}) {
   // DOM 삽입 후 차트 생성
   GAS_KEYS.forEach(gas => {
     const value = gasData[gas] ?? null;
-    const risk  = gasData[`${gas}_risk`] ?? 'normal';
+    const risk  = _normalizeRisk(gasData[`${gas}_risk`]) || 'normal';
     createGasChart(`canvas-${gas}`, gas, value, risk);
   });
 }
@@ -213,7 +213,12 @@ function _onGasCardClick(gas) {
 /* ────────────────────────────────────────────
    좌측 가스 리스트 테이블 렌더
 ────────────────────────────────────────────── */
-const RISK_LABEL = { danger: '위험', warning: '주의', normal: '정상' };
+const RISK_LABEL = { danger: '위험', warning: '주의', normal: '정상', safe: '정상' };
+
+/* 서버에서 'safe'가 내려올 수 있으므로 'normal'로 통일한다 */
+function _normalizeRisk(risk) {
+  return (risk === 'safe' || !risk) ? 'normal' : risk;
+}
 
 function renderGasListTable(gasData = {}) {
   const tbody = document.getElementById('gas-tbody');
@@ -222,7 +227,7 @@ function renderGasListTable(gasData = {}) {
   tbody.innerHTML = GAS_KEYS.map(gas => {
     const cfg   = GAS_CONFIG[gas];
     const value = gasData[gas] ?? null;
-    const risk  = gasData[`${gas}_risk`] ?? 'normal';
+    const risk  = _normalizeRisk(gasData[`${gas}_risk`]);
     const isSelected = _selectedGas === gas;
 
     return `<tr data-gas="${gas}" class="${isSelected ? 'selected' : ''}" onclick="onGasRowClick('${gas}')">
@@ -249,7 +254,7 @@ function renderSensorTable(gasData = {}, connected = true) {
   let worstRisk = 'normal';
   let worstGas  = '-';
   GAS_KEYS.forEach(gas => {
-    const risk = gasData[`${gas}_risk`] ?? 'normal';
+    const risk = _normalizeRisk(gasData[`${gas}_risk`]);
     if (risk === 'danger') { worstRisk = 'danger'; worstGas = GAS_CONFIG[gas].label; }
     else if (risk === 'warning' && worstRisk !== 'danger') { worstRisk = 'warning'; worstGas = GAS_CONFIG[gas].label; }
   });
