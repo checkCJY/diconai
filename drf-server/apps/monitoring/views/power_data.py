@@ -4,10 +4,24 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.constants import POWER_THRESHOLDS
 from apps.monitoring.serializers.power_data import (
     PowerDataBulkIngestSerializer,
     PowerEventIngestSerializer,
 )
+
+
+class PowerThresholdView(APIView):
+    """
+    GET /monitoring/api/power/thresholds/
+
+    전력 임계치(W)를 반환한다. 프론트엔드 차트 주석 라인 및 위험도 판정에 사용.
+    """
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response(POWER_THRESHOLDS)
 
 
 class PowerEventIngestView(APIView):
