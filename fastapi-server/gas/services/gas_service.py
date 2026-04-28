@@ -14,7 +14,9 @@ from fastapi import HTTPException
 from core.config import settings
 from core.gas_thresholds import calculate_individual_risks
 from gas.schemas.gas import GasDataPayload
-from websocket.state import active_alarms, latest_gas_snapshot
+from datetime import datetime, timezone
+
+from websocket.state import active_alarms, gas_latest, latest_gas_snapshot
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +101,7 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
         **individual_risks,
     }
     latest_gas_snapshot.update(gas_snapshot)
+    gas_latest["updated_at"] = datetime.now(timezone.utc).isoformat()
     if alarms:
         active_alarms.extend(alarms)
 
