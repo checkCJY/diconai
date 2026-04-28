@@ -38,6 +38,8 @@ const EventPanel = {
       <div class="${colorClass} event-desc">${data.message || data.alarm_type || ''}</div>
     `;
     listEl.insertBefore(item, listEl.firstChild);
+    // 최대 20개 유지 — 초과 시 오래된 항목 제거
+    while (listEl.children.length > 20) listEl.removeChild(listEl.lastChild);
   },
 
   // ── 24시간 요약 카운트 갱신 ─────────────────────────────

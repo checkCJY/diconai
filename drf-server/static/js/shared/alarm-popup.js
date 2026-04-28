@@ -11,10 +11,13 @@
 // WebSocket 수신 시 level === '위험' 이면 팝업 큐에 추가
 // ──────────────────────────────────────────────────────────
 const AlarmPopup = {
-  queue:  [],
-  isOpen: false,
+  queue:    [],
+  isOpen:   false,
+  _inited:  false,
+  MAX_QUEUE: 5,   // 큐 최대 크기 — 초과분은 버려 DOM 폭주 방지
 
   show(data) {
+    if (this.queue.length >= this.MAX_QUEUE) return;
     this.queue.push(data);
     if (!this.isOpen) this._process();
   },
@@ -47,14 +50,18 @@ const AlarmPopup = {
     this._autoCloseTimer = setTimeout(() => this.close(), 10000);
   },
 
+  // confirm/close 클릭 시 남은 큐를 비우고 팝업을 닫는다.
   close() {
     clearTimeout(this._autoCloseTimer);
+    this.queue  = [];
+    this.isOpen = false;
     const popup = document.getElementById('alarm-popup');
     if (popup) popup.style.display = 'none';
-    setTimeout(() => this._process(), 500);
   },
 
   init() {
+    if (this._inited) return;   // 중복 리스너 방지
+    this._inited = true;
     document.getElementById('alarm-popup-close')  ?.addEventListener('click', () => this.close());
     document.getElementById('alarm-popup-confirm') ?.addEventListener('click', () => this.close());
   },

@@ -384,11 +384,8 @@ function initWebSocket() {
         _renderAIPowerNav();
       }
 
-      // ── 가스 차트 실시간 업데이트 ─────────────────────────
-      const tick = nowLabel();
-      if (gasChart) pushData(gasChart, tick, data.co, Math.round(data.co * 1.5));
-
       // ── 전력 차트 — 채널별 히스토리 누적 후 현재 채널 렌더 ──
+      const tick = nowLabel();
       if (!data.power_loading) {
         if (data.total_power_kw != null)
           _pushChannelHistory(0, tick, Math.round(data.total_power_kw * 1.1 * 10) / 10);
