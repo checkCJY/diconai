@@ -10,30 +10,32 @@
 // MN-04 — 작업자 현황 패널
 // ──────────────────────────────────────────────────────────
 (function initMN04() {
-  const POLL_MS            = 30_000;
+  const POLL_MS            = 2_000;
   const API_MY_STATUS      = '/alerts/api/my-status/';
   const API_WORKER_SUMMARY = '/alerts/api/worker-summary/';
 
   const STATUS_CONFIG = {
-    normal:  { left: '16%', color: '#2d9e75', label: '정상' },
-    warning: { left: '50%', color: '#ef9f27', label: '경고' },
-    danger:  { left: '84%', color: '#e24b4a', label: '위험' },
+    normal:  { cls: 'normal',  label: '정상' },
+    warning: { cls: 'warning', label: '주의' },
+    danger:  { cls: 'danger',  label: '위험' },
   };
 
   const viewWorker = document.getElementById('mn04-view-worker');
   const viewAdmin  = document.getElementById('mn04-view-admin');
-  const elMarker      = document.getElementById('mn04-marker');
+  const elStatusBlock = document.getElementById('mn04-worker-status-block');
   const elStatusText  = document.getElementById('mn04-status-text');
   const elWorkerErr   = document.getElementById('mn04-worker-error');
-  const elTotal       = document.getElementById('mn04-kpi-total');
-  const elNormal      = document.getElementById('mn04-kpi-normal');
-  const elWarning     = document.getElementById('mn04-kpi-warning');
-  const elDanger      = document.getElementById('mn04-kpi-danger');
-  const elRatioBar    = document.getElementById('mn04-ratio-bar');
-  const elRatioNormal = document.getElementById('mn04-ratio-normal');
-  const elRatioWarn   = document.getElementById('mn04-ratio-warning');
-  const elRatioDanger = document.getElementById('mn04-ratio-danger');
-  const elAdminErr    = document.getElementById('mn04-admin-error');
+  const elTotal        = document.getElementById('mn04-kpi-total');
+  const elNormal       = document.getElementById('mn04-kpi-normal');
+  const elWarning      = document.getElementById('mn04-kpi-warning');
+  const elDanger       = document.getElementById('mn04-kpi-danger');
+  const elDangerBd     = document.getElementById('mn04-kpi-danger-bd');   // 우측 상세의 위험 수치
+  const elDangerBlock  = document.getElementById('mn04-danger-block');    // 좌측 강조 블록
+  const elRatioBar     = document.getElementById('mn04-ratio-bar');
+  const elRatioNormal  = document.getElementById('mn04-ratio-normal');
+  const elRatioWarn    = document.getElementById('mn04-ratio-warning');
+  const elRatioDanger  = document.getElementById('mn04-ratio-danger');
+  const elAdminErr     = document.getElementById('mn04-admin-error');
 
   function showErr(el, msg) { if (!el) return; el.textContent = msg; el.style.display = 'block'; }
   function clearErr(el)     { if (!el) return; el.textContent = '';  el.style.display = 'none'; }
@@ -43,11 +45,14 @@
   function renderWorkerStatus(data) {
     clearErr(elWorkerErr);
     const cfg = STATUS_CONFIG[data.status || 'normal'] || STATUS_CONFIG.normal;
-    if (elMarker)     { elMarker.style.left = cfg.left; elMarker.style.color = cfg.color; elMarker.style.display = 'block'; }
-    if (elStatusText) { elStatusText.textContent = cfg.label; elStatusText.style.color = cfg.color; }
+    if (elStatusBlock) {
+      elStatusBlock.classList.remove('normal', 'warning', 'danger');
+      elStatusBlock.classList.add(cfg.cls);
+    }
+    if (elStatusText) elStatusText.textContent = cfg.label;
   }
   function renderWorkerError(msg) {
-    if (elMarker) elMarker.style.display = 'none';
+    if (elStatusBlock) elStatusBlock.classList.remove('normal', 'warning', 'danger');
     if (elStatusText) elStatusText.textContent = '-';
     showErr(elWorkerErr, msg);
   }
@@ -59,15 +64,22 @@
           warning = data.warning_count ?? 0, danger = data.danger_count ?? 0;
     setKpi(elTotal, total); setKpi(elNormal, normal);
     setKpi(elWarning, warning); setKpi(elDanger, danger);
+    setKpi(elDangerBd, danger);
+
+    // 위험 인원 강조: danger > 0 이면 active 클래스로 pulse 애니메이션 + 빨간 테두리
+    if (elDangerBlock) elDangerBlock.classList.toggle('active', danger > 0);
+
     if (!elRatioBar) return;
     if (total === 0) { elRatioBar.style.display = 'none'; return; }
     elRatioBar.style.display = 'flex';
     if (elRatioNormal) elRatioNormal.style.flex = normal;
     if (elRatioWarn)   elRatioWarn.style.flex   = warning;
-    if (elRatioDanger) elRatioDanger.style.flex = danger;
+    if (elRatioDanger) elRatioDanger.style.flex  = danger;
   }
   function renderAdminError(msg) {
-    setKpi(elTotal, '-'); setKpi(elNormal, '-'); setKpi(elWarning, '-'); setKpi(elDanger, '-');
+    setKpi(elTotal, '-'); setKpi(elNormal, '-'); setKpi(elWarning, '-');
+    setKpi(elDanger, '-'); setKpi(elDangerBd, '-');
+    if (elDangerBlock) elDangerBlock.classList.remove('active');
     if (elRatioBar) elRatioBar.style.display = 'none';
     showErr(elAdminErr, msg);
   }
