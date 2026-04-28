@@ -1,0 +1,228 @@
+/* ==========================================================
+   dashboard_CJY.css — 전력 패널 UI 확장 스타일
+   적용 대상: main_dashboard_CJY.html
+   ========================================================== */
+
+/* ── 전력 패널 제목 크기 오버라이드 ──────────────────────── */
+#powerPanel .panel-title {
+  font-size: 14px;
+}
+
+/* ── 상세 보기 링크 ────────────────────────────────────────── */
+a.more {
+  text-decoration: none;
+}
+
+/* ── AI 패널 총 전력 요약 바 ───────────────────────────────── */
+.power-summary-bar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text2);
+  margin-bottom: 6px;
+}
+.power-summary-bar .fw   { color: var(--text1, #e6edf3); }
+.power-summary-bar .pipe { color: #30363d; }
+
+/* ── ON/OFF 배지 ───────────────────────────────────────────── */
+.brisk.on  { background: var(--safe);    color: #0d1117; }
+.brisk.off { background: #30363d;        color: var(--text2); }
+
+/* ── 오류/통신불능 배지 (gray) ────────────────────────────── */
+/* UI_Handling.md: 통신 장애/빈 데이터 → 모든 배지를 gray로 */
+.brisk.gray { background: #30363d; color: var(--text2); }
+
+/* ── 패널 상태 메시지 ─────────────────────────────────────── */
+/* UI_Handling.md: 패널 중앙에 오버레이 텍스트 */
+.panel-msg {
+  text-align: center;
+  padding: 12px 0;
+  color: var(--text2);
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+/* ── 스켈레톤 UI (Loading 상태) ───────────────────────────── */
+/* UI_Handling.md: 로딩 중 → 깜빡이는 회색 박스 */
+@keyframes skel-pulse {
+  0%, 100% { opacity: 0.4; }
+  50%       { opacity: 0.9; }
+}
+
+.skeleton {
+  display: inline-block;
+  background: #30363d;
+  border-radius: 3px;
+  animation: skel-pulse 1.4s ease-in-out infinite;
+}
+
+.skel-text  { width: 60px;  height: 10px; }
+.skel-sm    { width: 36px;  height: 10px; }
+.skel-badge { width: 28px;  height: 14px; border-radius: 3px; }
+
+/* ── 전력 KPI 박스 (총 전력 사용량 표시 영역) ─────────────── */
+.power-kpi-box {
+  background: rgba(255,255,255,0.04);
+  border-left: 3px solid var(--blue, #58a6ff);
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+}
+
+.power-kpi-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* ── AI 예측 패널 KPI 박스 ──────────────────────────────── */
+.ai-kpi-box {
+  background: rgba(255,255,255,0.04);
+  border-left: 3px solid var(--blue, #58a6ff);
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+}
+
+/* ── ai-nav: 장비명 + 방향 버튼 ─────────────────────────── */
+.ai-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.ai-equip-name {
+  font-size: 18px;
+  border-left: 3px solid var(--danger, #f85149);
+  padding-left: 8px;
+  line-height: 1.2;
+}
+
+.ai-nav-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ai-nav-btn {
+  background: transparent;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  color: var(--text1, #e6edf3);
+  width: 26px;
+  height: 26px;
+  cursor: pointer;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.ai-nav-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.ai-kpi-row {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 0;
+}
+
+.ai-kpi-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.ai-kpi-divider {
+  width: 1px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 0 10px;
+  align-self: stretch;
+}
+
+.ai-kpi-right {
+  text-align: right;
+}
+
+/* powerChangePct: 큰 숫자 오른쪽 하단 정렬 */
+.power-kpi-row #powerChangePct {
+  font-size: 11px;
+  padding-bottom: 3px;
+  white-space: nowrap;
+}
+
+/* ── 전력 테이블 스크롤 래퍼 ──────────────────────────────── */
+.tbl-scroll {
+  overflow-y: auto;
+  max-height: 220px;
+  border-radius: 10px;
+  overflow: hidden;
+  overflow-y: auto;
+}
+
+/* 스크롤바 스타일 (다크 테마) */
+.tbl-scroll::-webkit-scrollbar       { width: 4px; }
+.tbl-scroll::-webkit-scrollbar-track { background: transparent; }
+.tbl-scroll::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
+
+/* thead 고정 — 스크롤 시 컬럼 헤더 유지 */
+#powerPanel .tbl thead th {
+  position: sticky;
+  top: 0;
+  background: #1c2128;
+  z-index: 1;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--text2, #8b949e);
+  font-weight: 500;
+}
+
+/* 테이블 전체 border-radius 적용 */
+#powerPanel .tbl {
+  width: 100%;
+  border-collapse: collapse;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+#powerPanel .tbl td {
+  padding: 8px 10px;
+  font-size: 12px;
+  color: #e6edf3;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+#powerPanel .tbl tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* ── risk-level별 행 배경색 ─────────────────────────────── */
+.risk-row.risk-danger {
+  background: rgba(220, 38, 38, 0.55);
+}
+.risk-row.risk-danger td {
+  color: #fecaca;
+  font-weight: 600;
+}
+.risk-row.risk-caution {
+  background: rgba(202, 138, 4, 0.45);
+}
+.risk-row.risk-caution td {
+  color: #fef08a;
+  font-weight: 600;
+}
+.risk-row.risk-safe {
+  background: transparent;
+}
+
+/* 위험/주의 행 hover 시 살짝 밝게 */
+.risk-row.risk-danger:hover  { background: rgba(220, 38, 38, 0.75); }
+.risk-row.risk-caution:hover { background: rgba(202, 138, 4, 0.65); }
+.risk-row.risk-safe:hover    { background: rgba(40, 55, 75, 0.5); }
