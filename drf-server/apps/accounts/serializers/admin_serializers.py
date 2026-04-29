@@ -5,6 +5,7 @@ from django.utils import timezone
 from datetime import timedelta
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
+from apps.accounts.models import Department
 
 User = get_user_model()
 
@@ -73,6 +74,11 @@ class AccountsAdminCreateSerializer(serializers.ModelSerializer):
         write_only=True,
         required=True,
     )
+    department_id = serializers.PrimaryKeyRelatedField(
+        queryset=Department.objects.filter(is_active=True),
+        required=False,
+        allow_null=True,
+    )
 
     def validate_password(self, value):
         if " " in value:
@@ -89,7 +95,7 @@ class AccountsAdminCreateSerializer(serializers.ModelSerializer):
 
         password = validated_data.pop("password")
         status = validated_data.pop("status")
-        department_id = validated_data.pop("department_id", None)
+        department = validated_data.pop("department_id", None)  # Department 객체
 
         user = User(**validated_data)
         user.set_password(password)
@@ -97,9 +103,9 @@ class AccountsAdminCreateSerializer(serializers.ModelSerializer):
             user.is_active = False
         user.save()
 
-        if department_id:
+        if department:
             UserDepartment.objects.create(
-                user=user, department_id=department_id, is_primary=True
+                user=user, department=department, is_primary=True
             )
 
         if status == "locked":
@@ -120,7 +126,6 @@ class AccountsAdminCreateSerializer(serializers.ModelSerializer):
             "phone",
             "status",
         ]
-        extra_kwargs = {"department_id": {"required": False}}
 
 
 class AccountsAdminDetailSerializer(serializers.ModelSerializer):
@@ -180,6 +185,11 @@ class AccountsAdminUpdateSerializer(serializers.ModelSerializer):
         write_only=True,
         required=False,
     )
+    department_id = serializers.PrimaryKeyRelatedField(
+        queryset=Department.objects.filter(is_active=True),
+        required=False,
+        allow_null=True,
+    )
 
     def validate_password(self, value):
         if " " in value:
@@ -196,16 +206,16 @@ class AccountsAdminUpdateSerializer(serializers.ModelSerializer):
 
         password = validated_data.pop("password", None)
         status_val = validated_data.pop("status", None)
-        department_id = validated_data.pop("department_id", None)
+        department = validated_data.pop("department_id", None)  # Department 객체
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
-        if department_id is not None:
+        if department is not None:
             UserDepartment.objects.update_or_create(
                 user=instance,
                 is_primary=True,
-                defaults={"department_id": department_id},
+                defaults={"department": department},
             )
 
         if password:
@@ -236,4 +246,3 @@ class AccountsAdminUpdateSerializer(serializers.ModelSerializer):
             "password",
             "status",
         ]
-        extra_kwargs = {"department_id": {"required": False}}
