@@ -83,19 +83,19 @@ def fire_danger_alarm_task(
             detected_at=timezone.now(),
         )
 
-        if alarm is not None:
+        if event is not None:
             _push_to_ws({
-                "event_id":       event.id,
-                "alarm_type":     AlarmType.GAS_THRESHOLD,
-                "gas_type":       gas_type,
-                "risk_level":     "danger",
-                "measured_value": value,
+                "event_id":        event.id,
+                "alarm_type":      AlarmType.GAS_THRESHOLD,
+                "gas_type":        gas_type,
+                "risk_level":      "danger",
+                "measured_value":  value,
                 "threshold_value": threshold,
-                "source_label":   source_label,
-                "summary":        summary,
-                "is_new_event":   True,
+                "source_label":    source_label,
+                "summary":         summary,
+                "is_new_event":    alarm is not None,
             })
-            logger.info("DANGER 알람 생성 | sensor=%s gas=%s value=%s", sensor_id, gas_type, value)
+            logger.info("DANGER 알람 푸시 | sensor=%s gas=%s value=%s new_event=%s", sensor_id, gas_type, value, alarm is not None)
 
     except Exception as exc:
         logger.error("DANGER 알람 생성 실패: %s", exc)
@@ -142,7 +142,7 @@ def fire_warning_alarm_task(
             detected_at=timezone.now(),
         )
 
-        if alarm is not None:
+        if event is not None:
             _push_to_ws({
                 "event_id":        event.id,
                 "alarm_type":      AlarmType.GAS_THRESHOLD,
@@ -152,9 +152,9 @@ def fire_warning_alarm_task(
                 "threshold_value": threshold,
                 "source_label":    source_label,
                 "summary":         summary,
-                "is_new_event":    True,
+                "is_new_event":    alarm is not None,
             })
-            logger.info("WARNING 알람 생성 | sensor=%s gas=%s value=%s", sensor_id, gas_type, value)
+            logger.info("WARNING 알람 푸시 | sensor=%s gas=%s value=%s new_event=%s", sensor_id, gas_type, value, alarm is not None)
 
     except Exception as exc:
         logger.error("WARNING 알람 생성 실패: %s", exc)

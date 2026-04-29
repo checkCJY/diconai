@@ -1,56 +1,97 @@
 /* ==========================================================
-   alarm-popup.js — CM-07 실시간 알림 팝업
-   출처: dashboard.js AlarmPopup 모듈
-   의존: templates/alarm_popup.html (팝업 DOM)
+   alarm-popup.js — CM-07 실시간 알림 팝업 + 정상화 토스트
+   의존: templates/alarm_popup.html (팝업 · 토스트 DOM)
    ========================================================== */
 
 'use strict';
 
+// ── 위험/주의 레벨별 중앙 팝업 설정 ────────────────────────
+const _POPUP_CFG = {
+  danger: {
+    borderColor: 'var(--danger)',
+    iconClass:   '',
+    typeLabel:   '긴급 알림',
+    actionText:  '즉시 대피하세요!',
+    actionClass: 'alarm-popup-action',
+    badgeClass:  'brisk danger',
+    badgeText:   '위험',
+  },
+  warning: {
+    borderColor: 'var(--caution)',
+    iconClass:   'caution',
+    typeLabel:   '주의 알림',
+    actionText:  '주의하세요!',
+    actionClass: 'alarm-popup-action caution-text',
+    badgeClass:  'brisk caution',
+    badgeText:   '주의',
+  },
+};
+
 // ──────────────────────────────────────────────────────────
-// CM-07 — 실시간 알림 팝업
-// WebSocket 수신 시 level === '위험' 이면 팝업 큐에 추가
+// AlarmPopup — 위험/주의 전용 중앙 차단형 팝업
 // ──────────────────────────────────────────────────────────
 const AlarmPopup = {
   queue:    [],
   isOpen:   false,
   _inited:  false,
-  MAX_QUEUE: 5,   // 큐 최대 크기 — 초과분은 버려 DOM 폭주 방지
+  MAX_QUEUE: 5,
 
   show(data) {
+    const level = data.alarm_level;
+    if (level !== 'danger' && level !== 'warning') return;
+
     if (this.queue.length >= this.MAX_QUEUE) return;
     this.queue.push(data);
     if (!this.isOpen) this._process();
   },
 
-  // ── 큐에서 데이터를 꺼내 팝업 DOM을 채우고 10초 후 자동으로 닫는다. ─
   _process() {
     if (this.queue.length === 0) { this.isOpen = false; return; }
-    this.isOpen    = true;
-    const data     = this.queue.shift();
-    const isDanger = data.alarm_level === 'danger';
-    const popup    = document.getElementById('alarm-popup');
+    this.isOpen = true;
+    const data  = this.queue.shift();
+    const cfg   = _POPUP_CFG[data.alarm_level] || _POPUP_CFG.danger;
+    const popup = document.getElementById('alarm-popup');
     if (!popup) { this.isOpen = false; return; }
 
-    const levelEl   = document.getElementById('alarm-popup-level');
-    const msgEl     = document.getElementById('alarm-popup-message');
-    const metaEl    = document.getElementById('alarm-popup-meta');
+    popup.style.borderLeftColor = cfg.borderColor;
 
-    levelEl.textContent  = isDanger ? '🔴 위험' : '🟡 주의';
-    levelEl.style.color  = isDanger ? 'var(--danger)' : 'var(--caution)';
-    popup.style.borderLeftColor = isDanger ? 'var(--danger)' : 'var(--caution)';
-    msgEl.textContent    = data.message || '위험 이벤트가 발생했습니다.';
+    const timeEl = document.getElementById('alarm-popup-time');
+    if (timeEl) {
+      const ts = data.timestamp || data.created_at;
+      timeEl.textContent = ts
+        ? new Date(ts).toLocaleString('ko-KR', { hour12: false })
+        : '--';
+    }
 
-    const parts = [];
-    if (data.sensor_name) parts.push(data.sensor_name);
-    if (data.worker_name) parts.push(data.worker_name);
-    if (data.timestamp)   parts.push(new Date(data.timestamp).toLocaleTimeString());
-    metaEl.textContent = parts.join(' | ');
+    const iconEl = document.getElementById('alarm-popup-icon');
+    if (iconEl) iconEl.className = `alarm-popup-icon ${cfg.iconClass}`.trim();
+
+    const typeEl = document.getElementById('alarm-popup-type-label');
+    if (typeEl) typeEl.textContent = cfg.typeLabel;
+
+    const actionEl = document.getElementById('alarm-popup-action');
+    if (actionEl) {
+      actionEl.textContent = cfg.actionText;
+      actionEl.className   = cfg.actionClass;
+    }
+
+    const levelEl = document.getElementById('alarm-popup-level');
+    if (levelEl) {
+      levelEl.textContent = cfg.badgeText;
+      levelEl.className   = cfg.badgeClass;
+    }
+
+    const msgEl = document.getElementById('alarm-popup-message');
+    if (msgEl) {
+      const sensor = data.sensor_name || data.source_label || '';
+      const msg    = data.message     || data.summary      || '';
+      msgEl.textContent = sensor ? `${sensor} — ${msg}` : msg;
+    }
 
     popup.style.display = 'block';
     this._autoCloseTimer = setTimeout(() => this.close(), 10000);
   },
 
-  // confirm/close 클릭 시 남은 큐를 비우고 팝업을 닫는다.
   close() {
     clearTimeout(this._autoCloseTimer);
     this.queue  = [];
@@ -59,10 +100,54 @@ const AlarmPopup = {
     if (popup) popup.style.display = 'none';
   },
 
+  _goDetail() {
+    this.close();
+    window.location.href = '/dashboard/monitoring/events/';
+  },
+
   init() {
-    if (this._inited) return;   // 중복 리스너 방지
+    if (this._inited) return;
     this._inited = true;
-    document.getElementById('alarm-popup-close')  ?.addEventListener('click', () => this.close());
-    document.getElementById('alarm-popup-confirm') ?.addEventListener('click', () => this.close());
+    document.getElementById('alarm-popup-close') ?.addEventListener('click', () => this.close());
+    document.getElementById('alarm-popup-confirm')?.addEventListener('click', () => this.close());
+    document.getElementById('alarm-popup-detail') ?.addEventListener('click', () => this._goDetail());
+  },
+};
+
+// ──────────────────────────────────────────────────────────
+// AlarmToast — 정상화 전용 우하단 비차단형 토스트
+// ──────────────────────────────────────────────────────────
+const AlarmToast = {
+  _timer:  null,
+  _inited: false,
+
+  show(data) {
+    const toast = document.getElementById('alarm-toast');
+    if (!toast) return;
+
+    clearTimeout(this._timer);
+
+    const sensor = data.sensor_name || data.source_label || '';
+    const msg    = data.message     || data.summary      || '';
+    const msgEl  = document.getElementById('alarm-toast-message');
+    if (msgEl) msgEl.textContent = sensor ? `${sensor} — ${msg}` : msg;
+
+    toast.style.display = 'none';
+    requestAnimationFrame(() => {
+      toast.style.display = 'flex';
+      this._timer = setTimeout(() => this.close(), 5000);
+    });
+  },
+
+  close() {
+    clearTimeout(this._timer);
+    const toast = document.getElementById('alarm-toast');
+    if (toast) toast.style.display = 'none';
+  },
+
+  init() {
+    if (this._inited) return;
+    this._inited = true;
+    document.getElementById('alarm-toast-close')?.addEventListener('click', () => this.close());
   },
 };

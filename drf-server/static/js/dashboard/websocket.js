@@ -409,16 +409,23 @@ function initWebSocket() {
       // ── CM-07 — 알람 팝업 + 이벤트 패널 ─────────────────
       // alarms[]는 DRF가 새 Event 생성 시에만 포함되며, 병합(merge) 틱에서는 빈 배열이다.
       if (Array.isArray(data.alarms) && data.alarms.length > 0) {
+        console.log('[알람 수신]', data.alarms.map(a => `${a.risk_level}(new=${a.is_new_event})`));
         data.alarms.forEach(alarm => {
           const alarmData = {
-            alarm_level: alarm.risk_level,
-            message:     alarm.summary,
-            sensor_name: alarm.source_label,
-            timestamp:   new Date().toISOString(),
-            gas_type:    alarm.gas_type,
-            event_id:    alarm.event_id,
+            alarm_level:  alarm.risk_level,
+            is_new_event: alarm.is_new_event,
+            message:      alarm.summary,
+            sensor_name:  alarm.source_label,
+            timestamp:    new Date().toISOString(),
+            gas_type:     alarm.gas_type,
+            event_id:     alarm.event_id,
           };
-          AlarmPopup.show(alarmData);
+          // 새 이벤트(danger/warning)만 중앙 팝업 — 조치완료 전 동일 이벤트 재발화는 팝업 없음
+          if (alarm.is_new_event) AlarmPopup.show(alarmData);
+          // 정상화는 우하단 토스트
+          if (alarm.risk_level === 'normal' && typeof AlarmToast !== 'undefined') {
+            AlarmToast.show(alarmData);
+          }
           if (typeof EventPanel !== 'undefined') EventPanel.addItem(alarmData);
         });
       }

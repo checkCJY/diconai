@@ -1,10 +1,44 @@
-<!-- CM-07 실시간 알림 팝업 -->
+<!-- CM-07 실시간 알림 팝업 — 위험/주의 전용 중앙 차단형 -->
 <div id="alarm-popup" style="display:none;">
-  <div class="alarm-popup-header">
-    <span id="alarm-popup-level">🔴 위험</span>
+
+  <!-- 상단: 발생 시간 + 닫기 버튼 -->
+  <div class="alarm-popup-top">
+    <div class="alarm-popup-time-badge">
+      <span class="alarm-popup-time-label">발생 시간</span>
+      <span id="alarm-popup-time">--</span>
+    </div>
     <button id="alarm-popup-close">✕</button>
   </div>
-  <div id="alarm-popup-message"></div>
-  <div id="alarm-popup-meta"></div>
-  <button id="alarm-popup-confirm">확인</button>
+
+  <!-- 중앙: 아이콘 + 알림 유형 라벨 -->
+  <div class="alarm-popup-icon-wrap">
+    <div id="alarm-popup-icon" class="alarm-popup-icon">⚠</div>
+    <span id="alarm-popup-type-label" class="alarm-popup-type-label">긴급 알림</span>
+  </div>
+
+  <!-- 주요 행동 메시지 -->
+  <p id="alarm-popup-action" class="alarm-popup-action">즉시 대피하세요!</p>
+
+  <!-- 위험도 배지 + 상세 메시지 -->
+  <div class="alarm-popup-desc-row">
+    <span id="alarm-popup-level" class="brisk danger">위험</span>
+    <span id="alarm-popup-message" class="alarm-popup-desc"></span>
+  </div>
+
+  <!-- 하단 버튼 2개 -->
+  <div class="alarm-popup-btn-row">
+    <button id="alarm-popup-detail" class="alarm-popup-btn-detail">상세 확인</button>
+    <button id="alarm-popup-confirm" class="alarm-popup-btn-confirm">확인</button>
+  </div>
+
+</div>
+
+<!-- CM-07 정상화 알림 토스트 — 우하단 비차단형 -->
+<div id="alarm-toast" style="display:none;">
+  <div class="alarm-toast-icon">✓</div>
+  <div class="alarm-toast-body">
+    <div class="alarm-toast-title">정상화 알림</div>
+    <div id="alarm-toast-message" class="alarm-toast-msg"></div>
+  </div>
+  <button id="alarm-toast-close">✕</button>
 </div>
