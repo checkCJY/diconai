@@ -217,7 +217,10 @@ class WorkerListAPIView(APIView):
 
         dept_id = request.query_params.get("department_id")
         if dept_id:
-            workers = workers.filter(department_id=dept_id)
+            workers = workers.filter(
+                dept_memberships__department_id=dept_id,
+                dept_memberships__is_primary=True,
+            )
 
         name_q = request.query_params.get("name", "").strip()
         if name_q:
@@ -230,8 +233,8 @@ class WorkerListAPIView(APIView):
         )
         workers = (
             workers.annotate(is_present=Exists(today_positions))
-            .select_related("department")
-            .order_by("department__code", "name")
+            .prefetch_related("dept_memberships__department")
+            .order_by("name")
         )
 
         worker_list = [
@@ -249,8 +252,8 @@ class WorkerListAPIView(APIView):
         if request.user.user_type == "facility_admin":
             depts = (
                 Department.objects.filter(
-                    users__facility=request.user.facility,
-                    users__user_type="worker",
+                    memberships__user__facility=request.user.facility,
+                    memberships__user__user_type="worker",
                     is_active=True,
                 )
                 .distinct()

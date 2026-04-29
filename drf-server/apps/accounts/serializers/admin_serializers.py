@@ -18,7 +18,12 @@ _PWD_PATTERNS = [
 class AccountsAdminListSerializer(serializers.ModelSerializer):
     """사용자 목록 조회용 (읽기 전용)"""
 
-    department = serializers.CharField(source="department.name", default=None)
+    department = serializers.SerializerMethodField()
+
+    def get_department(self, obj):
+        dept = obj.department  # property (UserDepartment is_primary=True)
+        return dept.name if dept else None
+
     position = serializers.CharField(source="position.name", default=None)
     last_login_at = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
@@ -80,13 +85,23 @@ class AccountsAdminCreateSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
+        from apps.accounts.models.user_department import UserDepartment
+
         password = validated_data.pop("password")
         status = validated_data.pop("status")
+        department_id = validated_data.pop("department_id", None)
+
         user = User(**validated_data)
         user.set_password(password)
         if status == "inactive":
             user.is_active = False
         user.save()
+
+        if department_id:
+            UserDepartment.objects.create(
+                user=user, department_id=department_id, is_primary=True
+            )
+
         if status == "locked":
             user.account_locked_until = timezone.now() + timedelta(days=36500)
             user.save(update_fields=["account_locked_until"])
@@ -99,12 +114,13 @@ class AccountsAdminCreateSerializer(serializers.ModelSerializer):
             "password",
             "name",
             "email",
-            "department",
+            "department_id",
             "position",
             "user_type",
             "phone",
             "status",
         ]
+        extra_kwargs = {"department_id": {"required": False}}
 
 
 class AccountsAdminDetailSerializer(serializers.ModelSerializer):
@@ -117,10 +133,11 @@ class AccountsAdminDetailSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
 
     def get_department_id(self, obj):
-        return obj.department_id
+        return obj.department_id  # property
 
     def get_department_name(self, obj):
-        return obj.department.name if obj.department else None
+        dept = obj.department  # property
+        return dept.name if dept else None
 
     def get_position_id(self, obj):
         return obj.position_id
@@ -175,11 +192,21 @@ class AccountsAdminUpdateSerializer(serializers.ModelSerializer):
         return value
 
     def update(self, instance, validated_data):
+        from apps.accounts.models.user_department import UserDepartment
+
         password = validated_data.pop("password", None)
         status_val = validated_data.pop("status", None)
+        department_id = validated_data.pop("department_id", None)
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
+
+        if department_id is not None:
+            UserDepartment.objects.update_or_create(
+                user=instance,
+                is_primary=True,
+                defaults={"department_id": department_id},
+            )
 
         if password:
             instance.set_password(password)
@@ -203,9 +230,10 @@ class AccountsAdminUpdateSerializer(serializers.ModelSerializer):
         fields = [
             "name",
             "email",
-            "department",
+            "department_id",
             "position",
             "phone",
             "password",
             "status",
         ]
+        extra_kwargs = {"department_id": {"required": False}}

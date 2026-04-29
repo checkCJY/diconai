@@ -45,7 +45,11 @@ class AccountsAdminListView(APIView):
 
     def get(self, request):
         """필터·정렬·페이지네이션이 적용된 사용자 목록을 반환한다."""
-        qs = User.objects.select_related("department", "position").all()
+        qs = (
+            User.objects.prefetch_related("dept_memberships__department")
+            .select_related("position")
+            .all()
+        )
 
         name = request.query_params.get("name", "").strip()
         department_id = request.query_params.get("department")
@@ -57,7 +61,10 @@ class AccountsAdminListView(APIView):
         if name:
             qs = qs.filter(name__icontains=name)
         if department_id:
-            qs = qs.filter(department_id=department_id)
+            qs = qs.filter(
+                dept_memberships__department_id=department_id,
+                dept_memberships__is_primary=True,
+            )
         if position_id:
             qs = qs.filter(position_id=position_id)
         if user_type:
@@ -108,7 +115,11 @@ class AccountsAdminDetailView(APIView):
     def _get_user(self, pk):
         """pk로 사용자를 조회한다. 없으면 None 반환."""
         try:
-            return User.objects.select_related("department", "position").get(pk=pk)
+            return (
+                User.objects.prefetch_related("dept_memberships__department")
+                .select_related("position")
+                .get(pk=pk)
+            )
         except User.DoesNotExist:
             return None
 

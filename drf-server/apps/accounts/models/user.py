@@ -44,14 +44,6 @@ class CustomUser(AbstractUser):
         default=UserType.WORKER,
         verbose_name="사용자 유형",
     )
-    department = models.ForeignKey(
-        "accounts.Department",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="users",
-        verbose_name="소속 부서",
-    )
     position = models.ForeignKey(
         "accounts.Position",
         on_delete=models.SET_NULL,
@@ -90,6 +82,25 @@ class CustomUser(AbstractUser):
     )
 
     updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def department(self):
+        """주 소속 부서 반환. UserDepartment.is_primary=True 기준."""
+        m = (
+            self.dept_memberships.filter(is_primary=True)
+            .select_related("department")
+            .first()
+        )
+        return m.department if m else None
+
+    @property
+    def department_id(self):
+        m = (
+            self.dept_memberships.filter(is_primary=True)
+            .values("department_id")
+            .first()
+        )
+        return m["department_id"] if m else None
 
     @property
     def is_locked(self) -> bool:

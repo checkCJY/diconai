@@ -152,7 +152,8 @@ class MyProfileView(APIView):
     def get(self, request):
         user = (
             get_user_model()
-            .objects.select_related("department", "position", "facility")
+            .objects.prefetch_related("dept_memberships__department")
+            .select_related("position", "facility")
             .get(pk=request.user.pk)
         )
         return Response(MyProfileSerializer(user).data)

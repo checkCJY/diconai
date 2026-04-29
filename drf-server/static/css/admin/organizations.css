@@ -1,0 +1,260 @@
+/* admin/organizations.css — 조직 관리 페이지 스타일 */
+
+/* ── admin.css에 없는 공통 컴포넌트 ─────────────────────── */
+
+.card { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+.card-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #f1f5f9; }
+.card-title { font-size: 15px; font-weight: 700; margin: 0; color: #1e293b; }
+.card-body { padding: 16px 20px; }
+
+.btn { padding: 7px 14px; border-radius: 5px; font-size: 13px; cursor: pointer; font-weight: 500; border: none; }
+
+.data-table { width: 100%; border-collapse: collapse; text-align: center; }
+.data-table th, .data-table td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
+.data-table th { background: #f8fafc; color: #64748b; font-weight: 600; font-size: 12px; }
+.data-table tbody tr:hover { background: #f8fafc; }
+
+.badge-red { background: #fee2e2; color: #be123c; }
+
+.table-count { font-size: 13px; color: #64748b; }
+
+.pagination button:hover:not(.active):not(:disabled) { background: #f8fafc; }
+
+.search-box { position: relative; display: flex; align-items: center; }
+.search-box input { padding: 7px 28px 7px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; width: 100%; outline: none; }
+.search-box input:focus { border-color: #3b82f6; }
+.search-box .btn-clear { position: absolute; right: 6px; background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 14px; line-height: 1; padding: 0; }
+
+.check-label { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; user-select: none; }
+
+/* ── 페이지 레이아웃 ─────────────────────────────────────── */
+
+.org-layout {
+    display: flex;
+    gap: 16px;
+    height: calc(100vh - 60px - 48px - 96px); /* topbar + content padding + page-header */
+    min-height: 0;
+}
+
+/* ── 좌측 조직도 패널 ────────────────────────────────────── */
+
+.org-tree-panel {
+    width: 340px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.org-tree-panel .card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.org-tree-panel .card-body {
+    flex: 1;
+    overflow-y: auto;
+    padding-top: 12px;
+}
+
+/* ── 검색 인풋 (조직도 내) ───────────────────────────────── */
+
+.tree-search {
+    padding: 0 20px 12px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.tree-search-tip {
+    font-size: 11px;
+    color: #94a3b8;
+    margin: 6px 0 0;
+}
+
+/* ── 트리 리스트 ─────────────────────────────────────────── */
+
+.tree-root {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.tree-company {
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.tree-children {
+    list-style: none;
+    margin: 0;
+    padding: 0 0 0 16px;
+}
+
+.tree-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 13px;
+    color: #334155;
+    transition: background 0.12s;
+}
+
+.tree-item:hover {
+    background: #f1f5f9;
+}
+
+.tree-item.selected {
+    background: #eff6ff;
+    color: #2563eb;
+    font-weight: 600;
+}
+
+.tree-item .item-actions {
+    margin-left: auto;
+    display: none;
+    gap: 4px;
+}
+
+.tree-item:hover .item-actions,
+.tree-item.selected .item-actions {
+    display: flex;
+}
+
+.item-action-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #94a3b8;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-size: 14px;
+    line-height: 1;
+}
+
+.item-action-btn:hover {
+    color: #475569;
+    background: #e2e8f0;
+}
+
+.tree-no-org {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    margin-top: 4px;
+    font-size: 13px;
+    color: #64748b;
+    cursor: pointer;
+}
+
+/* ── 우측 패널 ───────────────────────────────────────────── */
+
+.org-detail-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+    overflow: hidden;
+}
+
+/* ── 부서 정보 카드 ──────────────────────────────────────── */
+
+.dept-info-card .card-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 40px;
+}
+
+.dept-info-row {
+    display: flex;
+    gap: 12px;
+    align-items: baseline;
+    font-size: 13px;
+}
+
+.dept-info-label {
+    width: 80px;
+    flex-shrink: 0;
+    color: #64748b;
+    font-weight: 500;
+}
+
+.dept-info-value {
+    color: #1e293b;
+    font-weight: 500;
+}
+
+/* ── 구성원 정보 카드 ─────────────────────────────────────── */
+
+.member-info-card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.member-info-card .card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.member-info-card .card-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding-bottom: 0;
+}
+
+.member-table-wrapper {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.member-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0 4px;
+    gap: 8px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+}
+
+.member-footer-left {
+    font-size: 13px;
+    color: #64748b;
+}
+
+.member-footer-center {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.member-footer-right {
+    display: flex;
+    gap: 8px;
+}
+
+/* ── 카드 헤더 액션 영역 ─────────────────────────────────── */
+
+.card-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}

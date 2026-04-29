@@ -35,11 +35,30 @@ class AccountsAdminPageView(TemplateView):
         return ctx
 
 
+class OrganizationsAdminPageView(TemplateView):
+    """
+    조직 관리 페이지.
+    실제 데이터는 JS가 API를 fetch해서 렌더링한다.
+    """
+
+    template_name = "admin_panel/organizations/organizations_main.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["active_nav"] = "org"
+        return ctx
+
+
 urlpatterns = [
     path(
         "accounts-management/",
         AccountsAdminPageView.as_view(),
         name="admin-accounts-page",
+    ),
+    path(
+        "organizations/",
+        OrganizationsAdminPageView.as_view(),
+        name="admin-organizations-page",
     ),
     path(
         "geofence/",
