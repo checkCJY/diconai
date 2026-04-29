@@ -1,7 +1,8 @@
 # websocket/routers/ws_router.py — 브라우저/IoT WebSocket 엔드포인트
 #
 # 두 가지 WebSocket 연결을 처리한다.
-#   WS /ws/sensors/  : 브라우저 연결. 1초마다 통합 페이로드(가스+전력+알람+작업자 위치)를 송출한다.
+#   WS /ws/sensors/  : 브라우저 연결. 단일 브로드캐스터(broadcast_loop)가 모든 클라이언트에
+#                      동시 전송해 active_alarms 중복 소비를 방지한다.
 #   WS /ws/position/ : IoT 위치 장비 연결. 위치 데이터를 수신해 DRF에 저장하고
 #                      worker_positions 공유 상태를 갱신한다.
 import asyncio
@@ -12,11 +13,49 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from core.config import settings
 from websocket.services.broadcast import build_broadcast_payload
-from websocket.state import worker_positions
+from websocket.state import active_alarms, sensor_clients, worker_positions
 
 POSITION_ENDPOINT = f"{settings.DRF_BASE_URL}/api/positioning/receive/"
+BROADCAST_INTERVAL = 30  # 센서 데이터 브로드캐스트 주기(초)
+ALARM_FLUSH_INTERVAL = 2  # 새 이벤트 알람 전용 플러시 주기(초)
 
 router = APIRouter()
+
+
+async def _send_to_all(payload: dict) -> None:
+    """연결된 모든 클라이언트에 페이로드를 전송하고 끊긴 클라이언트를 정리한다."""
+    dead: list[WebSocket] = []
+    for ws in list(sensor_clients):
+        try:
+            await ws.send_json(payload)
+        except Exception:
+            dead.append(ws)
+    for ws in dead:
+        if ws in sensor_clients:
+            sensor_clients.remove(ws)
+
+
+async def alarm_flush_loop():
+    """새 이벤트(is_new_event=True) 알람이 생기면 2초 내로 즉시 브로드캐스트한다.
+
+    30초 브로드캐스트를 기다리지 않고 위험 팝업을 빠르게 전달하기 위한 전용 루프.
+    """
+    while True:
+        await asyncio.sleep(ALARM_FLUSH_INTERVAL)
+        if not sensor_clients:
+            continue
+        if not any(a.get("is_new_event") for a in active_alarms):
+            continue
+        await _send_to_all(build_broadcast_payload())
+
+
+async def broadcast_loop():
+    """30초마다 모든 클라이언트에 센서 통합 데이터를 브로드캐스트한다."""
+    while True:
+        await asyncio.sleep(BROADCAST_INTERVAL)
+        if not sensor_clients:
+            continue
+        await _send_to_all(build_broadcast_payload())
 
 
 async def _forward_to_drf(payload: dict) -> dict:
@@ -49,17 +88,23 @@ async def sensor_stream(websocket: WebSocket):
     """
     브라우저용 실시간 통합 데이터 스트림.
 
-    10초마다 build_broadcast_payload()로 조립한 페이로드를 전송한다.
-    페이로드에는 가스 측정값·위험도, 전력 설비 현황, 알람 목록, 작업자 위치가 포함된다.
+    연결 즉시 첫 페이로드를 전송하고, 이후 broadcast_loop 가 주기적으로 전송한다.
+    클라이언트별 루프를 두지 않아 active_alarms 중복 소비를 방지한다.
     """
     await websocket.accept()
-    print("[ws/sensors] 브라우저 연결됨")
+    sensor_clients.append(websocket)
+    print(f"[ws/sensors] 브라우저 연결됨 (총 {len(sensor_clients)}개)")
     try:
-        while True:
-            await websocket.send_json(build_broadcast_payload())
-            await asyncio.sleep(10)
+        await websocket.send_json(build_broadcast_payload(include_alarms=False))
+        await websocket.receive_text()   # 연결 유지 (disconnect까지 대기)
     except WebSocketDisconnect:
-        print("[ws/sensors] 브라우저 연결 종료")
+        pass
+    except Exception:
+        pass
+    finally:
+        if websocket in sensor_clients:
+            sensor_clients.remove(websocket)
+        print(f"[ws/sensors] 브라우저 연결 종료 (총 {len(sensor_clients)}개)")
 
 
 @router.websocket("/ws/position/")

@@ -6,8 +6,6 @@
 #
 # 보안: 127.0.0.1 (localhost)에서만 호출 가능.
 
-from typing import Any
-
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
