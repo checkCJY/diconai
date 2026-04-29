@@ -1,0 +1,171 @@
+{% extends 'admin_panel/base.html' %}
+{% load static %}
+
+{% block title %}설비 관리{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/admin/facility.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="page-header fac-header">
+  <div class="header-titles">
+    <div class="breadcrumb">설비 관리</div>
+    <h2 class="page-title">설비 관리</h2>
+    <p class="page-desc">현장 설비를 등록·수정·비활성화합니다.</p>
+  </div>
+  <div class="header-actions">
+    <button class="btn-danger-outline" id="btnBulkDelete" disabled>선택 삭제</button>
+    <button class="btn-primary" id="btnCreate">설비 등록</button>
+  </div>
+</section>
+
+<!-- 검색·필터 -->
+<div class="fac-toolbar">
+  <div class="fac-search-wrap">
+    <input type="text" id="searchInput" placeholder="설비코드(EQP) 또는 설비명 검색">
+    <button class="btn-dark btn-sm" id="btnSearch">검색</button>
+  </div>
+  <div class="fac-filter-wrap">
+    <select id="filterFacility">
+      <option value="">공장 전체</option>
+    </select>
+    <select id="filterActive">
+      <option value="">사용여부 전체</option>
+      <option value="true">사용</option>
+      <option value="false">미사용</option>
+    </select>
+    <select id="filterOrder">
+      <option value="-created_at">최신 등록순</option>
+      <option value="created_at">오래된 등록순</option>
+      <option value="name">설비명 오름차순</option>
+      <option value="-name">설비명 내림차순</option>
+    </select>
+  </div>
+</div>
+
+<!-- 테이블 -->
+<div class="fac-table-wrap">
+  <table class="fac-table" id="facilityTable">
+    <colgroup>
+      <col style="width:3%">
+      <col style="width:8%">
+      <col style="width:8%">
+      <col style="width:12%">
+      <col style="width:13%">
+      <col style="width:15%">
+      <col style="width:8%">
+      <col style="width:10%">
+      <col style="width:7%">
+      <col style="width:9%">
+      <col style="width:7%">
+    </colgroup>
+    <thead>
+      <tr>
+        <th class="col-chk"><input type="checkbox" id="chkAll"></th>
+        <th>설비코드</th>
+        <th>공장코드</th>
+        <th>설비명</th>
+        <th>주소</th>
+        <th>연결 전력 시스템</th>
+        <th>담당자</th>
+        <th>비고</th>
+        <th>사용여부</th>
+        <th>등록일</th>
+        <th>관리</th>
+      </tr>
+    </thead>
+    <tbody id="facilityTbody">
+      <tr class="fac-empty-row">
+        <td colspan="11">데이터를 불러오는 중...</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- 페이지네이션 -->
+<div class="fac-pagination" id="pagination"></div>
+
+<!-- ── 설비 등록/수정 모달 ─────────────────────────────── -->
+<div class="fac-modal-overlay" id="formModal" style="display:none;">
+  <div class="fac-modal">
+    <div class="fac-modal-header">
+      <h3 id="formModalTitle">설비 등록</h3>
+      <p class="fac-modal-desc" id="formModalDesc">신규 설비 정보를 입력하고 연결 전력 시스템을 선택하세요.</p>
+    </div>
+    <div class="fac-modal-body">
+      <input type="hidden" id="formEquipmentId">
+      <div class="fac-form-row">
+        <label>설비코드</label>
+        <input type="text" id="formEquipmentCode" readonly placeholder="자동 생성" class="fac-input-readonly">
+      </div>
+      <div class="fac-form-row">
+        <label>공장 <span class="required">*</span></label>
+        <select id="formFacility">
+          <option value="">공장을 선택하세요</option>
+        </select>
+        <span class="fac-form-error" id="errFacility"></span>
+      </div>
+      <div class="fac-form-row">
+        <label>설비명 <span class="required">*</span></label>
+        <input type="text" id="formName" placeholder="설비명을 입력하세요">
+        <span class="fac-form-error" id="errName"></span>
+      </div>
+      <div class="fac-form-row">
+        <label>연결 전력 시스템</label>
+        <select id="formPowerDevice">
+          <option value="">선택 안 함</option>
+        </select>
+      </div>
+      <div class="fac-form-row">
+        <label>비고</label>
+        <textarea id="formNotes" rows="2" placeholder="비고 (선택)"></textarea>
+      </div>
+      <div class="fac-form-row fac-form-row-inline">
+        <label>사용여부</label>
+        <label class="fac-toggle">
+          <input type="checkbox" id="formIsActive" checked>
+          <span class="fac-toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+    <div class="fac-modal-footer">
+      <span class="fac-form-error-global" id="errGlobal"></span>
+      <button class="btn-outline" id="btnFormCancel">취소</button>
+      <button class="btn-primary" id="btnFormSubmit">등록</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 등록 완료 팝업 ─────────────────────────────────── -->
+<div class="fac-modal-overlay" id="successModal" style="display:none;">
+  <div class="fac-modal fac-modal-sm">
+    <div class="fac-modal-body fac-success-body">
+      <div class="fac-success-icon">✓</div>
+      <p id="successModalText">등록되었습니다.</p>
+    </div>
+    <div class="fac-modal-footer">
+      <button class="btn-primary" id="btnSuccessClose">확인</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 비활성화 확인 모달 ──────────────────────────────── -->
+<div class="fac-modal-overlay" id="deleteModal" style="display:none;">
+  <div class="fac-modal fac-modal-sm">
+    <div class="fac-modal-header"><h3>설비 비활성화</h3></div>
+    <div class="fac-modal-body">
+      <p id="deleteModalText">해당 설비를 비활성화하시겠습니까?</p>
+    </div>
+    <div class="fac-modal-footer">
+      <button class="btn-outline" id="btnDeleteCancel">취소</button>
+      <button class="btn-danger" id="btnDeleteConfirm">비활성화</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/shared/auth.js' %}"></script>
+<script src="{% static 'js/admin/facility/facility.js' %}"></script>
+{% endblock %}

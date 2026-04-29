@@ -41,6 +41,7 @@ class Facility(models.Model):
         related_name="managed_facilities",
         verbose_name="담당 관리자",
     )
+    notes = models.TextField(blank=True, default="", verbose_name="비고")
     is_active = models.BooleanField(default=True, verbose_name="운영 여부")
     deactivated_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
