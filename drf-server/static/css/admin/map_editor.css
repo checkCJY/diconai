@@ -1,0 +1,357 @@
+/* ============================================================
+   map_editor.css — 지도 편집 관리 페이지
+   ============================================================ */
+
+/* ── 페이지 헤더 ─────────────────────────────────────────── */
+.me-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+.btn-danger-outline {
+  background: transparent;
+  border: 1px solid #f85149;
+  color: #f85149;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.btn-danger-outline:hover { background: #f851490f; }
+
+/* ── 레이아웃: 사이드바 + 지도 ───────────────────────────── */
+.me-layout {
+  display: flex;
+  gap: 0;
+  height: calc(100vh - 200px);
+  min-height: 540px;
+  position: relative;
+}
+
+/* ── 좌측 사이드바 ───────────────────────────────────────── */
+.me-sidebar {
+  width: 300px;
+  flex-shrink: 0;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px 0 0 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  transition: width 0.2s;
+}
+.me-sidebar.collapsed { width: 0; overflow: hidden; border: none; }
+
+.me-sidebar-header {
+  padding: 16px 16px 8px;
+  border-bottom: 1px solid #30363d;
+}
+.me-sidebar-title { font-size: 14px; font-weight: 600; color: #e6edf3; }
+.me-sidebar-desc { font-size: 12px; color: #6e7681; margin-top: 4px; }
+
+.me-sidebar-filter { padding: 10px 16px 0; }
+.me-sidebar-filter select {
+  width: 100%;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  color: #e6edf3;
+  padding: 6px 8px;
+  border-radius: 5px;
+  font-size: 12px;
+}
+
+.me-search-row { padding: 8px 16px; }
+.me-search-label { font-size: 11px; color: #6e7681; display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.me-search-input-wrap { display: flex; gap: 6px; }
+.me-search-input-wrap input {
+  flex: 1;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  color: #e6edf3;
+  padding: 6px 8px;
+  border-radius: 5px;
+  font-size: 12px;
+}
+.btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 5px; cursor: pointer; }
+
+/* 배치 상태 탭 */
+.me-tabs {
+  display: flex;
+  padding: 8px 16px 0;
+  gap: 6px;
+}
+.me-tab {
+  flex: 1;
+  padding: 5px 4px;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  color: #6e7681;
+  font-size: 11px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.me-tab.active { background: #1f6feb22; border-color: #1f6feb; color: #58a6ff; }
+.me-tab span { font-weight: 700; }
+
+/* 타입 필터 */
+.me-type-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px 16px;
+  border-bottom: 1px solid #30363d;
+}
+.me-type {
+  padding: 3px 8px;
+  background: #21262d;
+  border: 1px solid #30363d;
+  color: #8b949e;
+  font-size: 11px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.me-type.active { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+
+/* 객체 목록 */
+.me-object-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+.me-object-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
+  border-bottom: 1px solid #21262d;
+  transition: background 0.1s;
+}
+.me-object-item:hover { background: #21262d; }
+.me-object-item.selected { background: #1f6feb18; }
+.me-object-item input[type=checkbox] { flex-shrink: 0; cursor: pointer; }
+.me-object-name { flex: 1; font-size: 12px; color: #e6edf3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.me-object-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+.badge-facility    { background: #1f6feb22; color: #58a6ff; border: 1px solid #1f6feb55; }
+.badge-gas_sensor  { background: #f8514922; color: #f85149; border: 1px solid #f8514955; }
+.badge-power_device{ background: #e3b34122; color: #e3b341; border: 1px solid #e3b34155; }
+.badge-position_node{ background: #3fb95022; color: #3fb950; border: 1px solid #3fb95055; }
+.badge-geofence    { background: #8b494922; color: #c9a227; border: 1px solid #c9a22755; }
+.me-object-unplaced { color: #6e7681; font-size: 11px; flex-shrink: 0; }
+
+/* 접기 버튼 */
+.me-sidebar-collapse {
+  position: absolute;
+  right: -14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 40px;
+  background: #30363d;
+  border: none;
+  border-radius: 0 4px 4px 0;
+  color: #8b949e;
+  font-size: 10px;
+  cursor: pointer;
+  z-index: 10;
+}
+
+/* ── 지도 영역 ───────────────────────────────────────────── */
+.me-map-wrap {
+  flex: 1;
+  position: relative;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+  overflow: hidden;
+}
+
+.me-map-tabs {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  z-index: 500;
+  background: #161b22cc;
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid #30363d;
+}
+.me-map-tab {
+  padding: 5px 12px;
+  background: transparent;
+  border: none;
+  color: #8b949e;
+  font-size: 12px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.me-map-tab.active { background: #1f6feb; color: #fff; }
+
+#meMap { width: 100%; height: 100%; }
+
+/* 확대/축소 */
+.me-zoom-ctrl {
+  position: absolute;
+  right: 16px;
+  top: 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 500;
+}
+.me-zoom-ctrl button {
+  width: 32px;
+  height: 32px;
+  background: #161b22;
+  border: 1px solid #30363d;
+  color: #e6edf3;
+  border-radius: 6px;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.me-zoom-ctrl button:hover { background: #21262d; }
+
+/* 그리기 모드 배너 */
+.me-draw-banner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: #e3b34133;
+  border-bottom: 2px solid #e3b341;
+  color: #e3b341;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 600;
+}
+
+/* ── 팝업 스타일 (Leaflet popup 내부) ────────────────────── */
+.me-popup-title { font-weight: 700; font-size: 13px; margin-bottom: 6px; }
+.me-popup-row   { font-size: 12px; color: #444; margin: 2px 0; }
+.me-popup-actions { display: flex; gap: 6px; margin-top: 10px; }
+.me-popup-actions button {
+  flex: 1;
+  padding: 5px 8px;
+  font-size: 11px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid #30363d;
+}
+.btn-popup-edit   { background: #1f6feb; color: #fff; border-color: #1f6feb; }
+.btn-popup-delete { background: #f85149; color: #fff; border-color: #f85149; }
+.btn-popup-save   { background: #3fb950; color: #fff; border-color: #3fb950; }
+.btn-popup-cancel { background: transparent; color: #6e7681; }
+
+/* ── 모달 ─────────────────────────────────────────────────── */
+.me-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: #00000088;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+.me-modal {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  width: 420px;
+  overflow: hidden;
+}
+.me-modal-sm { width: 320px; }
+.me-modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #30363d;
+}
+.me-modal-header h3 { font-size: 15px; font-weight: 700; color: #e6edf3; margin: 0; }
+.me-modal-body { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+.me-modal-body label { font-size: 12px; color: #8b949e; margin-bottom: 6px; display: block; }
+.me-modal-body input[type=text] {
+  width: 100%;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  color: #e6edf3;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+.me-modal-section { display: flex; flex-direction: column; }
+.me-btn-group { display: flex; gap: 8px; margin-top: 6px; }
+.me-toggle {
+  flex: 1;
+  padding: 8px;
+  background: #21262d;
+  border: 1px solid #30363d;
+  color: #8b949e;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.me-toggle.active { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+.me-info-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #8b949e;
+}
+.me-info-row span:last-child { color: #e6edf3; font-family: monospace; }
+.me-modal-footer {
+  padding: 12px 20px;
+  border-top: 1px solid #30363d;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ── 편집 중 상태 표시 (Leaflet 레이어) ──────────────────── */
+.me-editing-label {
+  background: #1f6feb;
+  color: #fff;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+/* ── 공통 버튼 (admin.css 보완) ─────────────────────────── */
+.btn-danger {
+  background: #f85149;
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.btn-danger:hover { background: #da3633; }

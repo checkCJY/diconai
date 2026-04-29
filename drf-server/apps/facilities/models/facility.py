@@ -27,6 +27,12 @@ class Facility(models.Model):
 
     name = models.CharField(max_length=200, verbose_name="공장 이름")
     address = models.CharField(max_length=500, verbose_name="공장 주소")
+
+    # 도면 상 위치/크기 (지도 편집 관리에서 설정)
+    map_x = models.FloatField(null=True, blank=True, verbose_name="도면 x 좌표 (px)")
+    map_y = models.FloatField(null=True, blank=True, verbose_name="도면 y 좌표 (px)")
+    map_width = models.FloatField(null=True, blank=True, verbose_name="도면 너비 (px)")
+    map_height = models.FloatField(null=True, blank=True, verbose_name="도면 높이 (px)")
     manager = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

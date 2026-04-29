@@ -1,45 +1,58 @@
-# positioning/routers/position_router.py — 더미 작업자 위치 WebSocket 엔드포인트
+# positioning/routers/position_router.py — 작업자 위치 수신 및 WebSocket 스트리밍
 #
-# 브라우저를 대상으로 더미 작업자 위치를 1초마다 송출하는 WebSocket 라우터.
-# 실제 IoT 장비 연동 전까지 DUMMY_WORKERS 시뮬레이션 데이터를 사용한다.
-#   WS /ws/positions/ : 브라우저 연결 → 1초마다 작업자 위치 배열 전송 + DRF 저장
+#   POST /api/positioning/receive : 더미 또는 IoT 장비에서 위치 배열을 수신해 공유 상태 갱신
+#   WS   /ws/positions/           : 브라우저 연결 → 1초마다 공유 상태의 위치 배열을 전송
 import asyncio
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from positioning.services.position_service import (
-    update_worker_positions,
-    save_positions_to_drf,
-)
+from positioning.schemas.position import WorkerPositionSchema
+from positioning.services.position_service import save_positions_to_drf
+from websocket import state as ws_state
 
 router = APIRouter()
+
+
+@router.post("/api/positioning/receive")
+async def receive_positions(positions: list[WorkerPositionSchema]):
+    """
+    더미 스크립트 또는 IoT 장비로부터 작업자 위치 배열을 수신한다.
+
+    공유 상태(worker_positions)를 갱신해 /ws/positions/ 및 /ws/sensors/ 다음 틱에
+    브라우저로 전달되도록 하고, DRF에 비동기로 저장을 요청한다.
+    """
+    now = datetime.now(timezone.utc)
+    for p in positions:
+        ws_state.worker_positions[p.worker_id] = {
+            "x": p.x,
+            "y": p.y,
+            "facility_id": p.facility_id,
+            "worker_name": p.worker_name,
+            "movement_status": p.movement_status,
+            "updated_at": (p.measured_at or now).isoformat(),
+        }
+    asyncio.create_task(save_positions_to_drf(positions))
+    return {"received": True, "count": len(positions)}
 
 
 @router.websocket("/ws/positions/")
 async def position_stream(websocket: WebSocket):
     """
-    브라우저에 더미 작업자 위치를 1초마다 스트리밍한다.
+    브라우저에 작업자 위치를 1초마다 스트리밍한다.
 
-    매 틱마다 update_worker_positions()로 더미 이동을 계산해 브라우저에 즉시 전송하고,
-    save_positions_to_drf()를 비동기 태스크로 실행해 DRF에 저장한다.
-    DRF 저장은 지오펜스 근접 시에만 실제 DB 레코드가 생성된다.
+    공유 상태(worker_positions)를 읽어 전송하므로,
+    position_dummy.py가 실행 중일 때는 시뮬레이션 데이터가,
+    실제 IoT 장비 연결 시에는 실측 데이터가 전달된다.
     """
     await websocket.accept()
     try:
         while True:
-            positions = update_worker_positions()
-
-            await websocket.send_json(
-                {
-                    "worker_positions": [
-                        {**p.model_dump(), "measured_at": p.measured_at.isoformat()}
-                        for p in positions
-                    ]
-                }
-            )
-
-            asyncio.create_task(save_positions_to_drf(positions))
-
+            positions = [
+                {"worker_id": wid, **data}
+                for wid, data in ws_state.worker_positions.items()
+            ]
+            await websocket.send_json({"worker_positions": positions})
             await asyncio.sleep(1)
-
     except WebSocketDisconnect:
         print("[positioning] Client disconnected")

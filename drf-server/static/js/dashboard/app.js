@@ -15,7 +15,7 @@ async function initApp() {
   await initHeaderAndSNB();
 
   initCharts();
-  MapPanel.init();
+  await MapPanel.init();
   initWebSocket();
   AlarmPopup.init();
   EventPanel.init();

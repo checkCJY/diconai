@@ -1,0 +1,173 @@
+{% extends 'admin_panel/base.html' %}
+{% load static %}
+
+{% block title %}지도 편집 관리{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="{% static 'css/admin/map_editor.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="page-header me-header">
+  <div class="header-titles">
+    <div class="breadcrumb">지도 편집 관리</div>
+    <h2 class="page-title">지도 편집 관리</h2>
+    <p class="page-desc">현장 내 설비/유해가스 센서/스마트 전력 시스템/위치 노드/위험구역을 직접 배치하고 수정합니다.</p>
+  </div>
+  <div class="header-actions">
+    <button class="btn-outline" id="btnResetAll">전체 되돌리기</button>
+    <button class="btn-primary" id="btnSaveAll">저장</button>
+    <button class="btn-danger-outline" id="btnAddGeofence">위험 구역 추가</button>
+  </div>
+</section>
+
+<div class="me-layout">
+  <!-- ── 좌측: 객체 선택 패널 ──────────────────────────── -->
+  <aside class="me-sidebar" id="meSidebar">
+    <div class="me-sidebar-header">
+      <span class="me-sidebar-title">객체 선택</span>
+      <p class="me-sidebar-desc">지도에 배치할 장비를 선택하세요.</p>
+    </div>
+
+    <div class="me-sidebar-filter">
+      <select id="facilitySelect">
+        <option value="">전체</option>
+      </select>
+    </div>
+
+    <div class="me-search-row">
+      <label class="me-search-label">
+        <input type="checkbox" id="chkSearchRegex"> 정규식 또는 객체 코드 검색
+      </label>
+      <div class="me-search-input-wrap">
+        <input type="text" id="searchInput" placeholder="객체명 또는 객체 코드 검색">
+        <button class="btn-dark btn-sm" id="btnSearch">검색</button>
+      </div>
+    </div>
+
+    <div class="me-tabs">
+      <button class="me-tab active" data-tab="all">전체 <span id="cntAll">0</span></button>
+      <button class="me-tab" data-tab="placed">배치 완료 <span id="cntPlaced">0</span></button>
+      <button class="me-tab" data-tab="unplaced">미배치 <span id="cntUnplaced">0</span></button>
+    </div>
+
+    <div class="me-type-tabs">
+      <button class="me-type active" data-type="all">전체</button>
+      <button class="me-type" data-type="facility">설비</button>
+      <button class="me-type" data-type="gas_sensor">유해가스 센서</button>
+      <button class="me-type" data-type="power_device">스마트 전력 시스템</button>
+      <button class="me-type" data-type="position_node">위치 노드</button>
+      <button class="me-type" data-type="geofence">위험 구역</button>
+    </div>
+
+    <div class="me-object-list" id="objectList"></div>
+
+    <button class="me-sidebar-collapse" id="btnCollapseSidebar" title="패널 접기">〈</button>
+  </aside>
+
+  <!-- ── 우측: Leaflet 지도 ─────────────────────────────── -->
+  <div class="me-map-wrap">
+    <!-- 지도 탭 필터 -->
+    <div class="me-map-tabs">
+      <button class="me-map-tab active" data-layer="all">전체</button>
+      <button class="me-map-tab" data-layer="facility">설비</button>
+      <button class="me-map-tab" data-layer="gas_sensor">유해가스 센서</button>
+      <button class="me-map-tab" data-layer="power_device">스마트 전력 시스템</button>
+      <button class="me-map-tab" data-layer="position_node">위치 노드</button>
+      <button class="me-map-tab" data-layer="geofence">위험 구역</button>
+    </div>
+
+    <div id="meMap"></div>
+
+    <!-- 확대/축소 컨트롤 -->
+    <div class="me-zoom-ctrl">
+      <button id="btnZoomIn" title="확대">+</button>
+      <button id="btnZoomOut" title="축소">−</button>
+      <button id="btnFitAll" title="전체 보기">⟳</button>
+    </div>
+
+    <!-- 위험구역 생성 모드 알림 띠 -->
+    <div class="me-draw-banner" id="drawBanner" style="display:none;">
+      <span id="drawBannerText">지도를 드래그해</span>
+      <div style="display:flex;gap:6px;">
+        <button class="btn-primary btn-sm" id="btnFinishDraw" style="display:none;">폴리곤 완료</button>
+        <button class="btn-outline btn-sm" id="btnCancelDraw">생성 취소</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 위험구역 생성 모달 ─────────────────────────────────── -->
+<div class="me-modal-overlay" id="geofenceCreateModal" style="display:none;">
+  <div class="me-modal">
+    <div class="me-modal-header">
+      <h3>위험구역 생성</h3>
+    </div>
+    <div class="me-modal-body">
+      <div class="me-modal-section">
+        <label>위험구역 유형 및 생성 방법을 선택하세요.</label>
+        <div class="me-btn-group">
+          <button class="me-toggle active" data-risk="warning">주의 구역 생성</button>
+          <button class="me-toggle" data-risk="danger">위험 구역 생성</button>
+        </div>
+      </div>
+      <div class="me-modal-section">
+        <div class="me-btn-group">
+          <button class="me-toggle active" data-shape="polygon">폴리곤 생성</button>
+          <button class="me-toggle" data-shape="circle">원형 생성</button>
+        </div>
+      </div>
+      <div class="me-modal-section">
+        <label>구역명</label>
+        <input type="text" id="newGeofenceName" placeholder="신규 위험 구역">
+      </div>
+      <div class="me-modal-section me-info-row" id="drawCoordInfo">
+        <span>현재 목표점 좌표</span>
+        <span id="drawCoordText">X 0 / Y 0</span>
+      </div>
+    </div>
+    <div class="me-modal-footer">
+      <button class="btn-outline" id="btnGeofenceModalCancel">취소</button>
+      <button class="btn-primary" id="btnStartDraw">지도에 그리기</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 저장 확인 모달 ─────────────────────────────────────── -->
+<div class="me-modal-overlay" id="saveConfirmModal" style="display:none;">
+  <div class="me-modal me-modal-sm">
+    <div class="me-modal-header"><h3>지도 저장 '재확인'</h3></div>
+    <div class="me-modal-body">
+      <p>지도 편집 관리 데이터를 저장하시겠습니까?</p>
+    </div>
+    <div class="me-modal-footer">
+      <button class="btn-outline" id="btnSaveCancel">취소</button>
+      <button class="btn-primary" id="btnSaveConfirm">확인</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 전체 되돌리기 확인 모달 ───────────────────────────── -->
+<div class="me-modal-overlay" id="resetConfirmModal" style="display:none;">
+  <div class="me-modal me-modal-sm">
+    <div class="me-modal-header"><h3>전체 되돌리기</h3></div>
+    <div class="me-modal-body">
+      <p>수정 중이던 편집 내용이 모두 취소됩니다.<br>계속하시겠습니까?</p>
+    </div>
+    <div class="me-modal-footer">
+      <button class="btn-outline" id="btnResetCancel">취소</button>
+      <button class="btn-danger" id="btnResetConfirm">확인</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  window.FACTORY_MAP_URL = "{% static 'img/factory_map.svg' %}";
+</script>
+<script src="{% static 'js/shared/auth.js' %}"></script>
+<script src="{% static 'js/admin/map_editor/map_editor.js' %}"></script>
+{% endblock %}
