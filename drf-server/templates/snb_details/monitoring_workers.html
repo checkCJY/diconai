@@ -98,6 +98,11 @@
 
             <!-- JS가 행을 동적으로 append하는 영역 -->
             <tbody id="worker-table-body">
+              <tr id="worker-table-loading">
+                <td colspan="7" style="text-align:center; padding:24px; color:#8b949e;">
+                  데이터 로딩 중...
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -169,8 +174,13 @@
         </div>
 
         <!-- 2. 작업자 프로필 -->
-        <!-- TODO: GET /api/workers/{id}/profile/ 응답으로 아래 필드 채우기
-                   필드: 이름, 사원번호, 소속, 직급, 이메일, 연락처 -->
+        <!--
+          [B안 전환 시 구현 필요]
+          현재: WebSocket worker_positions의 worker_name·dept 필드로 채움 (더미 데이터 기반)
+          B안:  행 클릭 시 GET /api/workers/{id}/profile/ 호출하여 실제 DB 프로필 표시
+                반환 필드: name, employee_id, department, position, email, phone
+          참고: WorkerListAPIView(/dashboard/api/workers-list/)의 응답 스키마 확장 필요
+        -->
         <div class="detail-card">
           <div class="detail-card-title">
             작업자 프로필
@@ -187,9 +197,12 @@
         </div>
 
         <!-- 3. 작업자 위험 현황 -->
-        <!-- TODO: GET /api/workers/{id}/risk/ 응답으로 PPE·체크리스트·VR 상태 채우기
-                   각 항목: { status: 'ok'|'warn'|'none', label }
-                   상태에 따라 아이콘(✓/✗/?) 및 박스 테두리 색 변경 예정 -->
+        <!--
+          [B안 전환 시 구현 필요]
+          현재: 체크리스트·VR 교육만 표시 (PPE는 IoT·AI 연동 미완료로 제거)
+          B안:  GET /api/workers/{id}/risk/ 호출 → 각 항목 { status:'ok'|'warn'|'none' }
+                PPE 항목은 IoT 센서 또는 AI 영상 분석 연동 완료 후 재추가
+        -->
         <div class="detail-card">
           <div class="detail-card-title">
             작업자 위험 현황
@@ -197,24 +210,17 @@
           </div>
           <div class="risk-item-grid">
 
-            <!-- PPE 착용 여부 -->
-            <!-- TODO: IoT 센서 또는 AI 영상 분석 결과와 연동 -->
-            <div class="risk-item" id="risk-ppe">
-              <div class="risk-item-icon">✕</div>
-              <div class="risk-item-label">PPE 착용</div>
-            </div>
-
-            <!-- 인신 확인 체크리스트 -->
+            <!-- 안전 확인 체크리스트 -->
             <!-- TODO: 작업 전 안전 확인 체크리스트 완료 여부 API 연동 -->
             <div class="risk-item" id="risk-checklist">
-              <div class="risk-item-icon">✕</div>
-              <div class="risk-item-label">인신 확인<br>체크리스트</div>
+              <div class="risk-item-icon">📋</div>
+              <div class="risk-item-label">안전 확인 체크리스트</div>
             </div>
 
             <!-- VR 교육 이수 여부 -->
             <!-- TODO: 교육 관리 시스템(LMS) 연동하여 최근 이수 여부 표시 -->
             <div class="risk-item" id="risk-vr">
-              <div class="risk-item-icon">✕</div>
+              <div class="risk-item-icon">🥽</div>
               <div class="risk-item-label">VR 교육</div>
             </div>
 
