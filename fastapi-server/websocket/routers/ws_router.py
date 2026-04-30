@@ -16,7 +16,7 @@ from websocket.services.broadcast import build_broadcast_payload
 from websocket.state import active_alarms, sensor_clients, worker_positions
 
 POSITION_ENDPOINT = f"{settings.DRF_BASE_URL}/api/positioning/receive/"
-BROADCAST_INTERVAL = 30  # 센서 데이터 브로드캐스트 주기(초)
+BROADCAST_INTERVAL = 2  # 센서 데이터 브로드캐스트 주기(초)
 ALARM_FLUSH_INTERVAL = 2  # 새 이벤트 알람 전용 플러시 주기(초)
 
 router = APIRouter()
@@ -96,7 +96,7 @@ async def sensor_stream(websocket: WebSocket):
     print(f"[ws/sensors] 브라우저 연결됨 (총 {len(sensor_clients)}개)")
     try:
         await websocket.send_json(build_broadcast_payload(include_alarms=False))
-        await websocket.receive_text()   # 연결 유지 (disconnect까지 대기)
+        await websocket.receive_text()  # 연결 유지 (disconnect까지 대기)
     except WebSocketDisconnect:
         pass
     except Exception:
