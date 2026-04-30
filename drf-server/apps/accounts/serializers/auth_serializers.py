@@ -84,7 +84,12 @@ class LoginSerializer(serializers.Serializer):
 
 
 class MyProfileSerializer(serializers.ModelSerializer):
-    department = serializers.CharField(source="department.name", default=None)
+    department = serializers.SerializerMethodField()
+
+    def get_department(self, obj):
+        dept = obj.department  # property
+        return dept.name if dept else None
+
     position = serializers.CharField(source="position.name", default=None)
     facility = serializers.CharField(source="facility.name", default=None)
 

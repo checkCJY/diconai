@@ -1,7 +1,14 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from apps.accounts.models import CustomUser, Department, LoginLog, Position
+from apps.accounts.models import (
+    Company,
+    CustomUser,
+    Department,
+    LoginLog,
+    Position,
+    UserDepartment,
+)
 
 
 @admin.register(CustomUser)
@@ -24,7 +31,6 @@ class CustomUserAdmin(UserAdmin):
                 "fields": (
                     "name",
                     "user_type",
-                    "department",
                     "position",
                     "facility",
                     "phone",
@@ -43,7 +49,6 @@ class CustomUserAdmin(UserAdmin):
                     "name",
                     "email",
                     "user_type",
-                    "department",
                     "position",
                     "facility",
                     "phone",
@@ -53,10 +58,22 @@ class CustomUserAdmin(UserAdmin):
     )
 
 
+@admin.register(Company)
+class CompanyAdmin(admin.ModelAdmin):
+    list_display = ("name", "is_active", "created_at")
+    ordering = ("name",)
+
+
 @admin.register(Department)
 class DepartmentAdmin(admin.ModelAdmin):
-    list_display = ("name", "code", "is_active")
+    list_display = ("name", "code", "company", "leader", "is_active")
     ordering = ("code",)
+
+
+@admin.register(UserDepartment)
+class UserDepartmentAdmin(admin.ModelAdmin):
+    list_display = ("user", "department", "is_primary", "joined_at")
+    list_filter = ("is_primary",)
 
 
 @admin.register(Position)

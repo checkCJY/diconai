@@ -1,7 +1,7 @@
 """
 apps/accounts/admin_urls.py
 
-어드민 패널 — 사용자 관리 API URL 설정.
+어드민 패널 — 사용자/조직 관리 API URL 설정.
 config/urls.py에서 "api/admin/" 프리픽스로 포함된다.
 """
 
@@ -12,20 +12,58 @@ from apps.accounts.views.admin_views import (
     AccountsAdminListView,
     AccountsAdminLockView,
 )
+from apps.accounts.views.org_views import (
+    OrgTreeView,
+    DeptListCreateView,
+    DeptDetailView,
+    DeptMemberListView,
+    DeptMemberAddView,
+    DeptMemberMoveView,
+    DeptMemberRemoveView,
+    DeptLeaderAssignView,
+)
 
 urlpatterns = [
-    # 목록 조회 / 신규 등록
+    # ── 사용자 관리 ────────────────────────────────────────────
     path("accounts/", AccountsAdminListView.as_view(), name="admin-accounts-list"),
-    # 상세 조회 / 수정 / 비활성화
     path(
         "accounts/<int:pk>/",
         AccountsAdminDetailView.as_view(),
         name="admin-accounts-detail",
     ),
-    # 계정 잠금 / 잠금 해제  (?action=lock|unlock)
     path(
         "accounts/<int:pk>/<str:action>/",
         AccountsAdminLockView.as_view(),
         name="admin-accounts-lock",
+    ),
+    # ── 조직 관리 ──────────────────────────────────────────────
+    path("organizations/tree/", OrgTreeView.as_view(), name="admin-org-tree"),
+    path("departments/", DeptListCreateView.as_view(), name="admin-dept-list-create"),
+    path("departments/<int:pk>/", DeptDetailView.as_view(), name="admin-dept-detail"),
+    # ── 구성원 관리 (조직 없음은 pk="none") ────────────────────
+    path(
+        "departments/<pk>/members/",
+        DeptMemberListView.as_view(),
+        name="admin-dept-members",
+    ),
+    path(
+        "departments/<int:pk>/members/add/",
+        DeptMemberAddView.as_view(),
+        name="admin-dept-member-add",
+    ),
+    path(
+        "departments/<pk>/members/move/",
+        DeptMemberMoveView.as_view(),
+        name="admin-dept-member-move",
+    ),
+    path(
+        "departments/<int:pk>/members/remove/",
+        DeptMemberRemoveView.as_view(),
+        name="admin-dept-member-remove",
+    ),
+    path(
+        "departments/<int:pk>/members/assign-leader/",
+        DeptLeaderAssignView.as_view(),
+        name="admin-dept-leader",
     ),
 ]

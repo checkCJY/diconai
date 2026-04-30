@@ -1,0 +1,153 @@
+{% extends 'admin_panel/base.html' %}
+{% load static %}
+
+{% block title %}조직 관리{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/admin/organizations.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<!-- 페이지 헤더 -->
+<section class="page-header">
+    <div class="header-titles">
+        <div class="breadcrumb">사용자 관리 &gt; 조직 관리</div>
+        <h2 class="page-title">조직 관리</h2>
+        <p class="page-desc">조직도와 부서 정보를 조회하고 구성원 정보를 관리합니다.</p>
+    </div>
+</section>
+
+<!-- 메인 레이아웃: 좌측 조직도 + 우측 상세 -->
+<div class="org-layout">
+
+    <!-- ① 좌측: 조직도 패널 -->
+    <div class="org-tree-panel">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">조직도</h3>
+            </div>
+
+            <!-- ② 부서명 검색 -->
+            <div class="tree-search">
+                <div class="search-box">
+                    <input type="text" id="orgSearchInput" placeholder="부서명 검색">
+                    <button class="btn-clear" id="btnClearOrgSearch" title="지우기" style="display:none;">✕</button>
+                </div>
+                <p class="tree-search-tip">TIP 부서를 선택하면 우측에서 상세 정보와 구성원을 확인할 수 있습니다.</p>
+            </div>
+
+            <!-- ④⑤ 조직 트리 — JS가 동적 렌더링 -->
+            <div class="card-body">
+                <ul class="tree-root" id="orgTree"></ul>
+
+                <!-- ⑥ 조직 없음 -->
+                <div class="tree-no-org" id="noDeptItem">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v2h20v-2c0-3.3-6.7-5-10-5z"/></svg>
+                    <span>조직 없음</span>
+                    <span class="no-dept-count" style="font-size:12px; color:#94a3b8;"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 우측: 부서 상세 + 구성원 -->
+    <div class="org-detail-panel">
+
+        <!-- ⑦ 부서 정보 카드 -->
+        <div class="card dept-info-card">
+            <div class="card-header">
+                <h3 class="card-title">부서 정보</h3>
+            </div>
+            <div class="card-body">
+                <div class="dept-info-row">
+                    <span class="dept-info-label">부서명</span>
+                    <span class="dept-info-value" id="deptName">-</span>
+                </div>
+                <div class="dept-info-row">
+                    <span class="dept-info-label">최근 수정일</span>
+                    <span class="dept-info-value" id="deptUpdatedAt">-</span>
+                </div>
+                <div class="dept-info-row">
+                    <span class="dept-info-label">부서 코드</span>
+                    <span class="dept-info-value" id="deptCode">-</span>
+                </div>
+                <div class="dept-info-row">
+                    <span class="dept-info-label">최근 수정자</span>
+                    <span class="dept-info-value" id="deptUpdatedBy">-</span>
+                </div>
+                <div class="dept-info-row">
+                    <span class="dept-info-label">생성일</span>
+                    <span class="dept-info-value" id="deptCreatedAt">-</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ⑧ 구성원 정보 카드 -->
+        <div class="member-info-card">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">구성원 정보 <button class="btn btn-sm btn-outline" id="btnAddMember">+ 추가</button></h3>
+                    <!-- ⑩ 검색 -->
+                    <div class="card-header-actions">
+
+                        <div class="search-box">
+                            <input type="text" id="memberSearchInput" placeholder="이름, ID 검색">
+                            <button class="btn-clear" id="btnClearMemberSearch" title="지우기" style="display:none;">✕</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-body">
+                    <!-- ⑪ 구성원 테이블 -->
+                    <div class="member-table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <!-- ⑪ 전체 선택 체크박스 -->
+                                    <th style="width:40px;"><input type="checkbox" id="checkAllMembers"></th>
+                                    <th>사용자명</th>
+                                    <th>아이디</th>
+                                    <th>직위</th>
+                                    <th>계정 상태</th>
+                                </tr>
+                            </thead>
+                            <tbody id="memberTableBody">
+                                <tr>
+                                    <td colspan="5" style="color:#94a3b8; padding:32px 0;">
+                                        부서를 선택하면 구성원 목록이 표시됩니다.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- ⑬⑭⑮⑯⑰⑱ 푸터: 카운트 + 페이지네이션 + 액션 버튼 -->
+                    <div class="member-footer">
+                        <div class="member-footer-left">
+                            <span id="selectedCount">0</span>명 선택
+                        </div>
+                        <div class="member-footer-center">
+                            <!-- ⑭ 페이지네이션 — JS가 동적 렌더링 -->
+                            <div class="pagination" id="memberPagination"></div>
+                        </div>
+                        <div class="member-footer-right">
+                            <!-- ⑮ 부서 이동 ⑯ 소속 제외 ⑰ 조직장 임명 -->
+                            <button class="btn btn-outline btn-sm" id="btnMoveDept" disabled>부서 이동</button>
+                            <button class="btn btn-warning btn-sm" id="btnRemoveMember" disabled>소속 제외</button>
+                            <button class="btn btn-primary btn-sm" id="btnAssignLeader" disabled>조직장 임명</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /org-detail-panel -->
+
+</div><!-- /org-layout -->
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/admin/organizations/organizations.js' %}"></script>
+{% endblock %}

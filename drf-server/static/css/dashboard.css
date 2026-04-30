@@ -357,34 +357,70 @@ a.more {
 /* ── 작업자 뷰 (B View): 가로 상태 바 ── */
 #mn04-view-worker { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
 
-.mn04-status-bar-wrap { position: relative; padding-bottom: 18px; }
-.mn04-status-bar      { display: flex; height: 18px; border-radius: 6px; overflow: hidden; }
-.mn04-bar-section     { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: rgba(255, 255, 255, 0.85); }
-.mn04-bar-normal      { background: #2d9e75; }
-.mn04-bar-warning     { background: #ef9f27; }
-.mn04-bar-danger      { background: #e24b4a; }
-.mn04-marker          { position: absolute; bottom: 0; transform: translateX(-50%); font-size: 14px; line-height: 1; transition: left 0.4s ease; }
-.mn04-status-text     { text-align: center; font-size: 13px; font-weight: 700; }
+/* 작업자 현재 상태 블록 */
+.mn04-worker-status-block {
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8px; padding: 14px 8px;
+  background: var(--bg3); border: 1px solid var(--border);
+  transition: background .3s, border-color .3s;
+}
+.mn04-status-text { font-size: 22px; font-weight: 700; color: var(--text2); transition: color .3s; }
+
+.mn04-worker-status-block.normal  { background: rgba(45,158,117,.1);  border-color: #2d9e75; }
+.mn04-worker-status-block.normal  .mn04-status-text { color: #2d9e75; }
+.mn04-worker-status-block.warning { background: rgba(239,159,39,.1);  border-color: #ef9f27; }
+.mn04-worker-status-block.warning .mn04-status-text { color: #ef9f27; }
+.mn04-worker-status-block.danger  { background: rgba(226,75,74,.12);  border-color: #e24b4a; animation: mn04-pulse 1.8s ease-in-out infinite; }
+.mn04-worker-status-block.danger  .mn04-status-text { color: #e24b4a; }
 
 /* ── 관리자 뷰 (D View): KPI 카드 + 미니 비율 바 ── */
 #mn04-view-admin { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
 
-.mn04-kpi-grid    { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
-.mn04-kpi-card    { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; text-align: center; }
-.mn04-kpi-label   { font-size: 10px; color: var(--text2); margin-bottom: 2px; }
-.mn04-kpi-value   { font-size: 20px; font-weight: 700; line-height: 1.2; }
+/* ── 관리자 작업자 현황 — 신규 레이아웃 ── */
+.mn04-total-row   { display: flex; align-items: baseline; gap: 5px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.mn04-total-label { font-size: 11px; color: var(--text2); }
+.mn04-total-value { font-size: 20px; font-weight: 700; color: var(--text); margin-left: auto; }
+.mn04-total-unit  { font-size: 11px; color: var(--text2); }
 
-.mn04-kpi-total   { border-color: var(--border); }
-.mn04-kpi-total   .mn04-kpi-value { color: var(--text); }
-.mn04-kpi-normal  { border-color: #2d9e75; }
-.mn04-kpi-normal  .mn04-kpi-value { color: #2d9e75; }
-.mn04-kpi-warning { border-color: #ef9f27; }
-.mn04-kpi-warning .mn04-kpi-value { color: #ef9f27; }
-.mn04-kpi-danger  { background: #FCEBEB; border-color: #F7C1C1; }
-.mn04-kpi-danger  .mn04-kpi-label { color: #A32D2D; }
-.mn04-kpi-danger  .mn04-kpi-value { color: #A32D2D; font-size: 26px; }
+.mn04-admin-body  { display: flex; gap: 10px; align-items: stretch; }
 
-.mn04-ratio-bar     { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--bg3); }
+/* 좌: 위험 강조 블록 */
+.mn04-danger-block {
+  flex: 0 0 72px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 4px;
+  transition: background .3s, border-color .3s;
+}
+.mn04-danger-label { font-size: 10px; color: var(--text2); margin-bottom: 4px; }
+.mn04-danger-count { font-size: 28px; font-weight: 700; color: var(--text2); line-height: 1; }
+.mn04-danger-unit  { font-size: 10px; color: var(--text2); margin-top: 2px; }
+
+/* 위험 인원 > 0 일 때 강조 */
+.mn04-danger-block.active {
+  background: rgba(226,75,74,.12);
+  border-color: #e24b4a;
+  animation: mn04-pulse 1.8s ease-in-out infinite;
+}
+.mn04-danger-block.active .mn04-danger-label,
+.mn04-danger-block.active .mn04-danger-count,
+.mn04-danger-block.active .mn04-danger-unit { color: #e24b4a; }
+
+@keyframes mn04-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(226,75,74,.45); }
+  50%       { box-shadow: 0 0 0 6px rgba(226,75,74,0); }
+}
+
+/* 우: 상세 현황 */
+.mn04-breakdown    { flex: 1; display: flex; flex-direction: column; justify-content: space-around; }
+.mn04-bd-row       { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.mn04-bd-dot       { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.mn04-bd-label     { color: var(--text2); flex: 1; }
+.mn04-bd-value     { font-weight: 700; color: var(--text); }
+.mn04-bd-danger-val { color: #e24b4a; }
+.mn04-bd-unit      { font-size: 10px; color: var(--text2); }
+
+.mn04-ratio-bar     { display: flex; height: 6px; border-radius: 4px; overflow: hidden; background: var(--bg3); }
 .mn04-ratio-normal  { background: #2d9e75; }
 .mn04-ratio-warning { background: #ef9f27; }
 .mn04-ratio-danger  { background: #e24b4a; }

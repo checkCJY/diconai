@@ -471,7 +471,7 @@ const AccountsAdmin = {
       name: document.getElementById('createName').value.trim(),
       username: document.getElementById('createUsername').value,
       password: document.getElementById('createPassword').value,
-      department: parseInt(document.getElementById('createDepartment').value),
+      department_id: parseInt(document.getElementById('createDepartment').value),
       user_type: document.getElementById('createUserType').value,
       status: document.getElementById('createStatus').value,
     };
@@ -685,7 +685,7 @@ const AccountsAdmin = {
     const id = document.getElementById('editUserId').value;
     const payload = {
       name: document.getElementById('editName').value.trim(),
-      department: parseInt(document.getElementById('editDepartment').value),
+      department_id: parseInt(document.getElementById('editDepartment').value),
       status: document.getElementById('editStatus').value,
     };
 
