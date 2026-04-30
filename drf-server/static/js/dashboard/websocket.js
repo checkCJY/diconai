@@ -25,6 +25,71 @@
 const _riskLabel = { normal: '정상', warning: '주의', danger: '위험' };
 const _riskClass = { normal: 'safe', warning: 'caution', danger: 'danger' };
 
+// ── AI 가스 네비게이션 상태 ──────────────────────────────────
+const _GAS_META = [
+  { key: 'co',  name: 'CO (일산화탄소)',        unit: 'ppm' },
+  { key: 'h2s', name: 'H₂S (황화수소)',         unit: 'ppm' },
+  { key: 'co2', name: 'CO₂ (이산화탄소)',       unit: 'ppm' },
+  { key: 'o2',  name: 'O₂ (산소)',              unit: '%'   },
+  { key: 'no2', name: 'NO₂ (이산화질소)',       unit: 'ppm' },
+  { key: 'so2', name: 'SO₂ (이산화황)',         unit: 'ppm' },
+  { key: 'o3',  name: 'O₃ (오존)',              unit: 'ppm' },
+  { key: 'nh3', name: 'NH₃ (암모니아)',         unit: 'ppm' },
+  { key: 'voc', name: 'VOC (휘발성유기화합물)', unit: 'ppm' },
+];
+const _RISK_LABEL = { danger: '위험', warning: '주의', normal: '정상', safe: '정상' };
+
+let _aiGasIdx  = 0;           // 현재 선택된 가스 인덱스
+let _aiGasData = {};          // 최근 수신 가스 데이터 캐시
+const _aiGasHist = {};        // 가스별 차트 히스토리 { key: { labels, current, predicted } }
+
+// 가스 히스토리에 데이터를 추가한다. 최대 _HIST_MAX개 유지.
+function _pushGasHistory(key, label, currentVal) {
+  if (currentVal == null) return;
+  if (!_aiGasHist[key]) _aiGasHist[key] = { labels: [], current: [], predicted: [] };
+  const h = _aiGasHist[key];
+  h.labels.push(label);
+  h.current.push(currentVal);
+  h.predicted.push(parseFloat((currentVal * 1.3).toFixed(2)));
+  if (h.labels.length > _HIST_MAX) { h.labels.shift(); h.current.shift(); h.predicted.shift(); }
+}
+
+// 현재 선택 가스의 차트를 히스토리 데이터로 교체 렌더링한다.
+function _switchGasChart(key) {
+  if (!gasChart || !_aiGasHist[key]) return;
+  const h = _aiGasHist[key];
+  gasChart.data.labels              = [...h.labels];
+  gasChart.data.datasets[0].data   = [...h.current];
+  gasChart.data.datasets[1].data   = [...h.predicted];
+  gasChart.update('none');
+}
+
+// AI 가스 패널 네비게이션 UI를 현재 인덱스 기준으로 갱신한다.
+function _renderAIGasNav() {
+  const gas  = _GAS_META[_aiGasIdx];
+  const data = _aiGasData;
+  const risk = data[`${gas.key}_risk`] || 'normal';
+  const val  = data[gas.key] ?? null;
+
+  const nameEl    = document.getElementById('aiGasName');
+  const countEl   = document.getElementById('aiGasNavCount');
+  const currentEl = document.getElementById('aiCurrentVal');
+  const maxEl     = document.getElementById('aiMaxVal');
+
+  if (nameEl) {
+    nameEl.textContent = gas.name;
+    nameEl.className   = risk === 'danger' ? 'danger-text fw' : risk === 'warning' ? 'caution-text fw' : 'fw';
+  }
+  if (countEl)   countEl.textContent   = `${_aiGasIdx + 1} / ${_GAS_META.length}`;
+  if (currentEl) {
+    currentEl.textContent = val != null ? `${val} ${gas.unit}` : '--';
+    currentEl.className   = `big ${risk === 'danger' ? 'danger-text' : risk === 'warning' ? 'caution-text' : ''}`;
+  }
+  if (maxEl) maxEl.textContent = val != null ? `${(val * 1.3).toFixed(2)} ${gas.unit}` : '--';
+
+  _switchGasChart(gas.key);
+}
+
 // ── AI 전력 채널 네비게이션 상태 ─────────────────────────────
 let _aiPowerIdx    = 0;
 let _aiPowerPreds  = [];   // 채널별 AI 예측 배열 [{ name, eta_min, max_load_val, max_load_unit, max_load_pct, risk_level }]
@@ -127,6 +192,26 @@ function _renderPowerRow(eq) {
   </tr>`;
 }
 
+// 유해가스 패널을 오류/빈 상태로 전환한다.
+// 총합·위험도를 '-'로 비우고 테이블을 지운 뒤 메시지를 노출한다.
+function _setGasPanelError(msg) {
+  const gasWorstName = document.getElementById('gasWorstName');
+  const gasWorstRisk = document.getElementById('gasWorstRisk');
+  const gasTableBody = document.getElementById('gasTableBody');
+  const gasPanelMsg  = document.getElementById('gasPanelMsg');
+
+  if (gasWorstName) gasWorstName.textContent = '-';
+  if (gasWorstRisk) { gasWorstRisk.textContent = '-'; gasWorstRisk.className = ''; }
+  if (gasPanelMsg)  { gasPanelMsg.textContent = msg; gasPanelMsg.style.display = 'block'; }
+  if (gasTableBody) gasTableBody.innerHTML = '';
+}
+
+// 유해가스 패널 오류 메시지를 숨긴다.
+function _clearGasPanelMsg() {
+  const el = document.getElementById('gasPanelMsg');
+  if (el) el.style.display = 'none';
+}
+
 // 전력 패널 전체를 오류/빈 상태로 전환한다.
 // 총합·증감률을 '-'로 비우고 패널 메시지를 노출한다.
 function _setPowerPanelError(msg) {
@@ -159,6 +244,16 @@ function _clearPowerPanelMsg() {
 function initWebSocket() {
   const wsStatusEl = document.getElementById('wsStatus');
 
+  // AI 가스 화살표 버튼 이벤트 등록
+  document.getElementById('aiGasPrev')?.addEventListener('click', () => {
+    _aiGasIdx = (_aiGasIdx - 1 + _GAS_META.length) % _GAS_META.length;
+    _renderAIGasNav();
+  });
+  document.getElementById('aiGasNext')?.addEventListener('click', () => {
+    _aiGasIdx = (_aiGasIdx + 1) % _GAS_META.length;
+    _renderAIGasNav();
+  });
+
   // 헤더 상단 WebSocket 연결 상태 배지를 갱신한다.
   function setWsStatus(text, cls) {
     if (!wsStatusEl) return;
@@ -188,42 +283,47 @@ function initWebSocket() {
       try { data = JSON.parse(e.data); } catch { return; }
 
       // ── 패널 12: 유해가스 현황 테이블 (9종) ──────────────
-      // {gas}_risk 필드는 FastAPI gas_service의 calculate_individual_risks()가 생성해 페이로드에 포함한다.
-      const tbody = document.getElementById('gasTableBody');
-      if (tbody && data.co !== undefined) {
-        const GAS_META = [
-          { key: 'co',  name: 'CO (일산화탄소)',        unit: 'ppm' },
-          { key: 'h2s', name: 'H₂S (황화수소)',         unit: 'ppm' },
-          { key: 'co2', name: 'CO₂ (이산화탄소)',       unit: 'ppm' },
-          { key: 'o2',  name: 'O₂ (산소)',              unit: '%'   },
-          { key: 'no2', name: 'NO₂ (이산화질소)',       unit: 'ppm' },
-          { key: 'so2', name: 'SO₂ (이산화황)',         unit: 'ppm' },
-          { key: 'o3',  name: 'O₃ (오존)',              unit: 'ppm' },
-          { key: 'nh3', name: 'NH₃ (암모니아)',         unit: 'ppm' },
-          { key: 'voc', name: 'VOC (휘발성유기화합물)', unit: 'ppm' },
-        ];
-        const RISK_LABEL = { danger: '위험', warning: '주의', normal: '정상', safe: '정상' };
-        tbody.innerHTML = GAS_META.map(g => {
-          const val  = data[g.key] ?? '-';
+      const gasTableBody = document.getElementById('gasTableBody');
+      if (data.gas_loading) {
+        _setGasPanelError('데이터가 존재하지 않습니다.');
+      } else if (gasTableBody && data.co !== undefined) {
+        _clearGasPanelMsg();
+
+        // 가장 위험한 가스 계산 후 KPI 박스 갱신
+        let worstGas = null, worstRisk = 'normal';
+        _GAS_META.forEach(g => {
           const risk = data[`${g.key}_risk`] || 'normal';
-          return `<tr class="gas-row ${risk}">
+          if (risk === 'danger' || (risk === 'warning' && worstRisk === 'normal')) {
+            worstRisk = risk; worstGas = g;
+          }
+        });
+        const gasWorstName = document.getElementById('gasWorstName');
+        const gasWorstRisk = document.getElementById('gasWorstRisk');
+        if (gasWorstName) gasWorstName.textContent = worstGas ? worstGas.name : '이상 없음';
+        if (gasWorstRisk) {
+          gasWorstRisk.textContent = _RISK_LABEL[worstRisk];
+          gasWorstRisk.className   = worstRisk === 'normal' ? 'safe-text' : `${worstRisk}-text`;
+        }
+
+        // 가스 리스트 테이블 갱신
+        gasTableBody.innerHTML = _GAS_META.map(g => {
+          const val      = data[g.key] ?? '-';
+          const risk     = data[`${g.key}_risk`] || 'normal';
+          const riskCls  = _riskClass[risk] || 'safe';   // normal → safe, warning → caution
+          return `<tr class="gas-row ${riskCls}">
             <td>${g.name}</td><td>${val}</td><td>${g.unit}</td>
-            <td><span class="brisk ${risk}">${RISK_LABEL[risk] || risk}</span></td>
+            <td><span class="brisk ${riskCls}">${_RISK_LABEL[risk] || risk}</span></td>
           </tr>`;
         }).join('');
       }
 
-      // ── 패널 13: AI 예측 — CO ─────────────────────────────
-      const coRisk       = data.co > 50;
-      const aiGasName    = document.getElementById('aiGasName');
-      const aiCurrentVal = document.getElementById('aiCurrentVal');
-      const aiMaxVal     = document.getElementById('aiMaxVal');
-      if (aiGasName) aiGasName.className = coRisk ? 'danger-text fw' : 'caution-text fw';
-      if (aiCurrentVal) {
-        aiCurrentVal.textContent = `${data.co} ppm`;
-        aiCurrentVal.className   = 'big ' + (coRisk ? 'danger-text' : 'caution-text');
+      // ── 패널 13: AI 예측 — 가스별 히스토리 누적 + 네비게이션 갱신 ──
+      if (data.co !== undefined) {
+        const tick = nowLabel();
+        _aiGasData = data;
+        _GAS_META.forEach(g => _pushGasHistory(g.key, tick, data[g.key] ?? null));
+        _renderAIGasNav();
       }
-      if (aiMaxVal) aiMaxVal.textContent = `${Math.round(data.co * 1.5)} ppm`;
 
       // ── 패널 14: 전력 현황 ────────────────────────────────
       const powerTotal     = document.getElementById('powerTotal');
@@ -284,11 +384,8 @@ function initWebSocket() {
         _renderAIPowerNav();
       }
 
-      // ── 가스 차트 실시간 업데이트 ─────────────────────────
-      const tick = nowLabel();
-      if (gasChart) pushData(gasChart, tick, data.co, Math.round(data.co * 1.5));
-
       // ── 전력 차트 — 채널별 히스토리 누적 후 현재 채널 렌더 ──
+      const tick = nowLabel();
       if (!data.power_loading) {
         if (data.total_power_kw != null)
           _pushChannelHistory(0, tick, Math.round(data.total_power_kw * 1.1 * 10) / 10);
@@ -312,16 +409,23 @@ function initWebSocket() {
       // ── CM-07 — 알람 팝업 + 이벤트 패널 ─────────────────
       // alarms[]는 DRF가 새 Event 생성 시에만 포함되며, 병합(merge) 틱에서는 빈 배열이다.
       if (Array.isArray(data.alarms) && data.alarms.length > 0) {
+        console.log('[알람 수신]', data.alarms.map(a => `${a.risk_level}(new=${a.is_new_event})`));
         data.alarms.forEach(alarm => {
           const alarmData = {
-            alarm_level: alarm.risk_level,
-            message:     alarm.summary,
-            sensor_name: alarm.source_label,
-            timestamp:   new Date().toISOString(),
-            gas_type:    alarm.gas_type,
-            event_id:    alarm.event_id,
+            alarm_level:  alarm.risk_level,
+            is_new_event: alarm.is_new_event,
+            message:      alarm.summary,
+            sensor_name:  alarm.source_label,
+            timestamp:    new Date().toISOString(),
+            gas_type:     alarm.gas_type,
+            event_id:     alarm.event_id,
           };
-          AlarmPopup.show(alarmData);
+          // 새 이벤트(danger/warning)만 중앙 팝업 — 조치완료 전 동일 이벤트 재발화는 팝업 없음
+          if (alarm.is_new_event) AlarmPopup.show(alarmData);
+          // 정상화는 우하단 토스트
+          if (alarm.risk_level === 'normal' && typeof AlarmToast !== 'undefined') {
+            AlarmToast.show(alarmData);
+          }
           if (typeof EventPanel !== 'undefined') EventPanel.addItem(alarmData);
         });
       }
@@ -331,14 +435,18 @@ function initWebSocket() {
     ws.onerror = () => {
       setWsStatus('● 연결 오류', 'error');
       _setPowerPanelError('데이터를 불러올 수 없습니다.');
-      MapPanel.setMarkersDisconnected();
+
+      _setGasPanelError('데이터를 불러올 수 없습니다.');
+
     };
 
     // 연결 끊김 시 3초 후 재연결을 시도한다.
     ws.onclose = () => {
       setWsStatus('● 연결 끊김', 'error');
       _setPowerPanelError('데이터를 불러올 수 없습니다.');
-      MapPanel.setMarkersDisconnected();
+
+      _setGasPanelError('데이터를 불러올 수 없습니다.');
+
       setTimeout(connect, 3000);
     };
   }

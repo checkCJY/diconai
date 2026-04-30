@@ -19,6 +19,14 @@
     <span class="breadcrumb">모니터링 &gt; 실시간/AI 예측 유해가스 현황</span>
   </div>
 
+  <!-- WebSocket 연결 상태 배너 -->
+  <div id="gas-conn-banner" style="display:none;">
+    <div class="gas-conn-msg">
+      <span class="conn-spinner"></span>
+      <span id="gas-conn-text">연결 시도 중...</span>
+    </div>
+  </div>
+
   <div class="gas-wrap">
 
     <!-- ❶ 좌측: 센서 목록 + 가스 리스트 -->
@@ -132,6 +140,7 @@
 <script src="{% static 'js/shared/auth.js' %}"></script>
 <script src="{% static 'js/shared/layout.js' %}"></script>
 <script src="{% static 'js/shared/app-sub.js' %}"></script>
+<script src="{% static 'js/detail/ui-exception.js' %}"></script>
 <script src="{% static 'js/detail/gas_monitoring.js' %}"></script>
 <script src="{% static 'js/detail/websocket_gas.js' %}"></script>
 </body>

@@ -63,6 +63,15 @@ class SystemLog(models.Model):
         # 이벤트 관리 (수동)
         MANUAL_EVENT_ACTION = "manual_event_action", "이벤트 수동 조치"
 
+        # 조직 관리
+        DEPT_CREATE = "dept_create", "부서 생성"
+        DEPT_UPDATE = "dept_update", "부서 수정"
+        DEPT_DELETE = "dept_delete", "부서 삭제"
+        MEMBER_ADD = "member_add", "구성원 추가"
+        MEMBER_REMOVE = "member_remove", "소속 제외"
+        MEMBER_MOVE = "member_move", "부서 이동"
+        LEADER_ASSIGN = "leader_assign", "조직장 임명"
+
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

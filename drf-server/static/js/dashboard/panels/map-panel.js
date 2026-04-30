@@ -484,51 +484,51 @@ _geofences: [],
   },
 
   updateGasSensorFromWS(wsData) {
-    // 개별 가스 위험도 필드(co_risk, h2s_risk 등)로 전체 위험 레벨 판정
-    const gasKeys = ['co', 'h2s', 'co2', 'o2', 'no2', 'so2', 'o3', 'nh3', 'voc'];
-    const risks = gasKeys.map(k => wsData[`${k}_risk`] || 'normal');
-    const level = risks.some(r => r === 'danger')  ? 2
-                : risks.some(r => r === 'warning') ? 1 : 0;
-
-    Object.values(this.gasMarkers).forEach(entry => {
+    const entry = this.gasMarkers['sensor_01'];
+    if (!entry) return;
+    const level = wsData.level === '위험' ? 2 : 0;
+    // 위험도가 바뀔 때만 setIcon — 매 틱마다 SVG 재생성·DOM 교체 방지
+    if (entry.data.risk_level !== level) {
       entry.marker.setIcon(this._createGasIcon(this.riskColor(level)));
       entry.data.risk_level = level;
-      entry.data.co  = wsData.co  ?? entry.data.co;
-      entry.data.h2s = wsData.h2s ?? entry.data.h2s;
-      entry.data.o2  = wsData.o2  ?? entry.data.o2;
-      if (entry.marker.isPopupOpen()) entry.marker.setPopupContent(this.gasPopupHtml(entry.data));
+    }
+    entry.data.co  = wsData.co;
+    entry.data.h2s = wsData.h2s;
+    entry.data.o2  = wsData.o2;
+    if (entry.marker.isPopupOpen()) entry.marker.setPopupContent(this.gasPopupHtml(entry.data));
+  },
+
+  updateWorkerPositions(positions) {
+    positions.forEach(w => {
+      const entry = this.workerMarkers[w.worker_id];
+      if (!entry) return;
+
+      entry.marker.setLatLng([w.y, w.x]);
+      entry.data.x = w.x;
+      entry.data.y = w.y;
+      entry.data.movement_status = w.movement_status;
+
+      let inGeofence = null;
+      for (const g of this._geofences) {
+        if (this._pointInPolygon(w.x, w.y, g.polygon)) {
+          inGeofence = g;
+          break;
+        }
+      }
+
+      const newColor = inGeofence
+        ? (this.ZONE_COLOR[inGeofence.risk_level] || '#f85149')
+        : '#58a6ff';
+      // 색이 바뀔 때만 setIcon
+      if (entry.data._iconColor !== newColor) {
+        entry.marker.setIcon(this._createWorkerIcon(newColor));
+        entry.data._iconColor = newColor;
+      }
+      entry.data.current_geofence = inGeofence ? inGeofence.name : null;
+
+      if (entry.marker.isPopupOpen()) {
+        entry.marker.setPopupContent(this.workerPopupHtml(entry.data));
+      }
     });
   },
-  updateWorkerPositions(positions) {
-  positions.forEach(w => {
-    const entry = this.workerMarkers[w.worker_id];  // worker_id로 찾음
-    if (!entry) return;
-
-    entry.marker.setLatLng([w.y, w.x]);
-    entry.data.x = w.x;
-    entry.data.y = w.y;
-    entry.data.movement_status = w.movement_status;
-
-    let inGeofence = null;
-    for (const g of this._geofences) {
-      if (this._pointInPolygon(w.x, w.y, g.polygon)) {
-        inGeofence = g;
-        break;
-      }
-    }
-
-    if (inGeofence) {
-      const color = this.ZONE_COLOR[inGeofence.risk_level] || '#f85149';
-      entry.marker.setIcon(this._createWorkerIcon(color));
-      entry.data.current_geofence = inGeofence.name;
-    } else {
-      entry.marker.setIcon(this._createWorkerIcon('#58a6ff')); // 기본 파란색
-      entry.data.current_geofence = null;
-    }
-
-    if (entry.marker.isPopupOpen()) {
-      entry.marker.setPopupContent(this.workerPopupHtml(entry.data));
-    }
-  });
-},
 };

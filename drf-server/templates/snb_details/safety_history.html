@@ -2,28 +2,191 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8">
-<title>안전 확인 이력 — 산재 예방 통합 관제 시스템</title>
-<link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
-<link rel="stylesheet" href="{% static 'css/components/header.css' %}">
+  <meta charset="UTF-8">
+  <title>안전 확인 이력 — 산재 예방 통합 관제 시스템</title>
+  <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+  <link rel="stylesheet" href="{% static 'css/components/header.css' %}">
+  <link rel="stylesheet" href="{% static 'css/snb_details/safety_history.css' %}">
 </head>
 <body>
+  {% include 'components/header.html' %}
 
-{% include 'components/header.html' %}
+  <div class="body-wrap page-wrap">
+    <div class="history-page">
 
-<div class="body-wrap page-wrap">
-  <div class="page-header">
-    <span class="breadcrumb">나의 안전확인 &gt; 안전 확인 이력</span>
+      <!-- 페이지 제목 -->
+      <div class="page-title">
+        안전 확인 이력
+        <span class="title-date" id="pageTitleDate"></span>
+      </div>
+
+      <!-- 탭 -->
+      <div class="history-tabs">
+        <button class="history-tab active" data-tab="my">나의 안전 확인</button>
+        <button class="history-tab" data-tab="all" id="tabAllBtn" style="display:none;">전체 이력 현황</button>
+      </div>
+
+      <!-- ══════════════════════════════════════════
+           나의 안전 확인 탭
+      ══════════════════════════════════════════ -->
+      <div id="tabMyHistory">
+
+        <!-- 작업자 이름 -->
+        <div class="my-worker-label"><span id="myWorkerName"></span>님의 안전 확인 이력</div>
+
+        <!-- 컨트롤 바 -->
+        <div class="history-controls">
+          <div class="month-nav">
+            <button class="month-nav-btn" id="btnPrevMonth">&#8249;</button>
+            <span class="month-label" id="monthLabel"></span>
+            <button class="month-nav-btn" id="btnNextMonth">&#8250;</button>
+          </div>
+          <div class="history-actions">
+            <button class="btn-download" id="btnDownload">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M8 12l-5-5h3V2h4v5h3l-5 5z"/>
+                <rect x="2" y="13" width="12" height="1.5" rx=".75"/>
+              </svg>
+              다운로드
+            </button>
+            <button class="btn-print" id="btnPrint">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M4 1h8v3H4V1zm-2 4h12a1 1 0 011 1v5a1 1 0 01-1 1h-2v3H4v-3H2a1 1 0 01-1-1V6a1 1 0 011-1zm2 6v3h8v-3H4zm-2-4a.75.75 0 100 1.5.75.75 0 000-1.5z"/>
+              </svg>
+              인쇄
+            </button>
+          </div>
+        </div>
+
+        <!-- 캘린더 -->
+        <div class="calendar-panel" id="myCalendarPanel">
+          <div class="cal-header">
+            <div class="cal-dow sun">일</div>
+            <div class="cal-dow">월</div>
+            <div class="cal-dow">화</div>
+            <div class="cal-dow">수</div>
+            <div class="cal-dow">목</div>
+            <div class="cal-dow">금</div>
+            <div class="cal-dow sat">토</div>
+          </div>
+          <div class="cal-body" id="calBody"></div>
+          <div class="cal-legend">
+            <div class="legend-item"><span class="legend-icon-done">○</span><span>완료</span></div>
+            <div class="legend-item"><span class="legend-icon-undone">✕</span><span>미완료</span></div>
+          </div>
+        </div>
+
+      </div><!-- /tabMyHistory -->
+
+      <!-- ══════════════════════════════════════════
+           전체 이력 현황 탭 (관리자 전용)
+      ══════════════════════════════════════════ -->
+      <div id="tabAllHistory" style="display:none;">
+        <div class="all-history-layout">
+
+          <!-- 좌측: 작업자 리스트 -->
+          <div class="worker-list-panel">
+            <div class="wlp-header">직원 리스트</div>
+
+            <!-- 필터 -->
+            <div class="wlp-filters">
+              <select class="wlp-select" id="deptFilter">
+                <option value="">소속 부서</option>
+              </select>
+              <div class="wlp-search-wrap">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M11.742 10.344a6.5 6.5 0 10-1.397 1.398l3.85 3.85a1 1 0 001.415-1.414l-3.868-3.834zm-5.242 1.156a5 5 0 110-10 5 5 0 010 10z"/>
+                </svg>
+                <input type="text" id="nameSearch" placeholder="이름 검색">
+              </div>
+            </div>
+
+            <!-- 작업자 목록 -->
+            <div class="wlp-table-wrap">
+              <table class="wlp-table">
+                <thead>
+                  <tr>
+                    <th style="width:28px;"><input type="checkbox" class="wlp-cb" id="cbSelectAll"></th>
+                    <th>소속</th>
+                    <th>작업자명</th>
+                    <th>출근 상태</th>
+                  </tr>
+                </thead>
+                <tbody id="workerTableBody">
+                  <tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text2);">불러오는 중...</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- 하단: 다운로드/인쇄 -->
+            <div class="wlp-footer">
+              <button class="btn-download" id="btnAllDownload">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M8 12l-5-5h3V2h4v5h3l-5 5z"/>
+                  <rect x="2" y="13" width="12" height="1.5" rx=".75"/>
+                </svg>
+                다운로드
+              </button>
+              <button class="btn-print" id="btnAllPrint">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M4 1h8v3H4V1zm-2 4h12a1 1 0 011 1v5a1 1 0 01-1 1h-2v3H4v-3H2a1 1 0 01-1-1V6a1 1 0 011-1zm2 6v3h8v-3H4zm-2-4a.75.75 0 100 1.5.75.75 0 000-1.5z"/>
+                </svg>
+                인쇄
+              </button>
+            </div>
+          </div><!-- /worker-list-panel -->
+
+          <!-- 우측: 작업자 캘린더 -->
+          <div class="worker-detail-panel">
+            <div style="display:flex; flex-direction:column; height:100%;">
+              <div class="wdp-title">작업자 안전 확인 이력 &nbsp;—&nbsp; <span id="wdpWorkerName"></span></div>
+              <div class="wdp-controls" id="wdpControls" style="visibility:hidden;">
+                <div class="month-nav">
+                  <button class="month-nav-btn" id="btnAllPrevMonth">&#8249;</button>
+                  <span class="month-label" id="allMonthLabel"></span>
+                  <button class="month-nav-btn" id="btnAllNextMonth">&#8250;</button>
+                </div>
+              </div>
+              <div class="calendar-panel" style="flex:1;">
+                <div class="cal-header" id="allCalHeader">
+                  <div class="cal-dow sun">일</div>
+                  <div class="cal-dow">월</div>
+                  <div class="cal-dow">화</div>
+                  <div class="cal-dow">수</div>
+                  <div class="cal-dow">목</div>
+                  <div class="cal-dow">금</div>
+                  <div class="cal-dow sat">토</div>
+                </div>
+                <div class="cal-body cal-body-all" id="allCalBody">
+                  <div class="cal-no-selection">작업자를 선택하면<br>이력이 표시됩니다.</div>
+                </div>
+                <div class="cal-legend" id="allCalLegend" style="visibility:hidden;">
+                  <div class="legend-item"><span class="legend-icon-done">○</span><span>완료</span></div>
+                  <div class="legend-item"><span class="legend-icon-undone">✕</span><span>미완료</span></div>
+                </div>
+              </div>
+            </div>
+          </div><!-- /worker-detail-panel -->
+
+        </div><!-- /all-history-layout -->
+      </div><!-- /tabAllHistory -->
+
+    </div><!-- /history-page -->
   </div>
-  <div class="panel">
-    <div class="panel-title">안전 확인 이력</div>
-    <p class="sub" style="padding:16px;">준비 중입니다.</p>
-  </div>
-</div>
 
-<script src="{% static 'js/shared/util.js' %}"></script>
-<script src="{% static 'js/shared/auth.js' %}"></script>
-<script src="{% static 'js/shared/layout.js' %}"></script>
-<script src="{% static 'js/shared/app-sub.js' %}"></script>
+  <script src="{% static 'js/shared/util.js' %}"></script>
+  <script src="{% static 'js/shared/auth.js' %}"></script>
+  <script src="{% static 'js/shared/layout.js' %}"></script>
+  <script src="{% static 'js/shared/app-sub.js' %}"></script>
+  <script src="{% static 'js/detail/safety_history.js' %}"></script>
+
+  <script>
+    (function () {
+      const d = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      document.getElementById('pageTitleDate').textContent =
+        `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    })();
+  </script>
 </body>
 </html>

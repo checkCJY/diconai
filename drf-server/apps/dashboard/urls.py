@@ -21,13 +21,27 @@ urlpatterns = [
         "monitoring/workers/", views.monitoring_workers_page, name="monitoring-workers"
     ),
     path("monitoring/events/", views.monitoring_events_page, name="monitoring-events"),
-    path("monitoring/events/<int:event_id>/", views.monitoring_event_detail_page, name="monitoring-event-detail"),
+    path(
+        "monitoring/events/<int:event_id>/",
+        views.monitoring_event_detail_page,
+        name="monitoring-event-detail",
+    ),
     # ── API ──────────────────────────────────────────────
     path("api/menu/", views.MenuView.as_view(), name="api-menu"),
     path(
         "api/safety-status/",
         views.MySafetyStatusView.as_view(),
         name="api-safety-status",
+    ),
+    path(
+        "api/safety-history/",
+        views.SafetyHistoryAPIView.as_view(),
+        name="api-safety-history",
+    ),
+    path(
+        "api/workers-list/",
+        views.WorkerListAPIView.as_view(),
+        name="api-workers-list",
     ),
     path(
         "api/refresh/",

@@ -1,0 +1,185 @@
+/* admin/accounts.css — 사용자 관리 페이지 전용 스타일 */
+
+/* ── 모달 공통 ─────────────────────────────────────────── */
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-container {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    width: 680px;
+    max-width: 92vw;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid #30363d;
+}
+
+.modal-header h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #c9d1d9;
+    margin: 0 0 4px;
+}
+
+.modal-desc {
+    font-size: 13px;
+    color: #6e7681;
+    margin: 0;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: #6e7681;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    padding: 2px;
+    flex-shrink: 0;
+}
+
+.modal-close:hover { color: #c9d1d9; }
+
+/* ── 폼 그리드 ───────────────────────────────────────────── */
+
+.modal-body {
+    padding: 20px 24px;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px 20px;
+}
+
+.form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.form-field label {
+    font-size: 13px;
+    color: #8b949e;
+    font-weight: 500;
+}
+
+.form-field input,
+.form-field select {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    color: #c9d1d9;
+    padding: 8px 12px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.15s;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.form-field input::placeholder { color: #484f58; }
+
+.form-field select option { background: #161b22; }
+
+.form-field input:focus,
+.form-field select:focus {
+    border-color: #388bfd;
+}
+
+.form-field input.is-error,
+.form-field select.is-error {
+    border-color: #f85149;
+}
+
+/* ── 필드 에러 메시지 ──────────────────────────────────────── */
+
+.field-error {
+    font-size: 12px;
+    color: #f85149;
+    display: none;
+    min-height: 0;
+}
+
+.field-error.visible {
+    display: block;
+}
+
+/* ── 필수 표시 ───────────────────────────────────────────── */
+
+.required { color: #f85149; }
+
+/* ── 그리드 전체 너비 스팬 ──────────────────────────────────── */
+
+.col-span-2 { grid-column: 1 / -1; }
+
+/* ── 비밀번호 초기화 행 ─────────────────────────────────────── */
+
+.password-reset-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.password-reset-row input {
+    flex: 1;
+}
+
+.btn-outline-sm {
+    background: none;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    color: #8b949e;
+    padding: 7px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color 0.15s, color 0.15s;
+    flex-shrink: 0;
+}
+
+.btn-outline-sm:hover {
+    border-color: #388bfd;
+    color: #388bfd;
+}
+
+.btn-outline-sm:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+/* ── read-only 필드 ─────────────────────────────────────── */
+
+.form-field input:disabled,
+.form-field input[readonly] {
+    background: #0d1117;
+    color: #484f58;
+    cursor: default;
+    border-color: #21262d;
+}
+
+/* ── 모달 푸터 ───────────────────────────────────────────── */
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 16px 24px;
+    border-top: 1px solid #30363d;
+}

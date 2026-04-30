@@ -28,7 +28,7 @@ DEVICE_ID = "63200c3afd12"
 DEVICE_NAME = "63200c3afd12"
 SOFTWARE_VERSION = "1.0.1"
 SENSOR_LOCATION = {"x": 140, "y": 160}
-DANGER_EVENT_PROB = 0.1
+DANGER_EVENT_PROB = 0.09   # 가스 1종당 위험 확률 (독립 적용) — 테스트 시 0.9로 올리면 위험 상태 유지
 
 GAS_NORMAL_RANGE: dict[str, tuple] = {
     "co": (0, 24),
@@ -75,12 +75,16 @@ def generate_device_info() -> dict:
     }
 
 
-def generate_gas_data(is_danger: bool = False) -> dict:
+def generate_gas_data() -> dict:
     """FastAPI /api/sensors/gas 에 전송할 가스 측정값 페이로드를 생성한다.
 
-    is_danger=True 이면 각 가스를 위험 범위에서 샘플링해 알람 로직 시뮬레이션에 사용한다.
+    각 가스가 독립적으로 DANGER_EVENT_PROB 확률로 위험 범위값을 가진다.
+    실제 센서처럼 특정 가스만 위험 수치를 나타내는 시나리오를 시뮬레이션한다.
     """
-    gas_values = {gas: _pick_value(gas, is_danger) for gas in GAS_NORMAL_RANGE}
+    gas_values = {
+        gas: _pick_value(gas, random.random() < DANGER_EVENT_PROB)
+        for gas in GAS_NORMAL_RANGE
+    }
     return {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "device_id": DEVICE_ID,
@@ -123,8 +127,7 @@ def run() -> None:
     send_data(FASTAPI_DEVICE_INFO_URL, generate_device_info(), "DEVICE_INFO")
     logger.info("가스 데이터 전송 시작 → %s", FASTAPI_GAS_URL)
     while True:
-        is_danger = random.random() < DANGER_EVENT_PROB
-        send_data(FASTAPI_GAS_URL, generate_gas_data(is_danger), "GAS")
+        send_data(FASTAPI_GAS_URL, generate_gas_data(), "GAS")
         time.sleep(1)
 
 

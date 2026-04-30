@@ -7,10 +7,12 @@ from apps.monitoring.views import (
     GasDataCreateView,
     PowerDataBulkIngestView,
     PowerEventIngestView,
+    PowerThresholdView,
 )
 
 urlpatterns = [
     path("gas/", GasDataCreateView.as_view(), name="gas-data-create"),
+    path("power/thresholds/", PowerThresholdView.as_view(), name="power-thresholds"),
     path("power/event/", PowerEventIngestView.as_view(), name="power-event-ingest"),
     path("power/data/", PowerDataBulkIngestView.as_view(), name="power-data-ingest"),
 ]
