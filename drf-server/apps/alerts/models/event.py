@@ -109,6 +109,10 @@ class Event(models.Model):
     )
     resolved_at = models.DateTimeField(null=True, blank=True)
 
+    last_notified_at = models.DateTimeField(
+        null=True, blank=True, verbose_name="마지막 알림 발송 시각"
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     def clean(self):

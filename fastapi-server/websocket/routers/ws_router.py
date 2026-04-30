@@ -21,8 +21,8 @@ from websocket.state import (
 )
 
 POSITION_ENDPOINT = f"{settings.DRF_BASE_URL}/api/positioning/receive/"
-BROADCAST_INTERVAL = 2  # 센서 데이터 브로드캐스트 주기(초)
-ALARM_FLUSH_INTERVAL = 2  # 새 이벤트 알람 전용 플러시 주기(초)
+BROADCAST_INTERVAL = 5  # 센서 데이터 브로드캐스트 주기(초)
+ALARM_FLUSH_INTERVAL = 5  # 새 이벤트 알람 전용 플러시 주기(초)
 
 router = APIRouter()
 

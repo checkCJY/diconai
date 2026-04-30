@@ -27,8 +27,8 @@
         };
         if (alarm.is_new_event) {
           AlarmPopup.show(alarmData);
-          document.dispatchEvent(new CustomEvent('newAlarmEvent', { detail: alarmData }));
         }
+        document.dispatchEvent(new CustomEvent('newAlarmEvent', { detail: alarmData }));
         if (alarm.risk_level === 'normal' && typeof AlarmToast !== 'undefined') {
           AlarmToast.show(alarmData);
         }
