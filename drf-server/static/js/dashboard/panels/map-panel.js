@@ -448,43 +448,48 @@ _geofences: [],
     const entry = this.gasMarkers['sensor_01'];
     if (!entry) return;
     const level = wsData.level === '위험' ? 2 : 0;
-    entry.marker.setIcon(this._createGasIcon(this.riskColor(level)));
-    entry.data.risk_level = level;
+    // 위험도가 바뀔 때만 setIcon — 매 틱마다 SVG 재생성·DOM 교체 방지
+    if (entry.data.risk_level !== level) {
+      entry.marker.setIcon(this._createGasIcon(this.riskColor(level)));
+      entry.data.risk_level = level;
+    }
     entry.data.co  = wsData.co;
     entry.data.h2s = wsData.h2s;
     entry.data.o2  = wsData.o2;
     if (entry.marker.isPopupOpen()) entry.marker.setPopupContent(this.gasPopupHtml(entry.data));
   },
+
   updateWorkerPositions(positions) {
-  positions.forEach(w => {
-    const entry = this.workerMarkers[w.worker_id];  // worker_id로 찾음
-    if (!entry) return;
+    positions.forEach(w => {
+      const entry = this.workerMarkers[w.worker_id];
+      if (!entry) return;
 
-    entry.marker.setLatLng([w.y, w.x]);
-    entry.data.x = w.x;
-    entry.data.y = w.y;
-    entry.data.movement_status = w.movement_status;
+      entry.marker.setLatLng([w.y, w.x]);
+      entry.data.x = w.x;
+      entry.data.y = w.y;
+      entry.data.movement_status = w.movement_status;
 
-    let inGeofence = null;
-    for (const g of this._geofences) {
-      if (this._pointInPolygon(w.x, w.y, g.polygon)) {
-        inGeofence = g;
-        break;
+      let inGeofence = null;
+      for (const g of this._geofences) {
+        if (this._pointInPolygon(w.x, w.y, g.polygon)) {
+          inGeofence = g;
+          break;
+        }
       }
-    }
 
-    if (inGeofence) {
-      const color = this.ZONE_COLOR[inGeofence.risk_level] || '#f85149';
-      entry.marker.setIcon(this._createWorkerIcon(color));
-      entry.data.current_geofence = inGeofence.name;
-    } else {
-      entry.marker.setIcon(this._createWorkerIcon('#58a6ff')); // 기본 파란색
-      entry.data.current_geofence = null;
-    }
+      const newColor = inGeofence
+        ? (this.ZONE_COLOR[inGeofence.risk_level] || '#f85149')
+        : '#58a6ff';
+      // 색이 바뀔 때만 setIcon
+      if (entry.data._iconColor !== newColor) {
+        entry.marker.setIcon(this._createWorkerIcon(newColor));
+        entry.data._iconColor = newColor;
+      }
+      entry.data.current_geofence = inGeofence ? inGeofence.name : null;
 
-    if (entry.marker.isPopupOpen()) {
-      entry.marker.setPopupContent(this.workerPopupHtml(entry.data));
-    }
-  });
-},
+      if (entry.marker.isPopupOpen()) {
+        entry.marker.setPopupContent(this.workerPopupHtml(entry.data));
+      }
+    });
+  },
 };

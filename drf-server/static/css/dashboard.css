@@ -426,28 +426,108 @@ a.more {
 .mn04-ratio-danger  { background: #e24b4a; }
 
 /* ── CM-07 실시간 알림 팝업 ──────────────────────────────── */
+/* ── CM-07 알람 팝업 ──────────────────────────────────────── */
 #alarm-popup {
-  position: fixed; top: 70px; right: 20px;
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
   z-index: 1100;
-  width: 320px; border-radius: 8px; padding: 16px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, .4);
+  width: 340px; border-radius: 10px; padding: 18px 16px 14px;
+  box-shadow: 0 6px 24px rgba(0,0,0,.5);
   background: #1e1e2e; border-left: 4px solid var(--danger);
   transition: border-left-color .2s;
 }
-.alarm-popup-header {
+/* 상단 행: 발생 시간 + 닫기 */
+.alarm-popup-top {
   display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 14px;
 }
-#alarm-popup-level  { font-weight: 700; font-size: 13px; color: var(--danger); }
-#alarm-popup-close  { background: none; border: none; color: var(--text2); cursor: pointer; font-size: 16px; padding: 0; }
-#alarm-popup-message { font-size: 13px; color: var(--text); margin-bottom: 8px; }
-#alarm-popup-meta    { font-size: 11px; color: var(--text2); margin-bottom: 12px; }
-#alarm-popup-confirm {
-  width: 100%; padding: 6px; border: 1px solid var(--border);
-  background: none; color: var(--text2); border-radius: 4px;
-  cursor: pointer; font-size: 12px; font-family: inherit;
+.alarm-popup-time-badge {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,.06); border-radius: 20px;
+  padding: 3px 10px; font-size: 11px; color: var(--text2);
 }
-#alarm-popup-confirm:hover { border-color: var(--text); color: var(--text); }
+.alarm-popup-time-label {
+  font-weight: 600; color: var(--text2);
+}
+#alarm-popup-time { color: var(--text); }
+#alarm-popup-close {
+  background: none; border: none; color: var(--text2);
+  cursor: pointer; font-size: 16px; padding: 0; line-height: 1;
+}
+/* 중앙: 아이콘 + 알림 유형 */
+.alarm-popup-icon-wrap {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 6px; margin-bottom: 12px;
+}
+.alarm-popup-icon {
+  width: 52px; height: 52px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px;
+  background: rgba(248,81,73,.15); color: var(--danger);
+}
+.alarm-popup-icon.caution { background: rgba(227,179,65,.15); color: var(--caution); }
+.alarm-popup-icon.safe    { background: rgba(63,185,80,.15);  color: var(--safe); }
+.alarm-popup-type-label {
+  font-size: 11px; color: var(--text2); letter-spacing: .5px;
+}
+/* 행동 메시지 */
+.alarm-popup-action {
+  text-align: center; font-size: 18px; font-weight: 700;
+  margin: 0 0 12px; color: var(--danger);
+}
+.alarm-popup-action.caution-text { color: var(--caution); }
+.alarm-popup-action.safe-text    { color: var(--safe); }
+/* 배지 + 상세 내용 행 */
+.alarm-popup-desc-row {
+  display: flex; align-items: flex-start; gap: 8px;
+  margin-bottom: 14px; font-size: 12px; color: var(--text);
+}
+.alarm-popup-desc { line-height: 1.5; flex: 1; }
+/* 하단 버튼 행 */
+.alarm-popup-btn-row {
+  display: flex; gap: 8px;
+}
+.alarm-popup-btn-detail,
+.alarm-popup-btn-confirm {
+  flex: 1; padding: 7px 0; border-radius: 5px;
+  font-size: 12px; font-family: inherit; cursor: pointer;
+}
+.alarm-popup-btn-detail {
+  background: none; border: 1px solid var(--border); color: var(--text2);
+}
+.alarm-popup-btn-detail:hover { border-color: var(--text); color: var(--text); }
+.alarm-popup-btn-confirm {
+  background: var(--blue); border: 1px solid var(--blue); color: #fff;
+}
+.alarm-popup-btn-confirm:hover { opacity: .85; }
+
+/* ── CM-07 정상화 토스트 (우하단 비차단형) ──────────────── */
+#alarm-toast {
+  position: fixed; bottom: 24px; right: 24px; z-index: 1100;
+  display: flex; align-items: center; gap: 10px;
+  width: 300px; padding: 12px 14px; border-radius: 8px;
+  background: #1e1e2e; border-left: 4px solid var(--safe);
+  box-shadow: 0 4px 16px rgba(0,0,0,.4);
+  animation: toast-in .25s ease;
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.alarm-toast-icon {
+  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(63,185,80,.15); color: var(--safe); font-size: 16px; font-weight: 700;
+}
+.alarm-toast-body  { flex: 1; min-width: 0; }
+.alarm-toast-title { font-size: 11px; font-weight: 600; color: var(--safe); margin-bottom: 2px; }
+.alarm-toast-msg   { font-size: 11px; color: var(--text2); line-height: 1.4;
+                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#alarm-toast-close {
+  background: none; border: none; color: var(--text2);
+  cursor: pointer; font-size: 14px; padding: 0; flex-shrink: 0;
+}
 
 /* ── 서브 페이지 공통 ────────────────────────────────────── */
 .page-wrap        { padding: 16px; }

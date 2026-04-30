@@ -1,10 +1,10 @@
 # gas/services/gas_service.py — 가스 데이터 처리 서비스
 #
 # 가스 센서 수신 데이터의 비즈니스 로직을 담당한다.
-#   1. DRF에 측정값을 저장한다.
-#   2. DRF 응답에서 알람 목록을 꺼내 active_alarms에 추가한다.
-#   3. latest_gas_snapshot을 갱신해 다음 WebSocket 틱에 브라우저로 전달한다.
+#   1. DRF에 측정값을 저장한다 (DRF 내부에서 Celery 알람 태스크를 트리거함).
+#   2. latest_gas_snapshot을 갱신해 다음 WebSocket 틱에 브라우저로 전달한다.
 #
+# 알람은 Celery 태스크가 /internal/alarms/push/ 를 통해 직접 active_alarms에 추가한다.
 # HTTP Push(/internal/*) 없이 websocket/state.py를 직접 갱신하는 방식을 사용한다.
 import logging
 
@@ -16,7 +16,7 @@ from core.gas_thresholds import calculate_individual_risks
 from gas.schemas.gas import GasDataPayload
 from datetime import datetime, timezone
 
-from websocket.state import active_alarms, gas_latest, latest_gas_snapshot
+from websocket.state import gas_latest, latest_gas_snapshot
 
 logger = logging.getLogger(__name__)
 
@@ -51,9 +51,8 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
     가스 데이터 수신 후 전체 처리 흐름을 조율한다.
 
     1. 가스별 위험도(individual_risks)를 계산한다.
-    2. DRF에 측정값과 위험도를 저장하고 알람 목록을 받는다.
+    2. DRF에 측정값과 위험도를 저장한다 (DRF → Celery 태스크 → FastAPI /internal/alarms/push/).
     3. latest_gas_snapshot을 갱신해 WebSocket 브로드캐스트에 포함시킨다.
-    4. 새 알람이 있으면 active_alarms에 추가해 다음 WS 틱에 브라우저로 전달한다.
     """
     gas_values = {
         "o2": payload.o2,
@@ -85,8 +84,7 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
         "raw_payload": payload.model_dump(mode="json"),
     }
 
-    drf_data = await _forward_to_drf(drf_payload)
-    alarms = drf_data.get("alarms", [])
+    await _forward_to_drf(drf_payload)
 
     gas_snapshot = {
         "co": payload.co,
@@ -102,8 +100,6 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
     }
     latest_gas_snapshot.update(gas_snapshot)
     gas_latest["updated_at"] = datetime.now(timezone.utc).isoformat()
-    if alarms:
-        active_alarms.extend(alarms)
 
     return {
         "received": True,

@@ -18,6 +18,7 @@ async function initApp() {
   MapPanel.init();
   initWebSocket();
   AlarmPopup.init();
+  AlarmToast.init();
   EventPanel.init();
   loadMySafetyStatus();
 }

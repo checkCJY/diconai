@@ -24,7 +24,7 @@ _prev_total_kw: float | None = None  # 직전 총 전력값 — 증감률 계산
 DATA_STALE_SEC = 8  # 전력 데이터 갱신 없이 이 시간이 지나면 더미값으로 대체
 
 
-def build_broadcast_payload() -> dict:
+def build_broadcast_payload(include_alarms: bool = True) -> dict:
     """
     /ws/sensors/ 틱마다 브라우저로 전송할 통합 페이로드를 조립해 반환한다.
 
@@ -88,8 +88,9 @@ def build_broadcast_payload() -> dict:
         "ai_max_load_kw": ai_max_load_kw,
         "ai_max_load_pct": ai_max_load_pct,
         "worker_positions": dict(worker_positions),
-        "alarms": list(active_alarms),
+        "alarms": list(active_alarms)[:5] if include_alarms else [],
         **(latest_gas_snapshot if not gas_stale else {}),
     }
-    active_alarms.clear()
+    if include_alarms:
+        del active_alarms[:5]
     return payload

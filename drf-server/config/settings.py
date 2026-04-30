@@ -161,3 +161,32 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 LANGUAGE_CODE = "ko-kr"
 TIME_ZONE = "Asia/Seoul"
 USE_TZ = True
+
+# ── Redis ─────────────────────────────────────────────────────
+# 로컬 개발: Redis 설치 후 기본 포트(6379)로 실행하면 별도 설정 없이 동작.
+# Windows: https://github.com/microsoftarchive/redis/releases
+# Mac:     brew install redis && brew services start redis
+# Linux:   sudo apt install redis-server && sudo service redis start
+# .env에 REDIS_URL=redis://localhost:6379/0 추가 필요.
+REDIS_URL = env("REDIS_URL", default="redis://localhost:6379/0")
+
+# ── Celery ────────────────────────────────────────────────────
+# Celery worker 실행: celery -A config worker -l info
+# (DRF 서버와 별도 터미널에서 실행해야 함)
+CELERY_BROKER_URL         = REDIS_URL        # 태스크 전달 채널 (Redis)
+CELERY_RESULT_BACKEND     = REDIS_URL        # 태스크 결과 저장 (Redis)
+CELERY_ACCEPT_CONTENT     = ["json"]
+CELERY_TASK_SERIALIZER    = "json"
+CELERY_RESULT_SERIALIZER  = "json"
+CELERY_TIMEZONE           = TIME_ZONE
+CELERY_TASK_TRACK_STARTED = True
+
+# ── Cache (Redis) ─────────────────────────────────────────────
+# 가스 알람 상태(normal/warning/danger)와 WARNING 타이머 task ID를 저장.
+# Redis가 동일하게 사용되므로 추가 인프라 없이 동작.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": REDIS_URL,
+    }
+}
