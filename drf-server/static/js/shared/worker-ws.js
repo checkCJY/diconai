@@ -26,7 +26,10 @@
         timestamp:    new Date().toISOString(),
         event_id:     data.event_id,
       };
-      if (typeof AlarmPopup !== 'undefined') AlarmPopup.show(alarmData);
+      if (typeof AlarmPopup !== 'undefined') {
+        AlarmPopup.show(alarmData);
+        document.dispatchEvent(new CustomEvent('newAlarmEvent', { detail: alarmData }));
+      }
     };
 
     ws.onclose = function () {

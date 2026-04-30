@@ -74,4 +74,9 @@ document.addEventListener('DOMContentLoaded', () => {
       loadEvents(currentStatus);
     });
   });
+
+  document.addEventListener('newAlarmEvent', () => {
+    loadCounts();
+    loadEvents(currentStatus);
+  });
 });

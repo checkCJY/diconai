@@ -25,7 +25,10 @@
           gas_type:     alarm.gas_type,
           event_id:     alarm.event_id,
         };
-        if (alarm.is_new_event) AlarmPopup.show(alarmData);
+        if (alarm.is_new_event) {
+          AlarmPopup.show(alarmData);
+          document.dispatchEvent(new CustomEvent('newAlarmEvent', { detail: alarmData }));
+        }
         if (alarm.risk_level === 'normal' && typeof AlarmToast !== 'undefined') {
           AlarmToast.show(alarmData);
         }
