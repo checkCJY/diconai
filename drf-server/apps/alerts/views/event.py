@@ -4,9 +4,10 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.alerts.models import Event
+from apps.alerts.models import Event, EventLog
 from apps.alerts.serializers.event import EventListSerializer, EventDetailSerializer
 from apps.core.constants import EventStatus
+
 
 
 class EventViewSet(viewsets.ReadOnlyModelViewSet):
@@ -50,6 +51,7 @@ class EventViewSet(viewsets.ReadOnlyModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        previous_status = event.status
         event.status = new_status
         if new_status == EventStatus.IN_PROGRESS and not event.acknowledged_by:
             event.acknowledged_by = request.user
@@ -58,5 +60,18 @@ class EventViewSet(viewsets.ReadOnlyModelViewSet):
             event.resolved_by  = request.user
             event.resolved_at  = timezone.now()
         event.save()
+
+        action_map = {
+            EventStatus.ACKNOWLEDGED: EventLog.Action.CONFIRMED,
+            EventStatus.IN_PROGRESS:  EventLog.Action.STATUS_CHANGED,
+            EventStatus.RESOLVED:     EventLog.Action.RESOLVED,
+        }
+        EventLog.objects.create(
+            event=event,
+            actor=request.user,
+            action=action_map[new_status],
+            previous_status=previous_status,
+            new_status=new_status,
+        )
 
         return Response(EventDetailSerializer(event).data)
