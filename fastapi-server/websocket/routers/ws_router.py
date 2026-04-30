@@ -13,7 +13,12 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from core.config import settings
 from websocket.services.broadcast import build_broadcast_payload
-from websocket.state import active_alarms, sensor_clients, worker_positions
+from websocket.state import (
+    active_alarms,
+    sensor_clients,
+    worker_clients,
+    worker_positions,
+)
 
 POSITION_ENDPOINT = f"{settings.DRF_BASE_URL}/api/positioning/receive/"
 BROADCAST_INTERVAL = 2  # 센서 데이터 브로드캐스트 주기(초)
@@ -70,7 +75,7 @@ async def _forward_to_drf(payload: dict) -> dict:
         headers["Authorization"] = f"Bearer {settings.DRF_SERVICE_TOKEN}"
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            res = await client.post(POSITION_ENDPOINT, json=payload, headers=headers)
+            res = await client.post(POSITION_ENDPOINT, json=[payload], headers=headers)
             print(
                 f"[position] DRF {res.status_code}: worker={payload['worker_id']} ({payload['x']}, {payload['y']})"
             )
@@ -105,6 +110,28 @@ async def sensor_stream(websocket: WebSocket):
         if websocket in sensor_clients:
             sensor_clients.remove(websocket)
         print(f"[ws/sensors] 브라우저 연결 종료 (총 {len(sensor_clients)}개)")
+
+
+@router.websocket("/ws/worker/{user_id}/")
+async def worker_stream(websocket: WebSocket, user_id: int):
+    """
+    작업자 개인 알림 전용 WebSocket.
+
+    작업자가 로그인 후 본인 user_id로 연결한다.
+    지오펜스 진입 알람 발생 시 해당 작업자에게만 전송된다.
+    """
+    await websocket.accept()
+    worker_clients[user_id] = websocket
+    print(f"[ws/worker] 작업자 연결됨 user_id={user_id}")
+    try:
+        await websocket.receive_text()  # 연결 유지
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        pass
+    finally:
+        worker_clients.pop(user_id, None)
+        print(f"[ws/worker] 작업자 연결 종료 user_id={user_id}")
 
 
 @router.websocket("/ws/position/")
