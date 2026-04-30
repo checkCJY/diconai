@@ -44,13 +44,27 @@ class GeoFence(models.Model):
       함수가 변경 시 positioning 앱에 캐시 재계산을 트리거
     """
 
+    class ShapeType(models.TextChoices):
+        POLYGON = "polygon", "다각형"
+        CIRCLE = "circle", "원형"
+
     facility = models.ForeignKey(
         "facilities.Facility", on_delete=models.PROTECT, related_name="geo_fences"
     )
     name = models.CharField(max_length=50, verbose_name="구역 이름")
+    shape_type = models.CharField(
+        max_length=10,
+        choices=ShapeType.choices,
+        default=ShapeType.POLYGON,
+        verbose_name="형태",
+    )
     polygon = models.JSONField(
         validators=[validate_polygon], verbose_name="꼭짓점 좌표 배열"
     )
+    # 원형 전용 필드 (shape_type='circle' 일 때만 사용)
+    circle_cx = models.FloatField(null=True, blank=True, verbose_name="원 중심 x (px)")
+    circle_cy = models.FloatField(null=True, blank=True, verbose_name="원 중심 y (px)")
+    circle_radius = models.FloatField(null=True, blank=True, verbose_name="반지름 (px)")
     risk_level = models.CharField(
         max_length=10,
         choices=RiskLevel.choices,

@@ -17,4 +17,5 @@ urlpatterns = [
     path("api/positioning/", include("apps.positioning.urls")),
     path("api/monitoring/", include("apps.monitoring.urls")),
     path("admin-panel/", include("config.admin_panel_urls")),
+    path("api/", include("apps.facilities.urls")),
 ]

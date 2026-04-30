@@ -193,32 +193,71 @@ _geofences: [],
 
   // ── 가스센서·전력설비·지오펜스·작업자 마커를 지도에 일괄 그린다. ──────
   async _drawAll() {
-    this.DUMMY_GAS_SENSORS.forEach(s => {
-      const color = this.riskColor(s.risk_level);
-      const m = L.marker([s.y, s.x], {
-      icon: this._createGasIcon(color)
-    }).bindPopup(this.gasPopupHtml(s), { maxWidth: 220 });
-      m.addTo(this.layers.gas);
-      this.gasMarkers[s.device_id] = { marker: m, data: s };
-    });
-
-
-    this.DUMMY_POWER_DEVICES.forEach(d => {
-      const color = this.riskColor(d.risk_level);
-      L.marker([d.y, d.x], {
-        icon: this._createPowerIcon(color)
-      }).bindPopup(this.powerPopupHtml(d), { maxWidth: 220 }).addTo(this.layers.power);
-    });
-
-
+    await this._loadDevices();
     await this._loadGeofences();
 
     this.DUMMY_WORKERS.forEach(w => {
       const m = L.marker([w.y, w.x], {
         icon: this._createWorkerIcon('#58a6ff')
-    }).bindPopup(this.workerPopupHtml(w), { maxWidth: 200 });
-    m.addTo(this.layers.worker);
-    this.workerMarkers[w.id] = { marker: m, data: w };
+      }).bindPopup(this.workerPopupHtml(w), { maxWidth: 200 });
+      m.addTo(this.layers.worker);
+      this.workerMarkers[w.id] = { marker: m, data: w };
+    });
+  },
+
+  // ── 가스센서·전력장치 위치를 DB API에서 로드한다. ─────────────────────
+  async _loadDevices() {
+    try {
+      const token = Auth.getAccessToken();
+      const res = await fetch('/api/map-editor/objects/', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      data.gas_sensors.forEach(s => {
+        const sensorData = {
+          id: s.id, name: s.device_name, device_id: s.code,
+          x: s.x, y: s.y, risk_level: 0, co: 0, h2s: 0, o2: 0,
+        };
+        const m = L.marker([s.y, s.x], {
+          icon: this._createGasIcon(this.riskColor(0)),
+        }).bindPopup(this.gasPopupHtml(sensorData), { maxWidth: 220 });
+        m.addTo(this.layers.gas);
+        this.gasMarkers[s.code] = { marker: m, data: sensorData };
+      });
+
+      data.power_devices.forEach(d => {
+        const deviceData = {
+          id: d.id, name: d.device_name, device_id: d.code,
+          x: d.x, y: d.y, risk_level: 0,
+        };
+        L.marker([d.y, d.x], {
+          icon: this._createPowerIcon(this.riskColor(0)),
+        }).bindPopup(this.powerPopupHtml(deviceData), { maxWidth: 220 })
+          .addTo(this.layers.power);
+      });
+
+      console.log(`[MapPanel] 가스센서 ${data.gas_sensors.length}개, 전력장치 ${data.power_devices.length}개 로드`);
+    } catch (err) {
+      console.warn('[MapPanel] 장치 API 실패, 더미 데이터 사용:', err);
+      this._drawDummyDevices();
+    }
+  },
+
+  // ── API 실패 시 더미 데이터로 폴백 ───────────────────────────────────
+  _drawDummyDevices() {
+    this.DUMMY_GAS_SENSORS.forEach(s => {
+      const m = L.marker([s.y, s.x], {
+        icon: this._createGasIcon(this.riskColor(s.risk_level)),
+      }).bindPopup(this.gasPopupHtml(s), { maxWidth: 220 });
+      m.addTo(this.layers.gas);
+      this.gasMarkers[s.device_id] = { marker: m, data: s };
+    });
+    this.DUMMY_POWER_DEVICES.forEach(d => {
+      L.marker([d.y, d.x], {
+        icon: this._createPowerIcon(this.riskColor(d.risk_level)),
+      }).bindPopup(this.powerPopupHtml(d), { maxWidth: 220 }).addTo(this.layers.power);
     });
   },
 

@@ -100,6 +100,26 @@ class GasSensor(DeviceBase):
         ]
 
 
+class PositionNode(DeviceBase):
+    """
+    위치 추적 앵커 노드 (UWB/BLE 기반)
+
+    작업자 위치 측정을 위해 공장 내 설치되는 고정 수신기.
+    x, y는 도면 상 노드 설치 좌표.
+    """
+
+    def __str__(self):
+        return f"{self.device_name} ({self.device_id})"
+
+    class Meta:
+        db_table = "position_node"
+        indexes = [
+            models.Index(
+                fields=["facility", "is_active"], name="idx_pos_node_facility_active"
+            ),
+        ]
+
+
 class PowerDevice(DeviceBase):
     """
     전력 장비 마스터
