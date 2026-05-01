@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 import httpx
 
 from core.config import settings
+from core.power_thresholds import POWER_THRESHOLDS
 from websocket.state import power_latest
 
 DRF_POWER_EVENT_URL = f"{settings.DRF_BASE_URL}/api/monitoring/power/event/"
@@ -98,7 +99,7 @@ def build_equipment() -> tuple[list[dict], float]:
 
     WebSocket 브로드캐스트 페이로드의 equipment[] 필드를 생성하는 데 사용된다.
     watt/current/voltage가 모두 비어있으면 데이터 미수신 상태로 간주해 빈 리스트를 반환한다.
-    채널별 위험도: watt > 4000W → danger, > 2500W → warning, 그 외 → normal
+    채널별 위험도: watt > POWER_THRESHOLDS["danger"] → danger, > POWER_THRESHOLDS["caution"] → warning, 그 외 → normal
     """
     if not any(
         [power_latest["watt"], power_latest["current"], power_latest["voltage"]]
@@ -119,7 +120,11 @@ def build_equipment() -> tuple[list[dict], float]:
 
         if not is_comm and watt is not None:
             risk_level = (
-                "danger" if watt > 4000 else "warning" if watt > 2500 else "normal"
+                "danger"
+                if watt > POWER_THRESHOLDS["danger"]
+                else "warning"
+                if watt > POWER_THRESHOLDS["caution"]
+                else "normal"
             )
             total_w += watt
         else:
