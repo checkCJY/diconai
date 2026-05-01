@@ -1,0 +1,116 @@
+{% extends 'admin_panel/base.html' %}
+{% load static %}
+
+{% block title %}유해가스 센서 데이터 관리{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/admin/gas_data.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="breadcrumb">데이터 관리 &gt; 유해가스 센서 데이터</div>
+    <h1 class="page-title">유해가스 센서 데이터 관리</h1>
+    <p class="page-desc">가스 센서 측정 이력을 조회하고 CSV로 내보낼 수 있습니다.</p>
+  </div>
+</div>
+
+<!-- 필터 카드 -->
+<div class="filter-card">
+  <div class="filter-body">
+
+    <!-- 빠른 날짜 버튼 -->
+    <div class="quick-date-group">
+      <button class="quick-btn" data-range="today">오늘</button>
+      <button class="quick-btn" data-range="yesterday">어제</button>
+      <button class="quick-btn" data-range="7days">최근 7일</button>
+      <button class="quick-btn" data-range="month">이번달</button>
+    </div>
+
+    <div class="filter-row">
+      <!-- 조회 기간 -->
+      <div class="input-group">
+        <label>조회 기간</label>
+        <div class="date-range">
+          <input type="datetime-local" id="dateFrom">
+          <span class="date-sep">~</span>
+          <input type="datetime-local" id="dateTo">
+        </div>
+      </div>
+
+      <!-- 장비 선택 -->
+      <div class="input-group input-group--sm">
+        <label>장비명</label>
+        <select id="sensorFilter">
+          <option value="">전체</option>
+          {% for sensor in sensors %}
+          <option value="{{ sensor.id }}">{{ sensor.device_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- 정렬 -->
+      <div class="input-group input-group--sm">
+        <label>정렬</label>
+        <select id="orderingFilter">
+          <option value="-received_at">수신 시각 최신순</option>
+          <option value="received_at">수신 시각 오래된순</option>
+        </select>
+      </div>
+
+      <!-- 검색/초기화 버튼 -->
+      <div class="filter-actions">
+        <button class="btn-outline" id="btnReset">초기화</button>
+        <button class="btn-dark" id="btnSearch">검색</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 테이블 카드 -->
+<div class="table-card">
+  <div class="table-toolbar">
+    <div class="toolbar-left">
+      <span class="total-count">총 <strong id="totalCount">0</strong>건</span>
+    </div>
+    <div class="toolbar-right">
+      <button class="btn-dark btn-sm" id="btnExport">로그 내보내기 (CSV)</button>
+    </div>
+  </div>
+
+  <div class="table-wrapper">
+    <table id="gasTable">
+      <thead>
+        <tr>
+          <th>수신 시각</th>
+          <th>장비명</th>
+          <th>CO<br><small>ppm</small></th>
+          <th>H₂S<br><small>ppm</small></th>
+          <th>CO₂<br><small>ppm</small></th>
+          <th>O₂<br><small>%</small></th>
+          <th>NO₂<br><small>ppm</small></th>
+          <th>SO₂<br><small>ppm</small></th>
+          <th>O₃<br><small>ppm</small></th>
+          <th>NH₃<br><small>ppm</small></th>
+          <th>VOC<br><small>ppm</small></th>
+          <th>최고 위험도</th>
+        </tr>
+      </thead>
+      <tbody id="gasTableBody">
+        <tr><td colspan="12" class="empty-msg">검색 조건을 입력 후 검색 버튼을 눌러주세요.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 페이지네이션 -->
+  <div class="table-footer">
+    <span class="page-info" id="pageInfo"></span>
+    <div class="pagination" id="pagination"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/admin/gas/gas_data.js' %}"></script>
+{% endblock %}
