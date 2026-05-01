@@ -9,7 +9,7 @@
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from websocket.state import active_alarms, worker_clients
+from websocket.state import active_alarms, alarm_signal, worker_clients
 
 router = APIRouter(prefix="/internal")
 
@@ -41,6 +41,7 @@ async def push_alarm(request: Request, alarm: AlarmPayload):
 
     payload = alarm.model_dump(exclude_none=True)
     active_alarms.append(payload)
+    alarm_signal.set()
 
     # 지오펜스 진입 알람은 해당 작업자에게도 개인 전송
     if alarm.alarm_type == "geofence_intrusion" and alarm.worker_id is not None:

@@ -97,16 +97,22 @@ const AlarmPopup = {
 
   close() {
     clearTimeout(this._autoCloseTimer);
-    this.queue      = [];
-    this.isOpen     = false;
     this._currentId = null;
     const popup = document.getElementById('alarm-popup');
     if (popup) popup.style.display = 'none';
+    this.isOpen = false;
+    this._process();
   },
 
   _goDetail() {
     const id = this._currentId;
-    this.close();
+    // 큐는 유지한 채 현재 팝업만 닫고 상세 페이지로 이동
+    clearTimeout(this._autoCloseTimer);
+    this._currentId = null;
+    this.isOpen = false;
+    this.queue = [];
+    const popup = document.getElementById('alarm-popup');
+    if (popup) popup.style.display = 'none';
     window.location.href = id
       ? `/dashboard/monitoring/events/${id}/`
       : '/dashboard/monitoring/events/';

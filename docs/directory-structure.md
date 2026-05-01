@@ -1,7 +1,6 @@
 # diconai — 디렉토리 구조
 
-> 기준일: 2026-04-25 / 브랜치: devleop
-> Phase 3 리팩토링 완료 + Phase 4 P0·P1 수정 반영
+> 기준일: 2026-05-01 / 브랜치: feature/MN-04_refactor
 
 ---
 
@@ -12,7 +11,7 @@ diconai/                              # 프로젝트 루트
 │   ├── directory-structure.md        # 디렉토리 구조 (현재 파일)
 │   ├── url-structure.md              # URL 설계 구조
 │   ├── dev_convention.md             # 개발 컨벤션
-│   └── github_convention.md          # GitHub 협업 컨벤션
+│   └── COMMANDS.md
 │
 ├── drf-server/                       # Django REST Framework 서버 (포트 8000)
 │   └── [하단 상세 참조]
@@ -28,34 +27,42 @@ diconai/                              # 프로젝트 루트
 ```
 drf-server/
 ├── manage.py
-├── requirements.txt
-├── db.sqlite3                        # 개발용 SQLite (Git 제외)
-├── .env                              # 환경변수 — SECRET_KEY, DB 등 (Git 제외)
-├── .env.example
-│
 ├── config/                           # Django 프로젝트 설정
-│   ├── settings.py                   # 전역 설정
+│   ├── settings.py
 │   ├── urls.py                       # 루트 URL 라우터
+│   ├── admin_panel_urls.py           # 어드민 패널 HTML 페이지 라우터
 │   ├── asgi.py
+│   ├── celery.py
 │   └── wsgi.py
 │
-├── apps/                             # Django 앱 모음
+├── apps/
 │   │
-│   ├── accounts/                     # 사용자 인증
+│   ├── accounts/                     # 사용자 인증·조직
 │   │   ├── models/
-│   │   │   ├── user.py               # CustomUser, UserProfile
-│   │   │   └── login_log.py          # LoginLog
+│   │   │   ├── user.py               # CustomUser
+│   │   │   ├── company.py
+│   │   │   ├── department.py
+│   │   │   ├── position.py
+│   │   │   ├── user_department.py
+│   │   │   └── login_log.py
+│   │   ├── serializers/
+│   │   │   ├── admin_serializers.py
+│   │   │   ├── auth_serializers.py
+│   │   │   └── org_serializers.py
+│   │   ├── views/
+│   │   │   ├── admin_views.py        # 사용자 관리 어드민 API
+│   │   │   ├── auth_views.py         # 로그인/로그아웃/JWT
+│   │   │   └── org_views.py          # 조직 관리 API
 │   │   ├── selectors/
 │   │   ├── services/
-│   │   ├── serializers.py
-│   │   ├── views.py
-│   │   └── urls.py
+│   │   ├── admin_urls.py             # /api/admin/accounts|organizations|departments/
+│   │   └── urls.py                   # /accounts/login/, /api/auth/
 │   │
 │   ├── alerts/                       # 알람·이벤트
 │   │   ├── models/
-│   │   │   ├── alarm_record.py       # 알람 레코드
-│   │   │   ├── event.py              # 이벤트 (ACTIVE → RESOLVED 상태 관리)
-│   │   │   └── event_log.py          # 이벤트 히스토리
+│   │   │   ├── alarm_record.py       # AlarmRecord
+│   │   │   ├── event.py              # Event (ACTIVE → RESOLVED)
+│   │   │   └── event_log.py          # EventLog (이력)
 │   │   ├── selectors/
 │   │   │   ├── active_events.py
 │   │   │   ├── alarm_timeline.py
@@ -63,60 +70,75 @@ drf-server/
 │   │   ├── services/
 │   │   │   ├── alarm_service.py
 │   │   │   ├── event_service.py      # create_alarm_and_event, resolve_event
-│   │   │   └── merge_policy.py       # 이벤트 병합 정책
+│   │   │   └── merge_policy.py
 │   │   ├── serializers/
-│   │   │   └── alarm_record.py
+│   │   │   ├── alarm_record.py
+│   │   │   └── event.py
 │   │   ├── views/
-│   │   │   └── alarm_record.py       # AlarmRecordViewSet, EventResolveView
-│   │   └── urls.py
+│   │   │   ├── alarm_record.py       # AlarmRecordViewSet, MyStatusView, WorkerSummaryView
+│   │   │   └── event.py              # EventViewSet
+│   │   ├── tasks.py                  # Celery 태스크 (알람 생성 등)
+│   │   └── urls.py                   # /alerts/api/alarms|events/
 │   │
 │   ├── core/                         # 공통 유틸·시스템 로그
 │   │   ├── models/
+│   │   │   ├── base.py
 │   │   │   └── system_log.py
-│   │   ├── selectors/
-│   │   │   └── audit_trail.py
-│   │   ├── services/
-│   │   │   └── audit_service.py
+│   │   ├── selectors/audit_trail.py
+│   │   ├── services/audit_service.py
 │   │   ├── constants.py
 │   │   ├── mixins.py
+│   │   ├── pagination.py
+│   │   ├── permissions.py
 │   │   └── validators.py
 │   │
 │   ├── dashboard/                    # 대시보드 HTML 렌더링
-│   │   ├── menu.py                   # 사이드바 메뉴 구조
+│   │   ├── menu.py
 │   │   ├── views.py
-│   │   └── urls.py
+│   │   └── urls.py                   # /dashboard/
 │   │
 │   ├── facilities/                   # 설비·장치·임계값 마스터
 │   │   ├── models/
 │   │   │   ├── facility.py
 │   │   │   ├── devices.py            # GasSensor, PowerDevice
-│   │   │   └── thresholds.py
-│   │   ├── selectors/
+│   │   │   ├── equipment.py
+│   │   │   ├── thresholds.py
+│   │   │   ├── gas_sensor_inspection.py
+│   │   │   └── power_device_inspection.py
+│   │   ├── selectors/active_devices.py
 │   │   ├── services/
 │   │   │   ├── device_service.py
 │   │   │   └── threshold_service.py
 │   │   ├── serializers/
-│   │   └── views/
+│   │   │   ├── facility_admin.py
+│   │   │   ├── gas_sensor_admin.py
+│   │   │   ├── map_editor.py
+│   │   │   └── power_device_admin.py
+│   │   ├── views/
+│   │   │   ├── facility_admin.py
+│   │   │   ├── gas_sensor_admin.py
+│   │   │   ├── map_editor.py
+│   │   │   └── power_device_admin.py
+│   │   └── urls.py                   # /api/facilities|gas-sensors|power-devices|map-editor/
 │   │
 │   ├── geofence/                     # 지오펜스 관리
-│   │   ├── models/
-│   │   │   └── geofence.py
-│   │   ├── selectors/
-│   │   │   └── geofence_candidates.py
-│   │   ├── services/
-│   │   │   └── geofence_service.py
+│   │   ├── models/geofence.py
+│   │   ├── selectors/geofence_candidates.py
+│   │   ├── services/geofence_service.py
 │   │   ├── serializers/
+│   │   │   ├── serializers.py
+│   │   │   └── admin_serializers.py
 │   │   ├── views/
 │   │   │   ├── geofence_views.py     # GeoFenceViewSet
-│   │   │   └── admin_views.py        # GeoFenceAdminPageView
-│   │   ├── urls.py                   # /api/geofences/
-│   │   ├── admin_urls.py             # /admin-panel/geofence/
+│   │   │   └── admin_views.py        # GeoFenceAdminPageView, GeoFenceAdminListView
+│   │   ├── admin_urls.py             # (Django admin 전용 — 미사용 가능성)
+│   │   ├── urls.py                   # /api/geofences/, /api/admin/geofences/
 │   │   └── validators.py
 │   │
 │   ├── monitoring/                   # 가스·전력 센서 데이터 수집
 │   │   ├── models/
 │   │   │   ├── gas_data.py           # GasData (9종 가스 wide-table)
-│   │   │   ├── power_data.py         # PowerData (채널 정규화, long-format)
+│   │   │   ├── power_data.py         # PowerData (long-format)
 │   │   │   └── power_event.py        # PowerEvent (ON/OFF 스냅샷)
 │   │   ├── collectors/
 │   │   │   ├── gas_collector.py
@@ -129,19 +151,22 @@ drf-server/
 │   │   │   └── gas_alarm.py
 │   │   ├── serializers/
 │   │   │   ├── gas_data.py
-│   │   │   └── power_data.py         # PowerEventIngestSerializer, PowerDataBulkIngestSerializer
+│   │   │   └── power_data.py
 │   │   ├── views/
 │   │   │   ├── gas_data.py           # GasDataCreateView
-│   │   │   └── power_data.py         # PowerEventIngestView, PowerDataBulkIngestView
-│   │   ├── utils/
-│   │   │   └── gas_thresholds.py
+│   │   │   ├── gas_data_admin.py     # GasDataAdminListView, Export, SensorList
+│   │   │   ├── power_data.py         # PowerEventIngestView, PowerDataBulkIngestView
+│   │   │   └── power_data_admin.py   # PowerDataAdminListView, Export, DeviceList
+│   │   ├── utils/gas_thresholds.py
 │   │   ├── validators.py
-│   │   └── urls.py                   # /api/monitoring/gas|power/*
+│   │   ├── admin_urls.py             # /api/admin/gas-data|power-data/
+│   │   └── urls.py                   # /api/monitoring/gas|power/
 │   │
 │   ├── notifications/                # 알림 발송 (팝업·푸시·SMS)
-│   │   ├── models/
-│   │   │   └── notification.py
+│   │   ├── models/notification.py
 │   │   ├── selectors/
+│   │   │   ├── notification_history.py
+│   │   │   └── unread_notifications.py
 │   │   ├── services/
 │   │   │   ├── notification_service.py
 │   │   │   └── delivery/
@@ -152,91 +177,132 @@ drf-server/
 │   │   └── views/
 │   │
 │   ├── positioning/                  # 작업자 위치 추적
-│   │   ├── models/
-│   │   │   └── worker_position.py
-│   │   ├── collectors/
-│   │   │   └── position_collector.py
-│   │   ├── selectors/
-│   │   │   └── latest_positions.py
-│   │   ├── services/
-│   │   │   └── position_service.py   # 지오펜스 근접 시만 DB 저장
-│   │   ├── serializers/
-│   │   ├── views/
-│   │   │   └── position_views.py     # WorkerPositionReceiveView
+│   │   ├── models/worker_position.py
+│   │   ├── collectors/position_collector.py
+│   │   ├── selectors/latest_positions.py
+│   │   ├── services/position_service.py  # 지오펜스 근접 시만 DB 저장
+│   │   ├── serializers/serializers.py
+│   │   ├── views/position_views.py   # WorkerPositionReceiveView
 │   │   └── urls.py                   # /api/positioning/receive/
 │   │
 │   └── safety/                       # 안전 점검 체크리스트
-│       ├── models/
-│       │   └── safety.py
-│       ├── selectors/
-│       │   └── completion_stats.py
-│       ├── services/
-│       │   └── check_service.py
+│       ├── models/safety.py
+│       ├── selectors/completion_stats.py
+│       ├── services/check_service.py
 │       ├── serializers/
 │       └── views/
 │
-├── templates/                        # Django HTML 템플릿
-│   ├── main_dashboard.html           # ✅ 활성 메인 대시보드
-│   ├── alarm_panel.html
-│   ├── auth/
-│   │   └── login.html
+├── templates/
+│   ├── auth/login.html
 │   ├── components/
 │   │   ├── header.html
-│   │   └── alarm_popup.html
-│   ├── snb_details/                  # 사이드바 상세 패널
+│   │   ├── alarm_popup.html
+│   │   ├── geofence_modal.html
+│   │   └── admin_sidebar.html
+│   ├── dashboard/
+│   │   ├── main.html                 # ✅ 메인 대시보드
+│   │   └── panels/
+│   │       ├── event_panel.html
+│   │       ├── gas_panel.html
+│   │       ├── map_panel.html
+│   │       ├── power_panel.html
+│   │       └── safety_panel.html
+│   ├── snb_details/
 │   │   ├── monitoring_realtime.html
 │   │   ├── monitoring_gas.html
 │   │   ├── monitoring_power.html
 │   │   ├── monitoring_workers.html
 │   │   ├── monitoring_events.html
+│   │   ├── event_detail.html
 │   │   ├── safety_checklist.html
 │   │   ├── safety_history.html
-│   │   └── safety_vr.html
-│   ├── admin/
-│   │   ├── main.html
-│   │   └── geofence/
-│   │       └── geofence_list.html
-│   │
-│   ├── main_dashboard_CJY.html       # ⚠️ 미사용 — Phase 4 삭제 예정
-│   └── main_dashboard_jhh.html       # ⚠️ 미사용 — Phase 4 삭제 예정
+│   │   ├── safety_vr.html
+│   │   └── my_profile.html
+│   └── admin_panel/
+│       ├── base.html
+│       ├── accounts/accounts_main.html
+│       ├── organizations/organizations_main.html
+│       ├── data/
+│       │   ├── gas_data.html
+│       │   └── power_data.html
+│       ├── facility/facility.html
+│       ├── gas_sensor/gas_sensor.html
+│       ├── geofence/geofence_list.html
+│       ├── map_editor/map_editor.html
+│       └── power_system/power_system.html
 │
-└── static/                           # 정적 파일
+└── static/
     ├── css/
-    │   ├── dashboard.css             # ✅ 활성
     │   ├── admin.css
+    │   ├── dashboard.css
+    │   ├── dashboard_CJY.css
     │   ├── auth/login.css
     │   ├── components/header.css
-    │   ├── snb_details/
-    │   │   ├── safety_checklist.css
-    │   │   └── safety_vr.css
-    │   ├── admin/geofence.css
-    │   ├── detail/power_system.css   # ⚠️ 구 JS 전용 — Phase 4 검토 예정
-    │   └── dashboard_CJY.css         # ⚠️ 미사용 — Phase 4 삭제 예정
+    │   ├── admin/
+    │   │   ├── accounts.css
+    │   │   ├── facility.css
+    │   │   ├── gas_data.css
+    │   │   ├── gas_sensor.css
+    │   │   ├── geofence.css
+    │   │   ├── map_editor.css
+    │   │   ├── organizations.css
+    │   │   ├── power_data.css
+    │   │   └── power_system.css
+    │   ├── detail/
+    │   │   ├── event_monitoring.css
+    │   │   ├── gas_monitoring.css
+    │   │   ├── map_detail.css
+    │   │   ├── monitoring_workers.css
+    │   │   └── power_system.css
+    │   └── snb_details/
+    │       ├── my_profile.css
+    │       ├── safety_checklist.css
+    │       ├── safety_history.css
+    │       └── safety_vr.css
     │
     └── js/
-        ├── refactors/                # ✅ 활성 JS 모듈
-        │   ├── app.js                # 앱 진입점
+        ├── dashboard/                # 메인 대시보드
+        │   ├── app.js                # 진입점
+        │   ├── charts.js
+        │   ├── websocket.js          # /ws/sensors/ 연결
+        │   └── panels/
+        │       ├── event-panel.js
+        │       ├── gas-panel.js
+        │       ├── map-panel.js
+        │       └── worker-panel.js
+        ├── shared/                   # 전 페이지 공통 모듈
+        │   ├── alarm-popup.js
+        │   ├── alarm-ws.js
         │   ├── app-sub.js
-        │   ├── auth.js               # 인증 처리
-        │   ├── websocket.js          # WebSocket 연결 관리
-        │   ├── charts.js             # 차트 렌더링
-        │   ├── gas-panel.js          # 가스 센서 패널
-        │   ├── map-panel.js          # 공장 지도 패널
-        │   ├── worker-panel.js       # 작업자 위치 패널
-        │   ├── event-panel.js        # 이벤트 패널
-        │   ├── alarm-popup.js        # 알람 팝업 (확인 시 Event RESOLVED)
+        │   ├── auth.js
         │   ├── layout.js
         │   ├── util.js
-        │   │
-        │   ├── websocket_CJY.js      # ⚠️ 미사용 — Phase 4 삭제 예정
-        │   ├── websocket_jhh.js      # ⚠️ 미사용 — Phase 4 삭제 예정
-        │   ├── charts_CJY.js         # ⚠️ 미사용 — Phase 4 삭제 예정
-        │   └── gas-panel_jhh.js      # ⚠️ 미사용 — Phase 4 삭제 예정
-        │
-        └── detail/                   # ⚠️ 구 구조 — Phase 4 검토 예정
-            ├── power_system.js
-            ├── websocket_power.js
-            └── ui-exception.js
+        │   └── worker-ws.js
+        ├── detail/                   # SNB 상세 페이지
+        │   ├── event_detail.js
+        │   ├── event_list.js
+        │   ├── gas_monitoring.js
+        │   ├── map_detail.js
+        │   ├── monitoring_workers.js
+        │   ├── my_profile.js
+        │   ├── power_system.js
+        │   ├── safety_checklist.js
+        │   ├── safety_history.js
+        │   ├── safety_vr.js
+        │   ├── ui-exception.js
+        │   ├── websocket_gas.js
+        │   └── websocket_power.js
+        └── admin/                    # 어드민 패널
+            ├── main.js
+            ├── accounts/accounts.js
+            ├── facility/facility.js
+            ├── gas/gas_data.js
+            ├── gas_sensor/gas_sensor.js
+            ├── geofence/geofence.js
+            ├── map_editor/map_editor.js
+            ├── organizations/organizations.js
+            ├── power/power_data.js
+            └── power_system/power_system.js
 ```
 
 ---
@@ -246,50 +312,45 @@ drf-server/
 ```
 fastapi-server/
 ├── app.py                            # 진입점 — uvicorn app:app --port 8001
-├── requirements.txt
-│
-├── core/                             # 서버 공통 설정·유틸
-│   ├── config.py                     # Pydantic Settings (DRF_BASE_URL, DRF_SERVICE_TOKEN)
-│   └── gas_thresholds.py             # 가스 임계치 계산 함수
+│                                     # broadcast_loop: 5초마다 센서 브로드캐스트
+│                                     # import alarm_flush_loop: 5초마다 새 알람 플러시
+├── core/
+│   ├── config.py                     # Pydantic Settings (DRF_BASE_URL 등)
+│   └── gas_thresholds.py
 │
 ├── gas/                              # 가스 센서 도메인
-│   ├── routers/
-│   │   └── gas_router.py             # POST /api/sensors/info, /api/sensors/gas
-│   ├── schemas/
-│   │   └── gas.py                    # GasDataPayload, DeviceInfoPayload
-│   └── services/
-│       └── gas_service.py            # DRF 전송 + state 직접 갱신
+│   ├── routers/gas_router.py         # POST /api/sensors/info, /api/sensors/gas
+│   ├── schemas/gas.py
+│   └── services/gas_service.py       # DRF 전송 + state 갱신
 │
 ├── power/                            # 전력 센서 도메인
-│   ├── routers/
-│   │   └── power_router.py           # POST /api/power/onoff|current|voltage|watt
-│   ├── schemas/
-│   │   └── power.py                  # PowerOnOffPayload, PowerCurrentPayload 등
-│   └── services/
-│       └── power_service.py          # DRF 전송(BackgroundTask) + state 갱신
-│                                     # build_equipment() — 채널 → 설비 조립
+│   ├── routers/power_router.py       # POST /api/power/onoff|current|voltage|watt
+│   ├── schemas/power.py
+│   └── services/power_service.py
 │
 ├── positioning/                      # 작업자 위치 도메인
-│   ├── routers/
-│   │   └── position_router.py        # WS /ws/positions/ — 더미 위치 브로드캐스트
-│   ├── schemas/
-│   │   └── position.py               # WorkerPositionSchema
-│   └── services/
-│       └── position_service.py       # DRF 저장 + 더미 작업자 시뮬레이션
+│   ├── routers/position_router.py    # POST /api/positioning/receive
+│   │                                 # WS   /ws/positions/ (브라우저 스트리밍)
+│   ├── schemas/position.py
+│   └── services/position_service.py  # DRF 비동기 저장
 │
 ├── websocket/                        # WebSocket 브로드캐스트 도메인
 │   ├── state.py                      # 프로세스 공유 상태
 │   │                                 #   worker_positions, active_alarms,
 │   │                                 #   latest_gas_snapshot, power_latest
-│   ├── routers/
-│   │   └── ws_router.py              # WS /ws/sensors/ (브라우저)
-│   │                                 # WS /ws/position/ (IoT 수신)
-│   └── services/
-│       └── broadcast.py              # build_broadcast_payload() 조립
+│   │                                 #   sensor_clients, worker_clients
+│   ├── routers/ws_router.py          # WS /ws/sensors/ (브라우저)
+│   │                                 # WS /ws/position/ (IoT 위치 장비)
+│   └── services/broadcast.py         # build_broadcast_payload()
+│
+├── internal/                         # 내부 전용 (localhost only)
+│   └── routers/alarm_router.py       # POST /internal/alarms/push/
+│                                     # Celery → FastAPI WS 브리지
 │
 └── dummies/                          # 더미 데이터 전송 스크립트
-    ├── gas_dummy.py                  # python -m dummies.gas_dummy
-    └── power_dummy.py                # python -m dummies.power_dummy
+    ├── gas_dummy.py
+    ├── power_dummy.py
+    └── position_dummy.py
 ```
 
 ---
@@ -311,18 +372,4 @@ fastapi-server/
 | 서버 | 포트 | 주요 역할 |
 |------|------|----------|
 | `drf-server` | 8000 | 인증, HTML 렌더링, 데이터 영속성(DB), REST API |
-| `fastapi-server` | 8001 | 센서 데이터 수신, WebSocket 브로드캐스트 |
-
----
-
-> ⚠️ **Phase 4 수정 예정 항목** (templates/css/js)
->
-> 아래 파일은 현재 미사용 상태이며 Phase 4에서 삭제 또는 통합 예정입니다.
-> - `templates/main_dashboard_CJY.html`
-> - `templates/main_dashboard_jhh.html`
-> - `static/js/refactors/websocket_CJY.js`
-> - `static/js/refactors/websocket_jhh.js`
-> - `static/js/refactors/charts_CJY.js`
-> - `static/js/refactors/gas-panel_jhh.js`
-> - `static/css/dashboard_CJY.css`
-> - `static/js/detail/` 폴더 전체 (구 구조)
+| `fastapi-server` | 8001 | 센서 데이터 수신, WebSocket 브로드캐스트, Celery 브리지 |
