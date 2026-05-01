@@ -128,6 +128,7 @@ class MeView(APIView):
             menu_tree = []
 
         data = {
+            "id": user.id,
             "username": user.username,
             "role": user.user_type,
             "menu_tree": menu_tree,

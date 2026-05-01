@@ -3,10 +3,16 @@
     <nav class="snb">
         <a href="/admin-panel/accounts-management/" {% if active_nav == 'account' %}class="active"{% endif %}><span class="icon">계정</span></a>
         <a href="/admin-panel/organizations/" {% if active_nav == 'org' %}class="active"{% endif %}><span class="icon">조직</span></a>
+<<<<<<< HEAD
+        <a href="/admin-panel/facility/" {% if active_nav == 'equipment' %}class="active"{% endif %}><span class="icon">설비</span></a>
+        <a href="/admin-panel/geofence/" {% if active_nav == 'geofence' %}class="active"{% endif %}><span class="icon">구역 관리</span></a>
+        <a href="/admin-panel/map-editor/" {% if active_nav == 'geofence' %}class="active"{% endif %}><span class="icon">지도 관리</span></a>
+=======
         <a href="/admin-panel/facility/" {% if active_nav == 'power_system' %}class="active"{% endif %}><span class="icon">전력 시스템</span></a>
         <a href="/admin-panel/gas-sensors/" {% if active_nav == 'gas_sensor' %}class="active"{% endif %}><span class="icon">장비 관리</span></a>
         <a href="/admin-panel/geofence/" {% if active_nav == 'geofence' %}class="active"{% endif %}><span class="icon">지도/구역</span></a>
         <a href="/admin-panel/map-editor/" {% if active_nav == 'map_editor' %}class="active"{% endif %}><span class="icon">지도 편집</span></a>
+>>>>>>> devleop
         <a href="#" {% if active_nav == 'data' %}class="active"{% endif %}><span class="icon">데이터</span></a>
         <a href="/admin-panel/data/gas/" {% if active_nav == 'data' %}class="active"{% endif %}><span class="icon">가스 데이터</span></a>
         <a href="/admin-panel/data/power/" {% if active_nav == 'power_data' %}class="active"{% endif %}><span class="icon">전력 데이터</span></a>

@@ -499,15 +499,14 @@ _geofences: [],
   },
 
   updateWorkerPositions(positions) {
-    positions.forEach(w => {
-      const entry = this.workerMarkers[w.worker_id];
-      if (!entry) return;
+    // Array와 {worker_id: {...}} 객체 모두 허용
+    const posArray = Array.isArray(positions)
+      ? positions
+      : Object.entries(positions).map(([id, p]) => ({ worker_id: parseInt(id), ...p }));
 
-      entry.marker.setLatLng([w.y, w.x]);
-      entry.data.x = w.x;
-      entry.data.y = w.y;
-      entry.data.movement_status = w.movement_status;
-
+    const statuses = {};
+    posArray.forEach(w => {
+      // 지오펜스 판정 — 마커 유무와 무관하게 모든 작업자에 대해 실행
       let inGeofence = null;
       for (const g of this._geofences) {
         if (this._pointInPolygon(w.x, w.y, g.polygon)) {
@@ -515,6 +514,20 @@ _geofences: [],
           break;
         }
       }
+      statuses[w.worker_id] = {
+        status: inGeofence ? inGeofence.risk_level : 'normal',
+        geofence_name: inGeofence ? inGeofence.name : null,
+        worker_name: w.worker_name || String(w.worker_id),
+      };
+
+      // 맵 마커 갱신 (마커가 있는 작업자만)
+      const entry = this.workerMarkers[w.worker_id];
+      if (!entry) return;
+
+      entry.marker.setLatLng([w.y, w.x]);
+      entry.data.x = w.x;
+      entry.data.y = w.y;
+      entry.data.movement_status = w.movement_status;
 
       const newColor = inGeofence
         ? (this.ZONE_COLOR[inGeofence.risk_level] || '#f85149')
@@ -530,5 +543,8 @@ _geofences: [],
         entry.marker.setPopupContent(this.workerPopupHtml(entry.data));
       }
     });
+
+    // 작업자 현황 패널에 지오펜스 기반 실시간 상태 전달
+    document.dispatchEvent(new CustomEvent('workerStatusComputed', { detail: statuses }));
   },
 };

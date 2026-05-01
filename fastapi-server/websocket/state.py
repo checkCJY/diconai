@@ -3,8 +3,11 @@
 # HTTP /internal/* 엔드포인트 없이 상태를 공유한다.
 from fastapi import WebSocket
 
-# 연결된 브라우저 WebSocket 클라이언트 목록
+# 연결된 브라우저 WebSocket 클라이언트 목록 (관리자 broadcast용)
 sensor_clients: list[WebSocket] = []
+
+# 작업자 개인 알림용 WebSocket { user_id: WebSocket }
+worker_clients: dict[int, WebSocket] = {}
 
 # 작업자 최신 위치 { worker_id: { x, y, facility_id, updated_at } }
 worker_positions: dict[int, dict] = {}

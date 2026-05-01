@@ -31,9 +31,10 @@ const _POPUP_CFG = {
 // AlarmPopup — 위험/주의 전용 중앙 차단형 팝업
 // ──────────────────────────────────────────────────────────
 const AlarmPopup = {
-  queue:    [],
-  isOpen:   false,
-  _inited:  false,
+  queue:       [],
+  isOpen:      false,
+  _inited:     false,
+  _currentId:  null,
   MAX_QUEUE: 5,
 
   show(data) {
@@ -50,6 +51,8 @@ const AlarmPopup = {
     this.isOpen = true;
     const data  = this.queue.shift();
     const cfg   = _POPUP_CFG[data.alarm_level] || _POPUP_CFG.danger;
+    this._currentId = data.event_id || data.id || null;
+
     const popup = document.getElementById('alarm-popup');
     if (!popup) { this.isOpen = false; return; }
 
@@ -94,15 +97,19 @@ const AlarmPopup = {
 
   close() {
     clearTimeout(this._autoCloseTimer);
-    this.queue  = [];
-    this.isOpen = false;
+    this.queue      = [];
+    this.isOpen     = false;
+    this._currentId = null;
     const popup = document.getElementById('alarm-popup');
     if (popup) popup.style.display = 'none';
   },
 
   _goDetail() {
+    const id = this._currentId;
     this.close();
-    window.location.href = '/dashboard/monitoring/events/';
+    window.location.href = id
+      ? `/dashboard/monitoring/events/${id}/`
+      : '/dashboard/monitoring/events/';
   },
 
   init() {
@@ -113,6 +120,11 @@ const AlarmPopup = {
     document.getElementById('alarm-popup-detail') ?.addEventListener('click', () => this._goDetail());
   },
 };
+
+document.addEventListener('DOMContentLoaded', () => {
+  AlarmPopup.init();
+  AlarmToast.init();
+});
 
 // ──────────────────────────────────────────────────────────
 // AlarmToast — 정상화 전용 우하단 비차단형 토스트

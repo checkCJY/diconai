@@ -5,7 +5,10 @@ from apps.alerts.models import Event, AlarmRecord, EventLog
 from apps.core.constants import EventStatus, RiskLevel
 from django.utils import timezone
 
+from datetime import timedelta
+
 RISK_LEVELS = ["normal", "warning", "danger"]
+RENOTIFY_COOLDOWN_MINUTES = 5
 
 
 # 알람발생 시, Event 생성/병합 플로우
@@ -72,7 +75,7 @@ def create_alarm_and_event(
 
         else:
             # ✅ [기존 로직] 정상 병합 (타임 윈도우 이내)
-            AlarmRecord.objects.create(
+            alarm = AlarmRecord.objects.create(
                 facility_id=facility_id,
                 event=active_event,
                 alarm_type=alarm_type,
@@ -91,8 +94,22 @@ def create_alarm_and_event(
                 active_event.risk_level
             ):
                 active_event.risk_level = risk_level
+
+            # 쿨다운 초과 시 재알림: last_notified_at 갱신 후 alarm 반환
+            cooldown = timedelta(minutes=RENOTIFY_COOLDOWN_MINUTES)
+            needs_renotify = (
+                active_event.last_notified_at is None
+                or (timezone.now() - active_event.last_notified_at) >= cooldown
+            )
+            if needs_renotify:
+                active_event.last_notified_at = timezone.now()
+                active_event.save(
+                    update_fields=["last_detected_at", "risk_level", "last_notified_at"]
+                )
+                return active_event, alarm  # 재알림 발송
+
             active_event.save(update_fields=["last_detected_at", "risk_level"])
-            return active_event, None  # Notification은 재발송 안 함
+            return active_event, None  # 쿨다운 이내 — 재발송 안 함
 
     # 새 Event 생성 (활성 이벤트가 없거나, 타임 윈도우 초과로 강제 분리된 경우 실행됨)
     if not active_event:
@@ -109,6 +126,7 @@ def create_alarm_and_event(
             summary=summary,
             first_detected_at=detected_at,
             last_detected_at=detected_at,
+            last_notified_at=timezone.now(),
         )
         alarm = AlarmRecord.objects.create(
             facility_id=facility_id,

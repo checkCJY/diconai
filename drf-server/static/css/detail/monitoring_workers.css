@@ -271,31 +271,31 @@
 /* TODO: GET /api/workers/{id}/risk/ 연동 후 ok/warn/none 상태로 아이콘·색상 변경 */
 .risk-item-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
 }
 
 .risk-item {
   background: var(--bg2);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 10px 4px;
+  padding: 14px 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   text-align: center;
 }
 
 .risk-item-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 4px;
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
   border: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 22px;
   color: var(--text2);
   background: var(--bg3);
 }
