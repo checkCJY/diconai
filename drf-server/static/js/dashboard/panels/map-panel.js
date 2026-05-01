@@ -180,11 +180,12 @@ _geofences: [],
     };
 
     await this._drawAll();
+    this.setMarkersDisconnected();
     this._initTabFilter();
     this._startWorkerAnimation();
 
     const role = Auth.getRole();
-    if (role === 'admin') {
+    if (role === 'super_admin' || role === 'facility_admin') {
       document.getElementById('geofence-toolbar').style.display = 'flex';
       this._initDrawing();
     }
@@ -192,32 +193,71 @@ _geofences: [],
 
   // ── 가스센서·전력설비·지오펜스·작업자 마커를 지도에 일괄 그린다. ──────
   async _drawAll() {
-    this.DUMMY_GAS_SENSORS.forEach(s => {
-      const color = this.riskColor(s.risk_level);
-      const m = L.marker([s.y, s.x], {
-      icon: this._createGasIcon(color)
-    }).bindPopup(this.gasPopupHtml(s), { maxWidth: 220 });
-      m.addTo(this.layers.gas);
-      this.gasMarkers[s.device_id] = { marker: m, data: s };
-    });
-
-
-    this.DUMMY_POWER_DEVICES.forEach(d => {
-      const color = this.riskColor(d.risk_level);
-      L.marker([d.y, d.x], {
-        icon: this._createPowerIcon(color)
-      }).bindPopup(this.powerPopupHtml(d), { maxWidth: 220 }).addTo(this.layers.power);
-    });
-
-
+    await this._loadDevices();
     await this._loadGeofences();
 
     this.DUMMY_WORKERS.forEach(w => {
       const m = L.marker([w.y, w.x], {
         icon: this._createWorkerIcon('#58a6ff')
-    }).bindPopup(this.workerPopupHtml(w), { maxWidth: 200 });
-    m.addTo(this.layers.worker);
-    this.workerMarkers[w.id] = { marker: m, data: w };
+      }).bindPopup(this.workerPopupHtml(w), { maxWidth: 200 });
+      m.addTo(this.layers.worker);
+      this.workerMarkers[w.id] = { marker: m, data: w };
+    });
+  },
+
+  // ── 가스센서·전력장치 위치를 DB API에서 로드한다. ─────────────────────
+  async _loadDevices() {
+    try {
+      const token = Auth.getAccessToken();
+      const res = await fetch('/api/map-editor/objects/', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      data.gas_sensors.forEach(s => {
+        const sensorData = {
+          id: s.id, name: s.device_name, device_id: s.code,
+          x: s.x, y: s.y, risk_level: 0, co: 0, h2s: 0, o2: 0,
+        };
+        const m = L.marker([s.y, s.x], {
+          icon: this._createGasIcon(this.riskColor(0)),
+        }).bindPopup(this.gasPopupHtml(sensorData), { maxWidth: 220 });
+        m.addTo(this.layers.gas);
+        this.gasMarkers[s.code] = { marker: m, data: sensorData };
+      });
+
+      data.power_devices.forEach(d => {
+        const deviceData = {
+          id: d.id, name: d.device_name, device_id: d.code,
+          x: d.x, y: d.y, risk_level: 0,
+        };
+        L.marker([d.y, d.x], {
+          icon: this._createPowerIcon(this.riskColor(0)),
+        }).bindPopup(this.powerPopupHtml(deviceData), { maxWidth: 220 })
+          .addTo(this.layers.power);
+      });
+
+      console.log(`[MapPanel] 가스센서 ${data.gas_sensors.length}개, 전력장치 ${data.power_devices.length}개 로드`);
+    } catch (err) {
+      console.warn('[MapPanel] 장치 API 실패, 더미 데이터 사용:', err);
+      this._drawDummyDevices();
+    }
+  },
+
+  // ── API 실패 시 더미 데이터로 폴백 ───────────────────────────────────
+  _drawDummyDevices() {
+    this.DUMMY_GAS_SENSORS.forEach(s => {
+      const m = L.marker([s.y, s.x], {
+        icon: this._createGasIcon(this.riskColor(s.risk_level)),
+      }).bindPopup(this.gasPopupHtml(s), { maxWidth: 220 });
+      m.addTo(this.layers.gas);
+      this.gasMarkers[s.device_id] = { marker: m, data: s };
+    });
+    this.DUMMY_POWER_DEVICES.forEach(d => {
+      L.marker([d.y, d.x], {
+        icon: this._createPowerIcon(this.riskColor(d.risk_level)),
+      }).bindPopup(this.powerPopupHtml(d), { maxWidth: 220 }).addTo(this.layers.power);
     });
   },
 
@@ -234,21 +274,26 @@ _geofences: [],
       this._geofences = geofences;
       this.layers.geofence.clearLayers();
 
+      const role    = Auth.getRole();
+      const isAdmin = role === 'super_admin' || role === 'facility_admin';
+
       geofences.forEach(g => {
         const latlngs = g.polygon.map(([x, y]) => [y, x]);
         const color   = this.ZONE_COLOR[g.risk_level] || '#888';
         const layer   = L.polygon(latlngs, {
           color, fillColor: color, fillOpacity: 0.15, weight: 2
         });
-        const popupContent = `
-          <div class='popup-title'>🚧 ${g.name}</div>
-          <div>위험도: ${g.risk_level}</div>
-          <div>${g.description || ''}</div>
+        const deleteBtn = isAdmin ? `
           <button
             onclick="MapPanel.deleteGeofence(${g.id})"
             style="margin-top:8px; background:#f85149; color:#fff; border:none; border-radius:4px; padding:4px 10px; cursor:pointer; font-size:12px;">
             🗑️ 삭제
-          </button>
+          </button>` : '';
+        const popupContent = `
+          <div class='popup-title'>🚧 ${g.name}</div>
+          <div>위험도: ${g.risk_level}</div>
+          <div>${g.description || ''}</div>
+          ${deleteBtn}
         `;
         layer.bindPopup(popupContent, { maxWidth: 220 }).addTo(this.layers.geofence);
       });
@@ -304,8 +349,8 @@ _geofences: [],
     });
 
     btnDone.addEventListener('click', () => {
-      if (this.drawPoints.length < 3) {
-        alert('최소 3개 이상의 점을 찍어주세요.');
+      if (this.drawPoints.length < 4) {
+        alert('최소 4개 이상의 점을 찍어주세요 (사각형 이상).');
         return;
       }
       document.getElementById('geofence-modal').style.display = 'flex';
@@ -332,7 +377,7 @@ _geofences: [],
         color: '#1f6feb', weight: 2, dashArray: '5 5'
       }).addTo(this.map);
 
-      if (this.drawPoints.length >= 3) {
+      if (this.drawPoints.length >= 4) {
         if (this.drawPolygon) this.map.removeLayer(this.drawPolygon);
         this.drawPolygon = L.polygon(latlngs, {
           color: '#1f6feb', fillColor: '#1f6feb', fillOpacity: 0.1, weight: 2
@@ -426,47 +471,80 @@ _geofences: [],
 
   _startWorkerAnimation() {},
 
+  // 통신 장애 시 모든 작업자·가스 마커를 반투명으로 전환한다.
+  setMarkersDisconnected() {
+    Object.values(this.workerMarkers).forEach(({ marker }) => marker.setOpacity(0.5));
+    Object.values(this.gasMarkers).forEach(({ marker }) => marker.setOpacity(0.5));
+  },
+
+  // 연결 복구 시 마커 투명도를 원래대로 복원한다.
+  setMarkersConnected() {
+    Object.values(this.workerMarkers).forEach(({ marker }) => marker.setOpacity(1));
+    Object.values(this.gasMarkers).forEach(({ marker }) => marker.setOpacity(1));
+  },
+
   updateGasSensorFromWS(wsData) {
     const entry = this.gasMarkers['sensor_01'];
     if (!entry) return;
     const level = wsData.level === '위험' ? 2 : 0;
-    entry.marker.setIcon(this._createGasIcon(this.riskColor(level)));
-    entry.data.risk_level = level;
+    // 위험도가 바뀔 때만 setIcon — 매 틱마다 SVG 재생성·DOM 교체 방지
+    if (entry.data.risk_level !== level) {
+      entry.marker.setIcon(this._createGasIcon(this.riskColor(level)));
+      entry.data.risk_level = level;
+    }
     entry.data.co  = wsData.co;
     entry.data.h2s = wsData.h2s;
     entry.data.o2  = wsData.o2;
     if (entry.marker.isPopupOpen()) entry.marker.setPopupContent(this.gasPopupHtml(entry.data));
   },
+
   updateWorkerPositions(positions) {
-  positions.forEach(w => {
-    const entry = this.workerMarkers[w.worker_id];  // worker_id로 찾음
-    if (!entry) return;
+    // Array와 {worker_id: {...}} 객체 모두 허용
+    const posArray = Array.isArray(positions)
+      ? positions
+      : Object.entries(positions).map(([id, p]) => ({ worker_id: parseInt(id), ...p }));
 
-    entry.marker.setLatLng([w.y, w.x]);
-    entry.data.x = w.x;
-    entry.data.y = w.y;
-    entry.data.movement_status = w.movement_status;
-
-    let inGeofence = null;
-    for (const g of this._geofences) {
-      if (this._pointInPolygon(w.x, w.y, g.polygon)) {
-        inGeofence = g;
-        break;
+    const statuses = {};
+    posArray.forEach(w => {
+      // 지오펜스 판정 — 마커 유무와 무관하게 모든 작업자에 대해 실행
+      let inGeofence = null;
+      for (const g of this._geofences) {
+        if (this._pointInPolygon(w.x, w.y, g.polygon)) {
+          inGeofence = g;
+          break;
+        }
       }
-    }
+      statuses[w.worker_id] = {
+        status: inGeofence ? inGeofence.risk_level : 'normal',
+        geofence_name: inGeofence ? inGeofence.name : null,
+        worker_name: w.worker_name || String(w.worker_id),
+      };
 
-    if (inGeofence) {
-      const color = this.ZONE_COLOR[inGeofence.risk_level] || '#f85149';
-      entry.marker.setIcon(this._createWorkerIcon(color));
-      entry.data.current_geofence = inGeofence.name;
-    } else {
-      entry.marker.setIcon(this._createWorkerIcon('#58a6ff')); // 기본 파란색
-      entry.data.current_geofence = null;
-    }
+      // 맵 마커 갱신 (마커가 있는 작업자만)
+      const entry = this.workerMarkers[w.worker_id];
+      if (!entry) return;
 
-    if (entry.marker.isPopupOpen()) {
-      entry.marker.setPopupContent(this.workerPopupHtml(entry.data));
-    }
-  });
-},
+      entry.marker.setLatLng([w.y, w.x]);
+      entry.data.x = w.x;
+      entry.data.y = w.y;
+      entry.data.movement_status = w.movement_status;
+
+      const newColor = inGeofence
+        ? (this.ZONE_COLOR[inGeofence.risk_level] || '#f85149')
+        : '#58a6ff';
+      // 색이 바뀔 때만 setIcon
+      if (entry.data._iconColor !== newColor) {
+        entry.marker.setIcon(this._createWorkerIcon(newColor));
+        entry.data._iconColor = newColor;
+      }
+      entry.data.current_geofence = inGeofence ? inGeofence.name : null;
+
+      if (entry.marker.isPopupOpen()) {
+        entry.marker.setPopupContent(this.workerPopupHtml(entry.data));
+      }
+    });
+
+    // 작업자 현황 패널에 지오펜스 기반 실시간 상태 전달
+    document.dispatchEvent(new CustomEvent('workerStatusComputed', { detail: statuses }));
+  },
 };

@@ -38,12 +38,14 @@ const EventPanel = {
       <div class="${colorClass} event-desc">${data.message || data.alarm_type || ''}</div>
     `;
     listEl.insertBefore(item, listEl.firstChild);
+    // 최대 20개 유지 — 초과 시 오래된 항목 제거
+    while (listEl.children.length > 20) listEl.removeChild(listEl.lastChild);
   },
 
   // ── 24시간 요약 카운트 갱신 ─────────────────────────────
   async loadSummary() {
     try {
-      const res  = await Auth.apiFetch('/alerts/api/summary/');
+      const res  = await Auth.apiFetch('/alerts/api/alarms/summary/');
       if (!res.ok) return;
       const data = await res.json();
       const dangerEl  = document.getElementById('summary-danger');
@@ -58,7 +60,7 @@ const EventPanel = {
   // ── 최근 이벤트 목록 로드 ────────────────────────────────
   async loadEventList() {
     try {
-      const res  = await Auth.apiFetch('/alerts/api/?ordering=-created_at&limit=10');
+      const res  = await Auth.apiFetch('/alerts/api/alarms/?ordering=-created_at&limit=10');
       if (!res.ok) return;
       const data = await res.json();
       const list = Array.isArray(data) ? data : (data.results || []);

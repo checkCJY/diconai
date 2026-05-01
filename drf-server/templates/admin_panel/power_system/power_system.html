@@ -1,0 +1,399 @@
+{% extends 'admin_panel/base.html' %}
+{% load static %}
+
+{% block title %}스마트 전력 시스템 관리{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/admin/power_system.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="page-header ps-header">
+  <div class="header-titles">
+    <div class="breadcrumb">장비 관리 &gt; 스마트 전력 시스템 관리</div>
+    <h2 class="page-title">스마트 전력 시스템 관리</h2>
+    <p class="page-desc">스마트 전력 시스템의 연결 상태, 데이터 수신 상태와 점검 여부를 확인합니다.</p>
+  </div>
+  <div class="header-actions">
+    <button class="btn-danger-outline" id="btnBulkDelete" disabled>삭제</button>
+    <button class="btn-primary" id="btnCreate">장비 등록</button>
+  </div>
+</section>
+
+<!-- 검색·필터 -->
+<div class="ps-toolbar">
+  <div class="ps-filter-wrap">
+    <div class="ps-filter-item">
+      <label>장비 코드</label>
+      <select id="filterDeviceId">
+        <option value="">전체</option>
+      </select>
+    </div>
+    <div class="ps-filter-item">
+      <label>장비 상태</label>
+      <select id="filterActive">
+        <option value="">전체</option>
+        <option value="true">사용</option>
+        <option value="false">미사용</option>
+      </select>
+    </div>
+    <div class="ps-filter-item">
+      <label>연결 상태</label>
+      <select id="filterConnection">
+        <option value="">전체</option>
+        <option value="disconnected">연결 끊김</option>
+        <option value="normal">정상</option>
+        <option value="inactive">미사용</option>
+      </select>
+    </div>
+  </div>
+  <div class="ps-filter-actions">
+    <button class="btn-outline btn-sm" id="btnReset">초기화</button>
+    <button class="btn-dark btn-sm" id="btnSearch">검색</button>
+  </div>
+</div>
+
+<!-- 목록 헤더 -->
+<div class="ps-list-header">
+  <span class="ps-total-count">전체 <strong id="totalCount">0</strong>건</span>
+  <span class="ps-abnormal-note" id="abnormalNote" style="display:none">이상 상태 장치는 상단에 우선 노출됩니다.</span>
+  <div class="ps-right-header">
+    <select id="filterOrder" class="ps-order-select">
+      <option value="device_id_asc">장비 코드 오름차순</option>
+      <option value="device_id_desc">장비 코드 내림차순</option>
+      <option value="last_reading_desc">마지막 데이터 수신 최신순</option>
+      <option value="last_reading_asc">마지막 데이터 수신 오래된순</option>
+      <option value="inspection_desc">최근 점검일 최신순</option>
+      <option value="inspection_asc">최근 점검일 오래된순</option>
+    </select>
+  </div>
+</div>
+
+<!-- 테이블 -->
+<div class="ps-table-wrap">
+  <table class="ps-table" id="deviceTable">
+    <colgroup>
+      <col style="width:4%">
+      <col style="width:9%">
+      <col style="width:10%">
+      <col style="width:13%">
+      <col style="width:8%">
+      <col style="width:10%">
+      <col style="width:14%">
+      <col style="width:10%">
+      <col style="width:9%">
+      <col style="width:9%">
+    </colgroup>
+    <thead>
+      <tr>
+        <th class="col-chk col-center"><input type="checkbox" id="chkAll"></th>
+        <th class="col-center">점검 여부</th>
+        <th>장비 코드</th>
+        <th>장비명</th>
+        <th class="col-center">사용 상태</th>
+        <th class="col-center">연결 상태</th>
+        <th>마지막 데이터 수신</th>
+        <th>최근 점검일</th>
+        <th>담당자</th>
+        <th class="col-center">관리</th>
+      </tr>
+    </thead>
+    <tbody id="deviceTbody">
+      <tr class="ps-empty-row"><td colspan="10">데이터를 불러오는 중...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- 페이지네이션 -->
+<div class="ps-pagination" id="pagination"></div>
+
+
+<!-- ── 장비 등록 모달 ────────────────────────────────────── -->
+<div class="ps-modal-overlay" id="createModal" style="display:none;">
+  <div class="ps-modal ps-modal-lg">
+    <div class="ps-modal-header">
+      <h3>장비 등록</h3>
+      <p class="ps-modal-desc">현장 내 스마트 전력 시스템을 등록합니다.</p>
+    </div>
+    <div class="ps-modal-body">
+      <div class="ps-form-grid">
+        <div class="ps-form-row">
+          <label>장비 유형 <span class="required">*</span></label>
+          <select id="createDeviceType">
+            <option value="">장비 유형 선택</option>
+            <option value="smart_power">스마트 전력 시스템</option>
+          </select>
+          <span class="ps-form-error" id="errCreateDeviceType"></span>
+        </div>
+        <div class="ps-form-row">
+          <label>장비 코드 <span class="required">*</span></label>
+          <input type="text" id="createDeviceCode" placeholder="장비 유형 선택 후 자동 생성" readonly class="ps-input-readonly">
+          <span class="ps-form-error" id="errCreateDeviceCode"></span>
+        </div>
+        <div class="ps-form-row">
+          <label>장비명 <span class="required">*</span></label>
+          <input type="text" id="createDeviceName" placeholder="장비 유형 선택 시 자동 입력">
+          <span class="ps-form-error" id="errCreateDeviceName"></span>
+        </div>
+        <div class="ps-form-row">
+          <label>장비 ID(MAC) <span class="required">*</span></label>
+          <input type="text" id="createDeviceId" placeholder="ID 입력">
+          <span class="ps-form-error" id="errCreateDeviceId"></span>
+        </div>
+        <div class="ps-form-row">
+          <label>관리 부서 <span class="required">*</span></label>
+          <select id="createDepartment">
+            <option value="">부서 선택</option>
+          </select>
+          <span class="ps-form-error" id="errCreateDepartment"></span>
+        </div>
+        <div class="ps-form-row">
+          <label>관리 담당자 <span class="required">*</span></label>
+          <select id="createManager">
+            <option value="">담당자 선택</option>
+          </select>
+          <span class="ps-form-error" id="errCreateManager"></span>
+        </div>
+      </div>
+      <div class="ps-form-row-full">
+        <label>장비 통신 IP / PORT <span class="required">*</span></label>
+        <div class="ps-ip-port-wrap">
+          <input type="text" id="createIp" placeholder="IP 입력" class="ps-ip-input">
+          <input type="text" id="createPort" placeholder="PORT 입력" class="ps-port-input">
+          <button class="btn-outline btn-sm" id="btnCreateConnCheck">연결 확인</button>
+        </div>
+        <div id="createConnStatus" style="display:none;" class="ps-conn-status"></div>
+        <span class="ps-form-error" id="errCreateConn"></span>
+      </div>
+      <div class="ps-form-row-full" style="margin-bottom:0;">
+        <label>사용 여부 <span class="required">*</span></label>
+        <div class="ps-radio-wrap">
+          <label class="ps-radio-label"><input type="radio" name="createActive" value="true" checked> 사용</label>
+          <label class="ps-radio-label"><input type="radio" name="createActive" value="false"> 미사용</label>
+        </div>
+      </div>
+    </div>
+    <div class="ps-modal-footer">
+      <span class="ps-form-error-global" id="errCreateGlobal"></span>
+      <button class="btn-outline" id="btnCreateCancel">취소</button>
+      <button class="btn-primary" id="btnCreateSubmit">등록</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ── 상세/수정 모달 ─────────────────────────────────────── -->
+<div class="ps-modal-overlay" id="detailModal" style="display:none;">
+  <div class="ps-modal ps-modal-lg">
+    <div class="ps-modal-header">
+      <h3 id="detailTitle">스마트 전력 시스템</h3>
+      <p class="ps-modal-desc" id="detailDesc"></p>
+    </div>
+    <div class="ps-tabs" id="detailTabs">
+      <button class="ps-tab active" data-tab="info">기본 정보</button>
+      <button class="ps-tab" data-tab="insp">점검</button>
+    </div>
+
+    <!-- 정보 탭 -->
+    <div class="ps-tab-panel" id="tabInfo">
+      <div class="ps-modal-body">
+        <div class="ps-form-grid">
+          <div class="ps-form-row">
+            <label>장비 유형</label>
+            <input type="text" id="editDeviceType" readonly class="ps-input-readonly">
+          </div>
+          <div class="ps-form-row">
+            <label>장비 코드</label>
+            <input type="text" id="editDeviceCode" readonly class="ps-input-readonly">
+          </div>
+          <div class="ps-form-row">
+            <label>장비명 <span class="required">*</span></label>
+            <input type="text" id="editDeviceName">
+            <span class="ps-form-error" id="errEditDeviceName"></span>
+          </div>
+          <div class="ps-form-row">
+            <label>장비 ID(MAC) <span class="required">*</span></label>
+            <input type="text" id="editDeviceId">
+            <span class="ps-form-error" id="errEditDeviceId"></span>
+          </div>
+          <div class="ps-form-row">
+            <label>관리 부서 <span class="required">*</span></label>
+            <select id="editDepartment"><option value="">부서 선택</option></select>
+            <span class="ps-form-error" id="errEditDepartment"></span>
+          </div>
+          <div class="ps-form-row">
+            <label>관리 담당자 <span class="required">*</span></label>
+            <select id="editManager"><option value="">담당자 선택</option></select>
+            <span class="ps-form-error" id="errEditManager"></span>
+          </div>
+        </div>
+        <div class="ps-form-row-full">
+          <label>장비 통신 IP / PORT <span class="required">*</span></label>
+          <div class="ps-ip-port-wrap">
+            <input type="text" id="editIp" placeholder="IP 입력" class="ps-ip-input">
+            <input type="text" id="editPort" placeholder="PORT 입력" class="ps-port-input">
+            <button class="btn-outline btn-sm" id="btnEditConnCheck">연결 확인</button>
+          </div>
+          <div id="editConnStatus" style="display:none;" class="ps-conn-status"></div>
+          <span class="ps-form-error" id="errEditGlobal"></span>
+        </div>
+        <div class="ps-form-row-full" style="margin-bottom:0;">
+          <label>사용 여부</label>
+          <div class="ps-radio-wrap">
+            <label class="ps-radio-label"><input type="radio" name="editActive" value="true"> 사용</label>
+            <label class="ps-radio-label"><input type="radio" name="editActive" value="false"> 미사용</label>
+          </div>
+        </div>
+      </div>
+      <div class="ps-modal-footer">
+        <button class="btn-outline" id="btnEditCancel">취소</button>
+        <button class="btn-primary" id="btnEditSubmit">수정</button>
+      </div>
+    </div>
+
+    <!-- 점검 탭 -->
+    <div class="ps-tab-panel" id="tabInsp" style="display:none;">
+      <div class="ps-modal-body">
+        <div class="ps-insp-card" id="inspDeviceCard"></div>
+        <div class="ps-insp-status-wrap">
+          <h4>최근 점검 상태</h4>
+          <div class="ps-insp-status-cards">
+            <div class="ps-status-card"><div class="ps-status-label">점검 여부</div><div class="ps-status-val" id="inspStatusVal">-</div></div>
+            <div class="ps-status-card"><div class="ps-status-label">최근 점검일</div><div class="ps-status-val" id="inspLastDate">-</div></div>
+            <div class="ps-status-card"><div class="ps-status-label">조치 필요 건수</div><div class="ps-status-val needed" id="inspActionCount">-</div></div>
+          </div>
+        </div>
+        <div class="ps-insp-history-wrap">
+          <h4>점검 이력</h4>
+          <table class="ps-insp-table">
+            <thead>
+              <tr>
+                <th>점검 구분</th><th>조치 여부</th><th>점검일</th>
+                <th>점검자</th><th>조치 담당자</th><th>점검/조치 내용</th><th>관리</th>
+              </tr>
+            </thead>
+            <tbody id="inspTbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="ps-modal-footer">
+        <button class="btn-outline btn-sm" id="btnInspCreate">점검 등록</button>
+        <button class="btn-outline" id="btnInspClose">닫기</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ── 점검 등록 모달 ─────────────────────────────────────── -->
+<div class="ps-modal-overlay" id="inspCreateModal" style="display:none;">
+  <div class="ps-modal">
+    <div class="ps-modal-header">
+      <h3>점검 등록</h3>
+      <p class="ps-modal-desc">해당 장비의 점검 결과를 등록합니다.</p>
+    </div>
+    <div class="ps-modal-body">
+      <div class="ps-insp-card" id="inspCreateCard" style="margin-bottom:16px;"></div>
+      <div class="ps-form-grid">
+        <div class="ps-form-row">
+          <label>점검 구분 <span class="required">*</span></label>
+          <select id="inspType">
+            <option value="regular">정기 점검</option>
+            <option value="abnormal">이상 점검</option>
+          </select>
+        </div>
+        <div class="ps-form-row">
+          <label>점검일</label>
+          <input type="text" id="inspDate" readonly class="ps-input-readonly">
+        </div>
+        <div class="ps-form-row" style="grid-column:1/-1;">
+          <label>점검자</label>
+          <input type="text" id="inspector" readonly class="ps-input-readonly">
+        </div>
+        <div class="ps-form-row">
+          <label>점검 상태 <span class="required">*</span></label>
+          <select id="inspStatus">
+            <option value="normal">정상</option>
+            <option value="action_needed">조치 필요</option>
+          </select>
+        </div>
+        <div class="ps-form-row" id="inspExpectedDateWrap" style="display:none;">
+          <label>예상 조치일 <span class="required">*</span></label>
+          <input type="date" id="inspExpectedDate">
+        </div>
+      </div>
+      <div class="ps-form-row-full">
+        <label>점검 의견 <span class="required">*</span></label>
+        <textarea id="inspNotes" rows="3" placeholder="점검 결과 및 특이사항 입력"></textarea>
+        <span class="ps-form-error" id="errInspNotes"></span>
+      </div>
+    </div>
+    <div class="ps-modal-footer">
+      <span class="ps-form-error-global" id="errInspGlobal"></span>
+      <button class="btn-outline" id="btnInspCancel">취소</button>
+      <button class="btn-primary" id="btnInspSubmit">저장</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ── 조치 등록 모달 ─────────────────────────────────────── -->
+<div class="ps-modal-overlay" id="actionModal" style="display:none;">
+  <div class="ps-modal">
+    <div class="ps-modal-header">
+      <h3>조치 등록</h3>
+      <p class="ps-modal-desc">후속 조치 정보를 등록합니다.</p>
+    </div>
+    <div class="ps-modal-body">
+      <div class="ps-insp-card" id="actionCard" style="margin-bottom:16px;"></div>
+      <div class="ps-form-row-full">
+        <label>조치자</label>
+        <input type="text" id="actionUser" readonly class="ps-input-readonly">
+      </div>
+      <div class="ps-form-row-full">
+        <label>조치 내용 <span class="required">*</span></label>
+        <textarea id="actionNotes" rows="3" placeholder="조치 내용을 입력하세요"></textarea>
+        <span class="ps-form-error" id="errActionNotes"></span>
+      </div>
+    </div>
+    <div class="ps-modal-footer">
+      <button class="btn-outline" id="btnActionCancel">취소</button>
+      <button class="btn-primary" id="btnActionSubmit">조치 완료</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ── 성공 팝업 ──────────────────────────────────────────── -->
+<div class="ps-modal-overlay" id="successModal" style="display:none;">
+  <div class="ps-modal ps-modal-sm">
+    <div class="ps-success-body">
+      <div class="ps-success-icon">✓</div>
+      <p id="successMsg">완료되었습니다.</p>
+    </div>
+    <div class="ps-modal-footer" style="justify-content:center;">
+      <button class="btn-primary" id="btnSuccessClose">확인</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ── 삭제 확인 팝업 ─────────────────────────────────────── -->
+<div class="ps-modal-overlay" id="deleteModal" style="display:none;">
+  <div class="ps-modal ps-modal-sm">
+    <div class="ps-modal-header"><h3>비활성화 확인</h3></div>
+    <div class="ps-modal-body">
+      <p id="deleteMsg" style="font-size:14px;color:#374151;margin:0;"></p>
+    </div>
+    <div class="ps-modal-footer">
+      <button class="btn-outline" id="btnDeleteCancel">취소</button>
+      <button class="btn-danger" id="btnDeleteConfirm">비활성화</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/shared/auth.js' %}"></script>
+<script src="{% static 'js/admin/power_system/power_system.js' %}"></script>
+{% endblock %}

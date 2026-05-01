@@ -1,0 +1,129 @@
+{% extends 'admin_panel/base.html' %}
+{% load static %}
+
+{% block title %}사용자 관리{% endblock %}
+
+{% block content %}
+<!-- 페이지 헤더 -->
+<section class="page-header">
+    <div class="header-titles">
+        <div class="breadcrumb">계정/권한 관리 &gt; 사용자 관리</div>
+        <h2 class="page-title">사용자 관리</h2>
+        <p class="page-desc">계정을 조회하고 등록, 수정, 삭제할 수 있습니다.</p>
+    </div>
+    <button class="btn-primary" id="btnAddUser">사용자 등록</button>
+</section>
+
+<!-- 검색 필터 -->
+<section class="filter-card">
+    <div class="filter-inputs">
+        <div class="input-group">
+            <label>사용자명</label>
+            <input type="text" id="filterName" placeholder="이름 입력">
+        </div>
+        <div class="input-group">
+            <label>소속</label>
+            <select id="filterDepartment">
+                <option value="">전체</option>
+                {% for dept in departments %}
+                <option value="{{ dept.id }}">{{ dept.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="input-group">
+            <label>직위</label>
+            <select id="filterPosition">
+                <option value="">전체</option>
+                {% for pos in positions %}
+                <option value="{{ pos.id }}">{{ pos.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="input-group">
+            <label>권한</label>
+            <select id="filterUserType">
+                <option value="">전체</option>
+                <option value="super_admin">슈퍼관리자</option>
+                <option value="facility_admin">관리자</option>
+                <option value="worker">일반사용자</option>
+                <option value="viewer">열람자</option>
+            </select>
+        </div>
+        <div class="input-group">
+            <label>계정 상태</label>
+            <select id="filterStatus">
+                <option value="">전체</option>
+                <option value="active">사용</option>
+                <option value="locked">잠금</option>
+                <option value="inactive">비활성</option>
+            </select>
+        </div>
+    </div>
+    <div class="filter-actions">
+        <button class="btn-outline" id="btnReset">초기화</button>
+        <button class="btn-dark" id="btnSearch">검색</button>
+    </div>
+</section>
+
+<!-- 사용자 목록 테이블 -->
+<section class="table-card">
+    <div class="table-toolbar">
+        <div class="toolbar-left">
+            <span class="total-count">전체 사용자 <strong id="totalCount">0</strong>명</span>
+            <button class="btn-danger" id="btnDelete" disabled>삭제</button>
+            <button class="btn-warning" id="btnLock" disabled>계정 잠금</button>
+            <button class="btn-success" id="btnUnlock" disabled>계정 잠금 해제</button>
+        </div>
+        <div class="toolbar-right">
+            <select class="sort-select" id="sortSelect">
+                <option value="name_asc">사용자명 오름차순</option>
+                <option value="name_desc">사용자명 내림차순</option>
+                <option value="date_desc">등록일 최신순</option>
+                <option value="date_asc">등록일 오래된순</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th><input type="checkbox" id="checkAll"></th>
+                    <th>사용자명</th>
+                    <th>소속</th>
+                    <th>직급</th>
+                    <th>아이디</th>
+                    <th>권한</th>
+                    <th>계정 상태</th>
+                    <th>연락처</th>
+                    <th>최근 로그인</th>
+                    <th>등록일</th>
+                    <th>관리</th>
+                </tr>
+            </thead>
+            <tbody id="accountsTableBody">
+                <tr>
+                    <td colspan="11" class="empty-state">데이터를 불러오는 중...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="table-footer">
+        <span class="page-info" id="pageInfo">0 - 0 / 0</span>
+        <div class="pagination" id="pagination"></div>
+    </div>
+
+</section>
+
+{% include 'admin_panel/accounts/_modal_create.html' %}
+{% include 'admin_panel/accounts/_modal_edit.html' %}
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/admin/accounts.css' %}">
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/admin/accounts/accounts.js' %}"></script>
+{% endblock %}

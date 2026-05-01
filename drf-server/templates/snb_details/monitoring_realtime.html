@@ -6,24 +6,186 @@
 <title>실시간 모니터링 — 산재 예방 통합 관제 시스템</title>
 <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
 <link rel="stylesheet" href="{% static 'css/components/header.css' %}">
+<link rel="stylesheet" href="{% static 'css/detail/map_detail.css' %}">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>window.FACTORY_MAP_URL = "{% static 'img/factory_map.svg' %}";</script>
 </head>
 <body>
 
 {% include 'components/header.html' %}
 
-<div class="body-wrap page-wrap">
-  <div class="page-header">
-    <span class="breadcrumb">모니터링 &gt; 실시간 모니터링</span>
+<div class="rt-page">
+
+  <!-- 페이지 헤더 -->
+  <div class="rt-page-header">
+    <div class="rt-page-title-wrap">
+      <a href="/dashboard/" class="rt-back">&#8592;</a>
+      <div>
+        <div class="rt-page-title">실시간 모니터링</div>
+        <div class="rt-page-desc">현장 지도를 기반으로 작업자, 설비, 유해가스 센서, 스마트 전력 시스템, 위치 센서, 위험구역을 실시간으로 확인합니다.</div>
+      </div>
+    </div>
+    <span id="wsStatus" class="ws-status">연결 중...</span>
   </div>
-  <div class="panel">
-    <div class="panel-title">실시간 모니터링</div>
-    <p class="sub" style="padding:16px;">준비 중입니다.</p>
+
+  <!-- 탭바 + 우측 컨트롤 -->
+  <div class="rt-tabbar">
+    <div class="rt-tabs">
+      <button class="map-tab active" data-layer="all">전체</button>
+      <button class="map-tab" data-layer="worker">작업자</button>
+      <button class="map-tab" data-layer="facility">설비</button>
+      <button class="map-tab" data-layer="gas">가스센서</button>
+      <button class="map-tab" data-layer="power">전력</button>
+    </div>
+    <div class="rt-tab-actions">
+      <button class="rt-action-btn" onclick="MapPanel.map && MapPanel.map.zoomIn()">확대</button>
+      <button class="rt-action-btn" onclick="MapPanel.map && MapPanel.map.zoomOut()">축소</button>
+      <button class="rt-action-btn" onclick="MapPanel.map && MapPanel.map.fitBounds([[0,0],[600,1300]])">초기화</button>
+      <button class="rt-action-btn" id="btn-toggle-legend">범례</button>
+    </div>
   </div>
-</div>
+
+  <!-- 맵 컨테이너 (오버레이 기준점) -->
+  <div class="rt-map-container">
+    <div id="map"></div>
+
+    <!-- ❶ 좌측 오버레이: 지도 제어 -->
+    <div class="rt-overlay rt-left" id="rt-left-panel">
+
+      <div class="rt-section-title">지도 제어</div>
+      <div class="rt-section-sub">사업장/층 이동과 화면 제어</div>
+
+      <div class="rt-control-row">
+        <select class="rt-select">
+          <option>1공장 A동</option>
+          <option>1공장 B동</option>
+          <option>2공장</option>
+        </select>
+        <select class="rt-select" style="width:60px;">
+          <option>1F</option>
+          <option>2F</option>
+          <option>3F</option>
+        </select>
+      </div>
+
+      <div class="rt-control-row" style="gap:4px;">
+        <button class="rt-focus-btn" id="btn-focus-all">전체 맞춤</button>
+        <button class="rt-icon-btn" onclick="MapPanel.map && MapPanel.map.zoomIn()">+</button>
+      </div>
+
+      <!-- 관리자 드로잉 (관리자에게만 표시됨) -->
+      <div id="geofence-toolbar" style="display:none; margin-top:6px;">
+        <button id="btn-draw-geofence" class="geofence-draw-btn" style="width:100%;">✏️ 구역 그리기</button>
+        <button id="btn-draw-done"     class="geofence-draw-btn" style="display:none; width:100%;">✅ 완료</button>
+        <button id="btn-draw-cancel"   class="geofence-cancel-btn" style="display:none; width:100%;">❌ 취소</button>
+      </div>
+
+      <div class="rt-divider"></div>
+
+      <div class="rt-section-title">레이어 표시</div>
+      <div class="rt-section-sub">현재 레이어 표시 On/Off</div>
+
+      <div class="rt-layer-list">
+        <div class="rt-layer-row">
+          <span class="rt-layer-dot" style="background:#f85149;"></span>
+          <span class="rt-layer-name">작업자</span>
+          <button class="rt-toggle on" data-layer-key="worker">ON</button>
+        </div>
+        <div class="rt-layer-row">
+          <span class="rt-layer-dot" style="background:#3fb950;"></span>
+          <span class="rt-layer-name">설비</span>
+          <button class="rt-toggle on" data-layer-key="power">ON</button>
+        </div>
+        <div class="rt-layer-dot-row rt-layer-row">
+          <span class="rt-layer-dot" style="background:#bc8cff;"></span>
+          <span class="rt-layer-name">유해가스 센서</span>
+          <button class="rt-toggle on" data-layer-key="gas">ON</button>
+        </div>
+        <div class="rt-layer-row">
+          <span class="rt-layer-dot" style="background:#58a6ff;"></span>
+          <span class="rt-layer-name">위치 센서</span>
+          <button class="rt-toggle on" data-layer-key="worker">ON</button>
+        </div>
+        <div class="rt-layer-row">
+          <span class="rt-layer-dot" style="background:#e3b341;"></span>
+          <span class="rt-layer-name">위험구역</span>
+          <button class="rt-toggle on" data-layer-key="geofence">ON</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ❷ 우측 오버레이: AI 예측 타임라인 -->
+    <div class="rt-overlay rt-right" id="rt-right-panel">
+      <div class="rt-section-title">AI 예측 타임라인</div>
+      <div class="rt-section-sub">유해가스 확산 및 위험구역 변화 예측</div>
+
+      <div class="rt-timeline-wrap">
+        <div class="rt-timeline-labels">
+          <span>현재 시점</span>
+          <span>예측 시점</span>
+        </div>
+        <div class="rt-timeline-bar">
+          <div class="rt-timeline-track">
+            <div class="rt-timeline-fill" id="rt-timeline-fill"></div>
+            <div class="rt-timeline-thumb" id="rt-timeline-thumb"></div>
+          </div>
+          <div class="rt-timeline-ticks">
+            <span>0분</span>
+            <span>5분</span>
+            <span>10분</span>
+            <span>15분</span>
+            <span>20분</span>
+          </div>
+        </div>
+        <div class="rt-timeline-badge" id="rt-timeline-badge">현재 10분</div>
+      </div>
+
+      <div class="rt-ai-notice">
+        <span style="color:var(--caution);">⚠</span>
+        AI 예측 기능은 4차 프로젝트에서 연동 예정입니다.
+      </div>
+    </div>
+
+    <!-- ❸ 좌하단 오버레이: 실시간 이벤트 -->
+    <div class="rt-overlay rt-bottom-left" id="rt-events-panel">
+      <div class="rt-section-title">실시간 이벤트</div>
+      <div class="rt-event-list" id="rt-event-list">
+        <div class="rt-event-item danger">
+          <span class="rt-event-dot"></span>홍길동 작업자 위험구역 진입
+        </div>
+        <div class="rt-event-item caution">
+          <span class="rt-event-dot"></span>G2 유해가스 센서 산소 농도 저하
+        </div>
+      </div>
+    </div>
+
+    <!-- ❹ 우하단 오버레이: 지도 범례 -->
+    <div class="rt-overlay rt-bottom-right" id="rt-legend-panel">
+      <div class="rt-section-title">지도 범례</div>
+      <div class="rt-legend-grid">
+        <span class="rt-legend-item"><span class="rt-legend-dot" style="background:#f85149;"></span>위험구역</span>
+        <span class="rt-legend-item"><span class="rt-legend-dot" style="background:#e3b341;"></span>주의구역</span>
+        <span class="rt-legend-item"><span class="rt-legend-dot" style="background:#3fb950;"></span>정상</span>
+        <span class="rt-legend-item"><span class="rt-legend-dot" style="background:#58a6ff;"></span>위치 센서</span>
+        <span class="rt-legend-item"><span class="rt-legend-dot" style="background:#bc8cff;"></span>유해가스 센서</span>
+        <span class="rt-legend-item"><span class="rt-legend-dot" style="background:#3fb950;"></span>스마트 전력</span>
+      </div>
+    </div>
+
+  </div><!-- /rt-map-container -->
+</div><!-- /rt-page -->
+
+{% include 'components/alarm_popup.html' %}
+{% include 'components/geofence_modal.html' %}
 
 <script src="{% static 'js/shared/util.js' %}"></script>
 <script src="{% static 'js/shared/auth.js' %}"></script>
+<script src="{% static 'js/shared/alarm-popup.js' %}"></script>
+<script src="{% static 'js/shared/worker-ws.js' %}"></script>
 <script src="{% static 'js/shared/layout.js' %}"></script>
-<script src="{% static 'js/shared/app-sub.js' %}"></script>
+<script src="{% static 'js/dashboard/panels/map-panel.js' %}"></script>
+<script src="{% static 'js/dashboard/websocket.js' %}"></script>
+<script src="{% static 'js/detail/map_detail.js' %}"></script>
 </body>
 </html>

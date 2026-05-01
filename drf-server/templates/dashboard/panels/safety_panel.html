@@ -4,7 +4,6 @@
   <!-- ── 패널: 나의 안전확인 ──────────────────────────────── -->
   <div class="panel">
     <div class="panel-title">나의 안전확인</div>
-    <div class="safety-item"><span>PPE 착용</span><span class="done">완료</span></div>
     <div class="safety-item"><span>안전 확인 체크리스트</span><span id="safety-checklist-status" class="todo">미완료</span></div>
     <div class="safety-item"><span>VR 교육</span><span id="safety-vr-status" class="todo">미완료</span></div>
     <button class="safety-btn" onclick="location.href='/dashboard/safety/checklist/'">나의 안전 확인 바로가기</button>
@@ -16,41 +15,61 @@
       작업자 현황
       <span class="more" id="mn04-btn-detail">+ 상세 보기</span>
     </div>
-    <!-- 작업자 뷰: 나의 상태 바 -->
+    <!-- 작업자 뷰: 나의 상태 -->
     <div id="mn04-view-worker" style="display:none;">
-      <div class="sub" style="margin-bottom:6px;">현재 나의 상태</div>
-      <div class="mn04-status-bar-wrap">
-        <div class="mn04-status-bar">
-          <div class="mn04-bar-section mn04-bar-normal">정상</div>
-          <div class="mn04-bar-section mn04-bar-warning">경고</div>
-          <div class="mn04-bar-section mn04-bar-danger">위험</div>
-        </div>
-        <div class="mn04-marker" id="mn04-marker" style="left:16%;color:#2d9e75;">▼</div>
+      <div class="mn04-total-row">
+        <span class="mn04-total-label">현재 나의 상태</span>
       </div>
-      <div class="mn04-status-text" id="mn04-status-text" style="color:#2d9e75;">--</div>
+      <div class="mn04-worker-status-block" id="mn04-worker-status-block">
+        <div class="mn04-status-text" id="mn04-status-text">--</div>
+      </div>
       <div class="mn04-error" id="mn04-worker-error" style="display:none;"></div>
     </div>
-    <!-- 관리자 뷰: 총원·정상·경고·위험 KPI 카드 -->
+    <!-- 관리자 뷰: 총원 + 위험 강조 + 상세 현황 -->
     <div id="mn04-view-admin" style="display:none;">
-      <div class="mn04-kpi-grid">
-        <div class="mn04-kpi-card mn04-kpi-total">
-          <div class="mn04-kpi-label">총원</div>
-          <div class="mn04-kpi-value" id="mn04-kpi-total">--</div>
+
+      <!-- 총원 -->
+      <div class="mn04-total-row">
+        <span class="mn04-total-label">총원</span>
+        <span class="mn04-total-value" id="mn04-kpi-total">--</span>
+        <span class="mn04-total-unit">명</span>
+      </div>
+
+      <!-- 위험 강조 + 상세 현황 -->
+      <div class="mn04-admin-body">
+
+        <!-- 좌: 위험 인원 강조 블록 -->
+        <div class="mn04-danger-block" id="mn04-danger-block">
+          <div class="mn04-danger-label">위험</div>
+          <div class="mn04-danger-count" id="mn04-kpi-danger">--</div>
+          <div class="mn04-danger-unit">명</div>
         </div>
-        <div class="mn04-kpi-card mn04-kpi-normal">
-          <div class="mn04-kpi-label">정상</div>
-          <div class="mn04-kpi-value" id="mn04-kpi-normal">--</div>
-        </div>
-        <div class="mn04-kpi-card mn04-kpi-warning">
-          <div class="mn04-kpi-label">경고</div>
-          <div class="mn04-kpi-value" id="mn04-kpi-warning">--</div>
-        </div>
-        <div class="mn04-kpi-card mn04-kpi-danger">
-          <div class="mn04-kpi-label">위험</div>
-          <div class="mn04-kpi-value" id="mn04-kpi-danger">--</div>
+
+        <!-- 우: 정상·주의·위험 상세 -->
+        <div class="mn04-breakdown">
+          <div class="mn04-bd-row">
+            <span class="mn04-bd-dot" style="background:#2d9e75;"></span>
+            <span class="mn04-bd-label">정상</span>
+            <span class="mn04-bd-value" id="mn04-kpi-normal">--</span>
+            <span class="mn04-bd-unit">명</span>
+          </div>
+          <div class="mn04-bd-row">
+            <span class="mn04-bd-dot" style="background:#ef9f27;"></span>
+            <span class="mn04-bd-label">주의</span>
+            <span class="mn04-bd-value" id="mn04-kpi-warning">--</span>
+            <span class="mn04-bd-unit">명</span>
+          </div>
+          <div class="mn04-bd-row">
+            <span class="mn04-bd-dot" style="background:#e24b4a;"></span>
+            <span class="mn04-bd-label">위험</span>
+            <span class="mn04-bd-value mn04-bd-danger-val" id="mn04-kpi-danger-bd">--</span>
+            <span class="mn04-bd-unit">명</span>
+          </div>
         </div>
       </div>
-      <div class="mn04-ratio-bar" id="mn04-ratio-bar" style="display:none;">
+
+      <!-- 비율 바 -->
+      <div class="mn04-ratio-bar" id="mn04-ratio-bar" style="display:none; margin-top:8px;">
         <div class="mn04-ratio-normal"  id="mn04-ratio-normal"></div>
         <div class="mn04-ratio-warning" id="mn04-ratio-warning"></div>
         <div class="mn04-ratio-danger"  id="mn04-ratio-danger"></div>

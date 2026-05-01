@@ -51,15 +51,15 @@ def update_polygon(
     # recalculate_worker_positions_for_facility(geofence.facility_id)
 
     # positioning 앱에 캐시 재계산 요청
-    from apps.positioning.services.position_service import (
+    from positioning.services.position_service import (
         recalculate_worker_positions_for_facility,
     )
 
     recalculate_worker_positions_for_facility(geofence.facility_id)
 
     # 감사 로그
-    from apps.core.services.audit_service import log_action
-    from apps.core.models import SystemLog
+    from core.services.audit_service import log_action
+    from core.models import SystemLog
 
     log_action(
         actor_id=actor_user_id,

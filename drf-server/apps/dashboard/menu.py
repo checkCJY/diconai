@@ -6,9 +6,14 @@ import copy
 _MENU_WORKER = [
     {
         "id": "safety",
-        "label": "나의 안전확인",
+        "label": "나의 정보 확인",
         "icon": "shield",
         "children": [
+            {
+                "id": "SNB-01",
+                "label": "나의 프로필",
+                "path": "/dashboard/profile/",
+            },
             {
                 "id": "SNB-02",
                 "label": "작업 전 안전 확인",
@@ -61,7 +66,11 @@ _MENU_ADMIN_EXTRA = {
     "icon": "settings",
     "children": [
         # SNB-05 구현 시 전용 URL로 교체 필요
-        {"id": "SNB-05", "label": "전체 이력 현황", "path": "/dashboard/admin/"},
+        {
+            "id": "SNB-05",
+            "label": "전체 이력 현황",
+            "path": "/admin-panel/accounts-management/",
+        },
     ],
 }
 

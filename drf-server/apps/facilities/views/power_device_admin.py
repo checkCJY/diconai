@@ -1,0 +1,341 @@
+import socket as _socket
+
+from django.db.models import Case, IntegerField, When
+from django.utils import timezone
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from apps.accounts.models.user import CustomUser
+from apps.facilities.models import PowerDevice, PowerDeviceInspection
+from apps.facilities.serializers.power_device_admin import (
+    PowerDeviceAdminListSerializer,
+    PowerDeviceAdminWriteSerializer,
+    PowerDeviceActionWriteSerializer,
+    PowerDeviceInspectionSerializer,
+    PowerDeviceInspectionWriteSerializer,
+)
+
+
+class PowerDeviceAdminPageView(APIView):
+    authentication_classes = []
+    permission_classes = []
+
+    def get(self, request):
+        from django.shortcuts import render
+
+        return render(
+            request,
+            "admin_panel/power_system/power_system.html",
+            {"active_nav": "power_system"},
+        )
+
+
+# ── 장비 코드 목록 (필터 드롭다운용) ──────────────────────────
+class PowerDeviceCodesView(APIView):
+    authentication_classes = []
+    permission_classes = []
+
+    def get(self, request):
+        codes = (
+            PowerDevice.objects.filter(device_code__isnull=False)
+            .exclude(device_code="")
+            .order_by("device_code")
+            .values_list("device_code", flat=True)
+        )
+        power_ids = [f"PWR-{c}" for c in codes]
+        return Response(power_ids)
+
+
+# ── 다음 장비 코드 ─────────────────────────────────────────────
+class PowerDeviceNextCodeView(APIView):
+    authentication_classes = []
+    permission_classes = []
+
+    def get(self, request):
+        existing = PowerDevice.objects.filter(device_code__regex=r"^\d+$").values_list(
+            "device_code", flat=True
+        )
+        codes = set()
+        for c in existing:
+            try:
+                codes.add(int(c))
+            except ValueError:
+                pass
+        next_num = 1
+        while next_num in codes:
+            next_num += 1
+        return Response({"code": f"{next_num:03d}"})
+
+
+# ── 연결 확인 ─────────────────────────────────────────────────
+class PowerDeviceConnectionCheckView(APIView):
+    authentication_classes = []
+    permission_classes = []
+
+    def post(self, request):
+        ip = request.data.get("ip_address", "").strip()
+        port = request.data.get("port")
+
+        if not ip:
+            return Response(
+                {"detail": "IP 주소를 입력해 주세요."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not port:
+            return Response(
+                {"detail": "포트 번호를 입력해 주세요."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            port = int(port)
+            if not (1 <= port <= 65535):
+                raise ValueError
+        except (ValueError, TypeError):
+            return Response(
+                {"detail": "포트 번호는 1~65535 범위로 입력해 주세요."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            sock = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
+            sock.settimeout(3)
+            result = sock.connect_ex((ip, port))
+            sock.close()
+            ok = result == 0
+        except Exception:
+            ok = False
+
+        checked_at = timezone.now()
+        if not ok:
+            return Response(
+                {
+                    "ok": False,
+                    "checked_at": checked_at,
+                    "detail": "장비와 연결할 수 없습니다. 통신 정보를 확인해 주세요.",
+                }
+            )
+        return Response({"ok": True, "checked_at": checked_at})
+
+
+# ── 장치 목록 / 등록 ──────────────────────────────────────────
+class PowerDeviceAdminListView(APIView):
+    authentication_classes = []
+    permission_classes = []
+
+    def get(self, request):
+        qs = PowerDevice.objects.select_related(
+            "facility", "department", "manager"
+        ).prefetch_related("inspections")
+
+        q = request.query_params.get("q", "").strip()
+        if q:
+            if q.upper().startswith("PWR-"):
+                qs = qs.filter(device_code=q[4:])
+            else:
+                qs = qs.filter(device_name__icontains=q)
+
+        is_active = request.query_params.get("is_active", "").strip()
+        if is_active == "true":
+            qs = qs.filter(is_active=True)
+        elif is_active == "false":
+            qs = qs.filter(is_active=False)
+
+        conn = request.query_params.get("connection", "").strip()
+        if conn == "normal":
+            qs = qs.filter(is_active=True).exclude(status__in=["offline", "error"])
+        elif conn == "disconnected":
+            qs = qs.filter(status__in=["offline", "error"])
+        elif conn == "inactive":
+            qs = qs.filter(is_active=False)
+
+        order = request.query_params.get("order", "device_id_asc")
+        order_map = {
+            "device_id_asc": "device_code",
+            "device_id_desc": "-device_code",
+            "last_reading_desc": "-last_reading",
+            "last_reading_asc": "last_reading",
+            "inspection_desc": "-inspections__inspection_date",
+            "inspection_asc": "inspections__inspection_date",
+        }
+        order_field = order_map.get(order, "device_code")
+
+        qs = (
+            qs.annotate(
+                priority=Case(
+                    When(status__in=["offline", "error"], then=0),
+                    default=1,
+                    output_field=IntegerField(),
+                )
+            )
+            .order_by("priority", order_field)
+            .distinct()
+        )
+
+        try:
+            page = max(1, int(request.query_params.get("page", 1)))
+            page_size = max(1, min(100, int(request.query_params.get("page_size", 10))))
+        except (ValueError, TypeError):
+            page, page_size = 1, 10
+
+        total = qs.count()
+        devices = qs[(page - 1) * page_size : page * page_size]
+        return Response(
+            {
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+                "results": PowerDeviceAdminListSerializer(devices, many=True).data,
+            }
+        )
+
+    def post(self, request):
+        serializer = PowerDeviceAdminWriteSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        device = serializer.save()
+        out = PowerDevice.objects.select_related(
+            "facility", "department", "manager"
+        ).get(pk=device.pk)
+        return Response(
+            PowerDeviceAdminListSerializer(out).data, status=status.HTTP_201_CREATED
+        )
+
+
+# ── 장치 상세 / 수정 / 비활성화 ──────────────────────────────
+class PowerDeviceAdminDetailView(APIView):
+    authentication_classes = []
+    permission_classes = []
+
+    def _get(self, pk):
+        try:
+            return PowerDevice.objects.select_related(
+                "facility", "department", "manager"
+            ).get(pk=pk)
+        except PowerDevice.DoesNotExist:
+            return None
+
+    def get(self, request, pk):
+        device = self._get(pk)
+        if device is None:
+            return Response(
+                {"detail": "장치를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND
+            )
+        return Response(PowerDeviceAdminListSerializer(device).data)
+
+    def put(self, request, pk):
+        device = self._get(pk)
+        if device is None:
+            return Response(
+                {"detail": "장치를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND
+            )
+        serializer = PowerDeviceAdminWriteSerializer(
+            device, data=request.data, partial=True
+        )
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.save()
+        return Response(PowerDeviceAdminListSerializer(self._get(pk)).data)
+
+    def delete(self, request, pk):
+        device = self._get(pk)
+        if device is None:
+            return Response(
+                {"detail": "장치를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND
+            )
+        device.deactivate()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# ── 일괄 비활성화 ─────────────────────────────────────────────
+class PowerDeviceAdminBulkDeleteView(APIView):
+    authentication_classes = []
+    permission_classes = []
+
+    def post(self, request):
+        ids = request.data.get("ids", [])
+        if not isinstance(ids, list) or not ids:
+            return Response(
+                {"detail": "ids 목록이 필요합니다."}, status=status.HTTP_400_BAD_REQUEST
+            )
+        count = PowerDevice.objects.filter(id__in=ids, is_active=True).update(
+            is_active=False,
+            deactivated_at=timezone.now(),
+            status=PowerDevice.Status.INACTIVE,
+        )
+        return Response({"deleted": count})
+
+
+# ── 점검 이력 조회 / 등록 ─────────────────────────────────────
+class PowerDeviceInspectionListView(APIView):
+    authentication_classes = []
+    permission_classes = []
+
+    def get(self, request, device_pk):
+        inspections = (
+            PowerDeviceInspection.objects.filter(device_id=device_pk)
+            .select_related("inspector", "action_user")
+            .order_by("-inspection_date", "-created_at")
+        )
+        return Response(PowerDeviceInspectionSerializer(inspections, many=True).data)
+
+    def post(self, request, device_pk):
+        data = request.data.copy()
+        data["device"] = device_pk
+        if not data.get("inspection_date"):
+            data["inspection_date"] = timezone.localdate().isoformat()
+        serializer = PowerDeviceInspectionWriteSerializer(data=data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        inspection = serializer.save()
+        return Response(
+            PowerDeviceInspectionSerializer(inspection).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+# ── 조치 등록 ─────────────────────────────────────────────────
+class PowerDeviceInspectionActionView(APIView):
+    authentication_classes = []
+    permission_classes = []
+
+    def post(self, request, inspection_pk):
+        try:
+            inspection = PowerDeviceInspection.objects.select_related(
+                "inspector", "action_user"
+            ).get(pk=inspection_pk)
+        except PowerDeviceInspection.DoesNotExist:
+            return Response(
+                {"detail": "점검 이력을 찾을 수 없습니다."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if inspection.is_actioned:
+            return Response(
+                {"detail": "이미 조치 완료된 점검입니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = PowerDeviceActionWriteSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        inspection.is_actioned = True
+        inspection.action_date = timezone.localdate()
+        inspection.action_notes = serializer.validated_data["action_notes"]
+        action_user_id = serializer.validated_data.get("action_user")
+        if action_user_id:
+            try:
+                inspection.action_user = CustomUser.objects.get(pk=action_user_id)
+            except CustomUser.DoesNotExist:
+                pass
+        inspection.save(
+            update_fields=[
+                "is_actioned",
+                "action_date",
+                "action_notes",
+                "action_user",
+                "updated_at",
+            ]
+        )
+        return Response(PowerDeviceInspectionSerializer(inspection).data)

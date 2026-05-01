@@ -1,0 +1,334 @@
+/* ──────────────────────────────────────────────────────────
+   gas_monitoring.css  —  실시간/AI 예측 유해가스 현황
+   power_system.css 패턴 기반
+   ────────────────────────────────────────────────────────── */
+
+/* ── 전체 레이아웃 ── */
+.gas-wrap {
+  display: flex;
+  gap: 16px;
+  height: calc(100vh - 130px);
+  min-height: 540px;
+}
+
+/* ── 좌측 패널 ── */
+.gas-left {
+  width: 340px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── 우측 패널 ── */
+.gas-right {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── 센서 목록 패널 ── */
+.sensor-scroll {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.sensor-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.sensor-table th {
+  background: rgba(48, 54, 61, 0.6);
+  color: var(--text2);
+  font-weight: 500;
+  padding: 7px 8px;
+  text-align: left;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.sensor-table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid rgba(48, 54, 61, 0.5);
+  color: var(--text1);
+  cursor: pointer;
+}
+
+.sensor-table tr:hover td { background: rgba(48, 54, 61, 0.3); }
+.sensor-table tr.selected td { background: rgba(56, 139, 253, 0.12); }
+
+/* ── 가스 리스트 패널 ── */
+.gas-list-panel {
+  flex-shrink: 0;
+}
+
+.gas-list-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text1);
+  padding: 0 0 8px 0;
+}
+
+.gas-list-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.gas-list-table th {
+  background: rgba(48, 54, 61, 0.6);
+  color: var(--text2);
+  font-weight: 500;
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.gas-list-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(48, 54, 61, 0.4);
+  color: var(--text1);
+  cursor: pointer;
+}
+
+.gas-list-table tr:hover td { background: rgba(48, 54, 61, 0.3); }
+.gas-list-table tr.selected td { background: rgba(56, 139, 253, 0.12); }
+
+/* ── 위험도 요약 뱃지 (좌측 상단) ── */
+.risk-summary {
+  display: flex;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(48, 54, 61, 0.6);
+  flex-shrink: 0;
+}
+
+.risk-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text2);
+}
+
+.risk-badge strong { color: var(--text1); }
+
+.dot-sq {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.dot-sq.danger  { background: var(--danger); }
+.dot-sq.caution { background: var(--caution); }
+.dot-sq.safe    { background: var(--safe); }
+
+/* ── 탭 + 범례 ── */
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.tab-group { display: flex; gap: 4px; }
+
+.tab-btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(48, 54, 61, 0.8);
+  background: transparent;
+  color: var(--text2);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.tab-btn.active {
+  background: rgba(56, 139, 253, 0.15);
+  border-color: rgba(56, 139, 253, 0.5);
+  color: #58a6ff;
+}
+
+.chart-legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text2);
+}
+
+.legend-line-sample {
+  width: 18px;
+  height: 2px;
+  display: inline-block;
+}
+
+.legend-area-sample {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  display: inline-block;
+  opacity: 0.5;
+}
+
+/* ── AI 공지 배너 ── */
+.ai-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(56, 139, 253, 0.08);
+  border: 1px solid rgba(56, 139, 253, 0.3);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--text2);
+  line-height: 1.5;
+}
+
+.ai-notice-icon { font-size: 16px; }
+
+/* ── 차트 그리드 (3×3) ── */
+.chart-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.chart-card {
+  background: rgba(22, 27, 34, 0.8);
+  border: 1px solid rgba(48, 54, 61, 0.8);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  min-height: 140px;
+}
+
+.chart-card.border-danger  { border-color: rgba(248, 81, 73, 0.5); }
+.chart-card.border-caution { border-color: rgba(227, 179, 65, 0.5); }
+.chart-card.selected       { border-color: rgba(56, 139, 253, 0.6); }
+
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text1);
+  margin-bottom: 6px;
+  flex-shrink: 0;
+}
+
+.card-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.card-status-dot.danger  { background: var(--danger); }
+.card-status-dot.warning { background: var(--caution); }
+.card-status-dot.normal  { background: var(--safe); }
+
+.card-chart-wrap {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+}
+
+/* ── 하단 상태 바 ── */
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: rgba(22, 27, 34, 0.9);
+  border: 1px solid rgba(48, 54, 61, 0.8);
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.status-sensor-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--text1);
+}
+
+.sensor-color-box {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--danger);
+}
+
+.status-msg       { color: var(--text2); flex: 1; }
+.status-alert-msg { color: var(--danger); font-weight: 600; }
+.status-time      { color: var(--text2); margin-left: auto; }
+
+/* ── WebSocket 연결 배너 ── */
+#gas-conn-banner {
+  margin-bottom: 10px;
+}
+
+.gas-conn-msg {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(56, 139, 253, 0.08);
+  border: 1px solid rgba(56, 139, 253, 0.3);
+  border-radius: 6px;
+  padding: 9px 14px;
+  font-size: 12px;
+  color: var(--text2);
+}
+
+.conn-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(56, 139, 253, 0.25);
+  border-top-color: #58a6ff;
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: conn-spin 0.8s linear infinite;
+}
+
+@keyframes conn-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── 상태 뱃지 ── */
+.status-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.status-badge.danger  { background: rgba(248,81,73,0.15);   color: var(--danger); }
+.status-badge.warning { background: rgba(227,179,65,0.15);  color: var(--caution); }
+.status-badge.normal,
+.status-badge.safe    { background: rgba(63,185,80,0.15);   color: var(--safe); }
+.status-badge.offline { background: rgba(139,148,158,0.15); color: var(--text2); }

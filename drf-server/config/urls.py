@@ -13,7 +13,10 @@ urlpatterns = [
     path("dashboard/", include("apps.dashboard.urls")),
     path("alerts/", include("apps.alerts.urls")),
     path("api/", include("apps.geofence.urls")),
+    path("api/admin/", include("apps.accounts.admin_urls")),
+    path("api/admin/", include("apps.monitoring.admin_urls")),
     path("api/positioning/", include("apps.positioning.urls")),
     path("api/monitoring/", include("apps.monitoring.urls")),
-    path("admin-panel/", include("apps.geofence.admin_urls")),
+    path("admin-panel/", include("config.admin_panel_urls")),
+    path("api/", include("apps.facilities.urls")),
 ]

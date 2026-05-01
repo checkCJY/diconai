@@ -1,0 +1,91 @@
+<!-- 사용자 등록 모달 -->
+<div id="createUserModal" class="modal-overlay" style="display:none;">
+    <div class="modal-container">
+        <div class="modal-header">
+            <div>
+                <h3>사용자 등록</h3>
+                <p class="modal-desc">사용자 계정을 등록합니다.</p>
+            </div>
+            <button class="modal-close" id="btnCreateClose">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-grid">
+                <div class="form-field">
+                    <label>사용자명 <span class="required">*</span></label>
+                    <input type="text" id="createName" placeholder="이름을 입력하세요" maxlength="20">
+                    <span class="field-error" id="errName"></span>
+                </div>
+                <div class="form-field">
+                    <label>아이디 <span class="required">*</span></label>
+                    <input type="text" id="createUsername" placeholder="아이디를 입력하세요" maxlength="20">
+                    <span class="field-error" id="errUsername"></span>
+                </div>
+                <div class="form-field">
+                    <label>비밀번호 <span class="required">*</span></label>
+                    <input type="password" id="createPassword" placeholder="비밀번호를 입력하세요" maxlength="20">
+                    <span class="field-error" id="errPassword"></span>
+                </div>
+                <div class="form-field">
+                    <label>비밀번호 확인 <span class="required">*</span></label>
+                    <input type="password" id="createPasswordConfirm" placeholder="비밀번호를 다시 입력하세요" maxlength="20">
+                    <span class="field-error" id="errPasswordConfirm"></span>
+                </div>
+                <div class="form-field">
+                    <label>소속 <span class="required">*</span></label>
+                    <select id="createDepartment">
+                        <option value="">조직을 선택하세요</option>
+                        {% for dept in departments %}
+                        <option value="{{ dept.id }}">{{ dept.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <span class="field-error" id="errDepartment"></span>
+                </div>
+                <div class="form-field">
+                    <label>권한 <span class="required">*</span></label>
+                    <select id="createUserType">
+                        <option value="">권한을 선택하세요</option>
+                        <option value="super_admin">슈퍼관리자</option>
+                        <option value="facility_admin">관리자</option>
+                        <option value="worker">일반사용자</option>
+                        <option value="viewer">열람자</option>
+                    </select>
+                    <span class="field-error" id="errUserType"></span>
+                </div>
+                <div class="form-field">
+                    <label>직위</label>
+                    <select id="createPosition">
+                        <option value="">직급을 입력하세요</option>
+                        {% for pos in positions %}
+                        <option value="{{ pos.id }}">{{ pos.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <span class="field-error" id="errPosition"></span>
+                </div>
+                <div class="form-field">
+                    <label>계정 상태 <span class="required">*</span></label>
+                    <select id="createStatus">
+                        <option value="">상태를 선택하세요</option>
+                        <option value="active">사용</option>
+                        <option value="locked">잠금</option>
+                        <option value="inactive">비활성</option>
+                    </select>
+                    <span class="field-error" id="errStatus"></span>
+                </div>
+                <div class="form-field">
+                    <label>이메일 <span class="required">*</span></label>
+                    <input type="text" id="createEmail" placeholder="example@company.com" maxlength="100">
+                    <span class="field-error" id="errEmail"></span>
+                </div>
+                <div class="form-field">
+                    <label>연락처 <span class="required">*</span></label>
+                    <input type="text" id="createPhone" placeholder="010-0000-0000" maxlength="13">
+                    <span class="field-error" id="errPhone"></span>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-outline" id="btnCreateCancel">취소</button>
+            <button class="btn-primary" id="btnCreateSubmit">등록</button>
+        </div>
+    </div>
+</div>

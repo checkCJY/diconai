@@ -15,9 +15,10 @@ async function initApp() {
   await initHeaderAndSNB();
 
   initCharts();
-  MapPanel.init();
+  await MapPanel.init();
   initWebSocket();
   AlarmPopup.init();
+  AlarmToast.init();
   EventPanel.init();
   loadMySafetyStatus();
 }

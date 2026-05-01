@@ -3,12 +3,21 @@
    의존: Chart.js 4.x, chartjs-plugin-annotation 3.x
    ────────────────────────────────────────────────────────── */
 
-/* ── Phase A 임계치 고정값 (단위: W) ── */
-const THRESHOLD = {
-  caution: 2200,          // 안전 → 주의 경계 (W)
-  danger:  2860,          // 주의 → 위험 경계 (W, 2200 × 1.3)
-  maxY:    3500,          // Y축 기본 최대값 (W)
+/* ── 전력 임계치 (W) — GET /api/monitoring/power/thresholds/ 에서 로드 ── */
+let THRESHOLD = {
+  caution: 2200,
+  danger:  2860,
+  maxY:    3500,
 };
+
+async function loadThresholds() {
+  try {
+    const res = await fetch('/api/monitoring/power/thresholds/');
+    if (!res.ok) return;
+    const data = await res.json();
+    THRESHOLD = { caution: data.caution, danger: data.danger, maxY: data.maxY };
+  } catch (_) { /* 네트워크 오류 시 기본값 유지 */ }
+}
 
 /* ── 색상 팔레트 (CSS 변수와 동일) ── */
 const COLOR = {
@@ -289,12 +298,13 @@ function startClock() {
 /* ────────────────────────────────────────────
    초기화
 ────────────────────────────────────────────── */
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('tab-realtime')
     .addEventListener('click', () => switchTab('realtime'));
   document.getElementById('tab-ai')
     .addEventListener('click', () => switchTab('ai'));
 
+  await loadThresholds();
   startClock();
   loadRealtimeData();
 });

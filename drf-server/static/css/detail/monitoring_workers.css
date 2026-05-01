@@ -1,0 +1,317 @@
+/* ── 작업자 현황 페이지 전용 스타일 ── */
+
+/* ================================================================
+   분할 컨테이너
+   기본: 목록이 전체 너비
+   .has-selection: 좌 55% / 우 45% 분할
+================================================================ */
+.worker-panel-wrap {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.worker-list-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+  min-width: 0;
+  transition: flex 0.25s ease;
+}
+
+/* 우측 디테일 패널 — 기본 숨김 */
+.worker-detail-panel {
+  width: 0;
+  overflow: hidden;
+  opacity: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+  transition: width 0.25s ease, opacity 0.2s ease;
+}
+
+/* 행 선택 시 분할 레이아웃 활성화 */
+.worker-panel-wrap.has-selection .worker-detail-panel {
+  width: 42%;
+  opacity: 1;
+  overflow: visible;
+}
+
+/* ================================================================
+   섹션 1: 목록 헤더
+================================================================ */
+.worker-list-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.section-label {
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.summary-text {
+  font-size: 12px;
+  color: var(--text2);
+}
+.summary-text strong {
+  color: var(--text);
+  font-weight: 700;
+}
+
+/* 위험 단계별 필터 배지 */
+.status-filter-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+  user-select: none;
+}
+.badge input[type="checkbox"] {
+  width: 11px;
+  height: 11px;
+  cursor: pointer;
+  accent-color: currentColor;
+}
+.badge-count { font-size: 10px; font-weight: 700; }
+
+.badge-danger  { background: rgba(248,81,73,0.12);  color: var(--danger);  border-color: rgba(248,81,73,0.3); }
+.badge-caution { background: rgba(227,179,65,0.12); color: var(--caution); border-color: rgba(227,179,65,0.3); }
+.badge-normal  { background: rgba(63,185,80,0.12);  color: var(--safe);    border-color: rgba(63,185,80,0.3); }
+
+.badge-danger:has(input:checked)  { background: rgba(248,81,73,0.3);  border-color: var(--danger); }
+.badge-caution:has(input:checked) { background: rgba(227,179,65,0.3); border-color: var(--caution); }
+.badge-normal:has(input:checked)  { background: rgba(63,185,80,0.3);  border-color: var(--safe); }
+
+/* ================================================================
+   테이블
+================================================================ */
+.table-wrapper {
+  overflow-y: auto;
+  max-height: calc(100vh - 270px);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.table-wrapper::-webkit-scrollbar       { width: 4px; }
+.table-wrapper::-webkit-scrollbar-track { background: transparent; }
+.table-wrapper::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.worker-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.worker-table th {
+  position: sticky;
+  top: 0;
+  background: var(--bg3);
+  color: var(--text2);
+  font-weight: 500;
+  padding: 8px 10px;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  z-index: 1;
+}
+.worker-table td {
+  padding: 7px 10px;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  color: var(--text);
+  cursor: pointer;
+}
+.worker-table tbody tr:last-child td { border-bottom: none; }
+.worker-table tbody tr:hover td { background: rgba(88,166,255,0.06); }
+
+/* 선택된 행 강조 */
+.worker-row.selected td { background: rgba(31,111,235,0.18) !important; }
+
+/* 오프라인 행 흐리게 */
+.worker-row.offline td { color: var(--text2); opacity: 0.5; }
+
+/* 위험도별 행 배경 */
+.worker-row.danger  td { background: rgba(220,38,38,0.18); color: #fecaca; }
+.worker-row.caution td { background: rgba(202,138,4,0.18);  color: #fef08a; }
+.worker-row.danger:hover  td { background: rgba(220,38,38,0.30); }
+.worker-row.caution:hover td { background: rgba(202,138,4,0.30); }
+
+.worker-row.hidden { display: none; }
+
+/* 연결 상태 아이콘 */
+.conn-icon {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+  background: var(--border);
+}
+.conn-icon.connected    { background: var(--safe); }
+.conn-icon.disconnected { background: var(--danger); }
+.conn-label { font-size: 11px; vertical-align: middle; }
+
+/* 현재 상태 배지 */
+.status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.status-badge.danger  { background: rgba(248,81,73,0.25);  color: var(--danger); }
+.status-badge.caution { background: rgba(227,179,65,0.25); color: var(--caution); }
+.status-badge.normal  { background: rgba(63,185,80,0.25);  color: var(--safe); }
+
+/* ================================================================
+   알림 전송 버튼 바
+================================================================ */
+.notification-action-bar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 4px 2px;
+}
+
+.btn {
+  padding: 7px 18px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.15s, border-color 0.15s;
+}
+.btn-secondary { background: var(--bg3); color: var(--text2); }
+.btn-secondary:not(:disabled):hover { background: var(--bg2); border-color: var(--blue); color: var(--text); }
+.btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primary:hover { background: #388bfd; border-color: #388bfd; }
+
+/* ================================================================
+   우측 디테일 패널 카드
+================================================================ */
+.detail-card {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.detail-card-title {
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.detail-name-tag {
+  color: var(--blue);
+  font-weight: 400;
+}
+
+/* ── 1. 지도 플레이스홀더 ── */
+.detail-map-placeholder {
+  height: 180px;
+  background: #1a2332;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.placeholder-label {
+  font-size: 11px;
+  color: var(--text2);
+}
+
+/* ── 2. 작업자 프로필 ── */
+/* TODO: GET /api/workers/{id}/profile/ 연동 후 실데이터로 교체 */
+.detail-profile {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 5px 10px;
+  font-size: 11px;
+}
+.detail-profile dt {
+  color: var(--text2);
+  display: flex;
+  align-items: center;
+}
+.detail-profile dd {
+  color: var(--text);
+  margin: 0;
+}
+
+/* ── 3. 작업자 위험 현황 ── */
+/* TODO: GET /api/workers/{id}/risk/ 연동 후 ok/warn/none 상태로 아이콘·색상 변경 */
+.risk-item-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.risk-item {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 14px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.risk-item-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  color: var(--text2);
+  background: var(--bg3);
+}
+
+/* 상태별 아이콘 색상 (JS에서 data-risk 속성으로 제어) */
+.risk-item[data-risk="ok"]   .risk-item-icon { color: var(--safe);    border-color: var(--safe); }
+.risk-item[data-risk="warn"] .risk-item-icon { color: var(--caution); border-color: var(--caution); }
+.risk-item[data-risk="none"] .risk-item-icon { color: var(--text2);   border-color: var(--border); }
+
+.risk-item-label {
+  font-size: 10px;
+  color: var(--text2);
+  line-height: 1.4;
+}
+
+.detail-alert-btn {
+  width: 100%;
+  margin-top: 2px;
+}

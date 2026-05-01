@@ -1,0 +1,123 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>이벤트 상세 — 산재 예방 통합 관제 시스템</title>
+<link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+<link rel="stylesheet" href="{% static 'css/components/header.css' %}">
+<link rel="stylesheet" href="{% static 'css/detail/event_monitoring.css' %}">
+</head>
+<body>
+
+{% include 'components/header.html' %}
+{% include 'components/alarm_popup.html' %}
+
+<div class="body-wrap page-wrap">
+  <div class="page-header">
+    <span class="breadcrumb">모니터링 &gt; <a href="/dashboard/monitoring/events/">이벤트 현황</a> &gt; 이벤트 상세</span>
+  </div>
+
+  <!-- ❷ 이벤트 요약 카드 -->
+  <div class="panel event-summary-card">
+    <div class="summary-badges">
+      <span class="status-badge danger" id="summary-risk">-</span>
+      <span class="status-badge warning" id="summary-status">-</span>
+    </div>
+    <div class="summary-title" id="summary-title">유해가스 위험</div>
+    <div class="summary-meta">
+      <span>발생원 : <strong id="summary-source">-</strong></span>
+      <span>발생 시간 : <strong id="summary-time">-</strong></span>
+      <span>연관 작업자 : <strong id="summary-worker">-</strong></span>
+    </div>
+  </div>
+
+  <div class="detail-wrap">
+
+    <!-- ❸ 이벤트 상세 내용 -->
+    <div class="panel detail-left">
+      <div class="panel-title">이벤트 상세 내용</div>
+
+      <div class="detail-section">
+        <div class="detail-label">상세 내용</div>
+        <div class="detail-value" id="detail-summary">-</div>
+      </div>
+      <div class="detail-section">
+        <div class="detail-label">권고 조치</div>
+        <div class="detail-value">
+          1. 작업자 앱 긴급 알림 발송<br>
+          2. 현장 작업 중지 및 대피 안내<br>
+          3. 환기 설비 가동<br>
+          4. 센서/설비 상태 점검 후 조치 상태 갱신
+        </div>
+      </div>
+      <div class="detail-section">
+        <div class="detail-label">연관 대상 정보</div>
+        <div class="detail-value" id="detail-source-info">-</div>
+      </div>
+      <div class="detail-section">
+        <div class="detail-label">발생 추이</div>
+        <div class="detail-value" id="detail-trend">-</div>
+      </div>
+    </div>
+
+    <div class="detail-right">
+
+      <!-- ❹ 조치 상태 변경 -->
+      <div class="panel">
+        <div class="panel-title">조치 상태 변경</div>
+        <div class="status-change-desc" id="status-change-desc">현재 상태 : - → 변경 예정 : -</div>
+        <div class="status-btn-group">
+          <button class="status-btn" data-target="in_progress" id="btn-in-progress">조치 중</button>
+          <button class="status-btn active-btn" data-target="resolved" id="btn-resolved">조치 완료</button>
+        </div>
+        <button class="change-btn" id="btn-change">변경</button>
+      </div>
+
+      <!-- ❺ 연관 모니터링 정보 -->
+      <div class="panel">
+        <div class="panel-title">연관 모니터링 정보</div>
+        <div class="monitor-list" id="monitor-list">
+          <div class="monitor-item">
+            <input type="checkbox" checked readonly>
+            <span id="monitor-sensor">유해가스 센서 : - / - / -</span>
+          </div>
+          <div class="monitor-item">
+            <input type="checkbox" checked readonly>
+            <span id="monitor-worker">연관 작업자 : - / - / -</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div style="display:flex; justify-content:flex-end; margin-top:12px;">
+    <button class="confirm-btn" onclick="location.href='/dashboard/monitoring/events/'">확인</button>
+  </div>
+</div>
+
+<!-- 조치 상태 변경 확인 팝업 -->
+<div class="modal-overlay" id="modal-overlay" style="display:none;">
+  <div class="modal">
+    <div class="modal-icon">⚠</div>
+    <div class="modal-title">조치 상태 변경</div>
+    <div class="modal-body" id="modal-body">이벤트 조치 상태를 변경하시겠습니까?</div>
+    <div class="modal-btns">
+      <button class="modal-btn cancel" id="modal-cancel">취소</button>
+      <button class="modal-btn confirm" id="modal-confirm">확인</button>
+    </div>
+  </div>
+</div>
+
+<script>const EVENT_ID = {{ event_id }};</script>
+<script src="{% static 'js/shared/util.js' %}"></script>
+<script src="{% static 'js/shared/auth.js' %}"></script>
+<script src="{% static 'js/shared/layout.js' %}"></script>
+<script src="{% static 'js/shared/app-sub.js' %}"></script>
+<script src="{% static 'js/shared/alarm-popup.js' %}"></script>
+<script src="{% static 'js/shared/worker-ws.js' %}"></script>
+<script src="{% static 'js/shared/alarm-ws.js' %}"></script>
+<script src="{% static 'js/detail/event_detail.js' %}"></script>
+</body>
+</html>

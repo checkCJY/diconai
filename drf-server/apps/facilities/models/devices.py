@@ -71,24 +71,56 @@ class GasSensor(DeviceBase):
     """
     가스 센서 장비 마스터
 
+    [센서 ID 규칙]
+    GAS-{device_code} 형태 (예: GAS-001). device_code는 등록 시 자동 부여.
+
     [좌표계]
     x, y는 facility의 공장 도면 픽셀 좌표 (좌상단 원점)
-    GeoFence, WorkerPosition과 동일 좌표계
-    도면 해상도 변경 시 일괄 환산 필요 (4차)
 
     [상태 관리]
     - NORMAL: 정상 수신 중
-    - OFFLINE: last_reading 기준 5분 이상 미수신 (Celery Beat로 자동 판단)
-    - ERROR: 센서 하드웨어 이상 신호 또는 관리자 수동 변경
-    - INACTIVE: 철거/교체로 비활성화 (is_active=False와 함께)
-
-    [교체 정책]
-    교체 시 기존 레코드를 deactivate()하고 신규 레코드 생성
-    과거 GasData는 구 센서 FK를 유지하여 이력 보존
+    - OFFLINE: last_reading 기준 5분 이상 미수신
+    - ERROR: 센서 하드웨어 이상
+    - INACTIVE: 철거/교체로 비활성화
     """
 
+    device_code = models.CharField(max_length=10, unique=True, verbose_name="장비 코드")
+    department = models.ForeignKey(
+        "accounts.Department",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="gas_sensors",
+        verbose_name="관리 부서",
+    )
+    manager = models.ForeignKey(
+        "accounts.CustomUser",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="managed_gas_sensors",
+        verbose_name="관리 담당자",
+    )
+    ip_address = models.CharField(
+        max_length=45, blank=True, default="", verbose_name="통신 IP"
+    )
+    port = models.PositiveIntegerField(null=True, blank=True, verbose_name="통신 PORT")
+    connection_checked_at = models.DateTimeField(
+        null=True, blank=True, verbose_name="마지막 연결 확인일시"
+    )
+    connection_ok = models.BooleanField(
+        null=True, blank=True, verbose_name="연결 확인 결과"
+    )
+    notes = models.TextField(blank=True, default="", verbose_name="비고")
+
+    @property
+    def sensor_id(self):
+        if self.device_code:
+            return f"GAS-{self.device_code}"
+        return self.device_name
+
     def __str__(self):
-        return f"{self.device_name} ({self.device_id})"
+        return f"{self.sensor_id} ({self.device_id})"
 
     class Meta:
         db_table = "gas_sensor"
@@ -100,27 +132,83 @@ class GasSensor(DeviceBase):
         ]
 
 
+class PositionNode(DeviceBase):
+    """
+    위치 추적 앵커 노드 (UWB/BLE 기반)
+
+    작업자 위치 측정을 위해 공장 내 설치되는 고정 수신기.
+    x, y는 도면 상 노드 설치 좌표.
+    """
+
+    def __str__(self):
+        return f"{self.device_name} ({self.device_id})"
+
+    class Meta:
+        db_table = "position_node"
+        indexes = [
+            models.Index(
+                fields=["facility", "is_active"], name="idx_pos_node_facility_active"
+            ),
+        ]
+
+
 class PowerDevice(DeviceBase):
     """
-    전력 장비 마스터
+    전력 장비 마스터 — 스마트 전력 시스템 관리
 
-    16채널 스마트 파워 측정 장치 (에어위드 프로토콜)
-    [채널 메타데이터]
-    JSONField를 활용하여 채널별 용도(이름), 배율(Scale), 오프셋 등을 단일 테이블에서 통합 관리.
+    [장비 코드 규칙]
+    PWR-{device_code} 형태 (예: PWR-001). device_code는 등록 시 자동 부여.
+
+    [상태 관리]
+    - NORMAL: 정상 수신 중
+    - OFFLINE: last_reading 기준 5분 이상 미수신
+    - ERROR: 장비 하드웨어 이상
+    - INACTIVE: 철거/교체로 비활성화
     """
 
     channel_count = models.PositiveSmallIntegerField(default=16, verbose_name="채널 수")
-
-    # 모델 분리 대신 JSONField 도입
     channel_meta = models.JSONField(
         default=dict,
         blank=True,
         verbose_name="채널 메타데이터",
-        help_text='예: {"1": {"name": "메인 에어컨", "scale": 1.5, "offset": 0}, "2": {"name": "조명", "scale": 1.0, "offset": -0.5}}',
     )
+    device_code = models.CharField(max_length=10, unique=True, verbose_name="장비 코드")
+    department = models.ForeignKey(
+        "accounts.Department",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="power_devices",
+        verbose_name="관리 부서",
+    )
+    manager = models.ForeignKey(
+        "accounts.CustomUser",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="managed_power_devices",
+        verbose_name="관리 담당자",
+    )
+    ip_address = models.CharField(
+        max_length=45, blank=True, default="", verbose_name="통신 IP"
+    )
+    port = models.PositiveIntegerField(null=True, blank=True, verbose_name="통신 PORT")
+    connection_checked_at = models.DateTimeField(
+        null=True, blank=True, verbose_name="마지막 연결 확인일시"
+    )
+    connection_ok = models.BooleanField(
+        null=True, blank=True, verbose_name="연결 확인 결과"
+    )
+    notes = models.TextField(blank=True, default="", verbose_name="비고")
+
+    @property
+    def power_id(self):
+        if self.device_code:
+            return f"PWR-{self.device_code}"
+        return self.device_name
 
     def __str__(self):
-        return f"{self.device_name} ({self.device_id})"
+        return f"{self.power_id} ({self.device_id})"
 
     def clean(self):
         for ch_key, meta in self.channel_meta.items():
@@ -133,8 +221,7 @@ class PowerDevice(DeviceBase):
         db_table = "power_device"
         indexes = [
             models.Index(
-                fields=["facility", "is_active"],
-                name="idx_pwrdev_facility_active",
+                fields=["facility", "is_active"], name="idx_pwrdev_facility_active"
             ),
             models.Index(
                 fields=["status", "is_active"], name="idx_power_device_status"

@@ -1,0 +1,122 @@
+{% extends 'admin_panel/base.html' %}
+{% load static %}
+
+{% block title %}위험구역 관리{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/admin/geofence.css' %}">
+{% endblock %}
+
+{% block content %}
+<!-- 페이지 헤더 -->
+<section class="page-header">
+    <div class="header-titles">
+        <div class="breadcrumb">지도/구역 관리 &gt; 위험구역 관리</div>
+        <h2 class="page-title">위험구역 관리</h2>
+        <p class="page-desc">위험구역(지오펜스)을 조회하고 등록, 수정, 삭제할 수 있습니다.</p>
+    </div>
+    <button class="btn-primary" id="btnAdd">+ 위험구역 등록</button>
+</section>
+
+<!-- 검색 필터 -->
+<section class="filter-card">
+    <div class="filter-inputs">
+        <div class="input-group">
+            <label>구역명</label>
+            <input type="text" id="filterName" placeholder="구역명 입력">
+        </div>
+        <div class="input-group">
+            <label>위험도</label>
+            <select id="filterRisk">
+                <option value="">전체</option>
+                <option value="danger">위험</option>
+                <option value="warning">주의</option>
+                <option value="normal">정상</option>
+            </select>
+        </div>
+    </div>
+    <div class="filter-actions">
+        <button class="btn-outline" id="btnReset">초기화</button>
+        <button class="btn-dark" id="btnSearch">검색</button>
+    </div>
+</section>
+
+<!-- 테이블 -->
+<section class="table-card">
+    <div class="table-toolbar">
+        <div class="toolbar-left">
+            <span class="total-count">전체 <strong id="totalCount">0</strong>개</span>
+            <button class="btn-danger" id="btnDelete" disabled>삭제</button>
+        </div>
+    </div>
+
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th><input type="checkbox" id="checkAll"></th>
+                    <th>ID</th>
+                    <th>구역명</th>
+                    <th>공장</th>
+                    <th>위험도</th>
+                    <th>현재 작업자 수</th>
+                    <th>등록일</th>
+                    <th>관리</th>
+                </tr>
+            </thead>
+            <tbody id="geofenceTableBody">
+                <tr>
+                    <td colspan="8" class="empty-state">데이터를 불러오는 중...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="table-footer">
+        <span class="page-info" id="pageInfo">0 - 0 / 0</span>
+        <div class="pagination" id="pagination"></div>
+    </div>
+</section>
+
+<!-- 등록/수정 모달 -->
+<div id="geofenceModal" class="modal-overlay" style="display:none;">
+    <div class="modal-container">
+        <div class="modal-header">
+            <h3 id="modalTitle">위험구역 등록</h3>
+            <button class="modal-close" id="btnModalClose">✕</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="modalId">
+            <div class="input-group">
+                <label>구역명 <span class="required">*</span></label>
+                <input type="text" id="modalName" placeholder="구역명 입력">
+            </div>
+            <div class="input-group">
+                <label>위험도 <span class="required">*</span></label>
+                <select id="modalRisk">
+                    <option value="danger">위험</option>
+                    <option value="warning">주의</option>
+                    <option value="normal">정상</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label>설명</label>
+                <textarea id="modalDesc" placeholder="구역 설명 입력" rows="3"></textarea>
+            </div>
+            <div class="input-group">
+                <label>polygon 좌표 <span class="required">*</span> <small style="color:#6e7681;">(최소 3개)</small></label>
+                <div id="coordList"></div>
+                <button class="btn-outline" id="btnAddCoord" style="margin-top:8px; width:100%;">+ 좌표 추가</button>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-outline" id="btnModalCancel">취소</button>
+            <button class="btn-primary" id="btnModalSave">저장</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/admin/geofence/geofence.js' %}"></script>
+{% endblock %}

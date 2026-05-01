@@ -46,6 +46,8 @@ th{background-color:#f8fafc;color:#64748b;font-weight:600;font-size:13px}
 .badge-green{background:#dcfce3;color:#15803d}
 .badge-orange{background:#ffedd5;color:#c2410c}
 .btn-sm{padding:4px 8px;border:1px solid #cbd5e1;background:#fff;border-radius:4px;font-size:12px;cursor:pointer}
+.btn-dark.btn-sm{background-color:#1e293b;color:#fff;border-color:#1e293b}
+.btn-primary.btn-sm{background-color:#3b82f6;color:#fff;border:none}
 .table-footer{display:flex;justify-content:space-between;align-items:center;margin-top:20px}
 .page-info{color:#64748b;font-size:13px}
 .pagination{display:flex;gap:4px}

@@ -1,0 +1,178 @@
+/* ==========================================================
+   my_profile.css — 내 정보 확인 페이지
+   ========================================================== */
+
+.profile-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 52px);
+  padding: 24px 28px;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+.page-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 20px;
+}
+
+/* ── 프로필 카드 ── */
+.profile-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  max-width: 680px;
+}
+
+.profile-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.card-label {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.btn-password {
+  background: var(--bg3);
+  color: var(--text2);
+  border: 1px solid var(--border);
+  padding: 7px 16px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+.btn-password:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+/* ── 그리드 레이아웃 ── */
+.profile-grid {
+  padding: 8px 0;
+}
+
+.profile-row {
+  display: grid;
+  grid-template-columns: 110px 1fr 110px 1fr;
+  border-bottom: 1px solid var(--border);
+}
+.profile-row:last-child {
+  border-bottom: none;
+}
+.profile-row--single {
+  grid-template-columns: 110px 1fr;
+}
+
+.profile-label {
+  font-size: 13px;
+  color: var(--text2);
+  padding: 14px 16px;
+  background: var(--bg3);
+  border-right: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+}
+
+.profile-value {
+  font-size: 13px;
+  color: var(--text);
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  border-right: 1px solid var(--border);
+}
+.profile-row--single .profile-value {
+  border-right: none;
+}
+
+/* ── 비밀번호 변경 모달 ── */
+.pwd-modal-box {
+  min-width: 420px;
+  text-align: left;
+}
+
+.pwd-modal-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 14px;
+}
+
+.pwd-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 0 0 20px;
+}
+
+.pwd-field {
+  margin-bottom: 18px;
+}
+
+.pwd-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.pwd-hint {
+  font-size: 11px;
+  color: var(--text2);
+  margin: 0 0 6px;
+}
+.pwd-hint.error {
+  color: var(--danger);
+}
+
+.pwd-input-wrap {
+  position: relative;
+}
+
+.pwd-input {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  padding: 9px 36px 9px 12px;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color .15s;
+}
+.pwd-input:focus { border-color: var(--blue); }
+.pwd-input.error { border-color: var(--danger); }
+
+.pwd-clear {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text2);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 4px;
+  display: none;
+}
+.pwd-clear.visible { display: block; }
+.pwd-clear:hover { color: var(--text); }
+
+.pwd-footer {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 24px;
+}
+.pwd-footer .modal-btn-cancel { padding: 9px 32px; }
+.pwd-footer .modal-btn-blue   { padding: 9px 32px; }

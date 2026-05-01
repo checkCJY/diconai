@@ -6,6 +6,7 @@
 <title>작업자 현황 — 산재 예방 통합 관제 시스템</title>
 <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
 <link rel="stylesheet" href="{% static 'css/components/header.css' %}">
+<link rel="stylesheet" href="{% static 'css/detail/monitoring_workers.css' %}">
 </head>
 <body>
 
@@ -13,17 +14,242 @@
 
 <div class="body-wrap page-wrap">
   <div class="page-header">
-    <span class="breadcrumb">모니터링 &gt; 작업자 현황</span>
+    <h2>작업자 현황</h2>
   </div>
+
   <div class="panel">
-    <div class="panel-title">작업자 현황</div>
-    <p class="sub" style="padding:16px;">준비 중입니다.</p>
+
+    <!-- ============================================================
+         worker-panel-wrap: 좌(목록) + 우(디테일) 분할 컨테이너
+         .has-selection 클래스가 붙으면 55% / 45% 분할 레이아웃으로 전환
+    ============================================================= -->
+    <div class="worker-panel-wrap" id="worker-panel-wrap">
+
+      <!-- =====================================================
+           섹션 1 : 실시간 작업자 목록
+      ====================================================== -->
+      <div class="worker-list-section">
+
+        <!-- 목록 헤더 : 현장 투입 요약 + 위험 단계별 필터 -->
+        <div class="worker-list-header">
+          <span class="section-label">실시간 작업자 목록</span>
+
+          <!-- 현장 투입 요약
+               전체 작업자 수와 현재 출입자 수를 실시간 대조
+               → 미퇴근·누락 인원 즉시 식별 용도
+               TODO: WebSocket 또는 폴링으로 두 수치 실시간 갱신 -->
+          <span class="summary-text">
+            전체 작업자 <strong id="total-worker-count">--</strong> 명
+            / 현재 출입 작업자 <strong id="current-worker-count">--</strong> 명
+          </span>
+          <br>
+
+          <!-- 위험 단계별 필터 배지
+               배지 클릭 시 해당 상태 작업자만 테이블에 필터링
+               각 배지의 숫자는 현재 테이블 데이터 기준으로 동적 업데이트
+               TODO: JS에서 배지 toggle 이벤트 → 테이블 행 show/hide 처리 -->
+          <div class="status-filter-badges">
+            <label class="badge badge-danger">
+              <input type="checkbox" class="badge-filter" data-status="danger">
+              위험 <span class="badge-count" id="count-danger">0</span>
+            </label>
+            <label class="badge badge-caution">
+              <input type="checkbox" class="badge-filter" data-status="caution">
+              주의 <span class="badge-count" id="count-caution">0</span>
+            </label>
+            <label class="badge badge-normal">
+              <input type="checkbox" class="badge-filter" data-status="normal">
+              정상 <span class="badge-count" id="count-normal">0</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 작업자 테이블
+             TODO: 초기 로드 — GET /api/workers/status/ 응답을 파싱해 행 동적 삽입
+             TODO: 실시간 갱신 — WebSocket 이벤트 수신 시 해당 행의 셀만 업데이트
+             연결 끊긴 작업자(오프라인) 행은 흐리게(dimmed) 표시 예정 -->
+        <div class="table-wrapper">
+          <table class="worker-table">
+            <thead>
+              <tr>
+                <!-- 전체 선택 → 하단 '선택 알림 전송' 버튼 활성화와 연동 -->
+                <th><input type="checkbox" id="select-all"></th>
+                <th>작업자명</th>
+                <th>소속</th>
+                <th>작업지명</th>
+
+                <!-- 마지막 연결 시간
+                     작업자 앱과 서버가 마지막으로 통신한 시각(초 단위 기록)
+                     TODO: FastAPI IoT 게이트웨이 → DRF heartbeat 수신 시 갱신 -->
+                <th>마지막 연결 시간</th>
+
+                <!-- 연결 상태
+                     앱이 활성화되어 푸시 알림 수신 가능한지 여부
+                     TODO: heartbeat 수신 후 N초 초과 시 '연결 끊김'으로 자동 전환
+                           아이콘 + 텍스트로 직관적 표시 예정 -->
+                <th>연결 상태</th>
+
+                <!-- 현재 상태 배지
+                     유해가스 · 전력 수치와 연동해 작업자 위치 구역의 위험도 표시
+                     TODO: WebSocket 이벤트로 [위험/주의/정상] 배지 실시간 업데이트 -->
+                <th>현재 상태</th>
+              </tr>
+            </thead>
+
+            <!-- JS가 행을 동적으로 append하는 영역 -->
+            <tbody id="worker-table-body">
+              <tr id="worker-table-loading">
+                <td colspan="7" style="text-align:center; padding:24px; color:#8b949e;">
+                  데이터 로딩 중...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 행 복제용 템플릿 (화면에 렌더링되지 않음) -->
+        <template id="worker-row-template">
+          <tr class="worker-row" data-worker-id="">
+            <td><input type="checkbox" class="row-select"></td>
+            <td class="col-name">--</td>
+            <td class="col-dept">--</td>
+            <td class="col-zone">--</td>
+            <td class="col-last-seen">--</td>
+            <td class="col-connection">
+              <span class="conn-icon"></span>
+              <span class="conn-label">--</span>
+            </td>
+            <td class="col-status">
+              <span class="status-badge">--</span>
+            </td>
+          </tr>
+        </template>
+
+        <!-- =====================================================
+             섹션 2 : 알림 전송
+             관리자가 위험 상황 인지 즉시 작업자에게 행동 지침 하달
+        ====================================================== -->
+        <div class="notification-action-bar">
+
+          <!-- 선택 알림 전송 (Selective Push)
+               테이블 체크박스로 선택한 작업자에게만 타겟 알림 전송
+               체크박스 1개 이상 선택 시 활성화, 미선택 시 disabled 유지
+               TODO: POST /api/notifications/push/ { target:'selected', worker_ids:[...] } -->
+          <button class="btn btn-secondary" id="btn-notify-selected" disabled>
+            선택 알림 전송
+          </button>
+
+          <!-- 전체 알림 전송 (Global Emergency Push)
+               현장 전체 작업자에게 긴급 알림 수동 전송
+               TODO: 클릭 시 confirm 다이얼로그 후 API 호출
+                     오남용 방지를 위한 연속 클릭 쿨다운(예: 30초) 적용 예정 -->
+          <button class="btn btn-primary" id="btn-notify-all">
+            전체 알림 전송
+          </button>
+
+        </div>
+
+      </div>
+      <!-- /worker-list-section -->
+
+
+      <!-- ============================================================
+           우측 디테일 패널 — 작업자 행 클릭 시 .has-selection으로 표시
+      ============================================================= -->
+      <div class="worker-detail-panel" id="worker-detail-panel">
+
+        <!-- 1. 작업자 위치 모니터링 -->
+        <div class="detail-card">
+          <div class="detail-card-title">
+            작업자 위치 모니터링
+            <span class="detail-name-tag" id="detail-map-name">—</span>
+          </div>
+
+          <!-- TODO: Leaflet 지도 초기화 — map-panel.js 참고하여 연동
+                     작업자의 실시간 위치(lat/lng)를 마커로 표시
+                     geofence 위험 구역 폴리곤 오버레이 포함 예정 -->
+          <div class="detail-map-placeholder" id="worker-detail-map">
+            <span class="placeholder-label">지도 연동 예정</span>
+          </div>
+        </div>
+
+        <!-- 2. 작업자 프로필 -->
+        <!--
+          [B안 전환 시 구현 필요]
+          현재: WebSocket worker_positions의 worker_name·dept 필드로 채움 (더미 데이터 기반)
+          B안:  행 클릭 시 GET /api/workers/{id}/profile/ 호출하여 실제 DB 프로필 표시
+                반환 필드: name, employee_id, department, position, email, phone
+          참고: WorkerListAPIView(/dashboard/api/workers-list/)의 응답 스키마 확장 필요
+        -->
+        <div class="detail-card">
+          <div class="detail-card-title">
+            작업자 프로필
+            <span class="detail-name-tag" id="detail-profile-name">—</span>
+          </div>
+          <dl class="detail-profile">
+            <dt>이름</dt>    <dd id="dp-name">—</dd>
+            <dt>ID</dt>      <dd id="dp-id">—</dd>
+            <dt>소속</dt>    <dd id="dp-dept">—</dd>
+            <dt>직급</dt>    <dd id="dp-position">—</dd>
+            <dt>이메일</dt>  <dd id="dp-email">—</dd>
+            <dt>연락처</dt>  <dd id="dp-phone">—</dd>
+          </dl>
+        </div>
+
+        <!-- 3. 작업자 위험 현황 -->
+        <!--
+          [B안 전환 시 구현 필요]
+          현재: 체크리스트·VR 교육만 표시 (PPE는 IoT·AI 연동 미완료로 제거)
+          B안:  GET /api/workers/{id}/risk/ 호출 → 각 항목 { status:'ok'|'warn'|'none' }
+                PPE 항목은 IoT 센서 또는 AI 영상 분석 연동 완료 후 재추가
+        -->
+        <div class="detail-card">
+          <div class="detail-card-title">
+            작업자 위험 현황
+            <span class="detail-name-tag" id="detail-risk-name">—</span>
+          </div>
+          <div class="risk-item-grid">
+
+            <!-- 안전 확인 체크리스트 -->
+            <!-- TODO: 작업 전 안전 확인 체크리스트 완료 여부 API 연동 -->
+            <div class="risk-item" id="risk-checklist">
+              <div class="risk-item-icon">📋</div>
+              <div class="risk-item-label">안전 확인 체크리스트</div>
+            </div>
+
+            <!-- VR 교육 이수 여부 -->
+            <!-- TODO: 교육 관리 시스템(LMS) 연동하여 최근 이수 여부 표시 -->
+            <div class="risk-item" id="risk-vr">
+              <div class="risk-item-icon">🥽</div>
+              <div class="risk-item-label">VR 교육</div>
+            </div>
+
+          </div>
+
+          <!-- 해당 작업자 개인 알림 전송
+               TODO: 위험 현황 패널에서 바로 1:1 알림 전송
+                     POST /api/notifications/push/ { target:'selected', worker_ids:[선택된 id] } -->
+          <button class="btn btn-primary detail-alert-btn" id="btn-detail-notify">
+            알림 전송
+          </button>
+        </div>
+
+      </div>
+      <!-- /worker-detail-panel -->
+
+    </div>
+    <!-- /worker-panel-wrap -->
+
   </div>
+  <!-- /panel -->
 </div>
+<!-- /body-wrap -->
 
 <script src="{% static 'js/shared/util.js' %}"></script>
 <script src="{% static 'js/shared/auth.js' %}"></script>
 <script src="{% static 'js/shared/layout.js' %}"></script>
 <script src="{% static 'js/shared/app-sub.js' %}"></script>
+<script src="{% static 'js/detail/monitoring_workers.js' %}"></script>
+
 </body>
 </html>

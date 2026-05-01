@@ -1,0 +1,295 @@
+/* ── 설비 관리 페이지 ───────────────────────────────────── */
+
+.fac-header { margin-bottom: 20px; }
+
+/* 툴바 */
+.fac-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.fac-search-wrap {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  min-width: 200px;
+}
+.fac-search-wrap input {
+  flex: 1;
+  padding: 7px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+}
+.fac-filter-wrap {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.fac-filter-wrap select {
+  padding: 7px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #fff;
+  cursor: pointer;
+}
+
+/* 테이블 */
+.fac-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+}
+.fac-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 14px;
+  text-align: left;
+}
+.fac-table thead th {
+  background: #f9fafb;
+  padding: 12px 14px;
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+  border-bottom: 1px solid #e5e7eb;
+}
+.fac-table tbody td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #f3f4f6;
+  color: #374151;
+  vertical-align: middle;
+  text-align: left;
+}
+/* 텍스트 단순 컬럼만 말줄임 적용 (설비코드, 공장코드, 설비명, 주소, 담당자, 등록일) */
+.fac-table tbody td:nth-child(2),
+.fac-table tbody td:nth-child(3),
+.fac-table tbody td:nth-child(4),
+.fac-table tbody td:nth-child(5),
+.fac-table tbody td:nth-child(7),
+.fac-table tbody td:nth-child(10) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 연결 전력 시스템·비고 컬럼은 줄바꿈 허용 */
+.fac-table tbody td:nth-child(6),
+.fac-table tbody td.fac-notes-cell {
+  white-space: normal;
+  word-break: break-all;
+}
+.fac-table tbody tr:last-child td { border-bottom: none; }
+.fac-table tbody tr:hover td { background: #f9fafb; }
+.fac-table .col-chk { width: 36px; text-align: center; }
+
+.fac-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.fac-badge-active { background: #d1fae5; color: #065f46; }
+.fac-badge-inactive { background: #f3f4f6; color: #6b7280; }
+
+.fac-power-tag {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-family: monospace;
+  margin: 1px;
+}
+.fac-power-tag-id {
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.fac-action-btn {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #374151;
+  transition: background 0.15s;
+}
+.fac-action-btn:hover { background: #f3f4f6; }
+.fac-action-btn.danger { border-color: #fca5a5; color: #dc2626; }
+.fac-action-btn.danger:hover { background: #fef2f2; }
+.fac-action-wrap { display: flex; gap: 6px; }
+
+.fac-empty-row td {
+  text-align: center;
+  color: #9ca3af;
+  padding: 40px;
+}
+
+/* 페이지네이션 */
+.fac-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+}
+.fac-page-btn {
+  padding: 6px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  color: #374151;
+  transition: background 0.15s;
+}
+.fac-page-btn:hover:not(:disabled) { background: #f3f4f6; }
+.fac-page-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+.fac-page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.fac-page-info { font-size: 14px; color: #6b7280; padding: 0 8px; }
+
+/* 읽기 전용 입력 */
+.fac-input-readonly {
+  background: #f9fafb;
+  color: #9ca3af;
+  cursor: default;
+}
+
+/* 모달 설명 문구 */
+.fac-modal-desc {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+/* 등록 완료 팝업 */
+.fac-success-body {
+  text-align: center;
+  padding: 28px 24px 12px;
+}
+.fac-success-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #d1fae5;
+  color: #065f46;
+  font-size: 24px;
+  line-height: 48px;
+  margin: 0 auto 12px;
+}
+.fac-success-body p {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  color: #111827;
+}
+
+/* 모달 */
+.fac-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.fac-modal {
+  background: #fff;
+  border-radius: 12px;
+  width: 480px;
+  max-width: 95vw;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+  overflow: hidden;
+}
+.fac-modal-sm { width: 360px; }
+.fac-modal-header {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+.fac-modal-header h3 { margin: 0; font-size: 16px; color: #111827; }
+.fac-modal-body { padding: 20px 24px; }
+.fac-modal-body p { margin: 0; color: #374151; }
+.fac-modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 폼 */
+.fac-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+.fac-form-row label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+}
+.fac-form-row input,
+.fac-form-row textarea {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+}
+.fac-form-row input:focus,
+.fac-form-row textarea:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37,99,235,0.15);
+}
+.fac-form-row-inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+.required { color: #ef4444; }
+.fac-form-error { font-size: 12px; color: #ef4444; }
+.fac-form-error-global { font-size: 12px; color: #ef4444; flex: 1; }
+
+/* 토글 스위치 */
+.fac-toggle {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+.fac-toggle input { display: none; }
+.fac-toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: #d1d5db;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.fac-toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  top: 3px;
+  left: 3px;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.fac-toggle input:checked + .fac-toggle-slider { background: #2563eb; }
+.fac-toggle input:checked + .fac-toggle-slider::before { transform: translateX(20px); }

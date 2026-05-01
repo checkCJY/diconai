@@ -9,11 +9,11 @@ from apps.geofence.models import GeoFence
 from apps.geofence.serializers.admin_serializers import GeoFenceAdminSerializer
 
 from django.views.generic import TemplateView
-from django.contrib.auth.mixins import LoginRequiredMixin
 
 
-class GeoFenceAdminPageView(LoginRequiredMixin, TemplateView):
-    template_name = "admin/geofence/geofence_list.html"
+class GeoFenceAdminPageView(TemplateView):
+    template_name = "admin_panel/geofence/geofence_list.html"
+    extra_context = {"active_nav": "geofence"}
 
 
 class GeoFenceAdminListView(APIView):
