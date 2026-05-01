@@ -39,7 +39,10 @@ let _typeFilter   = 'all';
 let _searchQuery  = '';
 
 // ── 초기화 ────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
+let _accessGranted = false;
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!await AdminAccess.check()) return;
+  _accessGranted = true;
   _initMap();
   _initControls();
   _loadObjects();
@@ -756,8 +759,8 @@ function _hideModal(id) { document.getElementById(id).style.display = 'none'; }
 
 // ── 지도 더블클릭 이벤트 연결 (init 이후) ──────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  // dblclick은 _map 초기화 후 연결
   setTimeout(() => {
+    if (!_accessGranted) return;
     _map.on('dblclick', (e) => {
       if (!_drawMode || _drawMode.shape !== 'polygon') return;
       L.DomEvent.stop(e);

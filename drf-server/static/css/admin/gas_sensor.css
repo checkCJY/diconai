@@ -1,0 +1,357 @@
+/* ── 유해가스 센서 관리 ──────────────────────────────────── */
+
+.gs-header { margin-bottom: 20px; }
+
+/* 툴바 */
+.gs-toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+.gs-filter-wrap { display: flex; gap: 16px; flex: 1; flex-wrap: wrap; }
+.gs-filter-item { display: flex; flex-direction: column; gap: 4px; min-width: 140px; }
+.gs-filter-item label { font-size: 12px; font-weight: 500; color: #6b7280; }
+.gs-filter-item select {
+  padding: 7px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #fff;
+  cursor: pointer;
+}
+.gs-filter-actions { display: flex; gap: 6px; align-items: flex-end; }
+
+/* 목록 헤더 */
+.gs-list-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.gs-total-count { font-size: 14px; color: #374151; }
+.gs-total-count strong { font-weight: 700; }
+.gs-abnormal-note { font-size: 12px; color: #ef4444; }
+.gs-right-header { margin-left: auto; }
+.gs-order-select {
+  padding: 6px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 13px;
+  background: #fff;
+  cursor: pointer;
+}
+
+/* 테이블 */
+.gs-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+}
+.gs-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.gs-table thead th {
+  background: #f9fafb;
+  padding: 12px 14px;
+  font-weight: 600;
+  color: #374151;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+  vertical-align: middle;
+}
+.gs-table tbody td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #f3f4f6;
+  color: #374151;
+  vertical-align: middle;
+  text-align: left;
+}
+/* 연결상태 미사용 dash */
+.gs-conn-dash { color: #9ca3af; font-size: 16px; }
+.gs-table tbody tr:last-child td { border-bottom: none; }
+.gs-table tbody tr:hover td { background: #f9fafb; }
+.gs-table .col-chk { width: 40px; }
+.col-center { text-align: center !important; }
+.gs-row-abnormal td { background: #fff7f7; }
+.gs-row-abnormal:hover td { background: #fff1f1; }
+.gs-sensor-link { color: #2563eb; text-decoration: none; font-weight: 500; }
+.gs-sensor-link:hover { text-decoration: underline; }
+.gs-notes-cell { white-space: normal; word-break: break-all; max-width: 200px; }
+.gs-empty-row td, .gs-empty-cell { text-align: center; color: #9ca3af; padding: 40px; }
+
+/* 배지 */
+.gs-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.gs-badge-done { background: #d1fae5; color: #065f46; }
+.gs-badge-needed { background: #fee2e2; color: #dc2626; }
+.gs-badge-active { background: #d1fae5; color: #065f46; }
+.gs-badge-inactive { background: #f3f4f6; color: #6b7280; }
+
+/* 연결 상태 점 */
+.gs-conn-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.gs-conn-dot.normal { background: #22c55e; }
+.gs-conn-dot.disconnected { background: #ef4444; }
+
+/* 액션 버튼 */
+.gs-action-wrap { display: flex; gap: 6px; }
+.gs-action-btn {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #374151;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.gs-action-btn:hover { background: #f3f4f6; }
+.gs-action-btn.danger { border-color: #fca5a5; color: #dc2626; }
+.gs-action-btn.danger:hover { background: #fef2f2; }
+
+/* 페이지네이션 */
+.gs-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+}
+.gs-page-btn {
+  padding: 6px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  color: #374151;
+  transition: background 0.15s;
+}
+.gs-page-btn:hover:not(:disabled) { background: #f3f4f6; }
+.gs-page-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+.gs-page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.gs-page-info { font-size: 14px; color: #6b7280; padding: 0 8px; }
+
+/* 모달 공통 */
+.gs-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.gs-modal {
+  background: #fff;
+  border-radius: 12px;
+  width: 520px;
+  max-width: 95vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+}
+.gs-modal-lg { width: 680px; }
+.gs-modal-sm { width: 360px; }
+.gs-modal-header {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 1;
+}
+.gs-modal-header h3 { margin: 0; font-size: 16px; color: #111827; }
+.gs-modal-desc { margin: 4px 0 0; font-size: 13px; color: #6b7280; }
+.gs-modal-body { padding: 20px 24px; }
+.gs-modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  position: sticky;
+  bottom: 0;
+  background: #fff;
+}
+
+/* 탭 */
+.gs-tabs {
+  display: flex;
+  border-bottom: 2px solid #e5e7eb;
+  padding: 0 24px;
+}
+.gs-tab {
+  padding: 12px 16px;
+  border: none;
+  background: none;
+  font-size: 14px;
+  color: #6b7280;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  font-weight: 500;
+}
+.gs-tab.active { color: #2563eb; border-bottom-color: #2563eb; }
+.gs-tab-panel {}
+
+/* 폼 */
+.gs-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 20px;
+  margin-bottom: 14px;
+}
+.gs-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.gs-form-row-full { grid-column: 1 / -1; margin-bottom: 14px; }
+.gs-form-row label, .gs-form-row-full label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+}
+.gs-form-row input,
+.gs-form-row select,
+.gs-form-row textarea,
+.gs-form-row-full input,
+.gs-form-row-full select,
+.gs-form-row-full textarea {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+}
+.gs-form-row input:focus,
+.gs-form-row select:focus,
+.gs-form-row textarea:focus,
+.gs-form-row-full input:focus,
+.gs-form-row-full select:focus,
+.gs-form-row-full textarea:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37,99,235,0.15);
+}
+.gs-form-row textarea, .gs-form-row-full textarea { resize: vertical; }
+.gs-input-readonly { background: #f9fafb; color: #9ca3af; cursor: default; }
+.gs-form-error { font-size: 12px; color: #ef4444; }
+.gs-form-error-global { font-size: 12px; color: #ef4444; flex: 1; }
+.required { color: #ef4444; }
+
+/* IP/PORT 입력 */
+.gs-ip-port-wrap { display: flex; gap: 8px; align-items: center; }
+.gs-ip-input { flex: 2; }
+.gs-port-input { flex: 1; }
+
+/* 라디오 */
+.gs-radio-wrap { display: flex; gap: 20px; padding: 8px 0; }
+.gs-radio-label { display: flex; align-items: center; gap: 6px; font-size: 14px; cursor: pointer; }
+
+/* 연결 상태 표시 */
+.gs-conn-status {
+  margin-top: 6px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.gs-conn-status.success { background: #d1fae5; color: #065f46; }
+.gs-conn-status.fail { background: #fee2e2; color: #dc2626; }
+
+/* 점검 탭 */
+.gs-insp-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #374151;
+}
+.gs-insp-card-id {
+  font-weight: 700;
+  font-size: 15px;
+  color: #111827;
+  min-width: 70px;
+}
+.gs-insp-status-wrap { margin: 16px 0 12px; }
+.gs-insp-status-wrap h4, .gs-insp-history-wrap h4 {
+  font-size: 14px; font-weight: 600; color: #111827; margin: 0 0 10px;
+}
+.gs-insp-status-cards { display: flex; gap: 10px; flex-wrap: wrap; }
+.gs-status-card {
+  flex: 1;
+  min-width: 120px;
+  padding: 12px 14px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  text-align: center;
+}
+.gs-status-label { font-size: 12px; color: #6b7280; margin-bottom: 4px; }
+.gs-status-val { font-size: 14px; font-weight: 600; color: #111827; }
+.gs-status-val.done { color: #065f46; }
+.gs-status-val.needed { color: #dc2626; }
+
+.gs-insp-history-wrap { margin-top: 16px; }
+.gs-insp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.gs-insp-table th {
+  background: #f9fafb;
+  padding: 10px 12px;
+  font-weight: 600;
+  color: #374151;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+  white-space: nowrap;
+}
+.gs-insp-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f3f4f6;
+  color: #374151;
+  vertical-align: middle;
+}
+.gs-insp-table tbody tr:last-child td { border-bottom: none; }
+
+/* 성공 팝업 */
+.gs-success-body { text-align: center; padding: 28px 24px 12px; }
+.gs-success-icon {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  background: #d1fae5;
+  color: #065f46;
+  font-size: 24px;
+  line-height: 48px;
+  margin: 0 auto 12px;
+}
+.gs-success-body p { margin: 0; font-size: 15px; font-weight: 500; color: #111827; }

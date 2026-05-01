@@ -15,8 +15,9 @@ from apps.accounts.models.department import Department
 from apps.accounts.models.position import Position
 from apps.geofence.views.admin_views import GeoFenceAdminPageView
 from apps.facilities.views.map_editor import MapEditorPageView
-from apps.facilities.views.facility_admin import FacilityAdminPageView
-from apps.facilities.models.devices import GasSensor, PowerDevice
+from apps.facilities.views.gas_sensor_admin import GasSensorAdminPageView
+from apps.facilities.views.power_device_admin import PowerDeviceAdminPageView
+from apps.facilities.models.devices import GasSensor
 
 
 class AccountsAdminPageView(TemplateView):
@@ -79,9 +80,11 @@ class GasDataAdminPageView(TemplateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["active_nav"] = "data"
-        ctx["sensors"] = GasSensor.objects.filter(is_active=True).values(
-            "id", "device_name"
-        ).order_by("device_name")
+        ctx["sensors"] = (
+            GasSensor.objects.filter(is_active=True)
+            .values("id", "device_name")
+            .order_by("device_name")
+        )
         return ctx
 
 
@@ -108,8 +111,12 @@ urlpatterns = [
     ),
     path(
         "facility/",
-        FacilityAdminPageView.as_view(),
-        name="admin-facility",
+        PowerDeviceAdminPageView.as_view(),
+    ),
+    path(
+        "gas-sensors/",
+        GasSensorAdminPageView.as_view(),
+        name="admin-gas-sensor",
     ),
     path(
         "data/gas/",
