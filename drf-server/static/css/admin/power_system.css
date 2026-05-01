@@ -1,0 +1,357 @@
+/* ── 유해가스 센서 관리 ──────────────────────────────────── */
+
+.ps-header { margin-bottom: 20px; }
+
+/* 툴바 */
+.ps-toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+.ps-filter-wrap { display: flex; gap: 16px; flex: 1; flex-wrap: wrap; }
+.ps-filter-item { display: flex; flex-direction: column; gap: 4px; min-width: 140px; }
+.ps-filter-item label { font-size: 12px; font-weight: 500; color: #6b7280; }
+.ps-filter-item select {
+  padding: 7px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #fff;
+  cursor: pointer;
+}
+.ps-filter-actions { display: flex; gap: 6px; align-items: flex-end; }
+
+/* 목록 헤더 */
+.ps-list-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.ps-total-count { font-size: 14px; color: #374151; }
+.ps-total-count strong { font-weight: 700; }
+.ps-abnormal-note { font-size: 12px; color: #ef4444; }
+.ps-right-header { margin-left: auto; }
+.ps-order-select {
+  padding: 6px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 13px;
+  background: #fff;
+  cursor: pointer;
+}
+
+/* 테이블 */
+.ps-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+}
+.ps-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.ps-table thead th {
+  background: #f9fafb;
+  padding: 12px 14px;
+  font-weight: 600;
+  color: #374151;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+  vertical-align: middle;
+}
+.ps-table tbody td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #f3f4f6;
+  color: #374151;
+  vertical-align: middle;
+  text-align: left;
+}
+/* 연결상태 미사용 dash */
+.ps-conn-dash { color: #9ca3af; font-size: 16px; }
+.ps-table tbody tr:last-child td { border-bottom: none; }
+.ps-table tbody tr:hover td { background: #f9fafb; }
+.ps-table .col-chk { width: 40px; }
+.col-center { text-align: center !important; }
+.ps-row-abnormal td { background: #fff7f7; }
+.ps-row-abnormal:hover td { background: #fff1f1; }
+.ps-sensor-link { color: #2563eb; text-decoration: none; font-weight: 500; }
+.ps-sensor-link:hover { text-decoration: underline; }
+.ps-notes-cell { white-space: normal; word-break: break-all; max-width: 200px; }
+.ps-empty-row td, .ps-empty-cell { text-align: center; color: #9ca3af; padding: 40px; }
+
+/* 배지 */
+.ps-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.ps-badge-done { background: #d1fae5; color: #065f46; }
+.ps-badge-needed { background: #fee2e2; color: #dc2626; }
+.ps-badge-active { background: #d1fae5; color: #065f46; }
+.ps-badge-inactive { background: #f3f4f6; color: #6b7280; }
+
+/* 연결 상태 점 */
+.ps-conn-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.ps-conn-dot.normal { background: #22c55e; }
+.ps-conn-dot.disconnected { background: #ef4444; }
+
+/* 액션 버튼 */
+.ps-action-wrap { display: flex; gap: 6px; }
+.ps-action-btn {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #374151;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.ps-action-btn:hover { background: #f3f4f6; }
+.ps-action-btn.danger { border-color: #fca5a5; color: #dc2626; }
+.ps-action-btn.danger:hover { background: #fef2f2; }
+
+/* 페이지네이션 */
+.ps-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+}
+.ps-page-btn {
+  padding: 6px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  color: #374151;
+  transition: background 0.15s;
+}
+.ps-page-btn:hover:not(:disabled) { background: #f3f4f6; }
+.ps-page-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+.ps-page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.ps-page-info { font-size: 14px; color: #6b7280; padding: 0 8px; }
+
+/* 모달 공통 */
+.ps-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.ps-modal {
+  background: #fff;
+  border-radius: 12px;
+  width: 520px;
+  max-width: 95vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+}
+.ps-modal-lg { width: 680px; }
+.ps-modal-sm { width: 360px; }
+.ps-modal-header {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 1;
+}
+.ps-modal-header h3 { margin: 0; font-size: 16px; color: #111827; }
+.ps-modal-desc { margin: 4px 0 0; font-size: 13px; color: #6b7280; }
+.ps-modal-body { padding: 20px 24px; }
+.ps-modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  position: sticky;
+  bottom: 0;
+  background: #fff;
+}
+
+/* 탭 */
+.ps-tabs {
+  display: flex;
+  border-bottom: 2px solid #e5e7eb;
+  padding: 0 24px;
+}
+.ps-tab {
+  padding: 12px 16px;
+  border: none;
+  background: none;
+  font-size: 14px;
+  color: #6b7280;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  font-weight: 500;
+}
+.ps-tab.active { color: #2563eb; border-bottom-color: #2563eb; }
+.ps-tab-panel {}
+
+/* 폼 */
+.ps-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 20px;
+  margin-bottom: 14px;
+}
+.ps-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ps-form-row-full { grid-column: 1 / -1; margin-bottom: 14px; }
+.ps-form-row label, .ps-form-row-full label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+}
+.ps-form-row input,
+.ps-form-row select,
+.ps-form-row textarea,
+.ps-form-row-full input,
+.ps-form-row-full select,
+.ps-form-row-full textarea {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+}
+.ps-form-row input:focus,
+.ps-form-row select:focus,
+.ps-form-row textarea:focus,
+.ps-form-row-full input:focus,
+.ps-form-row-full select:focus,
+.ps-form-row-full textarea:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37,99,235,0.15);
+}
+.ps-form-row textarea, .ps-form-row-full textarea { resize: vertical; }
+.ps-input-readonly { background: #f9fafb; color: #9ca3af; cursor: default; }
+.ps-form-error { font-size: 12px; color: #ef4444; }
+.ps-form-error-global { font-size: 12px; color: #ef4444; flex: 1; }
+.required { color: #ef4444; }
+
+/* IP/PORT 입력 */
+.ps-ip-port-wrap { display: flex; gap: 8px; align-items: center; }
+.ps-ip-input { flex: 2; }
+.ps-port-input { flex: 1; }
+
+/* 라디오 */
+.ps-radio-wrap { display: flex; gap: 20px; padding: 8px 0; }
+.ps-radio-label { display: flex; align-items: center; gap: 6px; font-size: 14px; cursor: pointer; }
+
+/* 연결 상태 표시 */
+.ps-conn-status {
+  margin-top: 6px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.ps-conn-status.success { background: #d1fae5; color: #065f46; }
+.ps-conn-status.fail { background: #fee2e2; color: #dc2626; }
+
+/* 점검 탭 */
+.ps-insp-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #374151;
+}
+.ps-insp-card-id {
+  font-weight: 700;
+  font-size: 15px;
+  color: #111827;
+  min-width: 70px;
+}
+.ps-insp-status-wrap { margin: 16px 0 12px; }
+.ps-insp-status-wrap h4, .ps-insp-history-wrap h4 {
+  font-size: 14px; font-weight: 600; color: #111827; margin: 0 0 10px;
+}
+.ps-insp-status-cards { display: flex; gap: 10px; flex-wrap: wrap; }
+.ps-status-card {
+  flex: 1;
+  min-width: 120px;
+  padding: 12px 14px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  text-align: center;
+}
+.ps-status-label { font-size: 12px; color: #6b7280; margin-bottom: 4px; }
+.ps-status-val { font-size: 14px; font-weight: 600; color: #111827; }
+.ps-status-val.done { color: #065f46; }
+.ps-status-val.needed { color: #dc2626; }
+
+.ps-insp-history-wrap { margin-top: 16px; }
+.ps-insp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.ps-insp-table th {
+  background: #f9fafb;
+  padding: 10px 12px;
+  font-weight: 600;
+  color: #374151;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+  white-space: nowrap;
+}
+.ps-insp-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f3f4f6;
+  color: #374151;
+  vertical-align: middle;
+}
+.ps-insp-table tbody tr:last-child td { border-bottom: none; }
+
+/* 성공 팝업 */
+.ps-success-body { text-align: center; padding: 28px 24px 12px; }
+.ps-success-icon {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  background: #d1fae5;
+  color: #065f46;
+  font-size: 24px;
+  line-height: 48px;
+  margin: 0 auto 12px;
+}
+.ps-success-body p { margin: 0; font-size: 15px; font-weight: 500; color: #111827; }

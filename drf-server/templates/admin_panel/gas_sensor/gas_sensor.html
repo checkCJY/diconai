@@ -1,0 +1,479 @@
+{% extends 'admin_panel/base.html' %}
+{% load static %}
+
+{% block title %}유해가스 센서 관리{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/admin/gas_sensor.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="page-header gs-header">
+  <div class="header-titles">
+    <div class="breadcrumb">장비 관리 &gt; 유해가스 센서 관리</div>
+    <h2 class="page-title">유해가스 센서 관리</h2>
+    <p class="page-desc">유해가스 센서의 ID, 연결 상태, 데이터 수신 상태와 점검 여부를 확인합니다.</p>
+  </div>
+  <div class="header-actions">
+    <button class="btn-danger-outline" id="btnBulkDelete" disabled>삭제</button>
+    <button class="btn-primary" id="btnCreate">장비 등록</button>
+  </div>
+</section>
+
+<!-- 검색·필터 -->
+<div class="gs-toolbar">
+  <div class="gs-filter-wrap">
+    <div class="gs-filter-item">
+      <label>센서 ID</label>
+      <select id="filterSensorId">
+        <option value="">전체</option>
+      </select>
+    </div>
+    <div class="gs-filter-item">
+      <label>장비 상태</label>
+      <select id="filterActive">
+        <option value="">전체</option>
+        <option value="true">사용</option>
+        <option value="false">미사용</option>
+      </select>
+    </div>
+    <div class="gs-filter-item">
+      <label>연결 상태</label>
+      <select id="filterConnection">
+        <option value="">전체</option>
+        <option value="disconnected">연결 끊김</option>
+        <option value="normal">정상</option>
+        <option value="inactive">미사용</option>
+      </select>
+    </div>
+  </div>
+  <div class="gs-filter-actions">
+    <button class="btn-outline btn-sm" id="btnReset">초기화</button>
+    <button class="btn-dark btn-sm" id="btnSearch">검색</button>
+  </div>
+</div>
+
+<!-- 목록 헤더 -->
+<div class="gs-list-header">
+  <span class="gs-total-count">전체 <strong id="totalCount">0</strong>건</span>
+  <span class="gs-abnormal-note" id="abnormalNote" style="display:none">이상 상태 센서는 상단에 우선 노출됩니다.</span>
+  <div class="gs-right-header">
+    <select id="filterOrder" class="gs-order-select">
+      <option value="sensor_id_asc">센서 ID 오름차순</option>
+      <option value="sensor_id_desc">센서 ID 내림차순</option>
+      <option value="last_reading_desc">마지막 데이터 수신 최신순</option>
+      <option value="last_reading_asc">마지막 데이터 수신 오래된순</option>
+      <option value="inspection_desc">최근 점검일 최신순</option>
+      <option value="inspection_asc">최근 점검일 오래된순</option>
+    </select>
+  </div>
+</div>
+
+<!-- 테이블 -->
+<div class="gs-table-wrap">
+  <table class="gs-table" id="sensorTable">
+    <colgroup>
+      <col style="width:4%">
+      <col style="width:9%">
+      <col style="width:10%">
+      <col style="width:13%">
+      <col style="width:8%">
+      <col style="width:10%">
+      <col style="width:14%">
+      <col style="width:10%">
+      <col style="width:9%">
+      <col style="width:9%">
+    </colgroup>
+    <thead>
+      <tr>
+        <th class="col-chk col-center"><input type="checkbox" id="chkAll"></th>
+        <th class="col-center">점검 여부</th>
+        <th>센서 ID</th>
+        <th>센서명</th>
+        <th class="col-center">사용 상태</th>
+        <th class="col-center">연결 상태</th>
+        <th>마지막 데이터 수신</th>
+        <th>최근 점검일</th>
+        <th>담당자</th>
+        <th class="col-center">관리</th>
+      </tr>
+    </thead>
+    <tbody id="sensorTbody">
+      <tr class="gs-empty-row"><td colspan="10">데이터를 불러오는 중...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- 페이지네이션 -->
+<div class="gs-pagination" id="pagination"></div>
+
+
+<!-- ── 장비 등록 모달 ────────────────────────────────────── -->
+<div class="gs-modal-overlay" id="createModal" style="display:none;">
+  <div class="gs-modal gs-modal-lg">
+    <div class="gs-modal-header">
+      <h3>장비 등록</h3>
+      <p class="gs-modal-desc">현장 내 유해가스 센서를 등록합니다.</p>
+    </div>
+    <div class="gs-modal-body">
+      <div class="gs-form-grid">
+        <div class="gs-form-row">
+          <label>장비 유형 <span class="required">*</span></label>
+          <select id="createDeviceType">
+            <option value="">장비 유형 선택</option>
+            <option value="GAS">유해가스 센서</option>
+          </select>
+          <span class="gs-form-error" id="errCreateDeviceType"></span>
+        </div>
+        <div class="gs-form-row">
+          <label>장비 코드 <span class="required">*</span></label>
+          <input type="text" id="createDeviceCode" readonly placeholder="장비 유형 선택 후 자동 생성" class="gs-input-readonly">
+        </div>
+        <div class="gs-form-row">
+          <label>장비명 <span class="required">*</span></label>
+          <input type="text" id="createDeviceName" placeholder="장비 유형 선택 시 자동 입력" maxlength="50">
+          <span class="gs-form-error" id="errCreateDeviceName"></span>
+        </div>
+        <div class="gs-form-row">
+          <label>장비 ID(MAC) <span class="required">*</span></label>
+          <input type="text" id="createDeviceId" placeholder="ID 입력">
+          <span class="gs-form-error" id="errCreateDeviceId"></span>
+        </div>
+        <div class="gs-form-row">
+          <label>관리 부서 <span class="required">*</span></label>
+          <select id="createDepartment">
+            <option value="">부서 선택</option>
+          </select>
+          <span class="gs-form-error" id="errCreateDepartment"></span>
+        </div>
+        <div class="gs-form-row">
+          <label>관리 담당자 <span class="required">*</span></label>
+          <select id="createManager">
+            <option value="">담당자 선택</option>
+          </select>
+          <span class="gs-form-error" id="errCreateManager"></span>
+        </div>
+      </div>
+
+      <div class="gs-form-row gs-form-row-full">
+        <label>장비 통신 IP / PORT <span class="required">*</span></label>
+        <div class="gs-ip-port-wrap">
+          <input type="text" id="createIp" placeholder="IP 입력" class="gs-ip-input">
+          <input type="text" id="createPort" placeholder="PORT 입력" class="gs-port-input">
+          <button class="btn-outline btn-sm" id="btnCreateConnCheck">연결 확인</button>
+        </div>
+        <div class="gs-conn-status" id="createConnStatus" style="display:none;"></div>
+        <span class="gs-form-error" id="errCreateConn"></span>
+      </div>
+
+      <div class="gs-form-row gs-form-row-full">
+        <label>사용 여부 <span class="required">*</span></label>
+        <div class="gs-radio-wrap">
+          <label class="gs-radio-label"><input type="radio" name="createIsActive" value="true" checked> 사용</label>
+          <label class="gs-radio-label"><input type="radio" name="createIsActive" value="false"> 미사용</label>
+        </div>
+      </div>
+
+      <div class="gs-form-row gs-form-row-full">
+        <label>연결 확인 상태 / 마지막 확인일시</label>
+        <input type="text" id="createConnCheckedAt" readonly placeholder="통신 확인 후 표시" class="gs-input-readonly">
+      </div>
+
+      <div class="gs-form-row gs-form-row-full">
+        <label>비고</label>
+        <textarea id="createNotes" rows="2" placeholder="운영 메모를 입력하세요"></textarea>
+      </div>
+    </div>
+    <div class="gs-modal-footer">
+      <span class="gs-form-error-global" id="errCreateGlobal"></span>
+      <button class="btn-outline" id="btnCreateCancel">취소</button>
+      <button class="btn-primary" id="btnCreateSubmit">등록</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ── 센서 상세 모달 (탭) ────────────────────────────────── -->
+<div class="gs-modal-overlay" id="detailModal" style="display:none;">
+  <div class="gs-modal gs-modal-lg">
+    <div class="gs-modal-header">
+      <h3 id="detailModalTitle">유해가스 센서 GAS-001</h3>
+      <p class="gs-modal-desc">해당 장비의 기본 정보와 점검 실행 및 이력을 확인합니다.</p>
+    </div>
+
+    <!-- 탭 -->
+    <div class="gs-tabs">
+      <button class="gs-tab active" data-tab="info">기본 정보</button>
+      <button class="gs-tab" data-tab="inspection">점검 실행 및 이력</button>
+    </div>
+
+    <!-- 기본 정보 탭 -->
+    <div class="gs-tab-panel" id="tabInfo">
+      <div class="gs-modal-body">
+        <input type="hidden" id="detailSensorId">
+        <div class="gs-form-grid">
+          <div class="gs-form-row">
+            <label>장비 유형 <span class="required">*</span></label>
+            <select id="editDeviceType">
+              <option value="GAS">유해가스 센서</option>
+            </select>
+          </div>
+          <div class="gs-form-row">
+            <label>장비 코드</label>
+            <input type="text" id="editDeviceCode" readonly class="gs-input-readonly">
+          </div>
+          <div class="gs-form-row">
+            <label>장비명 <span class="required">*</span></label>
+            <input type="text" id="editDeviceName" maxlength="50">
+            <span class="gs-form-error" id="errEditDeviceName"></span>
+          </div>
+          <div class="gs-form-row">
+            <label>장비 ID(MAC) <span class="required">*</span></label>
+            <input type="text" id="editDeviceId">
+            <span class="gs-form-error" id="errEditDeviceId"></span>
+          </div>
+          <div class="gs-form-row">
+            <label>관리 부서 <span class="required">*</span></label>
+            <select id="editDepartment">
+              <option value="">부서 선택</option>
+            </select>
+            <span class="gs-form-error" id="errEditDepartment"></span>
+          </div>
+          <div class="gs-form-row">
+            <label>관리 담당자 <span class="required">*</span></label>
+            <select id="editManager">
+              <option value="">담당자 선택</option>
+            </select>
+            <span class="gs-form-error" id="errEditManager"></span>
+          </div>
+        </div>
+
+        <div class="gs-form-row gs-form-row-full">
+          <label>장비 통신 IP</label>
+          <div class="gs-ip-port-wrap">
+            <input type="text" id="editIp" placeholder="IP 입력" class="gs-ip-input">
+            <input type="text" id="editPort" placeholder="PORT 입력" class="gs-port-input">
+            <button class="btn-outline btn-sm" id="btnEditConnCheck">통신 확인</button>
+          </div>
+          <div class="gs-conn-status" id="editConnStatus" style="display:none;"></div>
+        </div>
+
+        <div class="gs-form-row gs-form-row-full">
+          <label>사용 여부 <span class="required">*</span></label>
+          <div class="gs-radio-wrap">
+            <label class="gs-radio-label"><input type="radio" name="editIsActive" value="true"> 사용</label>
+            <label class="gs-radio-label"><input type="radio" name="editIsActive" value="false"> 미사용</label>
+          </div>
+        </div>
+
+        <div class="gs-form-row gs-form-row-full">
+          <label>장비 상태 / 마지막 연결일시</label>
+          <div class="gs-ip-port-wrap">
+            <label class="gs-radio-label"><input type="checkbox" id="editConnOk"> 사용</label>
+            <input type="text" id="editConnCheckedAt" readonly class="gs-input-readonly" style="flex:1;">
+          </div>
+        </div>
+
+        <div class="gs-form-row gs-form-row-full">
+          <label>비고</label>
+          <textarea id="editNotes" rows="2"></textarea>
+        </div>
+      </div>
+      <div class="gs-modal-footer">
+        <span class="gs-form-error-global" id="errEditGlobal"></span>
+        <button class="btn-outline" id="btnDetailCancel">취소</button>
+        <button class="btn-primary" id="btnDetailSave">저장</button>
+      </div>
+    </div>
+
+    <!-- 점검 실행 및 이력 탭 -->
+    <div class="gs-tab-panel" id="tabInspection" style="display:none;">
+      <div class="gs-modal-body">
+        <!-- 장비 요약 -->
+        <div class="gs-insp-summary" id="inspSummary"></div>
+
+        <!-- 최근 점검 상태 -->
+        <div class="gs-insp-status-wrap">
+          <h4>최근 점검 상태</h4>
+          <div class="gs-insp-status-cards" id="inspStatusCards"></div>
+        </div>
+
+        <!-- 점검 이력 -->
+        <div class="gs-insp-history-wrap">
+          <h4>점검 이력</h4>
+          <table class="gs-insp-table">
+            <thead>
+              <tr>
+                <th>점검 구분</th>
+                <th>조치 여부</th>
+                <th>점검일</th>
+                <th>점검자</th>
+                <th>조치 담당자</th>
+                <th>점검/조치 내용</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="inspTbody">
+              <tr><td colspan="7" class="gs-empty-cell">점검 이력이 없습니다.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="gs-modal-footer">
+        <button class="btn-outline" id="btnInspCancel">확인</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ── 점검 등록 모달 ────────────────────────────────────── -->
+<div class="gs-modal-overlay" id="inspCreateModal" style="display:none;">
+  <div class="gs-modal">
+    <div class="gs-modal-header">
+      <h3>점검 등록</h3>
+      <p class="gs-modal-desc">해당 장비의 점검 결과를 등록합니다.</p>
+    </div>
+    <div class="gs-modal-body">
+      <div class="gs-insp-target-card" id="inspTargetCard"></div>
+
+      <h4 style="margin:16px 0 10px;">점검 기본 정보</h4>
+      <div class="gs-form-grid">
+        <div class="gs-form-row">
+          <label>점검 구분 <span class="required">*</span></label>
+          <select id="inspType">
+            <option value="">구분</option>
+            <option value="regular">정기 점검</option>
+            <option value="abnormal">이상 점검</option>
+          </select>
+          <span class="gs-form-error" id="errInspType"></span>
+        </div>
+        <div class="gs-form-row">
+          <label>점검일</label>
+          <input type="text" id="inspDate" readonly class="gs-input-readonly">
+        </div>
+        <div class="gs-form-row">
+          <label>점검자</label>
+          <input type="text" id="inspector" readonly class="gs-input-readonly">
+        </div>
+        <div class="gs-form-row">
+          <label>점검 상태 <span class="required">*</span></label>
+          <select id="inspStatus">
+            <option value="">점검 상태</option>
+            <option value="action_needed">조치 필요</option>
+            <option value="normal">정상</option>
+          </select>
+          <span class="gs-form-error" id="errInspStatus"></span>
+        </div>
+        <div class="gs-form-row" id="rowExpectedDate" style="display:none;">
+          <label>예상 조치일 <span class="required">*</span></label>
+          <input type="text" id="inspExpectedDate" placeholder="YYYY.MM.DD">
+          <span class="gs-form-error" id="errInspExpectedDate"></span>
+        </div>
+      </div>
+      <div class="gs-form-row gs-form-row-full">
+        <label>점검 의견 <span class="required">*</span></label>
+        <textarea id="inspNotes" rows="3" placeholder="정기 점검 결과 이상 없음"></textarea>
+        <span class="gs-form-error" id="errInspNotes"></span>
+      </div>
+    </div>
+    <div class="gs-modal-footer">
+      <button class="btn-outline" id="btnInspCreateCancel">취소</button>
+      <button class="btn-primary" id="btnInspCreateSubmit">등록</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ── 조치 등록 모달 ────────────────────────────────────── -->
+<div class="gs-modal-overlay" id="actionModal" style="display:none;">
+  <div class="gs-modal">
+    <div class="gs-modal-header">
+      <h3>조치 등록</h3>
+      <p class="gs-modal-desc">조속 조치 정보를 등록합니다.</p>
+    </div>
+    <div class="gs-modal-body">
+      <div class="gs-insp-target-card" id="actionTargetCard"></div>
+
+      <h4 style="margin:16px 0 10px;">점검 기본 정보</h4>
+      <div class="gs-form-grid">
+        <div class="gs-form-row">
+          <label>점검 구분</label>
+          <input type="text" id="actionInspType" readonly class="gs-input-readonly">
+        </div>
+        <div class="gs-form-row">
+          <label>점검일</label>
+          <input type="text" id="actionInspDate" readonly class="gs-input-readonly">
+        </div>
+        <div class="gs-form-row">
+          <label>점검자</label>
+          <input type="text" id="actionInspector" readonly class="gs-input-readonly">
+        </div>
+        <div class="gs-form-row">
+          <label>점검 상태</label>
+          <input type="text" id="actionInspStatus" readonly class="gs-input-readonly">
+        </div>
+      </div>
+      <div class="gs-form-row gs-form-row-full">
+        <label>점검 의견</label>
+        <textarea id="actionInspNotes" readonly rows="2" class="gs-input-readonly"></textarea>
+      </div>
+
+      <h4 style="margin:16px 0 10px;">조치 정보</h4>
+      <div class="gs-form-grid">
+        <div class="gs-form-row">
+          <label>조치 완료일</label>
+          <input type="text" id="actionDate" readonly class="gs-input-readonly">
+        </div>
+        <div class="gs-form-row">
+          <label>점검자</label>
+          <input type="text" id="actionUser" readonly class="gs-input-readonly">
+        </div>
+      </div>
+      <div class="gs-form-row gs-form-row-full">
+        <label>조치 의견 <span class="required">*</span></label>
+        <textarea id="actionNotes" rows="3" placeholder="해당 점검 조치 완료"></textarea>
+        <span class="gs-form-error" id="errActionNotes"></span>
+      </div>
+      <input type="hidden" id="actionInspectionId">
+    </div>
+    <div class="gs-modal-footer">
+      <button class="btn-outline" id="btnActionCancel">취소</button>
+      <button class="btn-primary" id="btnActionSubmit">등록</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ── 완료 팝업 ─────────────────────────────────────────── -->
+<div class="gs-modal-overlay" id="successModal" style="display:none;">
+  <div class="gs-modal gs-modal-sm">
+    <div class="gs-modal-body gs-success-body">
+      <div class="gs-success-icon">✓</div>
+      <p id="successModalText">저장되었습니다.</p>
+    </div>
+    <div class="gs-modal-footer">
+      <button class="btn-primary" id="btnSuccessClose">확인</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 삭제 확인 모달 ────────────────────────────────────── -->
+<div class="gs-modal-overlay" id="deleteModal" style="display:none;">
+  <div class="gs-modal gs-modal-sm">
+    <div class="gs-modal-header"><h3>장비 비활성화</h3></div>
+    <div class="gs-modal-body">
+      <p id="deleteModalText">선택한 장비를 비활성화하시겠습니까?</p>
+    </div>
+    <div class="gs-modal-footer">
+      <button class="btn-outline" id="btnDeleteCancel">취소</button>
+      <button class="btn-danger" id="btnDeleteConfirm">비활성화</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/shared/auth.js' %}"></script>
+<script src="{% static 'js/admin/gas_sensor/gas_sensor.js' %}"></script>
+{% endblock %}
