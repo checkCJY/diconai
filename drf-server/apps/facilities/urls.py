@@ -32,7 +32,6 @@ from apps.facilities.views.facility_admin import (
     EquipmentAdminDetailView,
     EquipmentAdminBulkDeleteView,
     PowerDeviceAdminListView as LegacyPowerDeviceListView,
-    PowerDeviceAdminDetailView as LegacyPowerDeviceDetailView,
     PowerDeviceAdminBulkDeleteView as LegacyPowerDeviceBulkDeleteView,
 )
 
@@ -161,11 +160,17 @@ urlpatterns = [
     path(
         "facilities/devices/bulk-delete/",
         LegacyPowerDeviceBulkDeleteView.as_view(),
+    ),
+    # 기존 PowerDevice API (하위 호환)
+    path("facilities/devices/", PowerDeviceAdminListView.as_view(), name="device-list"),
+    path(
+        "facilities/devices/bulk-delete/",
+        PowerDeviceAdminBulkDeleteView.as_view(),
         name="device-bulk-delete",
     ),
     path(
         "facilities/devices/<int:pk>/",
-        LegacyPowerDeviceDetailView.as_view(),
+        PowerDeviceAdminDetailView.as_view(),
         name="device-detail",
     ),
 ]

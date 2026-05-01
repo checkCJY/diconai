@@ -1,0 +1,33 @@
+/* 유해가스 센서 데이터 관리 페이지 전용 스타일 */
+
+/* 필터 카드 레이아웃 */
+.filter-card { background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+
+/* 빠른 날짜 버튼 행 */
+.quick-date-group { display: flex; gap: 8px; margin-bottom: 16px; }
+.quick-btn { padding: 5px 14px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; cursor: pointer; color: #475569; }
+.quick-btn:hover { background: #e2e8f0; }
+
+/* 필터 입력 행 */
+.filter-row { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; }
+.date-range { display: flex; align-items: center; gap: 8px; }
+.date-range input { padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; }
+.date-sep { color: #94a3b8; font-size: 14px; }
+.input-group--sm { max-width: 200px; }
+
+/* 테이블 오른쪽 툴바 버튼 */
+.toolbar-right { display: flex; gap: 8px; }
+
+/* 가스 수치 — 단위 작은 글씨 */
+table th small { font-weight: 400; color: #94a3b8; font-size: 11px; display: block; }
+
+/* 빈 상태 메시지 */
+.empty-msg { text-align: center; color: #94a3b8; padding: 40px 0; font-size: 14px; }
+
+/* 테이블 수치 컬럼 — 오른쪽 정렬 */
+table td:nth-child(n+3):nth-child(-n+11) { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* 페이지네이션 중앙 정렬 */
+.table-footer { display: flex; justify-content: center; align-items: center; position: relative; margin-top: 20px; }
+.table-footer .page-info { position: absolute; left: 0; }
+.table-footer .pagination { display: flex; gap: 4px; }
