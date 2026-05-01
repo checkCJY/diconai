@@ -338,7 +338,8 @@ function _showModal(id) { document.getElementById(id).style.display = 'flex'; }
 function _hideModal(id) { document.getElementById(id).style.display = 'none'; }
 
 // ── 이벤트 바인딩 ─────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!await AdminAccess.check()) return;
   _loadFacilityOptions();
   _loadEquipments();
 

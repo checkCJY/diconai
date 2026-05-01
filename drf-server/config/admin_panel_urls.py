@@ -15,7 +15,8 @@ from apps.accounts.models.department import Department
 from apps.accounts.models.position import Position
 from apps.geofence.views.admin_views import GeoFenceAdminPageView
 from apps.facilities.views.map_editor import MapEditorPageView
-from apps.facilities.views.facility_admin import FacilityAdminPageView
+from apps.facilities.views.gas_sensor_admin import GasSensorAdminPageView
+from apps.facilities.views.power_device_admin import PowerDeviceAdminPageView
 
 
 class AccountsAdminPageView(TemplateView):
@@ -74,7 +75,12 @@ urlpatterns = [
     ),
     path(
         "facility/",
-        FacilityAdminPageView.as_view(),
+        PowerDeviceAdminPageView.as_view(),
         name="admin-facility",
+    ),
+    path(
+        "gas-sensors/",
+        GasSensorAdminPageView.as_view(),
+        name="admin-gas-sensor",
     ),
 ]

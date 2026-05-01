@@ -280,4 +280,7 @@ const GeofenceAdmin = {
   },
 };
 
-document.addEventListener('DOMContentLoaded', () => GeofenceAdmin.init());
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!await AdminAccess.check()) return;
+  GeofenceAdmin.init();
+});
