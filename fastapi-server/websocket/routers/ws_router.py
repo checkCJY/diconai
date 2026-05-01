@@ -15,6 +15,7 @@ from core.config import settings
 from websocket.services.broadcast import build_broadcast_payload
 from websocket.state import (
     active_alarms,
+    alarm_signal,
     sensor_clients,
     worker_clients,
     worker_positions,
@@ -22,7 +23,6 @@ from websocket.state import (
 
 POSITION_ENDPOINT = f"{settings.DRF_BASE_URL}/api/positioning/receive/"
 BROADCAST_INTERVAL = 5  # 센서 데이터 브로드캐스트 주기(초)
-ALARM_FLUSH_INTERVAL = 5  # 새 이벤트 알람 전용 플러시 주기(초)
 
 router = APIRouter()
 
@@ -41,12 +41,14 @@ async def _send_to_all(payload: dict) -> None:
 
 
 async def alarm_flush_loop():
-    """새 이벤트(is_new_event=True) 알람이 생기면 2초 내로 즉시 브로드캐스트한다.
+    """새 알람이 active_alarms에 추가되는 즉시 브로드캐스트한다.
 
-    30초 브로드캐스트를 기다리지 않고 위험 팝업을 빠르게 전달하기 위한 전용 루프.
+    폴링 대신 asyncio.Event로 신호를 받아 대기 없이 즉각 전달한다.
+    alarm_router의 push_alarm이 alarm_signal.set()을 호출하면 이 루프가 깨어난다.
     """
     while True:
-        await asyncio.sleep(ALARM_FLUSH_INTERVAL)
+        await alarm_signal.wait()
+        alarm_signal.clear()
         if not sensor_clients:
             continue
         if not any(a.get("is_new_event") for a in active_alarms):
