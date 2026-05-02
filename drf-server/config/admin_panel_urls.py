@@ -4,7 +4,6 @@ config/admin_panel_urls.py
 어드민 패널 HTML 페이지 URL 설정.
 config/urls.py에서 "admin-panel/" 프리픽스로 포함된다.
 
-각 페이지 뷰는 LoginRequiredMixin을 통해 미인증 접근을 차단하고,
 필터 드롭다운에 필요한 초기 데이터(부서·직급 목록 등)를 context로 전달한다.
 """
 

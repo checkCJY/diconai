@@ -3,7 +3,6 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import TemplateView
 from django.db import transaction
 
@@ -20,7 +19,7 @@ from apps.facilities.serializers.map_editor import (
 )
 
 
-class MapEditorPageView(LoginRequiredMixin, TemplateView):
+class MapEditorPageView(TemplateView):
     template_name = "admin_panel/map_editor/map_editor.html"
     extra_context = {"active_nav": "map_editor"}
 
