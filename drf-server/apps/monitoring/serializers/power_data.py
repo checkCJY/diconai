@@ -4,6 +4,7 @@ from rest_framework import serializers
 from apps.core.constants import RiskLevel, SensorStatus
 from apps.facilities.models.devices import PowerDevice
 from apps.monitoring.models import PowerData, PowerEvent
+from apps.monitoring.services.power_alarm import trigger_power_alarms
 
 
 class PowerEventIngestSerializer(serializers.Serializer):
@@ -108,4 +109,7 @@ class PowerDataBulkIngestSerializer(serializers.Serializer):
             for ch in validated_data["channels"]
         ]
         PowerData.objects.bulk_create(objs, ignore_conflicts=True)
+        trigger_power_alarms(
+            objs, device
+        )  # watt 채널에 대해 위험도 판정 후 알람 라우팅
         return objs

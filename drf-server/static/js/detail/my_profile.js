@@ -226,7 +226,6 @@ const PasswordModal = {
 
 
 document.addEventListener('DOMContentLoaded', async () => {
-  await initHeaderAndSNB();
   await loadProfile();
   PasswordModal.init();
 });

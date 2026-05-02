@@ -261,3 +261,144 @@ def fire_clear_notification_task(
     except Exception as exc:
         logger.error("정상화 알림 실패: %s", exc)
         raise self.retry(exc=exc)
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=5)
+def fire_power_danger_task(
+    self,
+    device_id: int,
+    channel: int,
+    value: float,
+    facility_id: int,
+    source_label: str,
+):
+    """전력 DANGER 즉각 알람 — AlarmRecord/Event 생성 후 FastAPI WS 큐에 푸시."""
+    from apps.alerts.services.event_service import create_alarm_and_event
+    from apps.core.constants import AlarmType, POWER_THRESHOLDS
+
+    try:
+        threshold = POWER_THRESHOLDS["danger"]
+        summary = (
+            f"[긴급] {source_label} 전력 과부하 ({value}W)"
+            " — 즉시 확인하고 관리자에게 보고하세요."
+        )
+        event, alarm = create_alarm_and_event(
+            facility_id=facility_id,
+            alarm_type=AlarmType.POWER_OVERLOAD,
+            power_device_id=device_id,
+            measured_value=value,
+            threshold_value=threshold,
+            risk_level="danger",
+            source_label=source_label,
+            summary=summary,
+            detected_at=timezone.now(),
+        )
+        if event is not None:
+            _push_to_ws(
+                {
+                    "event_id": event.id,
+                    "alarm_type": AlarmType.POWER_OVERLOAD,
+                    "channel": channel,
+                    "risk_level": "danger",
+                    "measured_value": value,
+                    "threshold_value": threshold,
+                    "source_label": source_label,
+                    "summary": summary,
+                    "is_new_event": alarm is not None,
+                }
+            )
+            logger.info(
+                "전력 DANGER 알람 | device=%s ch=%s value=%sW new_event=%s",
+                device_id,
+                channel,
+                value,
+                alarm is not None,
+            )
+    except Exception as exc:
+        logger.error("전력 DANGER 알람 생성 실패: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=5)
+def fire_power_warning_task(
+    self,
+    device_id: int,
+    channel: int,
+    value: float,
+    facility_id: int,
+    source_label: str,
+):
+    """전력 WARNING 30초 지속 후 알람 — AlarmRecord/Event 생성 후 FastAPI WS 큐에 푸시."""
+    from apps.alerts.services.event_service import create_alarm_and_event
+    from apps.core.constants import AlarmType, POWER_THRESHOLDS
+
+    try:
+        threshold = POWER_THRESHOLDS["caution"]
+        summary = (
+            f"[주의] {source_label} 전력 경고 수준 {WARNING_DURATION_SEC}초 지속 ({value}W)"
+            " — 설비 상태를 확인하세요."
+        )
+        event, alarm = create_alarm_and_event(
+            facility_id=facility_id,
+            alarm_type=AlarmType.POWER_OVERLOAD,
+            power_device_id=device_id,
+            measured_value=value,
+            threshold_value=threshold,
+            risk_level="warning",
+            source_label=source_label,
+            summary=summary,
+            detected_at=timezone.now(),
+        )
+        if event is not None:
+            _push_to_ws(
+                {
+                    "event_id": event.id,
+                    "alarm_type": AlarmType.POWER_OVERLOAD,
+                    "channel": channel,
+                    "risk_level": "warning",
+                    "measured_value": value,
+                    "threshold_value": threshold,
+                    "source_label": source_label,
+                    "summary": summary,
+                    "is_new_event": alarm is not None,
+                }
+            )
+            logger.info(
+                "전력 WARNING 알람 | device=%s ch=%s value=%sW new_event=%s",
+                device_id,
+                channel,
+                value,
+                alarm is not None,
+            )
+    except Exception as exc:
+        logger.error("전력 WARNING 알람 생성 실패: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=5)
+def fire_power_clear_task(
+    self,
+    device_id: int,
+    channel: int,
+    source_label: str,
+):
+    """전력 정상화 알림 — WS 알림만 발송. 이벤트 상태는 운영자가 직접 변경."""
+    try:
+        summary = (
+            f"[안전] {source_label} — 전력이 정상 범위로 복귀했습니다."
+            " 관리자 확인 후 작업을 재개하세요."
+        )
+        _push_to_ws(
+            {
+                "alarm_type": "power_clear",
+                "channel": channel,
+                "risk_level": "normal",
+                "source_label": source_label,
+                "summary": summary,
+                "is_new_event": False,
+            }
+        )
+        logger.info("전력 정상화 알림 | device=%s ch=%s", device_id, channel)
+    except Exception as exc:
+        logger.error("전력 정상화 알림 실패: %s", exc)
+        raise self.retry(exc=exc)

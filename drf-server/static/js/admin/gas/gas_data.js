@@ -9,8 +9,9 @@
  *   4. CSV 내보내기 버튼 클릭 → export 엔드포인트로 파일 다운로드
  *
  * API 의존:
- *   GET /api/admin/gas-data/        — 목록 (GasDataAdminListView)
- *   GET /api/admin/gas-data/export/ — CSV 파일 다운로드 (GasDataAdminExportView)
+ *   GET /api/admin/gas-data/         — 목록 (GasDataAdminListView)
+ *   GET /api/admin/gas-data/export/  — CSV 파일 다운로드 (GasDataAdminExportView)
+ *   GET /api/admin/gas-data/sensors/ — 센서 드롭다운 옵션 (GasDataAdminSensorListView)
  */
 
 (function () {
@@ -251,6 +252,7 @@
     if (from) elDateFrom.value = from;
     if (to)   elDateTo.value   = to;
   }
+
 
   // ── 이벤트 바인딩 ─────────────────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', function () {

@@ -8,6 +8,7 @@ URL 프리픽스: /api/admin/accounts/
 """
 
 from django.contrib.auth import get_user_model
+from django.shortcuts import render
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
@@ -214,3 +215,35 @@ class AccountsAdminLockView(APIView):
             )
 
         return Response({"ok": True})
+
+
+class AccountsAdminPageView(APIView):
+    """사용자 관리 페이지 — 슈퍼관리자 전용."""
+
+    permission_classes = [IsSuperAdmin]
+
+    def get(self, request):
+        from apps.accounts.models.department import Department
+        from apps.accounts.models.position import Position
+
+        ctx = {
+            "active_nav": "account",
+            "departments": Department.objects.filter(is_active=True).values(
+                "id", "name"
+            ),
+            "positions": Position.objects.filter(is_active=True).values("id", "name"),
+        }
+        return render(request, "admin_panel/accounts/accounts_main.html", ctx)
+
+
+class OrganizationsAdminPageView(APIView):
+    """조직 관리 페이지 — 슈퍼관리자 전용."""
+
+    permission_classes = [IsSuperAdmin]
+
+    def get(self, request):
+        return render(
+            request,
+            "admin_panel/organizations/organizations_main.html",
+            {"active_nav": "org"},
+        )
