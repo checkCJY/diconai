@@ -1,9 +1,19 @@
+"""
+공장(Facility)·설비(Equipment)·전력 장치(PowerDevice) 어드민 API.
+
+URL 프리픽스: /api/admin/facilities/, /api/admin/equipments/, /api/admin/power-devices/
+권한: 모든 엔드포인트 IsSuperAdmin (HTML 페이지는 admin_panel_urls.py의 TemplateView).
+"""
+
 from django.db.models import Q
 from django.utils import timezone
-from rest_framework.views import APIView
-from rest_framework.response import Response
+from django.views.generic import TemplateView
 from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
+from apps.core.pagination import AdminPagination
+from apps.core.permissions import IsSuperAdmin
 from apps.facilities.models import Facility, Equipment
 from apps.facilities.models.devices import PowerDevice
 from apps.facilities.serializers.facility_admin import (
@@ -18,20 +28,21 @@ from apps.facilities.serializers.facility_admin import (
 )
 
 
-class FacilityAdminPageView(APIView):
-    authentication_classes = []
-    permission_classes = []
+class FacilityAdminPageView(TemplateView):
+    """공장·설비 관리 페이지 — HTML 셸만 반환. 데이터는 JS가 API 호출."""
 
-    def get(self, request):
-        from django.shortcuts import render
+    template_name = "admin_panel/facility/facility.html"
 
-        return render(
-            request, "admin_panel/facility/facility.html", {"active_nav": "facility"}
-        )
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["active_nav"] = "facility"
+        return ctx
 
 
 # ── 기존 공장 API (map-editor 내부 사용) ──────────────────────
 class FacilityAdminListView(APIView):
+    permission_classes = [IsSuperAdmin]
+
     def get(self, request):
         qs = (
             Facility.objects.all()
@@ -61,21 +72,11 @@ class FacilityAdminListView(APIView):
         if order not in ["id", "-id", "name", "-name", "created_at", "-created_at"]:
             order = "-created_at"
         qs = qs.order_by(order)
-        try:
-            page = max(1, int(request.query_params.get("page", 1)))
-            page_size = max(1, min(100, int(request.query_params.get("page_size", 20))))
-        except (ValueError, TypeError):
-            page, page_size = 1, 20
-        total = qs.count()
-        facilities = qs[(page - 1) * page_size : page * page_size]
-        return Response(
-            {
-                "total": total,
-                "page": page,
-                "page_size": page_size,
-                "results": FacilityAdminListSerializer(facilities, many=True).data,
-            }
-        )
+
+        paginator = AdminPagination()
+        page = paginator.paginate_queryset(qs, request)
+        serializer = FacilityAdminListSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
     def post(self, request):
         serializer = FacilityAdminWriteSerializer(data=request.data)
@@ -88,6 +89,8 @@ class FacilityAdminListView(APIView):
 
 
 class FacilityAdminDetailView(APIView):
+    permission_classes = [IsSuperAdmin]
+
     def _get(self, pk):
         try:
             return Facility.objects.get(pk=pk)
@@ -119,6 +122,8 @@ class FacilityAdminDetailView(APIView):
 
 
 class FacilityAdminBulkDeleteView(APIView):
+    permission_classes = [IsSuperAdmin]
+
     def post(self, request):
         ids = request.data.get("ids", [])
         if not isinstance(ids, list) or not ids:
@@ -132,6 +137,8 @@ class FacilityAdminBulkDeleteView(APIView):
 
 
 class FacilityPowerDeviceOptionsView(APIView):
+    permission_classes = [IsSuperAdmin]
+
     def get(self, request):
         devices = PowerDevice.objects.filter(is_active=True).values(
             "id", "device_id", "device_name", "facility_id"
@@ -141,8 +148,7 @@ class FacilityPowerDeviceOptionsView(APIView):
 
 # ── 공장 선택 드롭다운 ────────────────────────────────────────
 class FacilitySelectView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
     def get(self, request):
         facilities = Facility.objects.filter(is_active=True).order_by("id")
@@ -151,8 +157,7 @@ class FacilitySelectView(APIView):
 
 # ── 전력 장치 선택 드롭다운 (미연결 + 현재 설비 연결 장치) ────────
 class PowerDeviceSelectView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
     def get(self, request):
         current_equipment_id = request.query_params.get("equipment_id")
@@ -171,8 +176,7 @@ class PowerDeviceSelectView(APIView):
 
 # ── 설비(Equipment) CRUD ──────────────────────────────────────
 class EquipmentAdminListView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
     def get(self, request):
         qs = Equipment.objects.select_related(
@@ -208,23 +212,10 @@ class EquipmentAdminListView(APIView):
             order = "-created_at"
         qs = qs.order_by(order)
 
-        # 페이지네이션
-        try:
-            page = max(1, int(request.query_params.get("page", 1)))
-            page_size = max(1, min(100, int(request.query_params.get("page_size", 20))))
-        except (ValueError, TypeError):
-            page, page_size = 1, 20
-
-        total = qs.count()
-        equipments = qs[(page - 1) * page_size : page * page_size]
-        return Response(
-            {
-                "total": total,
-                "page": page,
-                "page_size": page_size,
-                "results": EquipmentAdminListSerializer(equipments, many=True).data,
-            }
-        )
+        paginator = AdminPagination()
+        page = paginator.paginate_queryset(qs, request)
+        serializer = EquipmentAdminListSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
     def post(self, request):
         serializer = EquipmentAdminWriteSerializer(data=request.data)
@@ -240,8 +231,7 @@ class EquipmentAdminListView(APIView):
 
 
 class EquipmentAdminDetailView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
     def _get(self, pk):
         try:
@@ -305,8 +295,7 @@ class EquipmentAdminDetailView(APIView):
 
 
 class EquipmentAdminBulkDeleteView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
     def post(self, request):
         ids = request.data.get("ids", [])
@@ -326,8 +315,7 @@ class EquipmentAdminBulkDeleteView(APIView):
 
 # ── 기존 PowerDevice API (하위 호환) ──────────────────────────
 class PowerDeviceAdminListView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
     def get(self, request):
         qs = PowerDevice.objects.select_related("facility", "facility__manager").all()
@@ -353,21 +341,11 @@ class PowerDeviceAdminListView(APIView):
         ]:
             order = "-created_at"
         qs = qs.order_by(order)
-        try:
-            page = max(1, int(request.query_params.get("page", 1)))
-            page_size = max(1, min(100, int(request.query_params.get("page_size", 20))))
-        except (ValueError, TypeError):
-            page, page_size = 1, 20
-        total = qs.count()
-        devices = qs[(page - 1) * page_size : page * page_size]
-        return Response(
-            {
-                "total": total,
-                "page": page,
-                "page_size": page_size,
-                "results": PowerDeviceAdminListSerializer(devices, many=True).data,
-            }
-        )
+
+        paginator = AdminPagination()
+        page = paginator.paginate_queryset(qs, request)
+        serializer = PowerDeviceAdminListSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
     def post(self, request):
         serializer = PowerDeviceAdminWriteSerializer(data=request.data)
@@ -383,8 +361,7 @@ class PowerDeviceAdminListView(APIView):
 
 
 class PowerDeviceAdminDetailView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
     def _get(self, pk):
         try:
@@ -427,8 +404,7 @@ class PowerDeviceAdminDetailView(APIView):
 
 
 class PowerDeviceAdminBulkDeleteView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
     def post(self, request):
         ids = request.data.get("ids", [])

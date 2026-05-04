@@ -16,6 +16,7 @@ class PowerThresholdView(APIView):
     GET /monitoring/api/power/thresholds/
 
     전력 임계치(W)를 반환한다. 프론트엔드 차트 주석 라인 및 위험도 판정에 사용.
+    공개 데이터(상수)이므로 인증 불필요.
     """
 
     permission_classes = [AllowAny]
@@ -31,6 +32,9 @@ class PowerEventIngestView(APIView):
     FastAPI로부터 ON/OFF 스냅샷(PowerEvent) 수신.
     요청 바디: { device_id, measured_at, snapshot }
     응답: { "id": <PowerEvent.id> }
+
+    의도적 무인증: 서버-서버(fastapi → drf) 호출 전용 ingest 엔드포인트.
+    Phase 5에서 서비스 토큰 또는 IP 화이트리스트 기반 보호 추가 예정.
     """
 
     permission_classes = [AllowAny]
@@ -49,6 +53,9 @@ class PowerDataBulkIngestView(APIView):
     FastAPI로부터 전류/전압/전력 16채널 데이터(PowerData) 일괄 수신.
     요청 바디: { device_id, measured_at, data_type, channels: [...] }
     응답: { "created": <저장된 행 수> }
+
+    의도적 무인증: 서버-서버(fastapi → drf) 호출 전용 ingest 엔드포인트.
+    Phase 5에서 서비스 토큰 또는 IP 화이트리스트 기반 보호 추가 예정.
     """
 
     permission_classes = [AllowAny]

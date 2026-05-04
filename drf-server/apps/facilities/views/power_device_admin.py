@@ -1,12 +1,22 @@
+"""
+스마트 전력 장비 관리 어드민 API.
+
+URL 프리픽스: /api/admin/power-devices/
+권한: 모든 엔드포인트 IsSuperAdmin (HTML 페이지는 admin_panel_urls.py의 TemplateView).
+"""
+
 import socket as _socket
 
 from django.db.models import Case, IntegerField, When
 from django.utils import timezone
+from django.views.generic import TemplateView
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models.user import CustomUser
+from apps.core.pagination import AdminPagination
+from apps.core.permissions import IsSuperAdmin
 from apps.facilities.models import PowerDevice, PowerDeviceInspection
 from apps.facilities.serializers.power_device_admin import (
     PowerDeviceAdminListSerializer,
@@ -17,24 +27,20 @@ from apps.facilities.serializers.power_device_admin import (
 )
 
 
-class PowerDeviceAdminPageView(APIView):
-    authentication_classes = []
-    permission_classes = []
+class PowerDeviceAdminPageView(TemplateView):
+    """전력 장비 관리 페이지 — HTML 셸만 반환. 데이터는 JS가 API 호출."""
 
-    def get(self, request):
-        from django.shortcuts import render
+    template_name = "admin_panel/power_system/power_system.html"
 
-        return render(
-            request,
-            "admin_panel/power_system/power_system.html",
-            {"active_nav": "power_system"},
-        )
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["active_nav"] = "power_system"
+        return ctx
 
 
 # ── 장비 코드 목록 (필터 드롭다운용) ──────────────────────────
 class PowerDeviceCodesView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
     def get(self, request):
         codes = (
@@ -49,8 +55,7 @@ class PowerDeviceCodesView(APIView):
 
 # ── 다음 장비 코드 ─────────────────────────────────────────────
 class PowerDeviceNextCodeView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
     def get(self, request):
         existing = PowerDevice.objects.filter(device_code__regex=r"^\d+$").values_list(
@@ -70,8 +75,7 @@ class PowerDeviceNextCodeView(APIView):
 
 # ── 연결 확인 ─────────────────────────────────────────────────
 class PowerDeviceConnectionCheckView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
     def post(self, request):
         ip = request.data.get("ip_address", "").strip()
@@ -120,8 +124,7 @@ class PowerDeviceConnectionCheckView(APIView):
 
 # ── 장치 목록 / 등록 ──────────────────────────────────────────
 class PowerDeviceAdminListView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
     def get(self, request):
         qs = PowerDevice.objects.select_related(
@@ -172,22 +175,10 @@ class PowerDeviceAdminListView(APIView):
             .distinct()
         )
 
-        try:
-            page = max(1, int(request.query_params.get("page", 1)))
-            page_size = max(1, min(100, int(request.query_params.get("page_size", 10))))
-        except (ValueError, TypeError):
-            page, page_size = 1, 10
-
-        total = qs.count()
-        devices = qs[(page - 1) * page_size : page * page_size]
-        return Response(
-            {
-                "total": total,
-                "page": page,
-                "page_size": page_size,
-                "results": PowerDeviceAdminListSerializer(devices, many=True).data,
-            }
-        )
+        paginator = AdminPagination()
+        page = paginator.paginate_queryset(qs, request)
+        serializer = PowerDeviceAdminListSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
     def post(self, request):
         serializer = PowerDeviceAdminWriteSerializer(data=request.data)
@@ -204,8 +195,7 @@ class PowerDeviceAdminListView(APIView):
 
 # ── 장치 상세 / 수정 / 비활성화 ──────────────────────────────
 class PowerDeviceAdminDetailView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
     def _get(self, pk):
         try:
@@ -249,8 +239,7 @@ class PowerDeviceAdminDetailView(APIView):
 
 # ── 일괄 비활성화 ─────────────────────────────────────────────
 class PowerDeviceAdminBulkDeleteView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
     def post(self, request):
         ids = request.data.get("ids", [])
@@ -268,8 +257,7 @@ class PowerDeviceAdminBulkDeleteView(APIView):
 
 # ── 점검 이력 조회 / 등록 ─────────────────────────────────────
 class PowerDeviceInspectionListView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
     def get(self, request, device_pk):
         inspections = (
@@ -296,8 +284,7 @@ class PowerDeviceInspectionListView(APIView):
 
 # ── 조치 등록 ─────────────────────────────────────────────────
 class PowerDeviceInspectionActionView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
     def post(self, request, inspection_pk):
         try:

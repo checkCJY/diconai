@@ -9,6 +9,9 @@ class GasDataCreateView(APIView):
     """
     POST /api/monitoring/gas/
     FastAPI로부터 가스 측정값을 수신하여 DB에 저장하고 알람을 생성한다.
+
+    의도적 무인증: 서버-서버(fastapi → drf) 호출 전용 ingest 엔드포인트.
+    Phase 5에서 fastapi 측 서비스 토큰 또는 IP 화이트리스트 기반 보호 추가 예정.
     """
 
     authentication_classes = []

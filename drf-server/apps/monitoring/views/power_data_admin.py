@@ -18,6 +18,8 @@ from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
+from apps.core.pagination import AdminPagination
+from apps.core.permissions import IsSuperAdmin
 from apps.monitoring.models import PowerData
 from apps.facilities.models.devices import PowerDevice
 
@@ -25,10 +27,10 @@ from apps.facilities.models.devices import PowerDevice
 DATA_TYPE_LABELS = {
     "current": "전류 (A)",
     "voltage": "전압 (V)",
-    "watt":    "전력 (W)",
+    "watt": "전력 (W)",
 }
 
-VALID_ORDERINGS  = ["received_at", "-received_at"]
+VALID_ORDERINGS = ["received_at", "-received_at"]
 VALID_DATA_TYPES = ["current", "voltage", "watt"]
 
 
@@ -88,14 +90,16 @@ def _build_queryset(params):
 def _serialize_row(obj):
     """PowerData ORM 인스턴스 1건을 프론트엔드용 딕셔너리로 변환한다."""
     return {
-        "id":              obj.id,
-        "received_at":     timezone.localtime(obj.received_at).strftime("%Y-%m-%d %H:%M:%S"),
-        "device_name":     obj.power_device.device_name,
-        "channel":         obj.channel,
-        "data_type":       obj.data_type,
+        "id": obj.id,
+        "received_at": timezone.localtime(obj.received_at).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        ),
+        "device_name": obj.power_device.device_name,
+        "channel": obj.channel,
+        "data_type": obj.data_type,
         "data_type_label": DATA_TYPE_LABELS.get(obj.data_type, obj.data_type),
-        "value":           round(obj.value, 2) if obj.value is not None else None,
-        "risk_level":      obj.risk_level,
+        "value": round(obj.value, 2) if obj.value is not None else None,
+        "risk_level": obj.risk_level,
     }
 
 
@@ -113,27 +117,15 @@ class PowerDataAdminListView(APIView):
       page       — 페이지 번호 (기본: 1)
       page_size  — 페이지당 행 수 (기본: 20, 최대: 100)
     """
-    authentication_classes = []
-    permission_classes = []
+
+    permission_classes = [IsSuperAdmin]
 
     def get(self, request):
         qs = _build_queryset(request.query_params)
 
-        try:
-            page      = max(1, int(request.query_params.get("page", 1)))
-            page_size = max(1, min(100, int(request.query_params.get("page_size", 20))))
-        except (ValueError, TypeError):
-            page, page_size = 1, 20
-
-        total = qs.count()
-        items = qs[(page - 1) * page_size : page * page_size]
-
-        return Response({
-            "total":     total,
-            "page":      page,
-            "page_size": page_size,
-            "results":   [_serialize_row(obj) for obj in items],
-        })
+        paginator = AdminPagination()
+        page = paginator.paginate_queryset(qs, request)
+        return paginator.get_paginated_response([_serialize_row(o) for o in page])
 
 
 class PowerDataAdminExportView(APIView):
@@ -144,8 +136,8 @@ class PowerDataAdminExportView(APIView):
     utf-8-sig(BOM) 인코딩으로 엑셀 한글 깨짐 방지.
     qs.iterator(chunk_size=500)으로 대용량 데이터 메모리 절약.
     """
-    authentication_classes = []
-    permission_classes = []
+
+    permission_classes = [IsSuperAdmin]
 
     def get(self, request):
         qs = _build_queryset(request.query_params)
@@ -154,17 +146,21 @@ class PowerDataAdminExportView(APIView):
         response["Content-Disposition"] = 'attachment; filename="power_data_export.csv"'
 
         writer = csv.writer(response)
-        writer.writerow(["수집 시각", "장비명", "채널", "측정 종류", "측정값", "위험도"])
+        writer.writerow(
+            ["수집 시각", "장비명", "채널", "측정 종류", "측정값", "위험도"]
+        )
 
         for obj in qs.iterator(chunk_size=500):
-            writer.writerow([
-                timezone.localtime(obj.received_at).strftime("%Y-%m-%d %H:%M:%S"),
-                obj.power_device.device_name,
-                obj.channel,
-                DATA_TYPE_LABELS.get(obj.data_type, obj.data_type),
-                round(obj.value, 2) if obj.value is not None else "",
-                obj.risk_level,
-            ])
+            writer.writerow(
+                [
+                    timezone.localtime(obj.received_at).strftime("%Y-%m-%d %H:%M:%S"),
+                    obj.power_device.device_name,
+                    obj.channel,
+                    DATA_TYPE_LABELS.get(obj.data_type, obj.data_type),
+                    round(obj.value, 2) if obj.value is not None else "",
+                    obj.risk_level,
+                ]
+            )
 
         return response
 
@@ -177,8 +173,8 @@ class PowerDataAdminDeviceListView(APIView):
     is_active=True인 장비만 반환하며 device_name 기준 오름차순 정렬.
     응답: [ { id, device_name, device_id }, ... ]
     """
-    authentication_classes = []
-    permission_classes = []
+
+    permission_classes = [IsSuperAdmin]
 
     def get(self, request):
         devices = (

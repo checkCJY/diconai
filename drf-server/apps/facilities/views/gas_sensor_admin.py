@@ -1,12 +1,23 @@
+"""
+유해가스 센서 관리 어드민 API.
+
+URL 프리픽스: /api/admin/gas-sensors/
+권한: 모든 엔드포인트 IsSuperAdmin (HTML 페이지는 admin_panel_urls.py의 TemplateView).
+"""
+
 import socket as _socket
 
+from django.db.models import Case, IntegerField, When
 from django.utils import timezone
+from django.views.generic import TemplateView
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models.department import Department
 from apps.accounts.models.user import CustomUser
+from apps.core.pagination import AdminPagination
+from apps.core.permissions import IsSuperAdmin
 from apps.facilities.models import GasSensor, GasSensorInspection
 from apps.facilities.serializers.gas_sensor_admin import (
     GasSensorAdminListSerializer,
@@ -17,24 +28,24 @@ from apps.facilities.serializers.gas_sensor_admin import (
 )
 
 
-class GasSensorAdminPageView(APIView):
-    authentication_classes = []
-    permission_classes = []
+class GasSensorAdminPageView(TemplateView):
+    """가스 센서 관리 페이지 — HTML 셸만 반환. 데이터는 JS가 API 호출.
 
-    def get(self, request):
-        from django.shortcuts import render
+    페이지 진입은 비인증 허용(JS가 토큰 없으면 로그인으로 리다이렉트).
+    실제 데이터 API는 IsSuperAdmin로 보호된다.
+    """
 
-        return render(
-            request,
-            "admin_panel/gas_sensor/gas_sensor.html",
-            {"active_nav": "gas_sensor"},
-        )
+    template_name = "admin_panel/gas_sensor/gas_sensor.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["active_nav"] = "gas_sensor"
+        return ctx
 
 
 # ── 드롭다운 옵션 ─────────────────────────────────────────────
 class DepartmentSelectView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
     def get(self, request):
         depts = Department.objects.filter(is_active=True).values("id", "name")
@@ -42,8 +53,7 @@ class DepartmentSelectView(APIView):
 
 
 class ManagerSelectView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
     def get(self, request):
         dept_id = request.query_params.get("department_id")
@@ -63,8 +73,7 @@ class ManagerSelectView(APIView):
 
 # ── 다음 장비 코드 ─────────────────────────────────────────────
 class GasSensorNextCodeView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
     def get(self, request):
         existing = GasSensor.objects.filter(device_code__regex=r"^\d+$").values_list(
@@ -84,8 +93,7 @@ class GasSensorNextCodeView(APIView):
 
 # ── 연결 확인 ─────────────────────────────────────────────────
 class GasSensorConnectionCheckView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
     def post(self, request):
         ip = request.data.get("ip_address", "").strip()
@@ -134,8 +142,7 @@ class GasSensorConnectionCheckView(APIView):
 
 # ── 센서 목록 / 등록 ──────────────────────────────────────────
 class GasSensorAdminListView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
     def get(self, request):
         qs = GasSensor.objects.select_related(
@@ -178,9 +185,6 @@ class GasSensorAdminListView(APIView):
         }
         order_field = order_map.get(order, "device_code")
 
-        # 이상 상태(연결 끊김) 우선 정렬
-        from django.db.models import Case, IntegerField, When
-
         qs = (
             qs.annotate(
                 priority=Case(
@@ -193,23 +197,10 @@ class GasSensorAdminListView(APIView):
             .distinct()
         )
 
-        # 페이지네이션
-        try:
-            page = max(1, int(request.query_params.get("page", 1)))
-            page_size = max(1, min(100, int(request.query_params.get("page_size", 10))))
-        except (ValueError, TypeError):
-            page, page_size = 1, 10
-
-        total = qs.count()
-        sensors = qs[(page - 1) * page_size : page * page_size]
-        return Response(
-            {
-                "total": total,
-                "page": page,
-                "page_size": page_size,
-                "results": GasSensorAdminListSerializer(sensors, many=True).data,
-            }
-        )
+        paginator = AdminPagination()
+        page = paginator.paginate_queryset(qs, request)
+        serializer = GasSensorAdminListSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
     def post(self, request):
         serializer = GasSensorAdminWriteSerializer(data=request.data)
@@ -226,8 +217,7 @@ class GasSensorAdminListView(APIView):
 
 # ── 센서 상세 / 수정 / 비활성화 ──────────────────────────────
 class GasSensorAdminDetailView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
     def _get(self, pk):
         try:
@@ -271,8 +261,7 @@ class GasSensorAdminDetailView(APIView):
 
 # ── 일괄 비활성화 ─────────────────────────────────────────────
 class GasSensorAdminBulkDeleteView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
     def post(self, request):
         ids = request.data.get("ids", [])
@@ -289,8 +278,7 @@ class GasSensorAdminBulkDeleteView(APIView):
 
 # ── 점검 이력 조회 / 점검 등록 ──────────────────────────────
 class GasSensorInspectionListView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
     def get(self, request, sensor_pk):
         inspections = (
@@ -317,8 +305,7 @@ class GasSensorInspectionListView(APIView):
 
 # ── 조치 등록 ─────────────────────────────────────────────────
 class GasSensorInspectionActionView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
     def post(self, request, inspection_pk):
         try:
