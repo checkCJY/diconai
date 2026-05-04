@@ -8,13 +8,13 @@ URL 프리픽스: /api/admin/accounts/
 """
 
 from django.contrib.auth import get_user_model
-from django.shortcuts import render
+from django.db import transaction
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.core.permissions import IsSuperAdmin
+from apps.accounts.selectors.admin_users import list_admin_users
 from apps.accounts.serializers import (
     AccountsAdminCreateSerializer,
     AccountsAdminDetailSerializer,
@@ -22,6 +22,7 @@ from apps.accounts.serializers import (
     AccountsAdminUpdateSerializer,
 )
 from apps.core.pagination import AdminPagination
+from apps.core.permissions import IsSuperAdmin
 
 User = get_user_model()
 
@@ -45,53 +46,20 @@ class AccountsAdminListView(APIView):
     permission_classes = [IsSuperAdmin]
 
     def get(self, request):
-        """필터·정렬·페이지네이션이 적용된 사용자 목록을 반환한다."""
-        qs = (
-            User.objects.prefetch_related("dept_memberships__department")
-            .select_related("position")
-            .all()
+        qs = list_admin_users(
+            name=request.query_params.get("name", ""),
+            department_id=request.query_params.get("department"),
+            position_id=request.query_params.get("position"),
+            user_type=request.query_params.get("user_type"),
+            account_status=request.query_params.get("status"),
+            sort=request.query_params.get("sort", "name_asc"),
         )
-
-        name = request.query_params.get("name", "").strip()
-        department_id = request.query_params.get("department")
-        position_id = request.query_params.get("position")
-        user_type = request.query_params.get("user_type")
-        account_status = request.query_params.get("status")
-        sort = request.query_params.get("sort", "name_asc")
-
-        if name:
-            qs = qs.filter(name__icontains=name)
-        if department_id:
-            qs = qs.filter(
-                dept_memberships__department_id=department_id,
-                dept_memberships__is_primary=True,
-            )
-        if position_id:
-            qs = qs.filter(position_id=position_id)
-        if user_type:
-            qs = qs.filter(user_type=user_type)
-
-        # 계정 상태 필터 — is_active + account_locked_until 조합으로 판별
-        if account_status == "active":
-            qs = qs.filter(is_active=True, account_locked_until=None)
-        elif account_status == "locked":
-            qs = qs.filter(is_active=True, account_locked_until__gt=timezone.now())
-        elif account_status == "inactive":
-            qs = qs.filter(is_active=False)
-
-        sort_map = {
-            "name_asc": "name",
-            "name_desc": "-name",
-            "date_asc": "date_joined",
-            "date_desc": "-date_joined",
-        }
-        qs = qs.order_by(sort_map.get(sort, "name"))
-
         paginator = AdminPagination()
         page = paginator.paginate_queryset(qs, request)
         serializer = AccountsAdminListSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
 
+    @transaction.atomic
     def post(self, request):
         """새 사용자를 등록한다. 비밀번호는 해시 처리 후 저장."""
         serializer = AccountsAdminCreateSerializer(data=request.data)
@@ -106,15 +74,11 @@ class AccountsAdminDetailView(APIView):
     GET    /api/admin/accounts/<id>/  — 사용자 상세 조회
     PATCH  /api/admin/accounts/<id>/  — 사용자 정보 수정 (비밀번호 제외)
     DELETE /api/admin/accounts/<id>/  — 사용자 비활성화 (소프트 삭제)
-
-    ※ DELETE는 실제 DB 레코드를 삭제하지 않는다.
-       CustomUser.deactivate()를 호출해 is_active=False 처리한다.
     """
 
     permission_classes = [IsSuperAdmin]
 
     def _get_user(self, pk):
-        """pk로 사용자를 조회한다. 없으면 None 반환."""
         try:
             return (
                 User.objects.prefetch_related("dept_memberships__department")
@@ -125,21 +89,20 @@ class AccountsAdminDetailView(APIView):
             return None
 
     def get(self, request, pk):
-        """단일 사용자 상세 정보를 반환한다."""
         user = self._get_user(pk)
         if not user:
             return Response(
-                {"error": "사용자를 찾을 수 없습니다."},
+                {"detail": "사용자를 찾을 수 없습니다."},
                 status=status.HTTP_404_NOT_FOUND,
             )
         return Response(AccountsAdminDetailSerializer(user).data)
 
+    @transaction.atomic
     def patch(self, request, pk):
-        """사용자 정보(이름·부서·직급·권한·연락처)를 부분 수정한다."""
         user = self._get_user(pk)
         if not user:
             return Response(
-                {"error": "사용자를 찾을 수 없습니다."},
+                {"detail": "사용자를 찾을 수 없습니다."},
                 status=status.HTTP_404_NOT_FOUND,
             )
         serializer = AccountsAdminUpdateSerializer(
@@ -151,16 +114,15 @@ class AccountsAdminDetailView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, pk):
-        """사용자를 비활성화한다. 본인 계정은 비활성화 불가."""
         user = self._get_user(pk)
         if not user:
             return Response(
-                {"error": "사용자를 찾을 수 없습니다."},
+                {"detail": "사용자를 찾을 수 없습니다."},
                 status=status.HTTP_404_NOT_FOUND,
             )
         if user.pk == request.user.pk:
             return Response(
-                {"error": "본인 계정은 비활성화할 수 없습니다."},
+                {"detail": "본인 계정은 비활성화할 수 없습니다."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         user.deactivate()
@@ -179,23 +141,21 @@ class AccountsAdminLockView(APIView):
     permission_classes = [IsSuperAdmin]
 
     def _get_user(self, pk):
-        """활성 사용자만 조회한다. 비활성이면 None 반환."""
         try:
             return User.objects.get(pk=pk, is_active=True)
         except User.DoesNotExist:
             return None
 
     def post(self, request, pk, action):
-        """action 값에 따라 잠금 또는 잠금 해제를 수행한다."""
         user = self._get_user(pk)
         if not user:
             return Response(
-                {"error": "사용자를 찾을 수 없습니다."},
+                {"detail": "사용자를 찾을 수 없습니다."},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
         if action == "lock":
-            # 관리자 수동 잠금 — account_locked_until을 100년 뒤로 설정해 사실상 무기한 처리
+            # 관리자 수동 잠금 — 100년 뒤로 설정해 사실상 무기한 처리
             user.account_locked_until = timezone.now() + timezone.timedelta(days=36500)
             user.save(update_fields=["account_locked_until", "updated_at"])
         elif action == "unlock":
@@ -211,39 +171,7 @@ class AccountsAdminLockView(APIView):
             )
         else:
             return Response(
-                {"error": "잘못된 요청입니다."}, status=status.HTTP_400_BAD_REQUEST
+                {"detail": "잘못된 요청입니다."}, status=status.HTTP_400_BAD_REQUEST
             )
 
         return Response({"ok": True})
-
-
-class AccountsAdminPageView(APIView):
-    """사용자 관리 페이지 — 슈퍼관리자 전용."""
-
-    permission_classes = [IsSuperAdmin]
-
-    def get(self, request):
-        from apps.accounts.models.department import Department
-        from apps.accounts.models.position import Position
-
-        ctx = {
-            "active_nav": "account",
-            "departments": Department.objects.filter(is_active=True).values(
-                "id", "name"
-            ),
-            "positions": Position.objects.filter(is_active=True).values("id", "name"),
-        }
-        return render(request, "admin_panel/accounts/accounts_main.html", ctx)
-
-
-class OrganizationsAdminPageView(APIView):
-    """조직 관리 페이지 — 슈퍼관리자 전용."""
-
-    permission_classes = [IsSuperAdmin]
-
-    def get(self, request):
-        return render(
-            request,
-            "admin_panel/organizations/organizations_main.html",
-            {"active_nav": "org"},
-        )

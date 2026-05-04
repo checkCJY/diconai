@@ -5,9 +5,10 @@ URL 프리픽스: /api/admin/gas-sensors/
 권한: 모든 엔드포인트 IsSuperAdmin (HTML 페이지는 admin_panel_urls.py의 TemplateView).
 """
 
+import logging
 import socket as _socket
 
-from django.db.models import Case, IntegerField, When
+from django.db import transaction
 from django.utils import timezone
 from django.views.generic import TemplateView
 from rest_framework import status
@@ -19,6 +20,7 @@ from apps.accounts.models.user import CustomUser
 from apps.core.pagination import AdminPagination
 from apps.core.permissions import IsSuperAdmin
 from apps.facilities.models import GasSensor, GasSensorInspection
+from apps.facilities.selectors.admin_devices import list_admin_gas_sensors
 from apps.facilities.serializers.gas_sensor_admin import (
     GasSensorAdminListSerializer,
     GasSensorAdminWriteSerializer,
@@ -26,6 +28,8 @@ from apps.facilities.serializers.gas_sensor_admin import (
     GasSensorInspectionSerializer,
     GasSensorInspectionWriteSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class GasSensorAdminPageView(TemplateView):
@@ -125,7 +129,11 @@ class GasSensorConnectionCheckView(APIView):
             result = sock.connect_ex((ip, port))
             sock.close()
             ok = result == 0
-        except Exception:
+        except OSError as exc:
+            # 호스트 불가, 잘못된 주소 등 — 사용자에게는 연결 실패로 안내, 서버에는 로깅.
+            logger.warning(
+                "[gas_sensor] connection check failed ip=%s port=%s: %s", ip, port, exc
+            )
             ok = False
 
         checked_at = timezone.now()
@@ -145,63 +153,18 @@ class GasSensorAdminListView(APIView):
     permission_classes = [IsSuperAdmin]
 
     def get(self, request):
-        qs = GasSensor.objects.select_related(
-            "facility", "department", "manager"
-        ).prefetch_related("inspections")
-
-        # 검색
-        q = request.query_params.get("q", "").strip()
-        if q:
-            if q.upper().startswith("GAS-"):
-                qs = qs.filter(device_code=q[4:])
-            else:
-                qs = qs.filter(device_name__icontains=q)
-
-        # 사용 여부 필터
-        is_active = request.query_params.get("is_active", "").strip()
-        if is_active == "true":
-            qs = qs.filter(is_active=True)
-        elif is_active == "false":
-            qs = qs.filter(is_active=False)
-
-        # 연결 상태 필터 (직렬화 get_connection_status 로직과 동일하게 적용)
-        conn = request.query_params.get("connection", "").strip()
-        if conn == "normal":
-            qs = qs.filter(is_active=True).exclude(status__in=["offline", "error"])
-        elif conn == "disconnected":
-            qs = qs.filter(status__in=["offline", "error"])
-        elif conn == "inactive":
-            qs = qs.filter(is_active=False)
-
-        # 정렬 (이상 센서 최상단, 이후 선택 정렬)
-        order = request.query_params.get("order", "sensor_id_asc")
-        order_map = {
-            "sensor_id_asc": "device_code",
-            "sensor_id_desc": "-device_code",
-            "last_reading_desc": "-last_reading",
-            "last_reading_asc": "last_reading",
-            "inspection_desc": "-inspections__inspection_date",
-            "inspection_asc": "inspections__inspection_date",
-        }
-        order_field = order_map.get(order, "device_code")
-
-        qs = (
-            qs.annotate(
-                priority=Case(
-                    When(status__in=["offline", "error"], then=0),
-                    default=1,
-                    output_field=IntegerField(),
-                )
-            )
-            .order_by("priority", order_field)
-            .distinct()
+        qs = list_admin_gas_sensors(
+            q=request.query_params.get("q", ""),
+            is_active=request.query_params.get("is_active", ""),
+            connection=request.query_params.get("connection", ""),
+            sort=request.query_params.get("order", "sensor_id_asc"),
         )
-
         paginator = AdminPagination()
         page = paginator.paginate_queryset(qs, request)
         serializer = GasSensorAdminListSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
 
+    @transaction.atomic
     def post(self, request):
         serializer = GasSensorAdminWriteSerializer(data=request.data)
         if not serializer.is_valid():
@@ -235,6 +198,7 @@ class GasSensorAdminDetailView(APIView):
             )
         return Response(GasSensorAdminListSerializer(sensor).data)
 
+    @transaction.atomic
     def put(self, request, pk):
         sensor = self._get(pk)
         if sensor is None:

@@ -5,9 +5,10 @@ URL 프리픽스: /api/admin/power-devices/
 권한: 모든 엔드포인트 IsSuperAdmin (HTML 페이지는 admin_panel_urls.py의 TemplateView).
 """
 
+import logging
 import socket as _socket
 
-from django.db.models import Case, IntegerField, When
+from django.db import transaction
 from django.utils import timezone
 from django.views.generic import TemplateView
 from rest_framework import status
@@ -18,6 +19,7 @@ from apps.accounts.models.user import CustomUser
 from apps.core.pagination import AdminPagination
 from apps.core.permissions import IsSuperAdmin
 from apps.facilities.models import PowerDevice, PowerDeviceInspection
+from apps.facilities.selectors.admin_devices import list_admin_power_devices
 from apps.facilities.serializers.power_device_admin import (
     PowerDeviceAdminListSerializer,
     PowerDeviceAdminWriteSerializer,
@@ -25,6 +27,8 @@ from apps.facilities.serializers.power_device_admin import (
     PowerDeviceInspectionSerializer,
     PowerDeviceInspectionWriteSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class PowerDeviceAdminPageView(TemplateView):
@@ -107,7 +111,13 @@ class PowerDeviceConnectionCheckView(APIView):
             result = sock.connect_ex((ip, port))
             sock.close()
             ok = result == 0
-        except Exception:
+        except OSError as exc:
+            logger.warning(
+                "[power_device] connection check failed ip=%s port=%s: %s",
+                ip,
+                port,
+                exc,
+            )
             ok = False
 
         checked_at = timezone.now()
@@ -127,59 +137,18 @@ class PowerDeviceAdminListView(APIView):
     permission_classes = [IsSuperAdmin]
 
     def get(self, request):
-        qs = PowerDevice.objects.select_related(
-            "facility", "department", "manager"
-        ).prefetch_related("inspections")
-
-        q = request.query_params.get("q", "").strip()
-        if q:
-            if q.upper().startswith("PWR-"):
-                qs = qs.filter(device_code=q[4:])
-            else:
-                qs = qs.filter(device_name__icontains=q)
-
-        is_active = request.query_params.get("is_active", "").strip()
-        if is_active == "true":
-            qs = qs.filter(is_active=True)
-        elif is_active == "false":
-            qs = qs.filter(is_active=False)
-
-        conn = request.query_params.get("connection", "").strip()
-        if conn == "normal":
-            qs = qs.filter(is_active=True).exclude(status__in=["offline", "error"])
-        elif conn == "disconnected":
-            qs = qs.filter(status__in=["offline", "error"])
-        elif conn == "inactive":
-            qs = qs.filter(is_active=False)
-
-        order = request.query_params.get("order", "device_id_asc")
-        order_map = {
-            "device_id_asc": "device_code",
-            "device_id_desc": "-device_code",
-            "last_reading_desc": "-last_reading",
-            "last_reading_asc": "last_reading",
-            "inspection_desc": "-inspections__inspection_date",
-            "inspection_asc": "inspections__inspection_date",
-        }
-        order_field = order_map.get(order, "device_code")
-
-        qs = (
-            qs.annotate(
-                priority=Case(
-                    When(status__in=["offline", "error"], then=0),
-                    default=1,
-                    output_field=IntegerField(),
-                )
-            )
-            .order_by("priority", order_field)
-            .distinct()
+        qs = list_admin_power_devices(
+            q=request.query_params.get("q", ""),
+            is_active=request.query_params.get("is_active", ""),
+            connection=request.query_params.get("connection", ""),
+            sort=request.query_params.get("order", "device_id_asc"),
         )
-
         paginator = AdminPagination()
         page = paginator.paginate_queryset(qs, request)
         serializer = PowerDeviceAdminListSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
 
+    @transaction.atomic
     def post(self, request):
         serializer = PowerDeviceAdminWriteSerializer(data=request.data)
         if not serializer.is_valid():
@@ -213,6 +182,7 @@ class PowerDeviceAdminDetailView(APIView):
             )
         return Response(PowerDeviceAdminListSerializer(device).data)
 
+    @transaction.atomic
     def put(self, request, pk):
         device = self._get(pk)
         if device is None:

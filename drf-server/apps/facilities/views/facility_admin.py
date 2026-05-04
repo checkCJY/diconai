@@ -5,6 +5,7 @@ URL 프리픽스: /api/admin/facilities/, /api/admin/equipments/, /api/admin/pow
 권한: 모든 엔드포인트 IsSuperAdmin (HTML 페이지는 admin_panel_urls.py의 TemplateView).
 """
 
+from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from django.views.generic import TemplateView
@@ -249,6 +250,7 @@ class EquipmentAdminDetailView(APIView):
             )
         return Response(EquipmentAdminListSerializer(equipment).data)
 
+    @transaction.atomic
     def put(self, request, pk):
         equipment = self._get(pk)
         if equipment is None:

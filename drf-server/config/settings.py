@@ -36,6 +36,7 @@ ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["127.0.0.1", "localhos
 INSTALLED_APPS = [
     # DRF
     "rest_framework",
+    "drf_spectacular",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -137,6 +138,21 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
+    # 응답 봉투 표준 {error: {code, message, details?}}로 4xx/5xx 변환.
+    "EXCEPTION_HANDLER": "apps.core.exceptions.standard_exception_handler",
+    # OpenAPI 자동 스키마 (drf-spectacular)
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+# ── drf-spectacular (OpenAPI / Swagger) ────────────────────
+SPECTACULAR_SETTINGS = {
+    "TITLE": "diconai API",
+    "DESCRIPTION": "산재 예방 통합 관제 시스템 — drf-server REST API",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    # 어드민·내부 ingest 등 도메인별로 그룹핑
+    "SCHEMA_PATH_PREFIX": r"/api/",
+    "COMPONENT_SPLIT_REQUEST": True,
 }
 
 # ── Simple JWT ────────────────────────────────────────────

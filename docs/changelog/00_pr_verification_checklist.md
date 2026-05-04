@@ -15,7 +15,7 @@
 | 1 | 환경변수·설정 중앙화 + 응답 표준 결정 | ✅ 완료 | [phase1_config_centralization.md](phase1_config_centralization.md) |
 | 2 | 어드민 보안 핫픽스 + 페이지네이션 표준화 | ✅ 완료 | [phase2_admin_security_pagination.md](phase2_admin_security_pagination.md) |
 | 3 | 프론트 HTTP·WebSocket 통일 | ✅ 완료 | [phase3_frontend_http_ws_unification.md](phase3_frontend_http_ws_unification.md) |
-| 4 | drf 레이어 정리 + 예외 핸들러 + Swagger | ⏳ 대기 | — |
+| 4 | drf 레이어 정리 + 예외 핸들러 + Swagger | ✅ 완료 | [phase4_drf_layer_exceptions_swagger.md](phase4_drf_layer_exceptions_swagger.md) |
 | 5 | fastapi 정리 (DRF 클라이언트, 로깅, broadcast 분리) | ⏳ 대기 | — |
 
 ---
@@ -223,41 +223,65 @@ cd /home/cjy/diconai/drf-server && python manage.py check
 
 ---
 
-## Phase 4 — drf 레이어 정리 + 예외 핸들러 + Swagger (예정)
+## Phase 4 — drf 레이어 정리 + 예외 핸들러 + Swagger
 
-### 자동 검증 (예정)
+### 자동 검증
 ```bash
-# (1) view에 ORM 직접 호출이 사라졌는지 (selectors로 추출됨)
-grep -rn "\.filter(\|\.annotate(\|\.order_by(" drf-server/apps/*/views/ \
-  | grep -v "test_" | grep -v "/admin.py"
-# 기대: 거의 0건 (selectors/services에서만 호출)
+cd drf-server && source .venv/bin/activate
 
-# (2) 마이그레이션 누락 없음
-cd drf-server && python manage.py makemigrations --check --dry-run
-# 기대: No changes detected
-
-# (3) Swagger 엔드포인트 등록
+# (1) Django check + 신규 모듈 import
+python manage.py check
 python -c "
 import os; os.environ.setdefault('DJANGO_SECRET_KEY','test')
 import django; os.environ['DJANGO_SETTINGS_MODULE']='config.settings'; django.setup()
-from django.urls import resolve
-resolve('/api/schema/')
-resolve('/api/schema/swagger-ui/')
-print('Swagger URLs OK')
+from apps.core.exceptions import standard_exception_handler
+from apps.accounts.selectors.admin_users import list_admin_users
+from apps.facilities.selectors.admin_devices import list_admin_gas_sensors, list_admin_power_devices
+print('imports OK')
 "
+# 기대: ✅ 모두 OK
 
-# (4) selectors / services 패키지가 비어있지 않음
-ls drf-server/apps/accounts/selectors/  drf-server/apps/accounts/services/
-ls drf-server/apps/facilities/selectors/ drf-server/apps/facilities/services/
+# (2) view에서 selector로 추출된 List view에 ORM 직접 호출이 줄었는지
+grep -n "\.filter(\|\.annotate(" apps/accounts/views/admin_views.py \
+  apps/facilities/views/gas_sensor_admin.py apps/facilities/views/power_device_admin.py \
+  | grep -v "_get\|_get_user\|inspections.objects\|update_fields"
+# 기대: 0건 (List view 영역에서 ORM 호출 사라짐)
+
+# (3) Dead PageView (APIView 버전) 제거 확인
+grep -n "class AccountsAdminPageView\|class OrganizationsAdminPageView" apps/accounts/views/admin_views.py
+# 기대: 0건
+
+# (4) drf-spectacular 설정 확인
+grep -n "drf_spectacular" config/settings.py
+# 기대: INSTALLED_APPS, DEFAULT_SCHEMA_CLASS, SPECTACULAR_SETTINGS 모두 노출
+
+# (5) Swagger schema 생성
+python manage.py spectacular --file /tmp/diconai_schema.yaml
+ls -la /tmp/diconai_schema.yaml
+grep -c "^  /" /tmp/diconai_schema.yaml
+# 기대: 78개 path
+
+# (6) 표준 에러 봉투 응답 (서버 기동 후)
+python manage.py runserver 8000 --noreload &
+sleep 3
+curl -s http://localhost:8000/api/gas-sensors/
+# 기대: {"error":{"code":"authentication_required","message":"..."}}
+
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8000/api/schema/
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8000/api/schema/swagger-ui/
+# 기대: 200, 200
 ```
 
-### 수동 검증 (예정)
-- [ ] `/api/schema/swagger-ui/` 접속 → 모든 엔드포인트 schema 노출
-- [ ] 사용자 생성 도중 강제 IntegrityError → 부분 커밋 없음 (트랜잭션 동작)
-- [ ] 잘못된 입력으로 검증 실패 호출 → 응답이 `{error: {code: "validation_failed", message, details}}` 구조
-- [ ] 인증 실패 시 응답이 `{error: {code: "authentication_required", ...}}`
-- [ ] 어드민 패널 화면 14개 회귀 (selector 추출 후에도 동일 동작)
-- [ ] `apps/accounts/views/admin_views.py`의 dead code (`AccountsAdminPageView` APIView 버전, `OrganizationsAdminPageView` APIView 버전) 제거 확인
+### 수동 검증 (브라우저/통합)
+- [ ] **Swagger UI** — `http://localhost:8000/api/schema/swagger-ui/` 접속 → 78개 엔드포인트 표시, "Try it out" 동작
+- [ ] **에러 응답 표준화** — 어드민 패널 사용자 생성에 빈 name 입력 → 400 + `{error: {code: "validation_failed", message, details: {name: [...]}}}`
+- [ ] **로그인 실패** — 잘못된 비밀번호 → 401 + 표준 에러 봉투
+- [ ] **트랜잭션 — Equipment 수정** — Equipment + PowerDevice 재활성화 도중 한쪽 강제 실패 → 둘 다 원상태
+- [ ] **회귀 — admin 패널 8개 페이지** — 사용자/공장/설비/가스센서/전력장비/지오펜스/지도편집기/조직 CRUD
+- [ ] **회귀 — 프론트 에러 메시지 표시** — Phase 3에서 통일된 fetch 응답 처리가 새 에러 봉투에 맞게 동작 (필요 시 보강)
+
+### Breaking change 주의
+- **4xx/5xx 응답 형식 변경:** `{detail: ...}` → `{error: {code, message, details?}}`. 프론트가 `data.detail`을 직접 읽던 곳(특히 `admin/accounts/accounts.js`의 validation 오류 표시)은 `data.error?.details?.name`으로 경로 변경 필요. Phase 3+4 결합 회귀 검증 시점에 보강.
 
 ---
 
