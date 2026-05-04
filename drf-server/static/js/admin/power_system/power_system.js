@@ -11,11 +11,6 @@ function _fmt(dt) {
 }
 function _fmtDate(d) { return d || '-'; }
 
-function _authHeaders() {
-  const token = Auth.getAccessToken();
-  return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
-}
-
 // ── 상태 ──────────────────────────────────────────────────────
 let _page = 1;
 const _pageSize = 10;
@@ -45,7 +40,7 @@ function _buildQuery() {
 
 async function _loadDevices() {
   try {
-    const res = await fetch(`/api/power-devices/?${_buildQuery()}`, { headers: _authHeaders() });
+    const res = await Auth.apiFetch(`/api/power-devices/?${_buildQuery()}`);
     if (!res.ok) return;
     const data = await res.json();
     _total = data.total;
@@ -60,7 +55,7 @@ async function _populateDeviceFilter() {
   const cur = sel.value;
   while (sel.options.length > 1) sel.remove(1);
   try {
-    const res = await fetch('/api/power-devices/codes/', { headers: _authHeaders() });
+    const res = await Auth.apiFetch('/api/power-devices/codes/');
     if (!res.ok) return;
     const codes = await res.json();
     codes.forEach(code => {
@@ -78,7 +73,7 @@ async function _loadDepartmentOptions(selId, selectedId = '') {
   const sel = document.getElementById(selId);
   while (sel.options.length > 1) sel.remove(1);
   try {
-    const res = await fetch('/api/departments/select/', { headers: _authHeaders() });
+    const res = await Auth.apiFetch('/api/departments/select/');
     if (!res.ok) return;
     const depts = await res.json();
     depts.forEach(d => {
@@ -95,7 +90,7 @@ async function _loadManagerOptions(selId, deptId = '', selectedId = '') {
   while (sel.options.length > 1) sel.remove(1);
   try {
     const url = deptId ? `/api/managers/select/?department_id=${deptId}` : '/api/managers/select/';
-    const res = await fetch(url, { headers: _authHeaders() });
+    const res = await Auth.apiFetch(url);
     if (!res.ok) return;
     const mgrs = await res.json();
     mgrs.forEach(m => {
@@ -225,7 +220,7 @@ async function _onCreateTypeChange() {
   }
   document.getElementById('createDeviceName').value = '스마트 전력 시스템';
   try {
-    const res = await fetch('/api/power-devices/next-code/', { headers: _authHeaders() });
+    const res = await Auth.apiFetch('/api/power-devices/next-code/');
     const data = await res.json();
     document.getElementById('createDeviceCode').value = data.code;
   } catch {}
@@ -258,7 +253,7 @@ async function _submitCreate() {
   // facility는 기본 첫 번째 facility 사용
   let facilityId = 1;
   try {
-    const fr = await fetch('/api/facilities/select/', { headers: _authHeaders() });
+    const fr = await Auth.apiFetch('/api/facilities/select/');
     if (fr.ok) { const flist = await fr.json(); if (flist.length) facilityId = flist[0].id; }
   } catch {}
 
@@ -274,9 +269,7 @@ async function _submitCreate() {
   };
 
   try {
-    const res = await fetch('/api/power-devices/', {
-      method: 'POST', headers: _authHeaders(), body: JSON.stringify(payload),
-    });
+    const res = await Auth.apiFetch('/api/power-devices/', { method: 'POST', body: JSON.stringify(payload) });
     if (!res.ok) {
       const err = await res.json();
       document.getElementById('errCreateGlobal').textContent = JSON.stringify(err);
@@ -298,9 +291,7 @@ async function _checkConn(ipId, portId, statusId) {
   const statusEl = document.getElementById(statusId);
   statusEl.style.display = 'none';
   try {
-    const res = await fetch('/api/power-devices/check-connection/', {
-      method: 'POST', headers: _authHeaders(),
-      body: JSON.stringify({ ip_address: ip, port: port ? Number(port) : null }),
+    const res = await Auth.apiFetch('/api/power-devices/check-connection/', { method: 'POST', body: JSON.stringify({ ip_address: ip, port: port ? Number(port) : null }),
     });
     const data = await res.json();
     _connCheckedAt = data.checked_at;
@@ -318,7 +309,7 @@ async function _checkConn(ipId, portId, statusId) {
 // ── 상세 / 수정 ───────────────────────────────────────────────
 async function _openDetail(id) {
   try {
-    const res = await fetch(`/api/power-devices/${id}/`, { headers: _authHeaders() });
+    const res = await Auth.apiFetch(`/api/power-devices/${id}/`);
     if (!res.ok) return;
     const d = await res.json();
     _currentDevice = d;
@@ -376,9 +367,7 @@ async function _submitEdit() {
   };
 
   try {
-    const res = await fetch(`/api/power-devices/${_currentDevice.id}/`, {
-      method: 'PUT', headers: _authHeaders(), body: JSON.stringify(payload),
-    });
+    const res = await Auth.apiFetch(`/api/power-devices/${_currentDevice.id}/`, { method: 'PUT', body: JSON.stringify(payload) });
     if (!res.ok) {
       const err = await res.json();
       document.getElementById('errEditGlobal').textContent = JSON.stringify(err);
@@ -395,7 +384,7 @@ async function _submitEdit() {
 
 // ── 점검 탭 ───────────────────────────────────────────────────
 async function _loadInspections(deviceId) {
-  const res = await fetch(`/api/power-devices/${deviceId}/inspections/`, { headers: _authHeaders() });
+  const res = await Auth.apiFetch(`/api/power-devices/${deviceId}/inspections/`);
   if (!res.ok) return [];
   return await res.json();
 }
@@ -477,9 +466,7 @@ async function _submitInspection() {
   };
 
   try {
-    const res = await fetch(`/api/power-devices/${_currentDevice.id}/inspections/`, {
-      method: 'POST', headers: _authHeaders(), body: JSON.stringify(payload),
-    });
+    const res = await Auth.apiFetch(`/api/power-devices/${_currentDevice.id}/inspections/`, { method: 'POST', body: JSON.stringify(payload) });
     if (!res.ok) {
       const err = await res.json();
       document.getElementById('errInspGlobal').textContent = JSON.stringify(err);
@@ -521,9 +508,7 @@ async function _submitAction() {
   };
 
   try {
-    const res = await fetch(`/api/power-devices/inspections/${_currentInspectionId}/action/`, {
-      method: 'POST', headers: _authHeaders(), body: JSON.stringify(payload),
-    });
+    const res = await Auth.apiFetch(`/api/power-devices/inspections/${_currentInspectionId}/action/`, { method: 'POST', body: JSON.stringify(payload) });
     if (!res.ok) return;
     _hideModal('actionModal');
     document.getElementById('successMsg').textContent = '조치가 등록되었습니다.';
@@ -555,8 +540,7 @@ function _openBulkDelete(ids) {
 
 async function _confirmDelete() {
   try {
-    const res = await fetch('/api/power-devices/bulk-delete/', {
-      method: 'POST', headers: _authHeaders(), body: JSON.stringify({ ids: _deleteTargetIds }),
+    const res = await Auth.apiFetch('/api/power-devices/bulk-delete/', { method: 'POST', body: JSON.stringify({ ids: _deleteTargetIds }),
     });
     if (!res.ok) return;
     _hideModal('deleteModal');

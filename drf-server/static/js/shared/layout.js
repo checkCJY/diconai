@@ -241,7 +241,7 @@ async function initHeaderAndSNB() {
     Header.showAdminBtn(user.role);
     Menu.render(user.menu_tree);
     if (user.admin_url) Header.adminUrl = user.admin_url;
-    localStorage.setItem('role', user.role);
+    Auth.setRole(user.role);
   }
 
   SNB.init();

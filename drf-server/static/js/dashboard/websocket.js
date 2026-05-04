@@ -262,25 +262,18 @@ function initWebSocket() {
   }
 
   // /ws/sensors/ 에 연결해 1초마다 수신되는 통합 페이로드를 각 패널에 반영한다.
+  // shared/ws-client.js의 WSClient를 사용해 alarm-ws.js와 동일 엔드포인트
+  // 중복 연결을 방지한다.
   function connect() {
-    let ws;
-    try {
-      ws = new WebSocket('ws://127.0.0.1:8001/ws/sensors/');
-    } catch {
-      setWsStatus('● 연결 불가', 'error');
-      _setPowerPanelError('데이터를 불러올 수 없습니다.');
-      return;
-    }
+    const ws = WSClient.connect('/ws/sensors/');
 
-    ws.onopen = () => {
+    ws.onOpen(() => {
       setWsStatus('● 실시간 연결', 'connected');
       _clearPowerPanelMsg();
       MapPanel.setMarkersConnected();
-    };
+    });
 
-    ws.onmessage = (e) => {
-      let data;
-      try { data = JSON.parse(e.data); } catch { return; }
+    ws.onMessage((data) => {
 
       // ── 패널 12: 유해가스 현황 테이블 (9종) ──────────────
       const gasTableBody = document.getElementById('gasTableBody');
@@ -429,48 +422,33 @@ function initWebSocket() {
           if (typeof EventPanel !== 'undefined') EventPanel.addItem(alarmData);
         });
       }
-    };
+    });
 
-    // 연결 오류 시 상태 배지를 갱신한다. 재연결은 onclose에서 처리한다.
-    ws.onerror = () => {
+    // 연결 오류 시 상태 배지를 갱신한다. 재연결은 WSClient가 자동 처리.
+    ws.onError(() => {
       setWsStatus('● 연결 오류', 'error');
       _setPowerPanelError('데이터를 불러올 수 없습니다.');
-
       _setGasPanelError('데이터를 불러올 수 없습니다.');
+    });
 
-    };
-
-    // 연결 끊김 시 3초 후 재연결을 시도한다.
-    ws.onclose = () => {
+    // 연결 끊김 시 상태 배지만 갱신. 재연결은 WSClient(3초)가 처리.
+    ws.onClose(() => {
       setWsStatus('● 연결 끊김', 'error');
       _setPowerPanelError('데이터를 불러올 수 없습니다.');
-
       _setGasPanelError('데이터를 불러올 수 없습니다.');
-
-      setTimeout(connect, 3000);
-    };
+    });
   }
 
   // /ws/positions/ 에 연결해 IoT 장비로부터 수신된 작업자 위치만 별도로 처리한다.
   // sensors 페이로드에도 worker_positions가 포함되어 있으나,
   // 이 채널은 위치 전용 고빈도 갱신을 위해 분리 운영한다.
   function connectPositions() {
-    let wsPos;
-    try {
-      wsPos = new WebSocket('ws://127.0.0.1:8001/ws/positions/');
-    } catch {
-      return;
-    }
-
-    wsPos.onmessage = (e) => {
-      let data;
-      try { data = JSON.parse(e.data); } catch { return; }
+    const wsPos = WSClient.connect('/ws/positions/');
+    wsPos.onMessage((data) => {
       if (data.worker_positions && typeof MapPanel.updateWorkerPositions === 'function') {
         MapPanel.updateWorkerPositions(data.worker_positions);
       }
-    };
-
-    wsPos.onclose = () => setTimeout(connectPositions, 3000);
+    });
   }
 
   connect();

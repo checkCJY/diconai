@@ -11,10 +11,6 @@ let _createConnOk = false;
 let _editConnOk = false;
 
 // ── 헬퍼 ─────────────────────────────────────────────────
-function _authHeaders() {
-  const token = Auth.getAccessToken();
-  return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
-}
 function _esc(str) {
   if (!str) return '';
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -52,7 +48,7 @@ function _buildQuery() {
 // ── 데이터 로드 ───────────────────────────────────────────
 async function _loadSensors() {
   try {
-    const res = await fetch(`/api/gas-sensors/?${_buildQuery()}`, { headers: _authHeaders() });
+    const res = await Auth.apiFetch(`/api/gas-sensors/?${_buildQuery()}`);
     if (!res.ok) throw new Error();
     const data = await res.json();
     _total = data.total;
@@ -83,7 +79,7 @@ async function _loadDepartmentOptions(selId, selectedId = '') {
   const sel = document.getElementById(selId);
   while (sel.options.length > 1) sel.remove(1);
   try {
-    const res = await fetch('/api/departments/select/', { headers: _authHeaders() });
+    const res = await Auth.apiFetch('/api/departments/select/');
     if (!res.ok) return;
     const depts = await res.json();
     depts.forEach(d => {
@@ -103,7 +99,7 @@ async function _loadManagerOptions(selId, deptId = '', selectedId = '') {
     const url = deptId
       ? `/api/managers/select/?department_id=${deptId}`
       : '/api/managers/select/';
-    const res = await fetch(url, { headers: _authHeaders() });
+    const res = await Auth.apiFetch(url);
     if (!res.ok) return;
     const mgrs = await res.json();
     mgrs.forEach(m => {
@@ -244,7 +240,7 @@ async function _onCreateTypeChange() {
   if (!type) { document.getElementById('createDeviceCode').value = ''; return; }
   document.getElementById('errCreateDeviceType').textContent = '';
   try {
-    const res = await fetch('/api/gas-sensors/next-code/', { headers: _authHeaders() });
+    const res = await Auth.apiFetch('/api/gas-sensors/next-code/');
     const data = await res.json();
     document.getElementById('createDeviceCode').value = data.code;
     document.getElementById('createDeviceName').value = `GAS-${data.code}`;
@@ -263,10 +259,7 @@ async function _checkConnection(ipId, portId, statusId, connCheckedId, isCreate)
   if (errId) document.getElementById(errId).textContent = '';
 
   try {
-    const res = await fetch('/api/gas-sensors/check-connection/', {
-      method: 'POST',
-      headers: _authHeaders(),
-      body: JSON.stringify({ ip_address: ip, port: Number(port) }),
+    const res = await Auth.apiFetch('/api/gas-sensors/check-connection/', { method: 'POST', body: JSON.stringify({ ip_address: ip, port: Number(port) }),
     });
     const data = await res.json();
     const el = document.getElementById(statusId);
@@ -318,9 +311,7 @@ async function _submitCreate() {
   };
 
   try {
-    const res = await fetch('/api/gas-sensors/', {
-      method: 'POST', headers: _authHeaders(), body: JSON.stringify(payload),
-    });
+    const res = await Auth.apiFetch('/api/gas-sensors/', { method: 'POST', body: JSON.stringify(payload) });
     if (res.ok) {
       _hideModal('createModal');
       _page = 1;
@@ -339,7 +330,7 @@ async function _submitCreate() {
 // ── 센서 상세 모달 ────────────────────────────────────────
 async function _openDetail(id) {
   try {
-    const res = await fetch(`/api/gas-sensors/${id}/`, { headers: _authHeaders() });
+    const res = await Auth.apiFetch(`/api/gas-sensors/${id}/`);
     if (!res.ok) { alert('센서 정보를 불러오지 못했습니다.'); return; }
     _currentSensor = await res.json();
   } catch { alert('네트워크 오류가 발생했습니다.'); return; }
@@ -406,9 +397,7 @@ async function _submitEdit() {
   };
 
   try {
-    const res = await fetch(`/api/gas-sensors/${id}/`, {
-      method: 'PUT', headers: _authHeaders(), body: JSON.stringify(payload),
-    });
+    const res = await Auth.apiFetch(`/api/gas-sensors/${id}/`, { method: 'PUT', body: JSON.stringify(payload) });
     if (res.ok) {
       _hideModal('detailModal');
       _loadSensors();
@@ -437,7 +426,7 @@ async function _loadInspectionTab() {
 
   // 점검 이력 로드
   try {
-    const res = await fetch(`/api/gas-sensors/${s.id}/inspections/`, { headers: _authHeaders() });
+    const res = await Auth.apiFetch(`/api/gas-sensors/${s.id}/inspections/`);
     const inspections = await res.json();
 
     // 최근 점검 상태 카드
@@ -541,9 +530,7 @@ async function _submitInspCreate() {
   };
 
   try {
-    const res = await fetch(`/api/gas-sensors/${_currentSensor.id}/inspections/`, {
-      method: 'POST', headers: _authHeaders(), body: JSON.stringify(payload),
-    });
+    const res = await Auth.apiFetch(`/api/gas-sensors/${_currentSensor.id}/inspections/`, { method: 'POST', body: JSON.stringify(payload) });
     if (res.ok) {
       _hideModal('inspCreateModal');
       _loadInspectionTab();
@@ -561,7 +548,7 @@ async function _submitInspCreate() {
 // ── 조치 등록 ─────────────────────────────────────────────
 async function _openAction(inspectionId) {
   try {
-    const res = await fetch(`/api/gas-sensors/${_currentSensor.id}/inspections/`, { headers: _authHeaders() });
+    const res = await Auth.apiFetch(`/api/gas-sensors/${_currentSensor.id}/inspections/`);
     const inspections = await res.json();
     const insp = inspections.find(i => i.id === inspectionId);
     if (!insp) return;
@@ -591,8 +578,7 @@ async function _submitAction() {
   if (!notes) { document.getElementById('errActionNotes').textContent = '조치 의견을 입력해 주세요.'; return; }
 
   try {
-    const res = await fetch(`/api/gas-sensors/inspections/${inspId}/action/`, {
-      method: 'POST', headers: _authHeaders(), body: JSON.stringify({ action_notes: notes }),
+    const res = await Auth.apiFetch(`/api/gas-sensors/inspections/${inspId}/action/`, { method: 'POST', body: JSON.stringify({ action_notes: notes }),
     });
     if (res.ok) {
       _hideModal('actionModal');
@@ -617,8 +603,7 @@ function _openBulkDelete(ids) {
 
 async function _confirmDelete() {
   try {
-    const res = await fetch('/api/gas-sensors/bulk-delete/', {
-      method: 'POST', headers: _authHeaders(), body: JSON.stringify({ ids: _deleteTargetIds }),
+    const res = await Auth.apiFetch('/api/gas-sensors/bulk-delete/', { method: 'POST', body: JSON.stringify({ ids: _deleteTargetIds }),
     });
     if (res.ok) {
       _hideModal('deleteModal');

@@ -208,10 +208,7 @@ _geofences: [],
   // ── 가스센서·전력장치 위치를 DB API에서 로드한다. ─────────────────────
   async _loadDevices() {
     try {
-      const token = Auth.getAccessToken();
-      const res = await fetch('/api/map-editor/objects/', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await Auth.apiFetch('/api/map-editor/objects/');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
 
@@ -263,11 +260,7 @@ _geofences: [],
 
   async _loadGeofences() {
     try {
-      const token = Auth.getAccessToken();
-      const res = await fetch('/api/geofences/', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
+      const res = await Auth.apiFetch('/api/geofences/');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const geofences = await res.json();
@@ -314,11 +307,7 @@ _geofences: [],
   async deleteGeofence(id) {
     if (!confirm('이 지오펜스를 삭제하시겠습니까?')) return;
     try {
-      const token = Auth.getAccessToken();
-      const res = await fetch(`/api/geofences/${id}/`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
+      const res = await Auth.apiFetch(`/api/geofences/${id}/`, { method: 'DELETE' });
       if (res.status === 204) {
         this.map.closePopup();
         await this._loadGeofences();
@@ -393,13 +382,8 @@ _geofences: [],
       if (!name) { alert('구역 이름을 입력해주세요.'); return; }
 
       try {
-        const token = Auth.getAccessToken();
-        const res = await fetch('/api/geofences/', {
+        const res = await Auth.apiFetch('/api/geofences/', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
           body: JSON.stringify({
             facility: 1,
             name,

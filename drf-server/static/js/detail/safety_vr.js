@@ -10,7 +10,7 @@
   const btnDone     = document.getElementById('btnDone');
   let maxReached    = 0;
 
-  fetch(PROGRESS_API, { headers: { 'Authorization': 'Bearer ' + Auth.getAccessToken() } })
+  Auth.apiFetch(PROGRESS_API)
     .then(r => r.json())
     .then(data => {
       if (data.position > 0) {
@@ -51,14 +51,12 @@
   });
 
   function saveProgress(position) {
-    const token = Auth.getAccessToken();
     navigator.sendBeacon(PROGRESS_API + '?_method=POST',
       new Blob([JSON.stringify({ position })], { type: 'application/json' })
     );
-    /* sendBeacon은 커스텀 헤더 불가 — fallback으로 fetch 사용 */
-    fetch(PROGRESS_API, {
+    /* sendBeacon은 커스텀 헤더 불가 — fallback으로 Auth.apiFetch 사용 */
+    Auth.apiFetch(PROGRESS_API, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
       body: JSON.stringify({ position }),
       keepalive: true,
     }).catch(() => {});
@@ -95,9 +93,8 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key: 'vr' }),
     }).catch(() => {});
-    await fetch(PROGRESS_API, {
+    await Auth.apiFetch(PROGRESS_API, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + Auth.getAccessToken() },
       body: JSON.stringify({ position: 0 }),
       keepalive: true,
     }).catch(() => {});

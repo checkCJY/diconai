@@ -8,7 +8,7 @@
     const roleEl = document.getElementById('adminRole');
     if (nameEl) nameEl.textContent = me.username ?? '';
     if (roleEl) roleEl.textContent = me.role ?? '';
-    localStorage.setItem('role', me.role ?? '');
+    Auth.setRole(me.role);
 })();
 
 document.getElementById('btnHome').addEventListener('click', function () {
@@ -28,7 +28,7 @@ const AdminAccess = {
       const me = await Auth.getMe();
       if (!me) { Auth.redirectLogin(); return false; }
       role = me.role;
-      localStorage.setItem('role', role);
+      Auth.setRole(role);
     }
     if (!allowedRoles.includes(role)) {
       this._showDenied();

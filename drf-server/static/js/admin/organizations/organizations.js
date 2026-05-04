@@ -20,16 +20,9 @@ const Org = {
   // ── API 헬퍼 ──────────────────────────────────────────────
 
   async _api(method, url, body) {
-    const token = localStorage.getItem('access_token');
-    const opts = {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-    };
+    const opts = { method };
     if (body) opts.body = JSON.stringify(body);
-    const res = await fetch(url, opts);
+    const res = await Auth.apiFetch(url, opts);
     if (res.status === 204) return null;
     return res.json();
   },
