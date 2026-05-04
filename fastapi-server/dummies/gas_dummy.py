@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 
 import requests
 
+from core.config import settings
 from core.gas_thresholds import calculate_gas_status
 
 logging.basicConfig(
@@ -20,7 +21,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-FASTAPI_BASE_URL = "http://localhost:8001"
+FASTAPI_BASE_URL = f"http://{settings.DUMMY_TARGET_HOST}:{settings.DUMMY_TARGET_PORT}"
 FASTAPI_DEVICE_INFO_URL = f"{FASTAPI_BASE_URL}/api/sensors/info"
 FASTAPI_GAS_URL = f"{FASTAPI_BASE_URL}/api/sensors/gas"
 
@@ -28,7 +29,9 @@ DEVICE_ID = "63200c3afd12"
 DEVICE_NAME = "63200c3afd12"
 SOFTWARE_VERSION = "1.0.1"
 SENSOR_LOCATION = {"x": 140, "y": 160}
-DANGER_EVENT_PROB = 0.09   # 가스 1종당 위험 확률 (독립 적용) — 테스트 시 0.9로 올리면 위험 상태 유지
+DANGER_EVENT_PROB = (
+    settings.DUMMY_RISK_PROBABILITY
+)  # .env DUMMY_RISK_PROBABILITY로 제어
 
 GAS_NORMAL_RANGE: dict[str, tuple] = {
     "co": (0, 24),
@@ -128,7 +131,7 @@ def run() -> None:
     logger.info("가스 데이터 전송 시작 → %s", FASTAPI_GAS_URL)
     while True:
         send_data(FASTAPI_GAS_URL, generate_gas_data(), "GAS")
-        time.sleep(1)
+        time.sleep(settings.DUMMY_SEND_INTERVAL_SEC)
 
 
 if __name__ == "__main__":

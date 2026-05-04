@@ -20,10 +20,10 @@ from power.schemas.power import (
     PowerWattPayload,
 )
 from power.services.power_service import (
-    DRF_POWER_DATA_URL,
-    DRF_POWER_EVENT_URL,
+    DRF_POWER_DATA_PATH,
+    DRF_POWER_EVENT_PATH,
     now_utc_iso,
-    post_to_drf,
+    post_power_to_drf,
     to_channel_list,
     update_power_state,
 )
@@ -38,8 +38,8 @@ async def recv_onoff(payload: PowerOnOffPayload, bg: BackgroundTasks):
     measured_at = now_utc_iso()
     update_power_state("onoff", snapshot, measured_at)
     bg.add_task(
-        post_to_drf,
-        DRF_POWER_EVENT_URL,
+        post_power_to_drf,
+        DRF_POWER_EVENT_PATH,
         {
             "device_id": payload.device_id,
             "measured_at": measured_at,
@@ -56,8 +56,8 @@ async def recv_current(payload: PowerCurrentPayload, bg: BackgroundTasks):
     measured_at = now_utc_iso()
     update_power_state("current", channel_values, measured_at)
     bg.add_task(
-        post_to_drf,
-        DRF_POWER_DATA_URL,
+        post_power_to_drf,
+        DRF_POWER_DATA_PATH,
         {
             "device_id": payload.device_id,
             "measured_at": measured_at,
@@ -75,8 +75,8 @@ async def recv_voltage(payload: PowerVoltagePayload, bg: BackgroundTasks):
     measured_at = now_utc_iso()
     update_power_state("voltage", channel_values, measured_at)
     bg.add_task(
-        post_to_drf,
-        DRF_POWER_DATA_URL,
+        post_power_to_drf,
+        DRF_POWER_DATA_PATH,
         {
             "device_id": payload.device_id,
             "measured_at": measured_at,
@@ -94,8 +94,8 @@ async def recv_watt(payload: PowerWattPayload, bg: BackgroundTasks):
     measured_at = now_utc_iso()
     update_power_state("watt", channel_values, measured_at)
     bg.add_task(
-        post_to_drf,
-        DRF_POWER_DATA_URL,
+        post_power_to_drf,
+        DRF_POWER_DATA_PATH,
         {
             "device_id": payload.device_id,
             "measured_at": measured_at,

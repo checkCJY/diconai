@@ -12,12 +12,14 @@ from datetime import datetime, timezone
 
 import requests
 
+from core.config import settings
+
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
 )
 logger = logging.getLogger(__name__)
 
-FASTAPI_BASE_URL = "http://localhost:8001"
+FASTAPI_BASE_URL = f"http://{settings.DUMMY_TARGET_HOST}:{settings.DUMMY_TARGET_PORT}"
 FASTAPI_POSITION_URL = f"{FASTAPI_BASE_URL}/api/positioning/receive"
 
 DUMMY_WORKERS: list[dict] = [

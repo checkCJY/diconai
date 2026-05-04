@@ -9,6 +9,10 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """fastapi-server 전역 설정. .env 파일 또는 환경변수로 주입 가능."""
 
+    # ── 로깅 ───────────────────────────────────────────────────
+    # core.logging.setup_logging()에 전달. DEBUG/INFO/WARNING/ERROR.
+    LOG_LEVEL: str = "INFO"
+
     # ── DRF 연동 ───────────────────────────────────────────────
     DRF_BASE_URL: str = "http://localhost:8000"
     DRF_SERVICE_TOKEN: str = ""  # 빈 문자열이면 Authorization 헤더 미포함

@@ -3,6 +3,7 @@
 #   POST /api/positioning/receive : 더미 또는 IoT 장비에서 위치 배열을 수신해 공유 상태 갱신
 #   WS   /ws/positions/           : 브라우저 연결 → 1초마다 공유 상태의 위치 배열을 전송
 import asyncio
+import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -11,6 +12,7 @@ from positioning.schemas.position import WorkerPositionSchema
 from positioning.services.position_service import save_positions_to_drf
 from websocket import state as ws_state
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -55,4 +57,4 @@ async def position_stream(websocket: WebSocket):
             await websocket.send_json({"worker_positions": positions})
             await asyncio.sleep(1)
     except WebSocketDisconnect:
-        print("[positioning] Client disconnected")
+        logger.info("[ws/positions] action=disconnect")

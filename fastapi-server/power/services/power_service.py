@@ -4,16 +4,17 @@
 #   - DRF 비동기 전송 (BackgroundTask용 fire-and-forget 패턴)
 #   - power_latest 공유 상태 갱신
 #   - 채널 데이터를 equipment[] 형태로 조립해 WebSocket 브로드캐스트에 제공
+import logging
 from datetime import datetime, timezone
 
-import httpx
-
-from core.config import settings
 from core.power_thresholds import POWER_THRESHOLDS
+from services.drf_client import post_to_drf
 from websocket.state import power_latest
 
-DRF_POWER_EVENT_URL = f"{settings.DRF_BASE_URL}/api/monitoring/power/event/"
-DRF_POWER_DATA_URL = f"{settings.DRF_BASE_URL}/api/monitoring/power/data/"
+logger = logging.getLogger(__name__)
+
+DRF_POWER_EVENT_PATH = "/api/monitoring/power/event/"
+DRF_POWER_DATA_PATH = "/api/monitoring/power/data/"
 
 # 채널 번호 → 설비명 매핑
 # 운영 환경에서는 DRF PowerDevice.channel_meta 조회로 교체 예정
@@ -42,30 +43,13 @@ def now_utc_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def auth_headers() -> dict:
-    """DRF 요청용 헤더를 반환한다. 토큰이 설정된 경우 Bearer 인증 헤더를 포함한다."""
-    headers = {"Content-Type": "application/json"}
-    if settings.DRF_SERVICE_TOKEN:
-        headers["Authorization"] = f"Bearer {settings.DRF_SERVICE_TOKEN}"
-    return headers
-
-
-async def post_to_drf(url: str, payload: dict) -> None:
-    """
-    DRF에 데이터를 비동기로 전송한다.
+async def post_power_to_drf(path: str, payload: dict) -> None:
+    """전력 데이터를 DRF에 비동기 fire-and-forget 전송.
 
     BackgroundTask에서 실행되므로 실패해도 WebSocket 흐름을 블로킹하지 않는다.
-    오류 발생 시 print로 로그를 남기고 무시한다.
+    실패는 services.drf_client가 logger.warning/error로 기록한다.
     """
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            res = await client.post(url, json=payload, headers=auth_headers())
-            if res.status_code not in (200, 201):
-                print(f"[DRF] 저장 실패 {res.status_code}: {res.text[:80]}")
-    except httpx.TimeoutException:
-        print("[DRF] 응답 타임아웃")
-    except Exception as e:
-        print(f"[DRF] 전송 오류: {e}")
+    await post_to_drf(path, payload, raise_on_error=False, log_category="power_service")
 
 
 def to_channel_list(channel_values: dict) -> list[dict]:

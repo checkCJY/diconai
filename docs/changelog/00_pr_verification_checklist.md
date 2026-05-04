@@ -16,7 +16,7 @@
 | 2 | 어드민 보안 핫픽스 + 페이지네이션 표준화 | ✅ 완료 | [phase2_admin_security_pagination.md](phase2_admin_security_pagination.md) |
 | 3 | 프론트 HTTP·WebSocket 통일 | ✅ 완료 | [phase3_frontend_http_ws_unification.md](phase3_frontend_http_ws_unification.md) |
 | 4 | drf 레이어 정리 + 예외 핸들러 + Swagger | ✅ 완료 | [phase4_drf_layer_exceptions_swagger.md](phase4_drf_layer_exceptions_swagger.md) |
-| 5 | fastapi 정리 (DRF 클라이언트, 로깅, broadcast 분리) | ⏳ 대기 | — |
+| 5 | fastapi 정리 (DRF 클라이언트, 로깅, broadcast 분리) | ✅ 완료 | [phase5_fastapi_cleanup.md](phase5_fastapi_cleanup.md) |
 
 ---
 
@@ -285,51 +285,63 @@ curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8000/api/schema/swagge
 
 ---
 
-## Phase 5 — fastapi 정리 (예정)
+## Phase 5 — fastapi 정리 + 양 서버 로거 통일
 
-### 자동 검증 (예정)
+### 자동 검증
 ```bash
-# (1) print() 잔존 0건
-grep -rn "^\s*print(" fastapi-server/ --include="*.py" | grep -v dummies/ | grep -v __pycache__
-# 기대: 0건 (dummies는 CLI 출력 허용)
+cd /home/cjy/diconai/fastapi-server && source .venv/bin/activate
 
-# (2) Celery → fastapi 호출에 settings 사용
-grep -n "127.0.0.1:8001\|localhost:8001" drf-server/apps/alerts/tasks.py
-# 기대: 0건 (settings.FASTAPI_INTERNAL_URL 사용)
+# (1) print() 잔존 0건 (dummies 외)
+grep -rn "^\s*print(" --include="*.py" | grep -v "__pycache__\|dummies/"
+# 기대: 0건
 
-# (3) broadcast.py 함수 분할 확인
+# (2) drf_client + logging 모듈 + broadcast 책임 분리 함수
+test -f services/drf_client.py && echo "drf_client OK"
+test -f core/logging.py && echo "logging OK"
 python -c "
-from websocket.services import broadcast
-required = ['is_stale', 'assemble_payload']
-for fn in required:
-    assert hasattr(broadcast, fn), fn
-print('broadcast split OK')
+from websocket.services.broadcast import is_stale, build_ai_dummy_fields, build_broadcast_payload
+print('broadcast 3-fn split OK')
 "
 
-# (4) drf_client.py 신설 확인
-test -f fastapi-server/services/drf_client.py && echo "drf_client OK"
-
-# (5) Swagger UI에 모든 엔드포인트
-curl -s http://localhost:8001/openapi.json | python -c "
-import json, sys
-spec = json.load(sys.stdin)
-paths = list(spec['paths'].keys())
-expected = ['/api/sensors/gas', '/api/power/onoff', '/api/positioning/receive', '/internal/alarms/push/']
-for e in expected:
-    assert any(e in p for p in paths), e
-print(f'OpenAPI paths: {len(paths)} OK')
+# (3) app + logger 통합 동작
+python -c "from app import app; print('app routes:', len(app.routes))"
+python -c "
+from core.logging import setup_logging
+setup_logging('INFO')
+import logging
+logging.getLogger('test').info('[verify] action=ok')
 "
+# 기대: 2026-XX-XX INFO    test: [verify] action=ok 형식
+
+# (4) 모든 service에 logger
+grep -l "logger = logging.getLogger" gas/services/*.py power/services/*.py positioning/services/*.py
+# 기대: 3개 파일 모두
+
+# (5) settings 신규 필드 사용 확인
+grep -rn "settings\.\(BROADCAST_INTERVAL_SEC\|DATA_STALE_THRESHOLD_SEC\|DUMMY_TARGET\|DUMMY_RISK_PROBABILITY\)" --include="*.py" | wc -l
+# 기대: 5건 이상
+
+# (6) uvicorn 부팅 + /docs / 표준 에러 봉투
+uvicorn app:app --port 8001 &
+sleep 3
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8001/docs
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8001/openapi.json
+curl -s -X POST http://localhost:8001/api/sensors/gas -H "Content-Type: application/json" -d '{}'
+# 기대: 200, 200, {"error":{"code":"validation_failed","message":"...","details":[...]}}
 ```
 
-### 수동 검증 (예정)
-- [ ] 더미 3종 동시 송출 + DRF 강제 종료(`Ctrl+C`) → fastapi 죽지 않고 broadcast 계속, logger.error 출력
-- [ ] DRF 재기동 → 자동 회복, 알람 정상 생성
-- [ ] `/docs` (FastAPI Swagger UI) 모든 엔드포인트 schema 표시
-- [ ] WS 클라이언트가 동일 페이로드 수신 (회귀)
-- [ ] stale 판정 동작 (센서 데이터 8초 이상 미수신 → `stale: true` 표시)
-- [ ] 서버-서버 ingest 엔드포인트 보호 확인:
-  - localhost 외부에서 `/api/monitoring/gas/` 호출 → 차단됨
-  - localhost(fastapi)에서 호출 → 정상
+### 수동 검증
+- [ ] **더미 3종 동시 송출 + DRF 강제 종료** → fastapi 죽지 않고 broadcast 지속. ERROR 로그 출력 (gas는 5xx 응답, power/positioning은 무음 fire-and-forget)
+- [ ] **DRF 재기동** → 자동 회복, 알람 정상 생성
+- [ ] **`/docs` Swagger UI** 모든 엔드포인트 schema 표시
+- [ ] **WS 클라이언트** 동일 페이로드 수신 (회귀: gas/power/position 모두 정상)
+- [ ] **stale 판정** — 센서 데이터 9초 이상 미수신 → 페이로드의 `power_loading=true`, `gas_loading=true`
+- [ ] **로그 포맷** — drf-server와 동일 포맷 `시간 LEVEL 모듈: [CATEGORY] key=value`
+- [ ] **`LOG_LEVEL` env** 변경 시 출력 변화 (`DEBUG`로 재시작 → 더 상세 로그)
+- [ ] **`/internal/alarms/push/`** localhost 외부 차단 (Phase 5에서 코드 변경 없음, 기존 보호 유지)
+
+### Breaking change 주의
+- 4xx/5xx 응답이 `{detail}` → `{error: {code, message, details?}}`로 통일. 외부 도구가 fastapi `/api/...`를 직접 호출하는 경우만 영향. 브라우저·IoT 송출 영향 없음.
 
 ---
 
