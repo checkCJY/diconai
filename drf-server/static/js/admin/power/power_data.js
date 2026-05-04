@@ -59,7 +59,7 @@
    * 페이지 HTML 생성 시점과 실제 조회 시점 사이에 바뀔 수 있기 때문.
    */
   function loadDevices() {
-    fetch(API_DEVICES)
+    Auth.apiFetch(API_DEVICES)
       .then(function (res) { return res.json(); })
       .then(function (devices) {
         devices.forEach(function (d) {
@@ -98,7 +98,7 @@
     const params = buildParams(currentPage);
     elTableBody.innerHTML = '<tr><td colspan="6" class="empty-msg">불러오는 중...</td></tr>';
 
-    fetch(API_BASE + '?' + params.toString())
+    Auth.apiFetch(API_BASE + '?' + params.toString())
       .then(function (res) {
         if (!res.ok) throw new Error('서버 오류 ' + res.status);
         return res.json();
@@ -187,12 +187,22 @@
 
     const url = '/api/admin/power-data/export/?' + params.toString();
 
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'power_data_export.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    // <a href> 직접 트리거는 JWT를 부착하지 못해 401. fetch + blob으로 처리.
+    Auth.apiFetch(url)
+      .then(function (res) {
+        if (!res.ok) throw new Error('CSV 다운로드 실패 ' + res.status);
+        return res.blob();
+      })
+      .then(function (blob) {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'power_data_export.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(a.href);
+      })
+      .catch(function (err) { alert(err.message); });
   }
 
   // ── 빠른 날짜 버튼 ────────────────────────────────────────────────────
