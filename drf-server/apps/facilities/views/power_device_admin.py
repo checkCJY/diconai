@@ -112,12 +112,7 @@ class PowerDeviceConnectionCheckView(APIView):
             sock.close()
             ok = result == 0
         except OSError as exc:
-            logger.warning(
-                "[power_device] connection check failed ip=%s port=%s: %s",
-                ip,
-                port,
-                exc,
-            )
+            logger.warning(f"[power_device_conn] ip={ip} port={port} error={exc}")
             ok = False
 
         checked_at = timezone.now()

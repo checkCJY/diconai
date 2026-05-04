@@ -130,10 +130,7 @@ class GasSensorConnectionCheckView(APIView):
             sock.close()
             ok = result == 0
         except OSError as exc:
-            # 호스트 불가, 잘못된 주소 등 — 사용자에게는 연결 실패로 안내, 서버에는 로깅.
-            logger.warning(
-                "[gas_sensor] connection check failed ip=%s port=%s: %s", ip, port, exc
-            )
+            logger.warning(f"[gas_sensor_conn] ip={ip} port={port} error={exc}")
             ok = False
 
         checked_at = timezone.now()

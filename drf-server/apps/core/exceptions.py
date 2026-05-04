@@ -86,13 +86,10 @@ def standard_exception_handler(exc, context):
         response.data = body
         return response
 
-    # DRF가 처리 못한 예외는 logging.error + 500 표준 응답
+    # DRF가 처리 못한 예외는 traceback과 함께 ERROR 로그로 남기고 500 표준 응답.
     view = context.get("view")
-    logger.exception(
-        "[unhandled] view=%s exc=%r",
-        view.__class__.__name__ if view else "?",
-        exc,
-    )
+    view_name = view.__class__.__name__ if view else "?"
+    logger.exception(f"[unhandled_exception] view={view_name} exc={exc!r}")
     return Response(
         {
             "error": {

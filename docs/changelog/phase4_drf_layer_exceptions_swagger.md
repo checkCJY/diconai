@@ -78,7 +78,8 @@ def get(self, request):
 | 파일 | 변경 요약 |
 |---|---|
 | `drf-server/requirements.txt` | `drf-spectacular==0.29.0` + 트랜시티브(attrs, inflection, jsonschema-specifications, pyyaml, referencing, rpds-py, uritemplate) 추가 |
-| `drf-server/config/settings.py` | `INSTALLED_APPS`에 `drf_spectacular`, `REST_FRAMEWORK`에 `EXCEPTION_HANDLER`/`DEFAULT_SCHEMA_CLASS`, 신규 `SPECTACULAR_SETTINGS` 블록 |
+| `drf-server/config/settings.py` | `INSTALLED_APPS`에 `drf_spectacular`, `REST_FRAMEWORK`에 `EXCEPTION_HANDLER`/`DEFAULT_SCHEMA_CLASS`, 신규 `SPECTACULAR_SETTINGS` 블록, **`LOGGING` dictConfig + `DJANGO_LOG_LEVEL` env 추가** (포맷: `시간 LEVEL 모듈: [CATEGORY] key=value`) |
+| `drf-server/.env.example` | `DJANGO_LOG_LEVEL=INFO` 추가 |
 | `drf-server/config/urls.py` | `/api/schema/`, `/api/schema/swagger-ui/`, `/api/schema/redoc/` 라우트 추가 |
 | `drf-server/apps/accounts/views/admin_views.py` | List view를 selector 호출로 단순화, `@transaction.atomic` POST/PATCH 적용, dead `AccountsAdminPageView`·`OrganizationsAdminPageView`(APIView 버전, dead) 제거. 에러 응답 키 `error` → `detail` (글로벌 핸들러가 표준 봉투로 감싸므로 일관성 위해) |
 | `drf-server/apps/facilities/views/gas_sensor_admin.py` | List view selector 호출, POST/PUT `@transaction.atomic`, `connection_check`의 `except Exception` → `except OSError + logger.warning` |
@@ -166,6 +167,7 @@ python manage.py runserver
 | `EquipmentAdminDetailView.put` 트랜잭션 | **반드시 적용** | 적용 안 함 | Equipment 저장 + PowerDevice 재활성화의 다중 모델 쓰기. 한 쪽 실패 시 부분 커밋이 데이터 불일치 야기. event_service의 `@transaction.atomic` 패턴 차용. |
 | 트랜잭션 적용 폭 | **필요한 다중 쓰기 view에만** | 모든 POST/PUT 일괄 | 단일 모델 INSERT는 DB가 자체 트랜잭션. atomic 데코레이터 추가는 redundant. Surgical Changes. |
 | `except Exception` 처리 | **socket connection_check 2곳만 구체화** | auth_views.py / dashboard/views.py의 묵음 except도 정리 | auth/dashboard의 except는 graceful degradation으로 의도된 동작 — 변경하면 회귀 위험. Phase 4 범위 좁게. |
+| 로거 통일 정책 | **settings.py LOGGING dictConfig + 컨벤션 포맷 `[CATEGORY] key=value`** | 로거 모두 삭제 / 모듈별 로거 설정 분산 | 프로젝트 전체에 일관된 로깅 설계 유지. 추후 `DJANGO_LOG_LEVEL` env로 운영/개발 분기 가능. Phase 5에서 fastapi-server에도 동일 정책 적용 예정. dev_convention.md §6의 컨벤션 그대로 적용. |
 
 ## 8. 검증 방법 / 결과
 

@@ -198,6 +198,42 @@ LANGUAGE_CODE = "ko-kr"
 TIME_ZONE = "Asia/Seoul"
 USE_TZ = True
 
+# ── Logging ──────────────────────────────────────────────────
+# 컨벤션 (docs/dev_convention.md §6):
+#   - 모듈별 logger: logger = logging.getLogger(__name__)
+#   - 메시지 포맷: f"[CATEGORY] key=value key=value"
+#   - 레벨: DEBUG(상세) / INFO(정상완료) / WARNING(주의·재시도) / ERROR(실패)
+LOG_LEVEL = env("DJANGO_LOG_LEVEL", default="INFO")
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "diconai": {
+            "format": "{asctime} {levelname:<7} {name}: {message}",
+            "datefmt": "%Y-%m-%d %H:%M:%S",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "diconai",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": LOG_LEVEL,
+    },
+    "loggers": {
+        "django.request": {  # 4xx/5xx 응답 시 Django가 traceback을 남김
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+    },
+}
+
 # ── Redis ─────────────────────────────────────────────────────
 # 로컬 개발: Redis 설치 후 기본 포트(6379)로 실행하면 별도 설정 없이 동작.
 # Windows: https://github.com/microsoftarchive/redis/releases
