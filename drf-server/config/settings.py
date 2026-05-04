@@ -25,8 +25,8 @@ environ.Env.read_env(BASE_DIR / ".env")
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = env("DJANGO_SECRET_KEY")
 
-# SECURITY WARNING: don"t run with debug turned on in production!
-DEBUG = True
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = env.bool("DJANGO_DEBUG", default=False)
 
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["127.0.0.1", "localhost"])
 
@@ -77,6 +77,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "apps.core.context_processors.frontend_config",
             ],
         },
     },
@@ -94,11 +95,13 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
+# DATABASE_URL이 없으면 로컬 개발용 sqlite로 폴백.
+# 운영: postgres://user:pass@host:5432/dbname 형식
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
+    "default": env.db(
+        "DATABASE_URL",
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+    )
 }
 
 
@@ -138,8 +141,12 @@ REST_FRAMEWORK = {
 
 # ── Simple JWT ────────────────────────────────────────────
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(hours=24),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=30),
+    "ACCESS_TOKEN_LIFETIME": timedelta(
+        hours=env.int("JWT_ACCESS_TOKEN_LIFETIME_HOURS", default=24)
+    ),
+    "REFRESH_TOKEN_LIFETIME": timedelta(
+        days=env.int("JWT_REFRESH_TOKEN_LIFETIME_DAYS", default=30)
+    ),
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
@@ -147,6 +154,19 @@ SIMPLE_JWT = {
 ADMIN_BACKOFFICE_URL = env(
     "ADMIN_BACKOFFICE_URL", default="/admin-panel/accounts-management/"
 )
+
+# ── FastAPI 서버 (서버 간 호출용, localhost) ──────────────
+# Celery → FastAPI WS 브리지(/internal/alarms/push/) 호출에 사용.
+# 브라우저는 별도로 FRONTEND_WS_BASE_URL을 통해 직접 fastapi와 WS 연결.
+FASTAPI_INTERNAL_URL = env("FASTAPI_INTERNAL_URL", default="http://127.0.0.1:8001")
+
+# ── 프론트엔드 노출용 URL (config.js로 주입) ───────────────
+# 브라우저가 fastapi-server에 접속할 때 사용하는 공개 주소.
+# 운영 환경에서는 도메인/HTTPS로 교체.
+FRONTEND_API_BASE_URL = env(
+    "FRONTEND_API_BASE_URL", default=""
+)  # 빈 문자열이면 same-origin (Django 호스트)
+FRONTEND_WS_BASE_URL = env("FRONTEND_WS_BASE_URL", default="ws://127.0.0.1:8001")
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
@@ -173,12 +193,12 @@ REDIS_URL = env("REDIS_URL", default="redis://localhost:6379/0")
 # ── Celery ────────────────────────────────────────────────────
 # Celery worker 실행: celery -A config worker -l info
 # (DRF 서버와 별도 터미널에서 실행해야 함)
-CELERY_BROKER_URL         = REDIS_URL        # 태스크 전달 채널 (Redis)
-CELERY_RESULT_BACKEND     = REDIS_URL        # 태스크 결과 저장 (Redis)
-CELERY_ACCEPT_CONTENT     = ["json"]
-CELERY_TASK_SERIALIZER    = "json"
-CELERY_RESULT_SERIALIZER  = "json"
-CELERY_TIMEZONE           = TIME_ZONE
+CELERY_BROKER_URL = REDIS_URL  # 태스크 전달 채널 (Redis)
+CELERY_RESULT_BACKEND = REDIS_URL  # 태스크 결과 저장 (Redis)
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_TRACK_STARTED = True
 
 # ── Cache (Redis) ─────────────────────────────────────────────
