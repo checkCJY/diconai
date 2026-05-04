@@ -14,7 +14,7 @@
 |---|---|---|---|
 | 1 | 환경변수·설정 중앙화 + 응답 표준 결정 | ✅ 완료 | [phase1_config_centralization.md](phase1_config_centralization.md) |
 | 2 | 어드민 보안 핫픽스 + 페이지네이션 표준화 | ✅ 완료 | [phase2_admin_security_pagination.md](phase2_admin_security_pagination.md) |
-| 3 | 프론트 HTTP·WebSocket 통일 | ⏳ 대기 | — |
+| 3 | 프론트 HTTP·WebSocket 통일 | ✅ 완료 | [phase3_frontend_http_ws_unification.md](phase3_frontend_http_ws_unification.md) |
 | 4 | drf 레이어 정리 + 예외 핸들러 + Swagger | ⏳ 대기 | — |
 | 5 | fastapi 정리 (DRF 클라이언트, 로깅, broadcast 분리) | ⏳ 대기 | — |
 
@@ -174,29 +174,52 @@ print('Phase 2 pagination: 5 keys OK')
 
 ---
 
-## Phase 3 — 프론트 HTTP·WebSocket 통일 (예정)
+## Phase 3 — 프론트 HTTP·WebSocket 통일
 
-### 자동 검증 (예정)
+### 자동 검증
 ```bash
-# (1) WS URL 하드코딩 사라짐 (Auth.apiFetch는 제외)
-grep -rn "ws://127.0.0.1:8001\|http://localhost:8001" drf-server/static/js/
-# 기대: 0건 (전부 AppConfig.WS_BASE / apiUrl 사용)
+cd /home/cjy/diconai/drf-server/static/js
 
-# (2) localStorage.getItem('access_token') 직접 호출 사라짐
-grep -rn "localStorage.getItem('access_token')\|localStorage.getItem(\"access_token\")" drf-server/static/js/ \
-  | grep -v "shared/auth.js"
-# 기대: 0건 (auth.js 외부에서 직접 접근 없음)
+# (1) 하드코딩된 WS URL 잔존 — config.js의 fallback 1건만 허용
+grep -rn "ws://127.0.0.1\|http://localhost:8001\|http://127.0.0.1:8001" --include="*.js"
+# 기대: shared/config.js:8 (WS_BASE fallback) 1건만
 
-# (3) ws-client.js 신설 확인
-test -f drf-server/static/js/shared/ws-client.js && echo "ws-client OK"
+# (2) 수동 Authorization 헤더 — 0건이어야 함
+grep -rn "Authorization.*Bearer" --include="*.js" | grep -v "shared/auth.js"
+# 기대: 0건
+
+# (3) localStorage 직접 접근 (Auth 외부) — 0건
+grep -rn "localStorage\.\(getItem\|setItem\|removeItem\)" --include="*.js" | grep -v "shared/auth.js"
+# 기대: 0건
+
+# (4) _authHeaders 헬퍼 잔존 — 0건
+grep -rn "_authHeaders" --include="*.js"
+# 기대: 0건
+
+# (5) Auth.getAccessToken 직접 사용 — layout.js + login.js 2건만 허용 (토큰 존재 검사용)
+grep -rn "Auth\.getAccessToken" --include="*.js" | grep -v shared/auth.js | grep -v shared/ws-client.js
+# 기대: layout.js:233, login.js:3 두 곳만
+
+# (6) ws-client.js 신설 확인
+test -f shared/ws-client.js && echo "ws-client OK"
+
+# (7) Django check
+cd /home/cjy/diconai/drf-server && python manage.py check
+# 기대: System check identified no issues
 ```
 
-### 수동 검증 (예정)
-- [ ] 짧은 JWT lifetime(예: 1분)로 발급 → 어드민 CRUD 도중 만료 → `Auth.apiFetch`가 자동 refresh로 작업 연속성 유지
-- [ ] DevTools Network → WS 탭에서 `/ws/sensors/` 연결 **1개만** (현재는 2개: alarm-ws + dashboard/websocket)
-- [ ] `.env` `FRONTEND_WS_BASE_URL`만 변경하고 페이지 새로고침 → 새 호스트로 WS 연결됨
-- [ ] 토큰 없이 어드민 페이지 진입 → 모든 화면이 일관되게 `/accounts/login/`으로 리다이렉트
-- [ ] dashboard 메인 화면 + snb_details 모니터링 페이지 + 어드민 패널 + login 페이지 모두 정상 동작 (회귀)
+### 수동 검증 (브라우저 실측)
+- [ ] **JWT 자동 refresh:** 짧은 JWT lifetime(예: 1분)로 발급 → 어드민 CRUD 도중 만료 → 자동 refresh로 작업 연속성 유지
+- [ ] **WS 중복 연결 제거:** DevTools Network → WS 탭에서 `/ws/sensors/` 연결 **1개만** (이전: alarm-ws + dashboard 2개)
+- [ ] **WS_BASE 운영 전환:** `.env` `FRONTEND_WS_BASE_URL`을 다른 호스트로 변경 → 페이지 새로고침 시 새 호스트로 연결
+- [ ] **로그인 리다이렉트:** 토큰 없이 어드민 페이지 진입 → 모든 화면이 일관되게 `/accounts/login/`으로 이동
+- [ ] **회귀 — admin 8개 페이지:** accounts, facility, gas_sensor, power_system, geofence, map_editor, organizations, data 가스/전력 모두 CRUD 정상
+- [ ] **회귀 — dashboard 메인:** 가스/전력/위치 실시간 갱신, 알람 팝업, 지도 패널 정상
+- [ ] **회귀 — detail 5개:** `/dashboard/monitoring/{realtime,gas,power,workers,events}/` 정상
+- [ ] **회귀 — safety:** VR 진행률 저장/복원 정상, 안전 점검 체크리스트 정상
+
+### Breaking change 주의
+- **없음**(non-breaking). 단, 18개 JS 파일 수정의 회귀 가능성으로 위 수동 검증 시나리오를 모두 돌려보는 게 안전.
 
 ---
 
