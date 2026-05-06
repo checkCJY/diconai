@@ -312,7 +312,8 @@ a.more {
 .tbl-scroll::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
 
 /* thead 고정 — 스크롤 시 컬럼 헤더 유지 */
-#powerPanel .tbl thead th {
+#powerPanel .tbl thead th,
+#gasPanel .tbl thead th {
   position: sticky;
   top: 0;
   background: #1c2128;
@@ -322,19 +323,22 @@ a.more {
   color: var(--text2, #8b949e);
   font-weight: 500;
 }
-#powerPanel .tbl {
+#powerPanel .tbl,
+#gasPanel .tbl {
   width: 100%;
   border-collapse: collapse;
   border-radius: 10px;
   overflow: hidden;
 }
-#powerPanel .tbl td {
+#powerPanel .tbl td,
+#gasPanel .tbl td {
   padding: 8px 10px;
   font-size: 12px;
   color: #e6edf3;
   border-bottom: 1px solid rgba(255,255,255,0.05);
 }
-#powerPanel .tbl tbody tr:last-child td { border-bottom: none; }
+#powerPanel .tbl tbody tr:last-child td,
+#gasPanel .tbl tbody tr:last-child td { border-bottom: none; }
 
 /* ── risk-level별 행 배경색 ─────────────────────────────── */
 .risk-row.risk-danger  { background: rgba(220, 38, 38, 0.55); }
