@@ -287,9 +287,12 @@ function _processPositions(workerPositions) {
 
   entries.forEach(([wid, pos]) => {
     const workerId  = parseInt(wid);
+    // status는 백엔드가 평가한 실시간 위험도(센서 측정값 기반) 사용.
+    // 지오펜스의 정적 risk_level이 아니라 그 안 가스/전력 센서 임계치 초과 여부로 판정됨.
+    const status    = _riskToCss(pos.risk_level || 'normal');
     const geofence  = _findGeofence(pos.x, pos.y);
-    const status    = _riskToCss(geofence ? geofence.risk_level : 'normal');
-    const zone      = geofence ? geofence.name : _movementLabel(pos.movement_status);
+    const zone      = pos.zone_name
+                      || (geofence ? geofence.name : _movementLabel(pos.movement_status));
     const connected = _isConnected(pos.updated_at);
     if (connected) connectedCount++;
 

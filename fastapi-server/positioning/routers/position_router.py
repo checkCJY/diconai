@@ -39,6 +39,7 @@ router = APIRouter()
 async def receive_positions(positions: list[WorkerPositionSchema]):
     now = datetime.now(timezone.utc)
     for p in positions:
+        # 위험도/구역명은 DRF 응답 도착 후 비동기로 갱신됨. 도착 전엔 default 'normal'.
         ws_state.worker_positions[p.worker_id] = {
             "x": p.x,
             "y": p.y,
@@ -46,8 +47,19 @@ async def receive_positions(positions: list[WorkerPositionSchema]):
             "worker_name": p.worker_name,
             "movement_status": p.movement_status,
             "updated_at": (p.measured_at or now).isoformat(),
+            "risk_level": "normal",
+            "zone_name": None,
         }
-    asyncio.create_task(save_positions_to_drf(positions))
+
+    async def _persist_and_update_status():
+        statuses = await save_positions_to_drf(positions)
+        for wid, info in statuses.items():
+            entry = ws_state.worker_positions.get(wid)
+            if entry is not None:
+                entry["risk_level"] = info["risk_level"]
+                entry["zone_name"] = info["zone_name"]
+
+    asyncio.create_task(_persist_and_update_status())
     return {"received": True, "count": len(positions)}
 
 

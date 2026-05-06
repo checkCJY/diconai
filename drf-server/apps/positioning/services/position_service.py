@@ -8,6 +8,20 @@ from datetime import timedelta
 _RISK_ORDER = {"warning": 1, "danger": 2}
 
 
+def evaluate_worker_risk_level(geofence) -> str:
+    """
+    작업자 좌표가 속한 지오펜스의 실시간 위험도 판정.
+
+    지오펜스 자체의 정적 risk_level이 아닌, 그 영역 안에 위치한
+    가스/전력 센서 최신 측정값을 보고 'normal'/'warning'/'danger'를 반환한다.
+    geofence가 None이거나 안의 센서가 모두 normal/없음이면 'normal'.
+    """
+    if geofence is None:
+        return "normal"
+    info = _get_dangerous_sensors_in_geofence(geofence)
+    return info["risk_level"] if info else "normal"
+
+
 def _get_dangerous_sensors_in_geofence(geofence) -> dict | None:
     """
     지오펜스 polygon 안에 위치한 GasSensor/PowerDevice 중
@@ -114,15 +128,27 @@ def handle_position_receive(
     y: float,
     movement_status: str,
     measured_at,
-):
+) -> dict:
     """
     FastAPI로부터 위치 데이터 수신
     → 지오펜스 30픽셀 이내 접근 시에만 DB 저장
     → 그 외는 저장 안 함 (WebSocket 표시만)
+
+    반환: {
+        "worker_id": int,
+        "position_id": int | None,   # None이면 근접 X로 저장 생략
+        "risk_level": "normal"|"warning"|"danger",
+        "zone_name": str | None,
+    }
     """
     # 지오펜스 근접 여부 확인
     if not _is_near_any_geofence(facility_id, x, y):
-        return None  # 저장 안 함
+        return {
+            "worker_id": worker_id,
+            "position_id": None,
+            "risk_level": "normal",
+            "zone_name": None,
+        }
 
     # 근접 시에만 저장
     pos = WorkerPosition.objects.create(
@@ -138,21 +164,28 @@ def handle_position_receive(
     pos.update_geofence_cache()
     pos.save(update_fields=["current_geofence"])
 
-    if pos.current_geofence:
-        danger_info = _get_dangerous_sensors_in_geofence(pos.current_geofence)
-        if danger_info:
-            from apps.alerts.tasks import fire_geofence_alarm_task
+    geofence = pos.current_geofence
+    danger_info = _get_dangerous_sensors_in_geofence(geofence) if geofence else None
+    risk_level = danger_info["risk_level"] if danger_info else "normal"
 
-            fire_geofence_alarm_task.delay(
-                worker_id=worker_id,
-                facility_id=facility_id,
-                geofence_id=pos.current_geofence.id,
-                geofence_name=pos.current_geofence.name,
-                risk_level=danger_info["risk_level"],
-                sensor_source_label=danger_info["source_label"],
-            )
+    if danger_info:
+        from apps.alerts.tasks import fire_geofence_alarm_task
 
-    return pos
+        fire_geofence_alarm_task.delay(
+            worker_id=worker_id,
+            facility_id=facility_id,
+            geofence_id=geofence.id,
+            geofence_name=geofence.name,
+            risk_level=risk_level,
+            sensor_source_label=danger_info["source_label"],
+        )
+
+    return {
+        "worker_id": worker_id,
+        "position_id": pos.id,
+        "risk_level": risk_level,
+        "zone_name": geofence.name if geofence else None,
+    }
 
 
 def recalculate_worker_positions_for_facility(facility_id: int):
