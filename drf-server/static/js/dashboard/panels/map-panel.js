@@ -10,7 +10,17 @@ const MapPanel = {
   map:         null,
   layers:      {},
   gasMarkers:    {},
+  powerMarkers:  {},
   workerMarkers: {},
+
+  SVG_BOUNDS:  [[0, 0], [600, 1300]],
+  FIT_PADDING: [20, 20],
+  // 지오펜스 경계 톨러런스 (SVG 좌표 단위) — 폴리곤 변에서 이 거리 이내의 센서도 inside로 인식
+  GEOFENCE_TOLERANCE: 12,
+
+  recenter() {
+    if (this.map) this.map.fitBounds(this.SVG_BOUNDS, { padding: this.FIT_PADDING });
+  },
 
   // 드로잉 관련 상태
   drawMode:     false,
@@ -123,8 +133,10 @@ _createPowerIcon(color) {
       <div>CO: ${s.co} ppm &nbsp; H2S: ${s.h2s} ppm &nbsp; O2: ${s.o2}%</div>`;
   },
 
-  // 작업자 좌표가 polygon 내부인지 판별 (Ray Casting)
-_pointInPolygon(x, y, polygon) {
+  // 좌표가 polygon 내부인지 판별 (Ray Casting + 옵션 톨러런스)
+  // tolerance > 0 이면 폴리곤 변에서 그 거리 이내도 inside로 인식 (경계 흔들림 방지)
+  // 작업자 인식은 strict 유지 위해 tolerance 미지정 호출 (기본 0)
+_pointInPolygon(x, y, polygon, tolerance = 0) {
   let inside = false;
   const n = polygon.length;
   let j = n - 1;
@@ -136,11 +148,67 @@ _pointInPolygon(x, y, polygon) {
     }
     j = i;
   }
-  return inside;
+  if (inside) return true;
+  if (tolerance <= 0) return false;
+  for (let i = 0, k = n - 1; i < n; k = i, i++) {
+    if (this._distanceToSegment(x, y, polygon[k][0], polygon[k][1], polygon[i][0], polygon[i][1]) <= tolerance) {
+      return true;
+    }
+  }
+  return false;
+},
+
+// 점(px,py)에서 선분(x1,y1)-(x2,y2)까지의 최단 거리
+_distanceToSegment(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1;
+  if (dx === 0 && dy === 0) return Math.hypot(px - x1, py - y1);
+  const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)));
+  return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
 },
 
 // 현재 로드된 지오펜스 목록 (저장용)
 _geofences: [],
+// id → Leaflet polygon layer 매핑 (지오펜스 색상 동적 갱신용)
+_geofenceLayers: {},
+
+// 데이터 흐름: 센서/장치 → 지오펜스 색상.
+// 각 지오펜스에 대해 내부(톨러런스 포함) 장치를 모아 그 최댓값 위험도로 색상 결정.
+// 내부에 장치가 하나도 없으면 어드민이 설정한 risk_level 베이스라인 유지.
+_applyDeviceRiskToGeofences() {
+  const allDevices = [
+    ...Object.values(this.gasMarkers).map(({ data }) => data),
+    ...Object.values(this.powerMarkers).map(({ data }) => data),
+  ];
+
+  this._geofences.forEach(g => {
+    let maxRisk = -1;
+    for (const d of allDevices) {
+      if (this._pointInPolygon(d.x, d.y, g.polygon, this.GEOFENCE_TOLERANCE)) {
+        const r = d.risk_level || 0;
+        if (r > maxRisk) maxRisk = r;
+      }
+    }
+
+    let color, effectiveRisk;
+    if (maxRisk >= 0) {
+      // 내부 장치 존재 → 최댓값 위험도로 색상 결정 (ZONE 키 체계: warning 사용)
+      effectiveRisk = ['normal', 'warning', 'danger'][maxRisk];
+      color = this.ZONE_COLOR[effectiveRisk] || this.STATUS_COLOR.normal;
+    } else {
+      // 내부 장치 없음 → 어드민 베이스라인
+      effectiveRisk = g.risk_level;
+      color = this.ZONE_COLOR[g.risk_level] || '#888';
+    }
+
+    const layer = this._geofenceLayers[g.id];
+    if (layer && layer._currentColor !== color) {
+      layer.setStyle({ color, fillColor: color });
+      layer._currentColor = color;
+    }
+    // 작업자 색상/상태 산출에서 참조 — 동적 위험도 캐싱
+    if (layer) layer._currentRiskLevel = effectiveRisk;
+  });
+},
 
   powerPopupHtml(d) {
     const st    = this.levelToStatus(d.risk_level);
@@ -161,16 +229,23 @@ _geofences: [],
   async init() {
     if (!window.L || !document.getElementById('map')) return;
 
+    // minZoom을 임시로 넓게 풀어 fitBounds가 음수 줌까지 계산 가능하게 함
+    // (CRS.Simple 기본 minZoom=0이라 컨테이너 < SVG일 때 fitBounds가 잠겨버림)
+    // zoomSnap: 0 — 분수 줌을 허용해 fit이 정수로 스냅되며 과도하게 축소되는 것을 방지
     this.map = L.map('map', {
-      crs: L.CRS.Simple, minZoom: -2, maxZoom: 2,
+      crs: L.CRS.Simple, minZoom: -4, maxZoom: 2,
       zoomControl: false, dragging: true,
       scrollWheelZoom: true, doubleClickZoom: false, touchZoom: false,
+      maxBoundsViscosity: 1.0, zoomSnap: 0,
     });
 
-    const bounds = [[0, 0], [600, 1300]];
     const mapUrl = window.FACTORY_MAP_URL || '';
-    if (mapUrl) L.imageOverlay(mapUrl, bounds).addTo(this.map);
-    this.map.fitBounds(bounds);
+    if (mapUrl) L.imageOverlay(mapUrl, this.SVG_BOUNDS).addTo(this.map);
+
+    // 컨테이너에 SVG를 패딩만큼 띄워 채우고, 그 줌 레벨을 minZoom으로 잠궈 빈 여백 노출 차단
+    this.recenter();
+    this.map.setMinZoom(this.map.getZoom());
+    this.map.setMaxBounds(this.SVG_BOUNDS);
 
     this.layers = {
       gas:      L.layerGroup().addTo(this.map),
@@ -229,10 +304,11 @@ _geofences: [],
           id: d.id, name: d.device_name, device_id: d.code,
           x: d.x, y: d.y, risk_level: 0,
         };
-        L.marker([d.y, d.x], {
+        const m = L.marker([d.y, d.x], {
           icon: this._createPowerIcon(this.riskColor(0)),
-        }).bindPopup(this.powerPopupHtml(deviceData), { maxWidth: 220 })
-          .addTo(this.layers.power);
+        }).bindPopup(this.powerPopupHtml(deviceData), { maxWidth: 220 });
+        m.addTo(this.layers.power);
+        this.powerMarkers[d.code] = { marker: m, data: deviceData };
       });
 
       console.log(`[MapPanel] 가스센서 ${data.gas_sensors.length}개, 전력장치 ${data.power_devices.length}개 로드`);
@@ -252,9 +328,11 @@ _geofences: [],
       this.gasMarkers[s.device_id] = { marker: m, data: s };
     });
     this.DUMMY_POWER_DEVICES.forEach(d => {
-      L.marker([d.y, d.x], {
+      const m = L.marker([d.y, d.x], {
         icon: this._createPowerIcon(this.riskColor(d.risk_level)),
-      }).bindPopup(this.powerPopupHtml(d), { maxWidth: 220 }).addTo(this.layers.power);
+      }).bindPopup(this.powerPopupHtml(d), { maxWidth: 220 });
+      m.addTo(this.layers.power);
+      this.powerMarkers[d.device_id] = { marker: m, data: d };
     });
   },
 
@@ -265,6 +343,7 @@ _geofences: [],
 
       const geofences = await res.json();
       this._geofences = geofences;
+      this._geofenceLayers = {};
       this.layers.geofence.clearLayers();
 
       const role    = Auth.getRole();
@@ -276,6 +355,7 @@ _geofences: [],
         const layer   = L.polygon(latlngs, {
           color, fillColor: color, fillOpacity: 0.15, weight: 2
         });
+        layer._currentColor = color;
         const deleteBtn = isAdmin ? `
           <button
             onclick="MapPanel.deleteGeofence(${g.id})"
@@ -289,19 +369,27 @@ _geofences: [],
           ${deleteBtn}
         `;
         layer.bindPopup(popupContent, { maxWidth: 220 }).addTo(this.layers.geofence);
+        this._geofenceLayers[g.id] = layer;
       });
 
       console.log(`[MapPanel] 지오펜스 ${geofences.length}개 로드 완료`);
     } catch (err) {
       console.warn('[MapPanel] 지오펜스 로드 실패, 더미 데이터 사용:', err);
-      this.DUMMY_GEOFENCES.forEach(g => {
+      this._geofences = this.DUMMY_GEOFENCES.map((g, i) => ({
+        id: `dummy-${i}`, ...g, risk_level: g.zone_type,
+      }));
+      this._geofenceLayers = {};
+      this._geofences.forEach(g => {
         const latlngs = g.polygon.map(([x, y]) => [y, x]);
-        const color   = this.ZONE_COLOR[g.zone_type] || '#888';
-        L.polygon(latlngs, { color, fillColor: color, fillOpacity: 0.15, weight: 2 })
-         .bindPopup(`<div class='popup-title'>🚧 ${g.name}</div>`)
-         .addTo(this.layers.geofence);
+        const color   = this.ZONE_COLOR[g.risk_level] || '#888';
+        const layer = L.polygon(latlngs, { color, fillColor: color, fillOpacity: 0.15, weight: 2 })
+          .bindPopup(`<div class='popup-title'>🚧 ${g.name}</div>`);
+        layer._currentColor = color;
+        layer.addTo(this.layers.geofence);
+        this._geofenceLayers[g.id] = layer;
       });
     }
+    this._applyDeviceRiskToGeofences();
   },
 
   async deleteGeofence(id) {
@@ -467,19 +555,57 @@ _geofences: [],
     Object.values(this.gasMarkers).forEach(({ marker }) => marker.setOpacity(1));
   },
 
+  // 가스 9종(co, h2s, co2, o2, no2, so2, o3, nh3, voc) 중 최댓값 위험도를 산출 후
+  // 모든 가스 마커에 동일하게 적용한다 (WS 페이로드는 사이트 전체 합산 1세트).
   updateGasSensorFromWS(wsData) {
-    const entry = this.gasMarkers['sensor_01'];
-    if (!entry) return;
-    const level = wsData.level === '위험' ? 2 : 0;
-    // 위험도가 바뀔 때만 setIcon — 매 틱마다 SVG 재생성·DOM 교체 방지
-    if (entry.data.risk_level !== level) {
-      entry.marker.setIcon(this._createGasIcon(this.riskColor(level)));
-      entry.data.risk_level = level;
-    }
-    entry.data.co  = wsData.co;
-    entry.data.h2s = wsData.h2s;
-    entry.data.o2  = wsData.o2;
-    if (entry.marker.isPopupOpen()) entry.marker.setPopupContent(this.gasPopupHtml(entry.data));
+    let worstLevel = 0;
+    Object.keys(wsData).forEach(k => {
+      if (!k.endsWith('_risk')) return;
+      const r = wsData[k];
+      if (r === 'danger')       worstLevel = Math.max(worstLevel, 2);
+      else if (r === 'warning') worstLevel = Math.max(worstLevel, 1);
+    });
+
+    let changed = false;
+    Object.values(this.gasMarkers).forEach(({ marker, data }) => {
+      if (data.risk_level !== worstLevel) {
+        marker.setIcon(this._createGasIcon(this.riskColor(worstLevel)));
+        data.risk_level = worstLevel;
+        changed = true;
+      }
+      data.co  = wsData.co;
+      data.h2s = wsData.h2s;
+      data.o2  = wsData.o2;
+      if (marker.isPopupOpen()) marker.setPopupContent(this.gasPopupHtml(data));
+    });
+    if (changed) this._applyDeviceRiskToGeofences();
+  },
+
+  // WS equipment 배열의 risk_level('normal'/'warning'/'danger')을 매핑해 전력 마커 색상 갱신.
+  // 이름 매칭이 되면 개별 설비 위험도 사용, 안 되면 전체 설비 최댓값을 폴백으로 모든 마커에 적용
+  // (지도 위 전력 마커명과 WS 설비명이 다를 수 있어 폴백 필요 — 가스 패턴과 동일).
+  updatePowerDevicesFromWS(equipment) {
+    if (!equipment || !equipment.length) return;
+    const RISK_TO_LEVEL = { normal: 0, warning: 1, danger: 2 };
+
+    let worstLevel = 0;
+    equipment.forEach(eq => {
+      worstLevel = Math.max(worstLevel, RISK_TO_LEVEL[eq.risk_level] ?? 0);
+    });
+
+    let changed = false;
+    Object.values(this.powerMarkers).forEach(({ marker, data }) => {
+      const eq = equipment.find(e => e.name === data.name);
+      const newLevel = eq ? (RISK_TO_LEVEL[eq.risk_level] ?? 0) : worstLevel;
+
+      if (data.risk_level !== newLevel) {
+        marker.setIcon(this._createPowerIcon(this.riskColor(newLevel)));
+        data.risk_level = newLevel;
+        changed = true;
+      }
+      if (marker.isPopupOpen()) marker.setPopupContent(this.powerPopupHtml(data));
+    });
+    if (changed) this._applyDeviceRiskToGeofences();
   },
 
   updateWorkerPositions(positions) {
@@ -498,8 +624,12 @@ _geofences: [],
           break;
         }
       }
+      // 지오펜스의 동적 효과 위험도(센서 반영)를 우선, 없으면 어드민 베이스라인
+      const layer = inGeofence ? this._geofenceLayers[inGeofence.id] : null;
+      const effectiveRisk = layer?._currentRiskLevel || inGeofence?.risk_level || 'normal';
+
       statuses[w.worker_id] = {
-        status: inGeofence ? inGeofence.risk_level : 'normal',
+        status: inGeofence ? effectiveRisk : 'normal',
         geofence_name: inGeofence ? inGeofence.name : null,
         worker_name: w.worker_name || String(w.worker_id),
       };
@@ -514,7 +644,7 @@ _geofences: [],
       entry.data.movement_status = w.movement_status;
 
       const newColor = inGeofence
-        ? (this.ZONE_COLOR[inGeofence.risk_level] || '#f85149')
+        ? (this.ZONE_COLOR[effectiveRisk] || '#f85149')
         : '#58a6ff';
       // 색이 바뀔 때만 setIcon
       if (entry.data._iconColor !== newColor) {

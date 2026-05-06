@@ -392,8 +392,9 @@ function initWebSocket() {
         _switchPowerChart(_aiPowerIdx);
       }
 
-      // ── MN-02 맵 — 가스센서·작업자 위치 갱신 ─────────────
+      // ── MN-02 맵 — 가스센서·전력장치·작업자 위치 갱신 ─────
       MapPanel.updateGasSensorFromWS(data);
+      if (data.equipment) MapPanel.updatePowerDevicesFromWS(data.equipment);
       if (data.worker_positions && typeof MapPanel.updateWorkerPositions === 'function') {
         const posArray = Object.entries(data.worker_positions).map(([id, pos]) => ({
           worker_id: parseInt(id), ...pos,

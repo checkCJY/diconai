@@ -40,9 +40,7 @@ function _initLayerToggles() {
 /* ── 전체 맞춤 버튼 ── */
 function _initFocusBtn() {
   const btn = document.getElementById('btn-focus-all');
-  if (btn) btn.addEventListener('click', () => {
-    MapPanel.map && MapPanel.map.fitBounds([[0, 0], [600, 1300]]);
-  });
+  if (btn) btn.addEventListener('click', () => MapPanel.recenter());
 }
 
 /* ── 범례 패널 토글 ── */
