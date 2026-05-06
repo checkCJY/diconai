@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -15,6 +16,7 @@ from core.config import settings
 from core.logging import setup_logging
 from gas.routers.gas_router import router as gas_router
 from internal.routers.alarm_router import router as internal_alarm_router
+from internal.routers.scenario_router import router as internal_scenario_router
 from positioning.routers.position_router import router as positioning_router
 from power.routers.power_router import router as power_router
 from websocket.routers.ws_router import (
@@ -48,11 +50,20 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="DiconAI FastAPI Server", lifespan=lifespan)
 
+# 대시보드(DRF :8000) → FastAPI(:8001) 시연 컨트롤 fetch 허용
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://127.0.0.1:8000", "http://localhost:8000"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
+)
+
 app.include_router(gas_router)
 app.include_router(power_router)
 app.include_router(positioning_router)
 app.include_router(ws_router)
 app.include_router(internal_alarm_router)  # Celery → WS 브리지 (localhost 전용)
+app.include_router(internal_scenario_router)  # 시연 시나리오 모드 컨트롤
 
 
 # ── 전역 예외 핸들러 ────────────────────────────────────────────

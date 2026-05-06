@@ -12,6 +12,7 @@ import time
 import requests
 
 from core.config import settings
+from dummies._scenario import get_scenario_mode
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
@@ -45,8 +46,6 @@ POWER_CHANNELS = [
     "slave72",
 ]
 
-SEND_INTERVAL_SEC = 3
-
 
 def generate_power_onoff_data() -> dict:
     """16채널 ON/OFF 상태 페이로드를 생성한다. 70% 확률로 ON(255), 나머지는 OFF(0)."""
@@ -72,11 +71,33 @@ def generate_power_voltage_data() -> dict:
     return data
 
 
+def _pick_watt(mode: str) -> int:
+    """시나리오 모드에 따라 채널 와트값을 결정한다.
+
+    mixed 모드는 기존 동작(50~5000 또는 0) 유지.
+    fixed 모드는 POWER_THRESHOLD_CAUTION/DANGER 경계 기준 범위 강제.
+    """
+    caution = settings.POWER_THRESHOLD_CAUTION
+    danger = settings.POWER_THRESHOLD_DANGER
+    if mode == "normal":
+        return random.randint(50, max(50, caution - 1))
+    if mode == "warning":
+        return random.randint(caution + 1, max(caution + 2, danger - 1))
+    if mode == "danger":
+        return random.randint(danger + 1, max(danger + 2, 5000))
+    # mixed (현재 동작)
+    return random.randint(50, 5000) if random.random() < 0.5 else 0
+
+
 def generate_power_watt_data() -> dict:
-    """16채널 전력(W) 페이로드를 생성한다. 채널별로 50~5000W 또는 0W를 랜덤 배정한다."""
+    """16채널 전력(W) 페이로드를 생성한다.
+
+    시나리오 모드(mixed/normal/warning/danger)에 따라 채널별 와트값 범위가 결정된다.
+    """
+    mode = get_scenario_mode()
     data = {"device_id": DEVICE_ID}
     for ch in POWER_CHANNELS:
-        data[ch] = random.randint(50, 5000) if random.random() < 0.5 else 0
+        data[ch] = _pick_watt(mode)
     return data
 
 
@@ -101,9 +122,10 @@ def send_data(url: str, payload: dict, label: str) -> None:
 def run() -> None:
     """더미 전송 루프를 시작한다.
 
-    SEND_INTERVAL_SEC 주기로 onoff → current → voltage → watt 순서로 전송한다.
+    DUMMY_SEND_INTERVAL_SEC 주기로 onoff → current → voltage → watt 순서로 전송한다.
     """
-    logger.info("=== 전력 더미 전송 시작 (주기: %ds) ===", SEND_INTERVAL_SEC)
+    interval = settings.DUMMY_SEND_INTERVAL_SEC
+    logger.info("=== 전력 더미 전송 시작 (주기: %ds) ===", interval)
     while True:
         send_data(FASTAPI_POWER_ONOFF_URL, generate_power_onoff_data(), "POWER_ONOFF")
         send_data(
@@ -113,7 +135,7 @@ def run() -> None:
             FASTAPI_POWER_VOLTAGE_URL, generate_power_voltage_data(), "POWER_VOLTAGE"
         )
         send_data(FASTAPI_POWER_WATT_URL, generate_power_watt_data(), "POWER_WATT")
-        time.sleep(SEND_INTERVAL_SEC)
+        time.sleep(interval)
 
 
 if __name__ == "__main__":

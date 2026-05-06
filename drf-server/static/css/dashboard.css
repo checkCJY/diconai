@@ -662,3 +662,76 @@ a.more {
   border: 1px solid #30363d !important;
 }
 #btn-geofence-discard:hover { background: #30363d; }
+
+/* ── 시연 시나리오 패널 (영상 녹화 컨트롤) ───────────────── */
+.scenario-panel { margin-top: auto; }
+.scenario-desc {
+  font-size: 11px; color: var(--text2); line-height: 1.4;
+  margin-bottom: 10px;
+}
+.scenario-btns {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.scenario-btn {
+  padding: 8px 4px; border-radius: 5px;
+  font-size: 11px; font-weight: 600; font-family: inherit;
+  cursor: pointer; transition: background .15s ease, box-shadow .15s ease;
+  border: 1px solid transparent; letter-spacing: .5px;
+}
+
+/* 혼합 (gray) */
+.scenario-btn[data-mode="mixed"] {
+  background: rgba(139,148,158,.12); border-color: rgba(139,148,158,.4);
+  color: var(--text2);
+}
+.scenario-btn[data-mode="mixed"]:hover     { background: rgba(139,148,158,.25); }
+.scenario-btn[data-mode="mixed"].active    {
+  background: var(--text2); border-color: var(--text2); color: #fff;
+  box-shadow: 0 0 0 2px rgba(139,148,158,.3);
+}
+
+/* 정상 (green) */
+.scenario-btn[data-mode="normal"] {
+  background: rgba(63,185,80,.12); border-color: rgba(63,185,80,.45);
+  color: var(--safe);
+}
+.scenario-btn[data-mode="normal"]:hover    { background: rgba(63,185,80,.25); }
+.scenario-btn[data-mode="normal"].active   {
+  background: var(--safe); border-color: var(--safe); color: #fff;
+  box-shadow: 0 0 0 2px rgba(63,185,80,.3);
+}
+
+/* 주의 (yellow) */
+.scenario-btn[data-mode="warning"] {
+  background: rgba(227,179,65,.12); border-color: rgba(227,179,65,.45);
+  color: var(--caution);
+}
+.scenario-btn[data-mode="warning"]:hover   { background: rgba(227,179,65,.25); }
+.scenario-btn[data-mode="warning"].active  {
+  background: var(--caution); border-color: var(--caution); color: #1a1a1a;
+  box-shadow: 0 0 0 2px rgba(227,179,65,.3);
+}
+
+/* 위험 (red) */
+.scenario-btn[data-mode="danger"] {
+  background: rgba(248,81,73,.12); border-color: rgba(248,81,73,.45);
+  color: var(--danger);
+}
+.scenario-btn[data-mode="danger"]:hover    { background: rgba(248,81,73,.25); }
+.scenario-btn[data-mode="danger"].active   {
+  background: var(--danger); border-color: var(--danger); color: #fff;
+  box-shadow: 0 0 0 2px rgba(248,81,73,.3);
+}
+
+/* 상태 라벨 — 현재 모드에 맞춰 컬러 동기화 */
+#scenario-status {
+  font-size: 11px; font-weight: 600;
+  padding: 2px 8px; border-radius: 10px;
+  background: rgba(139,148,158,.15); color: var(--text2);
+}
+#scenario-status[data-mode="mixed"]   { background: rgba(139,148,158,.2);  color: var(--text2);  }
+#scenario-status[data-mode="normal"]  { background: rgba(63,185,80,.18);   color: var(--safe);    }
+#scenario-status[data-mode="warning"] { background: rgba(227,179,65,.2);   color: var(--caution); }
+#scenario-status[data-mode="danger"]  { background: rgba(248,81,73,.18);   color: var(--danger);  }
+#scenario-status[data-mode="error"]   { background: rgba(248,81,73,.18);   color: var(--danger);  }

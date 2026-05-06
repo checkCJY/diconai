@@ -33,10 +33,13 @@ class Settings(BaseSettings):
     # dummies/*.py 스크립트에서 fastapi-server 본인을 호출할 때 사용.
     DUMMY_TARGET_HOST: str = "127.0.0.1"
     DUMMY_TARGET_PORT: int = 8001
-    # 송출 주기(초). 0 이하면 1회만 송출.
-    DUMMY_SEND_INTERVAL_SEC: float = 1.0
+    # 송출 주기(초). 가스/전력/위치 3종 더미가 공유. 0 이하면 1회만 송출.
+    DUMMY_SEND_INTERVAL_SEC: float = 3.0
     # 임계치 초과 케이스 발생 확률 (0.0 ~ 1.0).
     DUMMY_RISK_PROBABILITY: float = 0.1
+    # 시연 시나리오 모드. mixed=확률 기반, normal/warning/danger=고정.
+    # 더미는 부팅 시 이 값을 초기 상태로 사용하고, 이후 FastAPI에 polling.
+    DUMMY_SCENARIO_MODE: str = "mixed"
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

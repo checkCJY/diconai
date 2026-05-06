@@ -15,8 +15,10 @@ from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
-# WARNING 타이머 (gas_alarm.py의 countdown 값과 반드시 일치해야 함)
-WARNING_DURATION_SEC = 30
+# WARNING 타이머 — gas_alarm.py / power_alarm.py가 import해서 사용하므로
+# 이 값만 바꾸면 두 도메인의 countdown이 함께 변경된다.
+
+WARNING_DURATION_SEC = 5
 
 # FastAPI 내부 알람 푸시 엔드포인트
 FASTAPI_INTERNAL_URL = "http://127.0.0.1:8001/internal/alarms/push/"

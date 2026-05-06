@@ -19,7 +19,10 @@
 
 <div class="body-wrap">
   <div class="top-row">
-    {% include 'dashboard/panels/safety_panel.html' %}
+    <div class="col-left">
+      {% include 'dashboard/panels/safety_panel.html' %}
+      {% include 'dashboard/panels/scenario_panel.html' %}
+    </div>
     {% include 'dashboard/panels/map_panel.html' %}
     {% include 'dashboard/panels/event_panel.html' %}
   </div>
@@ -47,6 +50,7 @@
 <script src="{% static 'js/shared/layout.js' %}"></script>
 <script src="{% static 'js/dashboard/panels/worker-panel.js' %}"></script>
 <script src="{% static 'js/dashboard/websocket.js' %}"></script>
+<script src="{% static 'js/dashboard/panels/scenario-panel.js' %}"></script>
 <script src="{% static 'js/dashboard/app.js' %}"></script>
 </body>
 </html>
