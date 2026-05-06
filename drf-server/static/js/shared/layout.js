@@ -203,7 +203,7 @@ const Header = {
       super_admin:    '슈퍼관리자',
       viewer:         '열람자',
     };
-    if (nameEl) nameEl.textContent = username ? `${username}님` : '-';
+    if (nameEl) nameEl.textContent = username ? `${username}님 환영합니다` : '-';
     if (roleEl) roleEl.textContent = roleLabel[role] || '-';
   },
 

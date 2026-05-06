@@ -280,7 +280,7 @@ function initWebSocket() {
       // ── 패널 12: 유해가스 현황 테이블 (9종) ──────────────
       const gasTableBody = document.getElementById('gasTableBody');
       if (data.gas_loading) {
-        _setGasPanelError('데이터가 존재하지 않습니다.');
+        // FastAPI 가스 수신 대기 중 — skeleton 상태 그대로 유지
       } else if (gasTableBody && data.co !== undefined) {
         _clearGasPanelMsg();
 

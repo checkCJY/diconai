@@ -77,9 +77,11 @@ def build_broadcast_payload(include_alarms: bool = True) -> dict:
 
     equipment, total_kw = ([], 0.0) if power_stale else build_equipment()
 
-    if not equipment:
-        total_power_kw = round(1200 + random.uniform(-50, 100))
-        power_change_pct = 0.0
+    # power_stale(=실데이터 미수신)일 땐 None을 송신해 프론트가 로딩/공백 상태를 유지하도록 한다.
+    # 하드코드 더미값(예: 1260kW)을 송신하면 더미 미가동 시에도 KPI에 가짜 숫자가 표시된다.
+    if power_stale:
+        total_power_kw = None
+        power_change_pct = None
     else:
         total_power_kw = total_kw
         if _prev_total_kw is not None and _prev_total_kw > 0:
@@ -90,6 +92,13 @@ def build_broadcast_payload(include_alarms: bool = True) -> dict:
             power_change_pct = 0.0
         _prev_total_kw = total_power_kw
 
+    # AI 더미 필드는 total_power_kw가 있을 때만 생성 (None이면 산술 연산 불가).
+    ai_fields = (
+        build_ai_dummy_fields(total_power_kw, equipment)
+        if total_power_kw is not None
+        else {}
+    )
+
     payload = {
         "device_id": "sensor-01",
         "timestamp": datetime.now().isoformat(),
@@ -99,7 +108,7 @@ def build_broadcast_payload(include_alarms: bool = True) -> dict:
         "equipment": equipment,
         "power_loading": len(equipment) == 0,
         "gas_loading": gas_stale,
-        **build_ai_dummy_fields(total_power_kw, equipment),
+        **ai_fields,
         "worker_positions": dict(worker_positions),
         "alarms": list(active_alarms)[:5] if include_alarms else [],
         **(latest_gas_snapshot if not gas_stale else {}),
