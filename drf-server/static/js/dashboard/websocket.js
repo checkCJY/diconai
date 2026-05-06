@@ -108,8 +108,10 @@ function _pushChannelHistory(idx, label, value) {
 }
 
 // 현재 선택된 채널(idx)의 히스토리 데이터로 전력 차트를 교체 렌더링한다.
+// idx 0 = "전체 사용량"(kW 단위), idx 1+ = 설비별(W 단위)이므로 단위에 맞춰 Y축/임계치도 교체한다.
 function _switchPowerChart(idx) {
   if (!powerChart || !_aiPowerHist[idx]) return;
+  applyPowerChartUnit(idx === 0 ? 'kW' : 'W');
   const h = _aiPowerHist[idx];
   powerChart.data.labels           = [...h.labels];
   powerChart.data.datasets[0].data = [...h.data];
@@ -323,10 +325,10 @@ function initWebSocket() {
       const powerChangePct = document.getElementById('powerChangePct');
       const powerTableBody = document.getElementById('powerTableBody');
 
-      if (powerTotal && data.total_power_kw !== undefined)
+      if (powerTotal && data.total_power_kw != null)
         powerTotal.textContent = `${data.total_power_kw.toLocaleString()} kW`;
 
-      if (powerChangePct && data.power_change_pct !== undefined) {
+      if (powerChangePct && data.power_change_pct != null) {
         const pct  = data.power_change_pct;
         const sign = pct >= 0 ? '▲ +' : '▼ ';
         powerChangePct.textContent = `기준 대비 ${sign}${pct}%`;
