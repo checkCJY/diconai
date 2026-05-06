@@ -15,7 +15,7 @@ from pydantic import BaseModel, field_validator
 from core.config import settings
 from websocket.state import scenario_mode
 
-router = APIRouter(prefix="/internal/scenario")
+router = APIRouter(prefix="/internal/scenario", tags=["internal"])
 
 ALLOWED_MODES = {"mixed", "normal", "warning", "danger"}
 
@@ -36,15 +36,34 @@ if settings.DUMMY_SCENARIO_MODE in ALLOWED_MODES:
     scenario_mode["value"] = settings.DUMMY_SCENARIO_MODE
 
 
-@router.get("/mode")
+@router.get(
+    "/mode",
+    summary="현재 시나리오 모드 조회",
+    description=(
+        "더미 스크립트가 polling으로 호출. 환경변수 `DUMMY_SCENARIO_MODE`로 부팅 시 초기값.\n\n"
+        "모드: `mixed`(기본 확률 기반) / `normal` / `warning` / `danger`."
+    ),
+)
 async def get_mode() -> dict:
-    """현재 시나리오 모드를 반환한다. 더미가 polling으로 호출."""
     return {"mode": scenario_mode["value"]}
 
 
-@router.post("/mode")
+@router.post(
+    "/mode",
+    summary="시나리오 모드 변경",
+    description=(
+        "프론트엔드 시연 컨트롤에서 호출해 더미 데이터의 위험도 분포를 강제한다.\n\n"
+        "- `normal`: 모든 가스/전력 정상 범위\n"
+        "- `warning`: 모든 가스/전력 주의 범위\n"
+        "- `danger`: 모든 가스/전력 위험 범위\n"
+        "- `mixed`: 확률 기반 (기본 동작)"
+    ),
+    responses={
+        400: {"description": "허용되지 않은 모드값"},
+        422: {"description": "ModePayload 검증 실패"},
+    },
+)
 async def set_mode(payload: ModePayload) -> dict:
-    """시나리오 모드를 변경한다. 프론트 컨트롤에서 호출."""
     if payload.mode not in ALLOWED_MODES:
         raise HTTPException(status_code=400, detail="허용되지 않은 모드입니다.")
     scenario_mode["value"] = payload.mode

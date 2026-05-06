@@ -1,5 +1,6 @@
 # apps/positioning/views/position_views.py
-from rest_framework import status
+from drf_spectacular.utils import OpenApiResponse, extend_schema, inline_serializer
+from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
@@ -28,6 +29,25 @@ class WorkerPositionReceiveView(APIView):
 
     permission_classes = [AllowAny]  # FastAPI 내부 통신이므로 인증 생략
 
+    @extend_schema(
+        tags=["Positioning (Ingest)"],
+        summary="작업자 위치 배열 인입 (FastAPI → DRF)",
+        description=(
+            "FastAPI(:8001)가 IoT 위치 센서/더미로부터 받은 작업자 좌표 배열을 DRF에 영속화. "
+            "배열 형태이며 단건당 worker_id/facility_id/x/y/movement_status/measured_at."
+        ),
+        request=WorkerPositionReceiveSerializer(many=True),
+        responses={
+            201: inline_serializer(
+                name="PositionReceiveResponse",
+                fields={
+                    "saved": serializers.IntegerField(help_text="저장된 행 수"),
+                    "ids": serializers.ListField(child=serializers.IntegerField()),
+                },
+            ),
+            400: OpenApiResponse(description="검증 실패 또는 배열이 아님"),
+        },
+    )
     def post(self, request):
         # 배열 형태로 받음
         if not isinstance(request.data, list):

@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 POSITION_PATH = "/api/positioning/receive/"
 
-router = APIRouter()
+router = APIRouter(tags=["websocket"])
 
 
 async def _send_to_all(payload: dict) -> None:

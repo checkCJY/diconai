@@ -15,6 +15,13 @@ import csv
 from datetime import datetime
 from django.http import HttpResponse
 from django.utils import timezone
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiResponse,
+    extend_schema,
+    inline_serializer,
+)
+from rest_framework import serializers
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
@@ -120,6 +127,43 @@ class PowerDataAdminListView(APIView):
 
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Power Data"],
+        summary="전력 측정 데이터 목록 조회",
+        parameters=[
+            OpenApiParameter(
+                name="device", type=int, required=False, description="PowerDevice.id"
+            ),
+            OpenApiParameter(
+                name="data_type",
+                type=str,
+                required=False,
+                description="current | voltage | watt",
+            ),
+            OpenApiParameter(name="date_from", type=str, required=False),
+            OpenApiParameter(name="date_to", type=str, required=False),
+            OpenApiParameter(name="ordering", type=str, required=False),
+            OpenApiParameter(name="page", type=int, required=False),
+            OpenApiParameter(name="page_size", type=int, required=False),
+        ],
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: inline_serializer(
+                name="PowerDataRow",
+                fields={
+                    "id": serializers.IntegerField(),
+                    "received_at": serializers.CharField(),
+                    "device_name": serializers.CharField(),
+                    "channel": serializers.IntegerField(),
+                    "data_type": serializers.CharField(),
+                    "data_type_label": serializers.CharField(),
+                    "value": serializers.FloatField(allow_null=True),
+                    "risk_level": serializers.CharField(),
+                },
+                many=True,
+            ),
+        },
+    )
     def get(self, request):
         qs = _build_queryset(request.query_params)
 
@@ -139,6 +183,21 @@ class PowerDataAdminExportView(APIView):
 
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Power Data"],
+        summary="전력 측정 데이터 CSV 다운로드",
+        parameters=[
+            OpenApiParameter(name="device", type=int, required=False),
+            OpenApiParameter(name="data_type", type=str, required=False),
+            OpenApiParameter(name="date_from", type=str, required=False),
+            OpenApiParameter(name="date_to", type=str, required=False),
+            OpenApiParameter(name="ordering", type=str, required=False),
+        ],
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: OpenApiResponse(description="CSV 파일 (text/csv)"),
+        },
+    )
     def get(self, request):
         qs = _build_queryset(request.query_params)
 
@@ -176,6 +235,22 @@ class PowerDataAdminDeviceListView(APIView):
 
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Power Data"],
+        summary="활성 전력 장비 드롭다운 옵션",
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: inline_serializer(
+                name="PowerDeviceOption",
+                fields={
+                    "id": serializers.IntegerField(),
+                    "device_name": serializers.CharField(),
+                    "device_id": serializers.CharField(),
+                },
+                many=True,
+            ),
+        },
+    )
     def get(self, request):
         devices = (
             PowerDevice.objects.filter(is_active=True)

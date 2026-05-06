@@ -15,6 +15,13 @@ import csv
 from datetime import datetime
 from django.http import HttpResponse
 from django.utils import timezone
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiResponse,
+    extend_schema,
+    inline_serializer,
+)
+from rest_framework import serializers
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
@@ -140,6 +147,53 @@ class GasDataAdminListView(APIView):
 
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Gas Data"],
+        summary="가스 측정 데이터 목록 조회",
+        description="필터 + 페이지네이션. CSV 다운로드는 `/export/` 엔드포인트에서.",
+        parameters=[
+            OpenApiParameter(
+                name="sensor", type=int, required=False, description="GasSensor.id"
+            ),
+            OpenApiParameter(
+                name="date_from",
+                type=str,
+                required=False,
+                description="YYYY-MM-DD or YYYY-MM-DDTHH:MM",
+            ),
+            OpenApiParameter(name="date_to", type=str, required=False),
+            OpenApiParameter(
+                name="ordering",
+                type=str,
+                required=False,
+                description="received_at | -received_at",
+            ),
+            OpenApiParameter(name="page", type=int, required=False),
+            OpenApiParameter(name="page_size", type=int, required=False),
+        ],
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: inline_serializer(
+                name="GasDataRow",
+                fields={
+                    "id": serializers.IntegerField(),
+                    "received_at": serializers.CharField(),
+                    "sensor_name": serializers.CharField(),
+                    "max_risk_level": serializers.CharField(),
+                    "co": serializers.FloatField(allow_null=True),
+                    "h2s": serializers.FloatField(allow_null=True),
+                    "co2": serializers.FloatField(allow_null=True),
+                    "o2": serializers.FloatField(allow_null=True),
+                    "no2": serializers.FloatField(allow_null=True),
+                    "so2": serializers.FloatField(allow_null=True),
+                    "o3": serializers.FloatField(allow_null=True),
+                    "nh3": serializers.FloatField(allow_null=True),
+                    "voc": serializers.FloatField(allow_null=True),
+                },
+                many=True,
+            ),
+        },
+    )
     def get(self, request):
         qs = _build_queryset(request.query_params)
 
@@ -170,6 +224,21 @@ class GasDataAdminExportView(APIView):
 
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Gas Data"],
+        summary="가스 측정 데이터 CSV 다운로드",
+        description="목록과 동일 필터 적용, 페이지네이션 없이 전체. utf-8-sig BOM으로 엑셀 한글 호환.",
+        parameters=[
+            OpenApiParameter(name="sensor", type=int, required=False),
+            OpenApiParameter(name="date_from", type=str, required=False),
+            OpenApiParameter(name="date_to", type=str, required=False),
+            OpenApiParameter(name="ordering", type=str, required=False),
+        ],
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: OpenApiResponse(description="CSV 파일 (text/csv)"),
+        },
+    )
     def get(self, request):
         qs = _build_queryset(request.query_params)
 
@@ -214,6 +283,22 @@ class GasDataAdminSensorListView(APIView):
 
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Gas Data"],
+        summary="활성 가스 센서 드롭다운 옵션",
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: inline_serializer(
+                name="GasSensorOption",
+                fields={
+                    "id": serializers.IntegerField(),
+                    "device_name": serializers.CharField(),
+                    "device_id": serializers.CharField(),
+                },
+                many=True,
+            ),
+        },
+    )
     def get(self, request):
         sensors = (
             GasSensor.objects.filter(is_active=True)

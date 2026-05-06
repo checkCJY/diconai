@@ -11,7 +11,13 @@ import socket as _socket
 from django.db import transaction
 from django.utils import timezone
 from django.views.generic import TemplateView
-from rest_framework import status
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiResponse,
+    extend_schema,
+    inline_serializer,
+)
+from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -46,6 +52,16 @@ class PowerDeviceAdminPageView(TemplateView):
 class PowerDeviceCodesView(APIView):
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Power Device"],
+        summary="전력 장비 코드 목록 (필터 드롭다운)",
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: serializers.ListField(
+                child=serializers.CharField(help_text="PWR-001 형식")
+            ),
+        },
+    )
     def get(self, request):
         codes = (
             PowerDevice.objects.filter(device_code__isnull=False)
@@ -61,6 +77,18 @@ class PowerDeviceCodesView(APIView):
 class PowerDeviceNextCodeView(APIView):
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Power Device"],
+        summary="다음 가용 장비 코드 조회",
+        description="기존 코드 중 가장 작은 미사용 번호를 3자리 zero-padding으로 반환 (예: 007).",
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: inline_serializer(
+                name="PowerDeviceNextCode",
+                fields={"code": serializers.CharField()},
+            ),
+        },
+    )
     def get(self, request):
         existing = PowerDevice.objects.filter(device_code__regex=r"^\d+$").values_list(
             "device_code", flat=True
@@ -81,6 +109,30 @@ class PowerDeviceNextCodeView(APIView):
 class PowerDeviceConnectionCheckView(APIView):
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Power Device"],
+        summary="전력 장비 통신 연결 확인 (TCP)",
+        description="입력 IP/Port에 3초 timeout TCP connect 시도. 성공 여부 + 점검 시각 반환.",
+        request=inline_serializer(
+            name="PowerDeviceConnectionCheckRequest",
+            fields={
+                "ip_address": serializers.IPAddressField(),
+                "port": serializers.IntegerField(min_value=1, max_value=65535),
+            },
+        ),
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: inline_serializer(
+                name="PowerDeviceConnectionCheckResponse",
+                fields={
+                    "ok": serializers.BooleanField(),
+                    "checked_at": serializers.DateTimeField(),
+                    "detail": serializers.CharField(required=False),
+                },
+            ),
+            400: OpenApiResponse(description="IP/Port 검증 실패"),
+        },
+    )
     def post(self, request):
         ip = request.data.get("ip_address", "").strip()
         port = request.data.get("port")
@@ -131,6 +183,29 @@ class PowerDeviceConnectionCheckView(APIView):
 class PowerDeviceAdminListView(APIView):
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Power Device"],
+        summary="전력 장비 목록 (페이지네이션)",
+        parameters=[
+            OpenApiParameter(
+                name="q", type=str, required=False, description="이름/코드 검색"
+            ),
+            OpenApiParameter(name="is_active", type=str, required=False),
+            OpenApiParameter(name="connection", type=str, required=False),
+            OpenApiParameter(
+                name="order",
+                type=str,
+                required=False,
+                description="정렬 키 (device_id_asc 등)",
+            ),
+            OpenApiParameter(name="page", type=int, required=False),
+            OpenApiParameter(name="page_size", type=int, required=False),
+        ],
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: PowerDeviceAdminListSerializer(many=True),
+        },
+    )
     def get(self, request):
         qs = list_admin_power_devices(
             q=request.query_params.get("q", ""),
@@ -143,6 +218,16 @@ class PowerDeviceAdminListView(APIView):
         serializer = PowerDeviceAdminListSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
 
+    @extend_schema(
+        tags=["Admin — Power Device"],
+        summary="전력 장비 신규 등록",
+        request=PowerDeviceAdminWriteSerializer,
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            201: PowerDeviceAdminListSerializer,
+            400: OpenApiResponse(description="검증 실패"),
+        },
+    )
     @transaction.atomic
     def post(self, request):
         serializer = PowerDeviceAdminWriteSerializer(data=request.data)
@@ -169,6 +254,15 @@ class PowerDeviceAdminDetailView(APIView):
         except PowerDevice.DoesNotExist:
             return None
 
+    @extend_schema(
+        tags=["Admin — Power Device"],
+        summary="전력 장비 상세 조회",
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: PowerDeviceAdminListSerializer,
+            404: OpenApiResponse(description="장치 없음"),
+        },
+    )
     def get(self, request, pk):
         device = self._get(pk)
         if device is None:
@@ -177,6 +271,17 @@ class PowerDeviceAdminDetailView(APIView):
             )
         return Response(PowerDeviceAdminListSerializer(device).data)
 
+    @extend_schema(
+        tags=["Admin — Power Device"],
+        summary="전력 장비 수정 (Partial)",
+        request=PowerDeviceAdminWriteSerializer,
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: PowerDeviceAdminListSerializer,
+            400: OpenApiResponse(description="검증 실패"),
+            404: OpenApiResponse(description="장치 없음"),
+        },
+    )
     @transaction.atomic
     def put(self, request, pk):
         device = self._get(pk)
@@ -192,6 +297,15 @@ class PowerDeviceAdminDetailView(APIView):
         serializer.save()
         return Response(PowerDeviceAdminListSerializer(self._get(pk)).data)
 
+    @extend_schema(
+        tags=["Admin — Power Device"],
+        summary="전력 장비 비활성화 (Soft Delete)",
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            204: OpenApiResponse(description="삭제 완료"),
+            404: OpenApiResponse(description="장치 없음"),
+        },
+    )
     def delete(self, request, pk):
         device = self._get(pk)
         if device is None:
@@ -206,6 +320,22 @@ class PowerDeviceAdminDetailView(APIView):
 class PowerDeviceAdminBulkDeleteView(APIView):
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Power Device"],
+        summary="전력 장비 일괄 비활성화",
+        request=inline_serializer(
+            name="PowerDeviceBulkDeleteRequest",
+            fields={"ids": serializers.ListField(child=serializers.IntegerField())},
+        ),
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: inline_serializer(
+                name="PowerDeviceBulkDeleteResponse",
+                fields={"deleted": serializers.IntegerField()},
+            ),
+            400: OpenApiResponse(description="ids 누락"),
+        },
+    )
     def post(self, request):
         ids = request.data.get("ids", [])
         if not isinstance(ids, list) or not ids:
@@ -224,6 +354,14 @@ class PowerDeviceAdminBulkDeleteView(APIView):
 class PowerDeviceInspectionListView(APIView):
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Power Device"],
+        summary="전력 장비 점검 이력 목록",
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: PowerDeviceInspectionSerializer(many=True),
+        },
+    )
     def get(self, request, device_pk):
         inspections = (
             PowerDeviceInspection.objects.filter(device_id=device_pk)
@@ -232,6 +370,16 @@ class PowerDeviceInspectionListView(APIView):
         )
         return Response(PowerDeviceInspectionSerializer(inspections, many=True).data)
 
+    @extend_schema(
+        tags=["Admin — Power Device"],
+        summary="전력 장비 점검 이력 등록",
+        request=PowerDeviceInspectionWriteSerializer,
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            201: PowerDeviceInspectionSerializer,
+            400: OpenApiResponse(description="검증 실패"),
+        },
+    )
     def post(self, request, device_pk):
         data = request.data.copy()
         data["device"] = device_pk
@@ -251,6 +399,18 @@ class PowerDeviceInspectionListView(APIView):
 class PowerDeviceInspectionActionView(APIView):
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Power Device"],
+        summary="전력 장비 점검에 대한 조치 등록",
+        description="해당 점검에 대한 조치 내용·조치 담당자를 기록. 이미 조치 완료된 항목은 400.",
+        request=PowerDeviceActionWriteSerializer,
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: PowerDeviceInspectionSerializer,
+            400: OpenApiResponse(description="이미 조치 완료 / 검증 실패"),
+            404: OpenApiResponse(description="점검 이력 없음"),
+        },
+    )
     def post(self, request, inspection_pk):
         try:
             inspection = PowerDeviceInspection.objects.select_related(

@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 from websocket.state import active_alarms, alarm_signal, worker_clients
 
-router = APIRouter(prefix="/internal")
+router = APIRouter(prefix="/internal", tags=["internal"])
 
 
 class AlarmPayload(BaseModel):
@@ -29,12 +29,22 @@ class AlarmPayload(BaseModel):
     worker_id: int | None = None  # 지오펜스 알람 시 타겟 작업자
 
 
-@router.post("/alarms/push/")
+@router.post(
+    "/alarms/push/",
+    summary="Celery → WebSocket 알람 브리지 (localhost 전용)",
+    description=(
+        "DRF Celery 태스크가 알람을 생성한 뒤 이 엔드포인트를 호출하면 "
+        "FastAPI의 `active_alarms` 큐에 추가되어 다음 broadcast tick(1초)에 브라우저로 전달된다.\n\n"
+        "**보안**: 127.0.0.1/::1/localhost에서만 호출 가능. 외부 호출은 403.\n\n"
+        "**개인 알림**: `alarm_type=geofence_intrusion` + `worker_id` 지정 시 해당 작업자의 "
+        "`/ws/worker/{user_id}/` 채널로도 즉시 push."
+    ),
+    responses={
+        403: {"description": "localhost 외부에서 호출"},
+        422: {"description": "AlarmPayload 검증 실패"},
+    },
+)
 async def push_alarm(request: Request, alarm: AlarmPayload):
-    """Celery 태스크에서 WebSocket 브로드캐스트 큐에 알람을 추가한다.
-
-    localhost 전용 — 외부 접근 시 403 반환.
-    """
     client_host = request.client.host if request.client else ""
     if client_host not in ("127.0.0.1", "::1", "localhost"):
         raise HTTPException(status_code=403, detail="내부 전용 엔드포인트입니다.")

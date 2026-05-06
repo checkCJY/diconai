@@ -48,7 +48,33 @@ async def lifespan(app: FastAPI):
         logger.info("[app] action=shutdown")
 
 
-app = FastAPI(title="DiconAI FastAPI Server", lifespan=lifespan)
+app = FastAPI(
+    title="DiconAI Realtime API",
+    version="1.0.0",
+    description=(
+        "산재 예방 통합 관제 시스템의 실시간 처리 서버.\n\n"
+        "**역할**:\n"
+        "- IoT 센서(가스/전력/위치) 데이터 인입 및 검증\n"
+        "- DRF 서버(:8000)로 영속화 위임\n"
+        "- 브라우저로 WebSocket 실시간 브로드캐스트 (1초 주기)\n"
+        "- Celery 태스크와의 알람 브리지 (`/internal/alarms/push/`)\n\n"
+        "**데이터 흐름**: `IoT → FastAPI(:8001) → DRF(:8000) / 브라우저 WS`\n\n"
+        "**관련 문서**: [API 명세](../docs/api_specification.md), "
+        "[응답 봉투 표준](../docs/api_response_convention.md)"
+    ),
+    openapi_tags=[
+        {"name": "sensors", "description": "가스 센서 HTTP 인입 (IoT 장비 → FastAPI)"},
+        {"name": "power", "description": "전력 센서 HTTP 인입 (IoT 장비 → FastAPI)"},
+        {"name": "positioning", "description": "작업자 위치 인입 (IoT/더미 → FastAPI)"},
+        {"name": "websocket", "description": "브라우저용 실시간 스트림 (WS)"},
+        {
+            "name": "internal",
+            "description": "서비스 간 통신 (Celery → FastAPI 브리지). localhost 전용",
+        },
+        {"name": "health", "description": "헬스체크"},
+    ],
+    lifespan=lifespan,
+)
 
 # 대시보드(DRF :8000) → FastAPI(:8001) 시연 컨트롤 fetch 허용
 app.add_middleware(
@@ -124,7 +150,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     )
 
 
-@app.get("/health/")
-async def health_check():
-    """서버 생존 확인용 엔드포인트."""
+@app.get("/health/", tags=["health"], summary="헬스체크")
+async def health_check() -> dict[str, str]:
+    """서버 생존 확인용 엔드포인트. Liveness probe 등 운영 모니터링에 사용."""
     return {"status": "ok"}

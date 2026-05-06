@@ -10,7 +10,13 @@ URL 프리픽스: /api/admin/accounts/
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
-from rest_framework import status
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiResponse,
+    extend_schema,
+    inline_serializer,
+)
+from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -45,6 +51,41 @@ class AccountsAdminListView(APIView):
 
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Accounts"],
+        summary="사용자 목록",
+        parameters=[
+            OpenApiParameter(
+                name="name", type=str, required=False, description="이름 부분검색"
+            ),
+            OpenApiParameter(name="department", type=int, required=False),
+            OpenApiParameter(name="position", type=int, required=False),
+            OpenApiParameter(
+                name="user_type",
+                type=str,
+                required=False,
+                description="super_admin/facility_admin/worker/viewer",
+            ),
+            OpenApiParameter(
+                name="status",
+                type=str,
+                required=False,
+                description="active/locked/inactive",
+            ),
+            OpenApiParameter(
+                name="sort",
+                type=str,
+                required=False,
+                description="name_asc/name_desc/date_asc/date_desc",
+            ),
+            OpenApiParameter(name="page", type=int, required=False),
+            OpenApiParameter(name="page_size", type=int, required=False),
+        ],
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: AccountsAdminListSerializer(many=True),
+        },
+    )
     def get(self, request):
         qs = list_admin_users(
             name=request.query_params.get("name", ""),
@@ -59,6 +100,16 @@ class AccountsAdminListView(APIView):
         serializer = AccountsAdminListSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
 
+    @extend_schema(
+        tags=["Admin — Accounts"],
+        summary="사용자 신규 등록",
+        request=AccountsAdminCreateSerializer,
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            201: AccountsAdminCreateSerializer,
+            400: OpenApiResponse(description="검증 실패"),
+        },
+    )
     @transaction.atomic
     def post(self, request):
         """새 사용자를 등록한다. 비밀번호는 해시 처리 후 저장."""
@@ -88,6 +139,15 @@ class AccountsAdminDetailView(APIView):
         except User.DoesNotExist:
             return None
 
+    @extend_schema(
+        tags=["Admin — Accounts"],
+        summary="사용자 상세 조회",
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: AccountsAdminDetailSerializer,
+            404: OpenApiResponse(description="사용자 없음"),
+        },
+    )
     def get(self, request, pk):
         user = self._get_user(pk)
         if not user:
@@ -97,6 +157,17 @@ class AccountsAdminDetailView(APIView):
             )
         return Response(AccountsAdminDetailSerializer(user).data)
 
+    @extend_schema(
+        tags=["Admin — Accounts"],
+        summary="사용자 정보 수정 (Partial, 비밀번호 제외)",
+        request=AccountsAdminUpdateSerializer,
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: AccountsAdminListSerializer,
+            400: OpenApiResponse(description="검증 실패"),
+            404: OpenApiResponse(description="사용자 없음"),
+        },
+    )
     @transaction.atomic
     def patch(self, request, pk):
         user = self._get_user(pk)
@@ -113,6 +184,17 @@ class AccountsAdminDetailView(APIView):
             return Response(AccountsAdminListSerializer(user).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @extend_schema(
+        tags=["Admin — Accounts"],
+        summary="사용자 비활성화 (Soft Delete)",
+        description="본인 계정은 비활성화 불가.",
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            204: OpenApiResponse(description="삭제 완료"),
+            400: OpenApiResponse(description="본인 계정"),
+            404: OpenApiResponse(description="사용자 없음"),
+        },
+    )
     def delete(self, request, pk):
         user = self._get_user(pk)
         if not user:
@@ -146,6 +228,23 @@ class AccountsAdminLockView(APIView):
         except User.DoesNotExist:
             return None
 
+    @extend_schema(
+        tags=["Admin — Accounts"],
+        summary="계정 잠금 / 잠금해제",
+        description=(
+            "URL의 `<action>` path parameter로 동작 구분 — `lock` 또는 `unlock`. "
+            "잠금 시 100년 뒤로 `account_locked_until` 설정. 잠금해제 시 실패 카운터도 초기화."
+        ),
+        request=None,
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: inline_serializer(
+                name="AccountLockResponse", fields={"ok": serializers.BooleanField()}
+            ),
+            400: OpenApiResponse(description="잘못된 action 값"),
+            404: OpenApiResponse(description="사용자 없음"),
+        },
+    )
     def post(self, request, pk, action):
         user = self._get_user(pk)
         if not user:

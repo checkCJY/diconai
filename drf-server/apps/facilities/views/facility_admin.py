@@ -9,7 +9,13 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from django.views.generic import TemplateView
-from rest_framework import status
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiResponse,
+    extend_schema,
+    inline_serializer,
+)
+from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -41,9 +47,46 @@ class FacilityAdminPageView(TemplateView):
 
 
 # ── 기존 공장 API (map-editor 내부 사용) ──────────────────────
+_LIST_QUERY_PARAMS = [
+    OpenApiParameter(name="q", type=str, required=False, description="이름/코드 검색"),
+    OpenApiParameter(name="is_active", type=str, required=False),
+    OpenApiParameter(name="order", type=str, required=False),
+    OpenApiParameter(name="page", type=int, required=False),
+    OpenApiParameter(name="page_size", type=int, required=False),
+]
+
+
+def _bulk_delete_request(name):
+    return inline_serializer(
+        name=name,
+        fields={"ids": serializers.ListField(child=serializers.IntegerField())},
+    )
+
+
+def _bulk_delete_response(name):
+    return inline_serializer(name=name, fields={"deleted": serializers.IntegerField()})
+
+
 class FacilityAdminListView(APIView):
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Facility"],
+        summary="공장 목록 (페이지네이션)",
+        parameters=_LIST_QUERY_PARAMS
+        + [
+            OpenApiParameter(
+                name="power_device",
+                type=str,
+                required=False,
+                description="전력장치 device_id 필터",
+            ),
+        ],
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: FacilityAdminListSerializer(many=True),
+        },
+    )
     def get(self, request):
         qs = (
             Facility.objects.all()
@@ -79,6 +122,16 @@ class FacilityAdminListView(APIView):
         serializer = FacilityAdminListSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
 
+    @extend_schema(
+        tags=["Admin — Facility"],
+        summary="공장 신규 등록",
+        request=FacilityAdminWriteSerializer,
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            201: FacilityAdminListSerializer,
+            400: OpenApiResponse(description="검증 실패"),
+        },
+    )
     def post(self, request):
         serializer = FacilityAdminWriteSerializer(data=request.data)
         if not serializer.is_valid():
@@ -98,6 +151,17 @@ class FacilityAdminDetailView(APIView):
         except Facility.DoesNotExist:
             return None
 
+    @extend_schema(
+        tags=["Admin — Facility"],
+        summary="공장 수정 (Partial)",
+        request=FacilityAdminWriteSerializer,
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: FacilityAdminListSerializer,
+            400: OpenApiResponse(description="검증 실패"),
+            404: OpenApiResponse(description="공장 없음"),
+        },
+    )
     def put(self, request, pk):
         facility = self._get(pk)
         if facility is None:
@@ -112,6 +176,15 @@ class FacilityAdminDetailView(APIView):
         serializer.save()
         return Response(FacilityAdminListSerializer(facility).data)
 
+    @extend_schema(
+        tags=["Admin — Facility"],
+        summary="공장 비활성화 (Soft Delete)",
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            204: OpenApiResponse(description="삭제 완료"),
+            404: OpenApiResponse(description="공장 없음"),
+        },
+    )
     def delete(self, request, pk):
         facility = self._get(pk)
         if facility is None:
@@ -125,6 +198,16 @@ class FacilityAdminDetailView(APIView):
 class FacilityAdminBulkDeleteView(APIView):
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Facility"],
+        summary="공장 일괄 비활성화",
+        request=_bulk_delete_request("FacilityBulkDeleteRequest"),
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: _bulk_delete_response("FacilityBulkDeleteResponse"),
+            400: OpenApiResponse(description="ids 누락"),
+        },
+    )
     def post(self, request):
         ids = request.data.get("ids", [])
         if not isinstance(ids, list) or not ids:
@@ -140,6 +223,23 @@ class FacilityAdminBulkDeleteView(APIView):
 class FacilityPowerDeviceOptionsView(APIView):
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Dropdowns"],
+        summary="공장 등록 시 전력장치 옵션",
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: inline_serializer(
+                name="FacilityPowerDeviceOption",
+                fields={
+                    "id": serializers.IntegerField(),
+                    "device_id": serializers.CharField(),
+                    "device_name": serializers.CharField(),
+                    "facility_id": serializers.IntegerField(allow_null=True),
+                },
+                many=True,
+            ),
+        },
+    )
     def get(self, request):
         devices = PowerDevice.objects.filter(is_active=True).values(
             "id", "device_id", "device_name", "facility_id"
@@ -151,6 +251,14 @@ class FacilityPowerDeviceOptionsView(APIView):
 class FacilitySelectView(APIView):
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Dropdowns"],
+        summary="공장 드롭다운 옵션",
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: FacilitySelectSerializer(many=True),
+        },
+    )
     def get(self, request):
         facilities = Facility.objects.filter(is_active=True).order_by("id")
         return Response(FacilitySelectSerializer(facilities, many=True).data)
@@ -160,6 +268,19 @@ class FacilitySelectView(APIView):
 class PowerDeviceSelectView(APIView):
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Dropdowns"],
+        summary="설비-전력장치 연결용 드롭다운",
+        description=(
+            "설비 등록/수정 화면에서 연결할 전력장치 옵션. "
+            "`equipment_id` 미지정(등록): 활성+미연결만. 지정(수정): 다른 설비 미연결 + 현재 설비 연결분."
+        ),
+        parameters=[OpenApiParameter(name="equipment_id", type=int, required=False)],
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: PowerDeviceSelectSerializer(many=True),
+        },
+    )
     def get(self, request):
         current_equipment_id = request.query_params.get("equipment_id")
 
@@ -179,6 +300,20 @@ class PowerDeviceSelectView(APIView):
 class EquipmentAdminListView(APIView):
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Equipment"],
+        summary="설비 목록 (페이지네이션)",
+        parameters=_LIST_QUERY_PARAMS
+        + [
+            OpenApiParameter(
+                name="facility", type=int, required=False, description="공장 ID 필터"
+            ),
+        ],
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: EquipmentAdminListSerializer(many=True),
+        },
+    )
     def get(self, request):
         qs = Equipment.objects.select_related(
             "facility", "facility__manager", "power_device"
@@ -218,6 +353,16 @@ class EquipmentAdminListView(APIView):
         serializer = EquipmentAdminListSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
 
+    @extend_schema(
+        tags=["Admin — Equipment"],
+        summary="설비 신규 등록",
+        request=EquipmentAdminWriteSerializer,
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            201: EquipmentAdminListSerializer,
+            400: OpenApiResponse(description="검증 실패"),
+        },
+    )
     def post(self, request):
         serializer = EquipmentAdminWriteSerializer(data=request.data)
         if not serializer.is_valid():
@@ -242,6 +387,15 @@ class EquipmentAdminDetailView(APIView):
         except Equipment.DoesNotExist:
             return None
 
+    @extend_schema(
+        tags=["Admin — Equipment"],
+        summary="설비 상세 조회",
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: EquipmentAdminListSerializer,
+            404: OpenApiResponse(description="설비 없음"),
+        },
+    )
     def get(self, request, pk):
         equipment = self._get(pk)
         if equipment is None:
@@ -250,6 +404,18 @@ class EquipmentAdminDetailView(APIView):
             )
         return Response(EquipmentAdminListSerializer(equipment).data)
 
+    @extend_schema(
+        tags=["Admin — Equipment"],
+        summary="설비 수정 (Partial)",
+        description="활성 설비에 신규 전력장치가 연결되면 그 장치도 자동 재활성화됨.",
+        request=EquipmentAdminWriteSerializer,
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: EquipmentAdminListSerializer,
+            400: OpenApiResponse(description="검증 실패"),
+            404: OpenApiResponse(description="설비 없음"),
+        },
+    )
     @transaction.atomic
     def put(self, request, pk):
         equipment = self._get(pk)
@@ -286,6 +452,15 @@ class EquipmentAdminDetailView(APIView):
         out = self._get(pk)
         return Response(EquipmentAdminListSerializer(out).data)
 
+    @extend_schema(
+        tags=["Admin — Equipment"],
+        summary="설비 비활성화 (Soft Delete)",
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            204: OpenApiResponse(description="삭제 완료"),
+            404: OpenApiResponse(description="설비 없음"),
+        },
+    )
     def delete(self, request, pk):
         equipment = self._get(pk)
         if equipment is None:
@@ -299,6 +474,16 @@ class EquipmentAdminDetailView(APIView):
 class EquipmentAdminBulkDeleteView(APIView):
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Equipment"],
+        summary="설비 일괄 비활성화",
+        request=_bulk_delete_request("EquipmentBulkDeleteRequest"),
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: _bulk_delete_response("EquipmentBulkDeleteResponse"),
+            400: OpenApiResponse(description="ids 누락"),
+        },
+    )
     def post(self, request):
         ids = request.data.get("ids", [])
         if not isinstance(ids, list) or not ids:
@@ -319,6 +504,19 @@ class EquipmentAdminBulkDeleteView(APIView):
 class PowerDeviceAdminListView(APIView):
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Power Device (Legacy)"],
+        summary="(레거시) 전력장치 목록",
+        description="새 API는 `/api/admin/power-devices/` (power_device_admin.py). 이건 facility_admin과의 하위 호환 경로.",
+        parameters=_LIST_QUERY_PARAMS
+        + [
+            OpenApiParameter(name="facility", type=int, required=False),
+        ],
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: PowerDeviceAdminListSerializer(many=True),
+        },
+    )
     def get(self, request):
         qs = PowerDevice.objects.select_related("facility", "facility__manager").all()
         facility_id = request.query_params.get("facility", "").strip()
@@ -349,6 +547,16 @@ class PowerDeviceAdminListView(APIView):
         serializer = PowerDeviceAdminListSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
 
+    @extend_schema(
+        tags=["Admin — Power Device (Legacy)"],
+        summary="(레거시) 전력장치 등록",
+        request=PowerDeviceAdminWriteSerializer,
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            201: PowerDeviceAdminListSerializer,
+            400: OpenApiResponse(description="검증 실패"),
+        },
+    )
     def post(self, request):
         serializer = PowerDeviceAdminWriteSerializer(data=request.data)
         if not serializer.is_valid():
@@ -373,6 +581,15 @@ class PowerDeviceAdminDetailView(APIView):
         except PowerDevice.DoesNotExist:
             return None
 
+    @extend_schema(
+        tags=["Admin — Power Device (Legacy)"],
+        summary="(레거시) 전력장치 상세",
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: PowerDeviceAdminListSerializer,
+            404: OpenApiResponse(description="없음"),
+        },
+    )
     def get(self, request, pk):
         device = self._get(pk)
         if device is None:
@@ -381,6 +598,17 @@ class PowerDeviceAdminDetailView(APIView):
             )
         return Response(PowerDeviceAdminListSerializer(device).data)
 
+    @extend_schema(
+        tags=["Admin — Power Device (Legacy)"],
+        summary="(레거시) 전력장치 수정",
+        request=PowerDeviceAdminWriteSerializer,
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: PowerDeviceAdminListSerializer,
+            400: OpenApiResponse(description="검증 실패"),
+            404: OpenApiResponse(description="없음"),
+        },
+    )
     def put(self, request, pk):
         device = self._get(pk)
         if device is None:
@@ -395,6 +623,15 @@ class PowerDeviceAdminDetailView(APIView):
         serializer.save()
         return Response(PowerDeviceAdminListSerializer(self._get(pk)).data)
 
+    @extend_schema(
+        tags=["Admin — Power Device (Legacy)"],
+        summary="(레거시) 전력장치 비활성화",
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            204: OpenApiResponse(description="삭제 완료"),
+            404: OpenApiResponse(description="없음"),
+        },
+    )
     def delete(self, request, pk):
         device = self._get(pk)
         if device is None:
@@ -408,6 +645,16 @@ class PowerDeviceAdminDetailView(APIView):
 class PowerDeviceAdminBulkDeleteView(APIView):
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Power Device (Legacy)"],
+        summary="(레거시) 전력장치 일괄 비활성화",
+        request=_bulk_delete_request("LegacyPowerDeviceBulkDeleteRequest"),
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: _bulk_delete_response("LegacyPowerDeviceBulkDeleteResponse"),
+            400: OpenApiResponse(description="ids 누락"),
+        },
+    )
     def post(self, request):
         ids = request.data.get("ids", [])
         if not isinstance(ids, list) or not ids:
