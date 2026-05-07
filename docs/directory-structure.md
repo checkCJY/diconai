@@ -1,6 +1,6 @@
 # diconai — 디렉토리 구조
 
-> 기준일: 2026-05-01 / 브랜치: feature/MN-04_refactor
+> 기준일: 2026-05-07 / 브랜치: feature/project_4_refactoring_docstring
 
 ---
 
@@ -11,6 +11,7 @@ diconai/                              # 프로젝트 루트
 │   ├── directory-structure.md        # 디렉토리 구조 (현재 파일)
 │   ├── url-structure.md              # URL 설계 구조
 │   ├── dev_convention.md             # 개발 컨벤션
+│   ├── github_convention.md          # GitHub 컨벤션
 │   └── COMMANDS.md
 │
 ├── drf-server/                       # Django REST Framework 서버 (포트 8000)
@@ -73,7 +74,8 @@ drf-server/
 │   │   │   └── merge_policy.py
 │   │   ├── serializers/
 │   │   │   ├── alarm_record.py
-│   │   │   └── event.py
+│   │   │   ├── event.py
+│   │   │   └── responses.py          # 응답 전용 시리얼라이저
 │   │   ├── views/
 │   │   │   ├── alarm_record.py       # AlarmRecordViewSet, MyStatusView, WorkerSummaryView
 │   │   │   └── event.py              # EventViewSet
@@ -86,7 +88,11 @@ drf-server/
 │   │   │   └── system_log.py
 │   │   ├── selectors/audit_trail.py
 │   │   ├── services/audit_service.py
+│   │   ├── management/commands/
+│   │   │   └── seed_dummy_data.py    # 더미 데이터 시드
 │   │   ├── constants.py
+│   │   ├── context_processors.py     # 템플릿 공통 컨텍스트
+│   │   ├── exceptions.py             # 커스텀 예외
 │   │   ├── mixins.py
 │   │   ├── pagination.py
 │   │   ├── permissions.py
@@ -105,7 +111,9 @@ drf-server/
 │   │   │   ├── thresholds.py
 │   │   │   ├── gas_sensor_inspection.py
 │   │   │   └── power_device_inspection.py
-│   │   ├── selectors/active_devices.py
+│   │   ├── selectors/
+│   │   │   ├── active_devices.py
+│   │   │   └── admin_devices.py
 │   │   ├── services/
 │   │   │   ├── device_service.py
 │   │   │   └── threshold_service.py
@@ -148,11 +156,13 @@ drf-server/
 │   │   │   └── time_range_data.py
 │   │   ├── services/
 │   │   │   ├── aggregation_service.py
-│   │   │   └── gas_alarm.py
+│   │   │   ├── gas_alarm.py
+│   │   │   └── power_alarm.py
 │   │   ├── serializers/
 │   │   │   ├── gas_data.py
 │   │   │   └── power_data.py
 │   │   ├── views/
+│   │   │   ├── admin_views.py        # 어드민 공통 뷰
 │   │   │   ├── gas_data.py           # GasDataCreateView
 │   │   │   ├── gas_data_admin.py     # GasDataAdminListView, Export, SensorList
 │   │   │   ├── power_data.py         # PowerEventIngestView, PowerDataBulkIngestView
@@ -191,6 +201,8 @@ drf-server/
 │       ├── services/check_service.py
 │       ├── serializers/
 │       └── views/
+│
+├── docs/                             # drf-server 전용 문서 (리팩토링·기능 정의 등)
 │
 ├── templates/
 │   ├── auth/login.html
@@ -344,8 +356,16 @@ fastapi-server/
 │   └── services/broadcast.py         # build_broadcast_payload()
 │
 ├── internal/                         # 내부 전용 (localhost only)
-│   └── routers/alarm_router.py       # POST /internal/alarms/push/
-│                                     # Celery → FastAPI WS 브리지
+│   └── routers/
+│       ├── alarm_router.py           # POST /internal/alarms/push/
+│       │                             # Celery → FastAPI WS 브리지
+│       └── scenario_router.py        # GET/POST /internal/scenario/mode
+│                                     # 시나리오 모드 제어 (데모용)
+│
+├── services/                         # 외부 호출 클라이언트
+│   └── drf_client.py                 # DRF 비동기 호출 헬퍼
+│
+├── docs/                             # fastapi-server 전용 문서
 │
 └── dummies/                          # 더미 데이터 전송 스크립트
     ├── gas_dummy.py

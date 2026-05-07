@@ -68,13 +68,78 @@
 - **폴더 전환 시 패턴**: `__init__.py`를 활용하여 외부 import 경로 유지 (ex: `from .gas import GasSensorSerializer`).
 
 ## 6. COMMENTS & LOGGING
-- **Docstring**: `"""` 사용. 클래스 및 외부 호출용 함수에 필수 작성. `Args`와 `Returns` 명시.
-- **인라인/블록 주석**: 코드의 "무엇"이 아닌 **"왜(이유, 목적)"**를 설명.
-  - 법적 근거, 비즈니스 규칙 출처 명시 (ex: 산업안전보건법 기준).
-- **TODO**: 담당자와 기한 명시 (ex: `# TODO(재용): ...`).
-- **로깅 (Logging)**: `print()` 금지. 내장 `logging` 모듈 사용.
-  - 포맷: `logger.LEVEL(f"[CATEGORY] key=value")`
-  - 레벨: `DEBUG`(상세), `INFO`(정상완료), `WARNING`(주의/재시도), `ERROR`(실패).
+
+> **대원칙**: 주석은 코드의 **"무엇(WHAT)"이 아닌 "왜(WHY)"**를 설명한다.
+> 이름이 좋으면 주석은 불필요하다. 다음 4종 — 도메인 근거, 동시성·트랜잭션, 도메인 특수성, 외부 시스템 계약 — 에서만 인라인 주석을 적극 작성한다.
+
+### 6.1 모듈 헤더 주석
+- **형식**: `# <앱>/<file.py> — 역할 한 줄`을 첫 줄에 둔다. 이후 빈 주석 줄(`#`)을 두고 다중 태스크/엔드포인트/상태머신을 짧게 나열.
+- **필수 대상**: `services/`, `tasks.py`, `routers/`, `selectors/` 등 비즈니스 로직 또는 외부 진입점 모듈.
+- **표준 예시**: `drf-server/apps/alerts/tasks.py:1-9` 형식을 그대로 따른다.
+  ```python
+  # alerts/tasks.py — 가스 알람 Celery 태스크
+  #
+  # 3종 알람 태스크:
+  #   fire_danger_alarm_task  : DANGER 즉각 알람
+  #   fire_warning_alarm_task : WARNING 30초 지속 후 알람 (countdown=30)
+  #   fire_clear_notification_task : 정상화 알림
+  #
+  # 각 태스크는 AlarmRecord/Event를 DB에 기록한 뒤,
+  # FastAPI /internal/alarms/push/ 엔드포인트로 WS 브로드캐스트 큐에 알람을 추가한다.
+  ```
+
+### 6.2 클래스 Docstring
+- **형식**: `"""` 사용. 첫 줄은 1줄 요약, 이후 `[설계 원칙]` / `[v3 신설]` 같은 **대괄호 섹션 태그**로 의도·이력을 묶는다.
+- **필수 대상**: `models/` 의 모든 모델 클래스, 외부에서 import되는 모든 클래스.
+- **대괄호 섹션 태그 권장 목록**:
+  - `[설계 원칙]` — 이 모델/클래스를 만든 이유와 wide table 등 구조 결정의 근거
+  - `[v3 신설]`, `[v2 변경]` — 버전·이력 변경점
+  - `[가스 종류 출처]`, `[임계치 출처]` — 외부 명세서·법규 참조
+  - `[null 처리]` — `None`/`0` 구분 등 도메인 규약
+- **표준 예시**: `drf-server/apps/monitoring/models/gas_data.py:8-22`, `drf-server/apps/alerts/models/event.py:8-35`.
+
+### 6.3 함수 Docstring
+- **형식**: `"""` 사용. 첫 줄 1-2줄 요약 + 단계별 동작 설명(`1./2./3.`). `Args`, `Returns` 는 외부 호출용(API view·service·외부 라이브러리에서 import) 함수에 필수.
+- **내부 헬퍼 함수**(`_` 접두어)는 1줄 요약만으로 충분.
+- **표준 예시**: `drf-server/apps/alerts/services/event_service.py:31-37`.
+  ```python
+  def create_alarm_and_event(...):
+      """
+      AlarmRecord + Event 생성/병합 핵심 로직
+
+      1. 병합 대상 활성 Event 검색 (select_for_update)
+      2. 존재: AlarmRecord만 생성, Event 업데이트
+      3. 없음: Event 생성 + AlarmRecord 생성 + EventLog(CREATED)
+      """
+  ```
+
+### 6.4 인라인 주석 — WHY 4종 분류 ★
+인라인 주석은 아래 **4종 중 하나**에 해당할 때만 작성한다. 그 외에는 주석 없이 코드 자체로 의미를 드러낸다.
+
+| 분류 | 적용 대상 | 예시 |
+|---|---|---|
+| **상수·매직넘버** | 임계치, 타이머, 쿨다운, 배치 크기 등 숫자 상수 | `RENOTIFY_COOLDOWN_MINUTES = 5  # 동일 이벤트 재알림 최소 간격 — 알람 폭주 방지` |
+| **동시성·트랜잭션** | `select_for_update`, `asyncio.Event`, lock, atomic | `# select_for_update — 동일 facility 동시 알람 생성 race 방지` |
+| **도메인 특수성** | 직관과 다른 처리, 의외의 분기 | `# O2는 0이 유효값 — None만 결측 처리 (산소 결핍 0% 측정 가능)` |
+| **외부 시스템 계약** | 실패 정책, 재시도, 타임아웃 의도 | `# WS 푸시 실패해도 태스크 성공 — DB 기록이 진실의 원천` |
+
+### 6.5 좋은 예 / 나쁜 예
+
+| 나쁜 예 (WHAT) | 좋은 예 (WHY) |
+|---|---|
+| `# 이벤트를 생성한다` | `# 활성 이벤트 부재 또는 12h 윈도우 초과 시 새 Event 생성` |
+| `# 5분으로 설정` | `# 5분 — 운영팀 합의(2026-04 회의), 알람 폭주 vs 위험 재상승 감지의 균형` |
+| `# None 체크` | `# 통신 불능 채널은 0이 아닌 None — false positive 방지` |
+| `# 락 건다` | `# select_for_update — 동시 AlarmRecord 생성 race 방지` |
+
+### 6.6 TODO / FIXME
+- **형식**: `# TODO(담당자) [기한]: 설명` (ex: `# TODO(재용) [2026-06-01]: 임계치 외부 설정 분리`)
+- **FIXME**: 알려진 버그가 있고 임시 우회 중인 경우만 사용. 같은 형식.
+
+### 6.7 로깅 (Logging)
+- **`print()` 금지**, 내장 `logging` 모듈만 사용.
+- **포맷**: `logger.LEVEL(f"[CATEGORY] key=value")`
+- **레벨**: `DEBUG`(상세), `INFO`(정상완료), `WARNING`(주의/재시도), `ERROR`(실패).
 
 ## 7. PRE-PR CHECKLIST (자주 하는 실수 방지)
 1. 변수명 의미 명확성 (`tmp`, `data` 배제).
