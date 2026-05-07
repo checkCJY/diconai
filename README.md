@@ -7,8 +7,7 @@
 ![DRF](https://img.shields.io/badge/DRF-3.17-A30000)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.135-009688?logo=fastapi&logoColor=white)
 ![Celery](https://img.shields.io/badge/Celery-5.4-37814A?logo=celery&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14+-336791?logo=postgresql&logoColor=white)
-
+![SQLite3](https://img.shields.io/badge/SQLite3-3-003B57?logo=sqlite&logoColor=white)
 ---
 
 ## 📖 프로젝트 소개
@@ -19,13 +18,13 @@
 
 공통점은 하나입니다 — **감지가 늦었거나, 감지했어도 대응이 늦었습니다.**
 
-**diconai**는 IoT 가스 센서·위치 장비로 현장을 실시간 모니터링하고 위험 상황을 자동 판정해 관리자·작업자에게 즉시 알람을 전달함으로써 **사고 발생 전 개입**을 목표로 하는 산업재해 예방 통합 플랫폼입니다. **유해가스 / 지오펜스(가상 위험구역) / 전력 이상** 세 가지 감지 축으로 현장 위험을 종합적으로 커버합니다.
+**diconai project**는 IoT 가스·전력·위치 센서 데이터를 가정하여  현장을 실시간 모니터링하고 위험 상황을 자동 판정해 관리자·작업자에게 즉시 알람을 전달함으로써 **사고 발생 전 개입**을 목표로 하는 산업재해 예방 통합 플랫폼입니다. **유해가스 / 지오펜스(가상 위험구역) / 전력 이상** 세 가지 감지 축으로 현장 위험을 종합적으로 커버합니다.
 
 ### 기술 구조
 
-1초 주기 IoT 수신과 WebSocket 실시간 브로드캐스트 요구사항 위에서, 동기 ORM 호출이 이벤트 루프를 막는 문제를 해결하기 위해 **DRF**(영속성·인증·비즈니스 로직)와 **FastAPI**(IoT 수신·실시간 스트림) 두 서버로 책임을 분리하고, **Celery + Redis** 비동기 파이프라인으로 알람 처리를 묶었습니다.
+IoT 수신·브라우저 송출은 현재 **5초 주기**로 운영하고 있으며, 초기 구현 단계에서 **수신 데이터 량과 DB 처리 속도로 인한 메시지 적체·드롭**을 고려해 안정성 확보 차원에서 5초로 잡은 값입니다(다음 단계 목표는 **3초**). 동기 ORM 호출이 이벤트 루프를 막는 문제를 해결하기 위해 **DRF**(영속성·인증·비즈니스 로직)와 **FastAPI**(IoT 수신·실시간 스트림) 두 서버로 책임을 분리하고, **Celery + Redis** 비동기 파이프라인으로 알람 처리를 묶었습니다.
 
-데이터 흐름은 단방향입니다 — `IoT → FastAPI → DRF (저장)`, 알람은 `Celery → Redis → FastAPI 내부 엔드포인트 → WebSocket → 브라우저` 순으로 1초 안에 도달합니다.
+데이터 흐름은 단방향입니다 — `IoT → FastAPI → DRF (저장)`. **일반 센서 통합 데이터는 5초 주기로 브라우저에 브로드캐스트**되며, **알람은 `Celery → Redis → FastAPI 내부 엔드포인트 → WebSocket → 브라우저` 순으로 이벤트 기반 즉시 전달**됩니다.
 
 ---
 
@@ -47,7 +46,7 @@
 
 ![시스템 구조도](docs/img/시스템구조도.png)
 
-> 센서는 FastAPI로만 들어오고 영속성은 DRF가 책임진다. 알람은 `Celery → Redis → FastAPI 내부 엔드포인트 → WebSocket` 순으로 1초 안에 브라우저에 도달한다.
+> 센서는 FastAPI로만 들어오고 영속성은 DRF가 책임진다. 센서 통합 데이터는 5초 주기로 브라우저에 송신되고, 알람은 `Celery → Redis → FastAPI 내부 엔드포인트 → WebSocket` 순으로 이벤트 즉시 전달된다.
 
 **핵심 컴포넌트**
 
@@ -319,6 +318,26 @@ apps/<app>/
 - **전력 임계치 양쪽 하드코딩** — DRF/JS 동기화 깨짐 → DRF `/api/monitoring/power/thresholds/` 단일 출처 API로 통일 ([34e808c](https://github.com/checkCJY/diconai/commit/34e808c))
 - **DRF 레이어 책임 혼재** — view에 비즈니스 로직 섞임, 예외 응답 형식 제각각 → service/selector 분리 + 글로벌 예외 핸들러 도입 ([Phase 4](docs/changelog/phase4_drf_layer_exceptions_swagger.md))
 - **프론트 HTTP·WebSocket 호출 분산** — 페이지마다 fetch/ws URL 하드코딩 → 단일 클라이언트 모듈로 통일, 인증 헤더 중앙 처리 ([Phase 3](docs/changelog/phase3_frontend_http_ws_unification.md))
+
+---
+
+## 🚀 향후 개선 포인트
+
+### 브로드캐스트 주기 단축 (5초 → 3초)
+
+현재 `BROADCAST_INTERVAL_SEC = 5.0`으로 운영하고 있습니다. 초기 구현 단계에서 **수신 데이터 량과 DB 처리 속도로 인한 적체**를 고려해 안정성 확보 차원에서 5초로 잡았으며, **다음 단계 목표는 3초 주기**입니다.
+
+| 단계 | 주기 | 상태 |
+|---|---|---|
+| v1 (현재) | **5초** | 안정 운영 |
+| v2 (목표) | **3초** | 개선 예정 |
+
+**개선 방향**
+
+- DRF 저장 경로 비동기화 (Celery 큐 단계 정리, 배치 INSERT 도입)
+- WebSocket 페이로드 슬림화 (변경분만 전송 / diff 프로토콜)
+- DB 운영 전환 (SQLite → PostgreSQL) 후 인덱스·WAL 튜닝
+- FastAPI ↔ DRF 내부 호출의 connection pool 재사용
 
 ---
 
