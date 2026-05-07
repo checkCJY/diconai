@@ -1,0 +1,1279 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "DiconAI Realtime API",
+    "description": "산재 예방 통합 관제 시스템의 실시간 처리 서버.\n\n**역할**:\n- IoT 센서(가스/전력/위치) 데이터 인입 및 검증\n- DRF 서버(:8000)로 영속화 위임\n- 브라우저로 WebSocket 실시간 브로드캐스트 (1초 주기)\n- Celery 태스크와의 알람 브리지 (`/internal/alarms/push/`)\n\n**데이터 흐름**: `IoT → FastAPI(:8001) → DRF(:8000) / 브라우저 WS`\n\n**관련 문서**: [API 명세](../docs/api_specification.md), [응답 봉투 표준](../docs/api_response_convention.md)",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/sensors/info": {
+      "post": {
+        "tags": [
+          "sensors"
+        ],
+        "summary": "가스 센서 기기 식별 정보 수신",
+        "description": "장비 부팅 시 1회 전송되는 기기 식별 정보를 수신한다. 현재는 확인 응답만 반환하며, 추후 장비 등록·인증 절차 추가 예정.",
+        "operationId": "receive_device_info_api_sensors_info_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceInfoPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceInfoResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "페이로드 검증 실패"
+          },
+          "500": {
+            "description": "서버 내부 오류"
+          }
+        }
+      }
+    },
+    "/api/sensors/gas": {
+      "post": {
+        "tags": [
+          "sensors"
+        ],
+        "summary": "가스 측정값 수신",
+        "description": "IoT 가스 센서가 1초 주기로 전송하는 9종 가스 농도(O₂/CO/CO₂/H₂S/LEL/NO₂/SO₂/O₃/NH₃/VOC)를 수신한다.\n\n**처리 흐름**:\n1. Pydantic 검증 + 서버에서 임계치 기준 `status` 재계산\n2. DRF로 영속화 요청 (`POST /api/monitoring/gas/`)\n3. WebSocket 공유 상태 갱신 → 다음 broadcast tick에 브라우저로 전달\n4. 'warning'/'danger' 시 Celery 태스크가 알람 생성",
+        "operationId": "receive_gas_data_api_sensors_gas_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GasDataPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GasDataResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "페이로드 검증 실패 (예: o2 범위 초과)"
+          },
+          "502": {
+            "description": "DRF 저장 실패"
+          },
+          "503": {
+            "description": "DRF 서버 연결 불가"
+          }
+        }
+      }
+    },
+    "/api/power/onoff": {
+      "post": {
+        "tags": [
+          "power"
+        ],
+        "summary": "전력 16채널 ON/OFF 스냅샷 수신",
+        "description": "각 채널의 통전 여부(0/255 → bool)를 수신해 공유 상태를 갱신하고 DRF `PowerEvent`에 비동기 저장한다. ON/OFF 변화는 이벤트성 데이터로 취급.",
+        "operationId": "recv_onoff_api_power_onoff_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PowerOnOffPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PowerIngestResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "페이로드 검증 실패"
+          },
+          "502": {
+            "description": "DRF 저장 실패 (BackgroundTask 비동기라 본 응답에는 영향 없음)"
+          }
+        }
+      }
+    },
+    "/api/power/current": {
+      "post": {
+        "tags": [
+          "power"
+        ],
+        "summary": "전력 16채널 전류(A) 수신",
+        "description": "각 채널의 전류값을 수신. -1은 통신 불능 채널 — DB에 저장되지만 통계에서 제외 필요.",
+        "operationId": "recv_current_api_power_current_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PowerCurrentPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PowerIngestResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "페이로드 검증 실패"
+          },
+          "502": {
+            "description": "DRF 저장 실패 (BackgroundTask 비동기라 본 응답에는 영향 없음)"
+          }
+        }
+      }
+    },
+    "/api/power/voltage": {
+      "post": {
+        "tags": [
+          "power"
+        ],
+        "summary": "전력 16채널 전압(V) 수신",
+        "description": "각 채널의 전압값을 수신. -1은 통신 불능 채널.",
+        "operationId": "recv_voltage_api_power_voltage_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PowerVoltagePayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PowerIngestResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "페이로드 검증 실패"
+          },
+          "502": {
+            "description": "DRF 저장 실패 (BackgroundTask 비동기라 본 응답에는 영향 없음)"
+          }
+        }
+      }
+    },
+    "/api/power/watt": {
+      "post": {
+        "tags": [
+          "power"
+        ],
+        "summary": "전력 16채널 전력(W) 수신",
+        "description": "각 채널의 전력값을 수신. 임계치(채널별 2200W 주의 / 2860W 위험) 초과 시 Celery 태스크가 알람 생성. -1은 통신 불능 채널.",
+        "operationId": "recv_watt_api_power_watt_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PowerWattPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PowerIngestResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "페이로드 검증 실패"
+          },
+          "502": {
+            "description": "DRF 저장 실패 (BackgroundTask 비동기라 본 응답에는 영향 없음)"
+          }
+        }
+      }
+    },
+    "/api/positioning/receive": {
+      "post": {
+        "tags": [
+          "positioning"
+        ],
+        "summary": "작업자 위치 배열 수신",
+        "description": "더미 스크립트 또는 IoT 장비로부터 작업자 위치 배열을 수신한다.\n\n**처리 흐름**:\n1. 공유 상태(`worker_positions`) 갱신\n2. `/ws/positions/`(1초 주기) 및 `/ws/sensors/`(broadcast tick)에서 브라우저로 송신\n3. DRF로 비동기 영속화 (`POST /api/positioning/receive/`)\n4. 지오펜스 진입 판정은 브라우저 측에서 좌표 비교로 수행",
+        "operationId": "receive_positions_api_positioning_receive_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "items": {
+                  "$ref": "#/components/schemas/WorkerPositionSchema"
+                },
+                "type": "array",
+                "title": "Positions"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PositionReceiveResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "페이로드 검증 실패 (예: x/y 음수)"
+          }
+        }
+      }
+    },
+    "/internal/alarms/push/": {
+      "post": {
+        "tags": [
+          "internal"
+        ],
+        "summary": "Celery → WebSocket 알람 브리지 (localhost 전용)",
+        "description": "DRF Celery 태스크가 알람을 생성한 뒤 이 엔드포인트를 호출하면 FastAPI의 `active_alarms` 큐에 추가되어 다음 broadcast tick(1초)에 브라우저로 전달된다.\n\n**보안**: 127.0.0.1/::1/localhost에서만 호출 가능. 외부 호출은 403.\n\n**개인 알림**: `alarm_type=geofence_intrusion` + `worker_id` 지정 시 해당 작업자의 `/ws/worker/{user_id}/` 채널로도 즉시 push.",
+        "operationId": "push_alarm_internal_alarms_push__post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlarmPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "403": {
+            "description": "localhost 외부에서 호출"
+          },
+          "422": {
+            "description": "AlarmPayload 검증 실패"
+          }
+        }
+      }
+    },
+    "/internal/scenario/mode": {
+      "get": {
+        "tags": [
+          "internal"
+        ],
+        "summary": "현재 시나리오 모드 조회",
+        "description": "더미 스크립트가 polling으로 호출. 환경변수 `DUMMY_SCENARIO_MODE`로 부팅 시 초기값.\n\n모드: `mixed`(기본 확률 기반) / `normal` / `warning` / `danger`.",
+        "operationId": "get_mode_internal_scenario_mode_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Mode Internal Scenario Mode Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "internal"
+        ],
+        "summary": "시나리오 모드 변경",
+        "description": "프론트엔드 시연 컨트롤에서 호출해 더미 데이터의 위험도 분포를 강제한다.\n\n- `normal`: 모든 가스/전력 정상 범위\n- `warning`: 모든 가스/전력 주의 범위\n- `danger`: 모든 가스/전력 위험 범위\n- `mixed`: 확률 기반 (기본 동작)",
+        "operationId": "set_mode_internal_scenario_mode_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModePayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Set Mode Internal Scenario Mode Post"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "허용되지 않은 모드값"
+          },
+          "422": {
+            "description": "ModePayload 검증 실패"
+          }
+        }
+      }
+    },
+    "/health/": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "헬스체크",
+        "description": "서버 생존 확인용 엔드포인트. Liveness probe 등 운영 모니터링에 사용.",
+        "operationId": "health_check_health__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Check Health  Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AlarmPayload": {
+        "properties": {
+          "alarm_type": {
+            "type": "string",
+            "title": "Alarm Type"
+          },
+          "risk_level": {
+            "type": "string",
+            "title": "Risk Level"
+          },
+          "source_label": {
+            "type": "string",
+            "title": "Source Label"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "is_new_event": {
+            "type": "boolean",
+            "title": "Is New Event"
+          },
+          "event_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Id"
+          },
+          "gas_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gas Type"
+          },
+          "measured_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measured Value"
+          },
+          "threshold_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold Value"
+          },
+          "worker_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worker Id"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "alarm_type",
+          "risk_level",
+          "source_label",
+          "summary",
+          "is_new_event"
+        ],
+        "title": "AlarmPayload"
+      },
+      "DeviceInfoPayload": {
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "title": "Device Id"
+          },
+          "device_name": {
+            "type": "string",
+            "title": "Device Name"
+          },
+          "software_version": {
+            "type": "string",
+            "title": "Software Version"
+          },
+          "location": {
+            "$ref": "#/components/schemas/SensorLocation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "device_id",
+          "device_name",
+          "software_version",
+          "location"
+        ],
+        "title": "DeviceInfoPayload",
+        "description": "기기 부팅 시 1회 전송하는 식별 정보.\n\n프로토콜 원본 필드: device_id, device_name, software_version\n확장 필드: location (지오펜스 좌표)\n\nNote: device_name은 프로토콜상 mac address와 동일하게 전송됨.\n      불필요 시 팀 확인 후 제거 가능."
+      },
+      "DeviceInfoResponse": {
+        "properties": {
+          "received": {
+            "type": "boolean",
+            "title": "Received"
+          },
+          "device_id": {
+            "type": "string",
+            "title": "Device Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "received",
+          "device_id"
+        ],
+        "title": "DeviceInfoResponse",
+        "description": "기기 식별 정보 수신 확인 응답."
+      },
+      "GasDataPayload": {
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "device_id": {
+            "type": "string",
+            "title": "Device Id"
+          },
+          "device_name": {
+            "type": "string",
+            "title": "Device Name"
+          },
+          "location": {
+            "$ref": "#/components/schemas/SensorLocation"
+          },
+          "o2": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "O2"
+          },
+          "co": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Co"
+          },
+          "co2": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Co2"
+          },
+          "h2s": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "H2S"
+          },
+          "lel": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Lel",
+            "description": "폭발하한계 (%) — 임계치 미정의, 수집만 함"
+          },
+          "no2": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "No2"
+          },
+          "so2": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "So2"
+          },
+          "o3": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "O3"
+          },
+          "nh3": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Nh3"
+          },
+          "voc": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Voc"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "warning",
+              "danger"
+            ],
+            "title": "Status",
+            "default": "normal"
+          }
+        },
+        "type": "object",
+        "required": [
+          "timestamp",
+          "device_id",
+          "device_name",
+          "location",
+          "o2",
+          "co",
+          "co2",
+          "h2s",
+          "lel",
+          "no2",
+          "so2",
+          "o3",
+          "nh3",
+          "voc"
+        ],
+        "title": "GasDataPayload",
+        "description": "가스 센서 실시간 측정값.\n\n프로토콜 원본 필드: device_id, o2, co, co2, h2s, lel\n확장 필드: no2, so2, o3, nh3, voc, location, status, timestamp\n\n단위\n- o2  : % (정상 범위 18.0 ~ 23.5)\n- lel : % (폭발하한계, 임계치 미정의 — 수집만 함)\n- 나머지 : ppm\n\nstatus는 수신 값을 무시하고 서버에서 가스값 기준으로 재계산한다."
+      },
+      "GasDataResponse": {
+        "properties": {
+          "received": {
+            "type": "boolean",
+            "title": "Received"
+          },
+          "device_id": {
+            "type": "string",
+            "title": "Device Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "warning",
+              "danger"
+            ],
+            "title": "Status"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "received",
+          "device_id",
+          "status"
+        ],
+        "title": "GasDataResponse",
+        "description": "가스 측정값 수신 확인 응답.\n\nstatus는 서버에서 9가지 가스 임계치를 재평가해 결정.\n추가로 가스별 위험도(`*_risk`: 'normal'/'warning'/'danger')가 동적으로 포함된다."
+      },
+      "ModePayload": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "title": "Mode"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mode"
+        ],
+        "title": "ModePayload"
+      },
+      "PositionReceiveResponse": {
+        "properties": {
+          "received": {
+            "type": "boolean",
+            "title": "Received"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "received",
+          "count"
+        ],
+        "title": "PositionReceiveResponse",
+        "description": "작업자 위치 배열 수신 확인 응답."
+      },
+      "PowerCurrentPayload": {
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "maxLength": 50,
+            "title": "Device Id"
+          },
+          "slave01": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave01"
+          },
+          "slave02": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave02"
+          },
+          "slave11": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave11"
+          },
+          "slave12": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave12"
+          },
+          "slave21": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave21"
+          },
+          "slave22": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave22"
+          },
+          "slave31": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave31"
+          },
+          "slave32": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave32"
+          },
+          "slave41": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave41"
+          },
+          "slave42": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave42"
+          },
+          "slave51": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave51"
+          },
+          "slave52": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave52"
+          },
+          "slave61": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave61"
+          },
+          "slave62": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave62"
+          },
+          "slave71": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave71"
+          },
+          "slave72": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave72"
+          }
+        },
+        "type": "object",
+        "required": [
+          "device_id",
+          "slave01",
+          "slave02",
+          "slave11",
+          "slave12",
+          "slave21",
+          "slave22",
+          "slave31",
+          "slave32",
+          "slave41",
+          "slave42",
+          "slave51",
+          "slave52",
+          "slave61",
+          "slave62",
+          "slave71",
+          "slave72"
+        ],
+        "title": "PowerCurrentPayload",
+        "description": "16채널 전류(A) 측정값 페이로드."
+      },
+      "PowerIngestResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "updated": {
+            "type": "string",
+            "title": "Updated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "updated"
+        ],
+        "title": "PowerIngestResponse",
+        "description": "전력 측정값 수신 확인 응답.\n\n`updated`는 어떤 측정 타입이 갱신되었는지 나타낸다 — onoff/current/voltage/watt."
+      },
+      "PowerOnOffPayload": {
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "maxLength": 50,
+            "title": "Device Id"
+          },
+          "slave01": {
+            "type": "integer",
+            "maximum": 255.0,
+            "minimum": 0.0,
+            "title": "Slave01"
+          },
+          "slave02": {
+            "type": "integer",
+            "maximum": 255.0,
+            "minimum": 0.0,
+            "title": "Slave02"
+          },
+          "slave11": {
+            "type": "integer",
+            "maximum": 255.0,
+            "minimum": 0.0,
+            "title": "Slave11"
+          },
+          "slave12": {
+            "type": "integer",
+            "maximum": 255.0,
+            "minimum": 0.0,
+            "title": "Slave12"
+          },
+          "slave21": {
+            "type": "integer",
+            "maximum": 255.0,
+            "minimum": 0.0,
+            "title": "Slave21"
+          },
+          "slave22": {
+            "type": "integer",
+            "maximum": 255.0,
+            "minimum": 0.0,
+            "title": "Slave22"
+          },
+          "slave31": {
+            "type": "integer",
+            "maximum": 255.0,
+            "minimum": 0.0,
+            "title": "Slave31"
+          },
+          "slave32": {
+            "type": "integer",
+            "maximum": 255.0,
+            "minimum": 0.0,
+            "title": "Slave32"
+          },
+          "slave41": {
+            "type": "integer",
+            "maximum": 255.0,
+            "minimum": 0.0,
+            "title": "Slave41"
+          },
+          "slave42": {
+            "type": "integer",
+            "maximum": 255.0,
+            "minimum": 0.0,
+            "title": "Slave42"
+          },
+          "slave51": {
+            "type": "integer",
+            "maximum": 255.0,
+            "minimum": 0.0,
+            "title": "Slave51"
+          },
+          "slave52": {
+            "type": "integer",
+            "maximum": 255.0,
+            "minimum": 0.0,
+            "title": "Slave52"
+          },
+          "slave61": {
+            "type": "integer",
+            "maximum": 255.0,
+            "minimum": 0.0,
+            "title": "Slave61"
+          },
+          "slave62": {
+            "type": "integer",
+            "maximum": 255.0,
+            "minimum": 0.0,
+            "title": "Slave62"
+          },
+          "slave71": {
+            "type": "integer",
+            "maximum": 255.0,
+            "minimum": 0.0,
+            "title": "Slave71"
+          },
+          "slave72": {
+            "type": "integer",
+            "maximum": 255.0,
+            "minimum": 0.0,
+            "title": "Slave72"
+          }
+        },
+        "type": "object",
+        "required": [
+          "device_id",
+          "slave01",
+          "slave02",
+          "slave11",
+          "slave12",
+          "slave21",
+          "slave22",
+          "slave31",
+          "slave32",
+          "slave41",
+          "slave42",
+          "slave51",
+          "slave52",
+          "slave61",
+          "slave62",
+          "slave71",
+          "slave72"
+        ],
+        "title": "PowerOnOffPayload",
+        "description": "16채널 ON/OFF 상태 스냅샷 페이로드.\n\n프로토콜 규정값: 255 = ON, 0 = OFF"
+      },
+      "PowerVoltagePayload": {
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "maxLength": 50,
+            "title": "Device Id"
+          },
+          "slave01": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave01"
+          },
+          "slave02": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave02"
+          },
+          "slave11": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave11"
+          },
+          "slave12": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave12"
+          },
+          "slave21": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave21"
+          },
+          "slave22": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave22"
+          },
+          "slave31": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave31"
+          },
+          "slave32": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave32"
+          },
+          "slave41": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave41"
+          },
+          "slave42": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave42"
+          },
+          "slave51": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave51"
+          },
+          "slave52": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave52"
+          },
+          "slave61": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave61"
+          },
+          "slave62": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave62"
+          },
+          "slave71": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave71"
+          },
+          "slave72": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave72"
+          }
+        },
+        "type": "object",
+        "required": [
+          "device_id",
+          "slave01",
+          "slave02",
+          "slave11",
+          "slave12",
+          "slave21",
+          "slave22",
+          "slave31",
+          "slave32",
+          "slave41",
+          "slave42",
+          "slave51",
+          "slave52",
+          "slave61",
+          "slave62",
+          "slave71",
+          "slave72"
+        ],
+        "title": "PowerVoltagePayload",
+        "description": "16채널 전압(V) 측정값 페이로드."
+      },
+      "PowerWattPayload": {
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "maxLength": 50,
+            "title": "Device Id"
+          },
+          "slave01": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave01"
+          },
+          "slave02": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave02"
+          },
+          "slave11": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave11"
+          },
+          "slave12": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave12"
+          },
+          "slave21": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave21"
+          },
+          "slave22": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave22"
+          },
+          "slave31": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave31"
+          },
+          "slave32": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave32"
+          },
+          "slave41": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave41"
+          },
+          "slave42": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave42"
+          },
+          "slave51": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave51"
+          },
+          "slave52": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave52"
+          },
+          "slave61": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave61"
+          },
+          "slave62": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave62"
+          },
+          "slave71": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave71"
+          },
+          "slave72": {
+            "type": "number",
+            "minimum": -1.0,
+            "title": "Slave72"
+          }
+        },
+        "type": "object",
+        "required": [
+          "device_id",
+          "slave01",
+          "slave02",
+          "slave11",
+          "slave12",
+          "slave21",
+          "slave22",
+          "slave31",
+          "slave32",
+          "slave41",
+          "slave42",
+          "slave51",
+          "slave52",
+          "slave61",
+          "slave62",
+          "slave71",
+          "slave72"
+        ],
+        "title": "PowerWattPayload",
+        "description": "16채널 전력(W) 측정값 페이로드."
+      },
+      "SensorLocation": {
+        "properties": {
+          "x": {
+            "type": "number",
+            "title": "X"
+          },
+          "y": {
+            "type": "number",
+            "title": "Y"
+          }
+        },
+        "type": "object",
+        "required": [
+          "x",
+          "y"
+        ],
+        "title": "SensorLocation",
+        "description": "지오펜스 연산용 픽셀 좌표 (설비 도면 기준)."
+      },
+      "WorkerPositionSchema": {
+        "properties": {
+          "worker_id": {
+            "type": "integer",
+            "title": "Worker Id"
+          },
+          "worker_name": {
+            "type": "string",
+            "title": "Worker Name"
+          },
+          "facility_id": {
+            "type": "integer",
+            "title": "Facility Id"
+          },
+          "x": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "X"
+          },
+          "y": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Y"
+          },
+          "movement_status": {
+            "type": "string",
+            "title": "Movement Status",
+            "default": "moving"
+          },
+          "measured_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Measured At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "worker_id",
+          "worker_name",
+          "facility_id",
+          "x",
+          "y",
+          "measured_at"
+        ],
+        "title": "WorkerPositionSchema",
+        "description": "작업자 위치 데이터 스키마 — Pydantic 검증"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "sensors",
+      "description": "가스 센서 HTTP 인입 (IoT 장비 → FastAPI)"
+    },
+    {
+      "name": "power",
+      "description": "전력 센서 HTTP 인입 (IoT 장비 → FastAPI)"
+    },
+    {
+      "name": "positioning",
+      "description": "작업자 위치 인입 (IoT/더미 → FastAPI)"
+    },
+    {
+      "name": "websocket",
+      "description": "브라우저용 실시간 스트림 (WS)"
+    },
+    {
+      "name": "internal",
+      "description": "서비스 간 통신 (Celery → FastAPI 브리지). localhost 전용"
+    },
+    {
+      "name": "health",
+      "description": "헬스체크"
+    }
+  ]
+}

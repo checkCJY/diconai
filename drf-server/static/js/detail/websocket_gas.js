@@ -2,23 +2,22 @@
    websocket_gas.js  —  실시간/AI 예측 유해가스 현황
    WebSocket 연결 → gas_monitoring.js 렌더 함수 연동
 
-   수신 페이로드 (ws://127.0.0.1:8001/ws/sensors/):
+   수신 페이로드 (/ws/sensors/, AppConfig.WS_BASE 사용):
      co, h2s, co2, o2, no2, so2, o3, nh3, voc  — 측정값
      co_risk, h2s_risk, ...                      — 위험도
      gas_loading                                 — stale 여부 (FastAPI)
+
+   shared/ws-client.js의 WSClient를 사용해 dashboard/websocket.js 등과
+   동일 엔드포인트(/ws/sensors/) 중복 연결을 방지한다.
    ────────────────────────────────────────────────────────── */
 
 'use strict';
-
-const GAS_WS_URL = 'ws://127.0.0.1:8001/ws/sensors/';
 
 function initGasWebSocket() {
   const grid    = document.getElementById('chart-grid');
   const gasLeft = document.querySelector('.gas-left');
   const banner  = document.getElementById('gas-conn-banner');
   const connTxt = document.getElementById('gas-conn-text');
-
-  let _countdownTimer = null;
 
   /* 배너 표시 */
   function _showBanner(text, spinning = true) {
@@ -29,33 +28,9 @@ function initGasWebSocket() {
     banner.style.display = '';
   }
 
-  /* 배너 숨김 + 카운트다운 정리 */
+  /* 배너 숨김 */
   function _hideBanner() {
     if (banner) banner.style.display = 'none';
-    _clearCountdown();
-  }
-
-  function _clearCountdown() {
-    if (_countdownTimer) {
-      clearInterval(_countdownTimer);
-      _countdownTimer = null;
-    }
-  }
-
-  /* N초 카운트다운 → onDone 실행 */
-  function _startCountdown(seconds, onDone) {
-    _clearCountdown();
-    let remaining = seconds;
-    _showBanner(`${remaining}초 후 재연결 시도...`);
-    _countdownTimer = setInterval(() => {
-      remaining--;
-      if (remaining <= 0) {
-        _clearCountdown();
-        onDone();
-      } else {
-        _showBanner(`${remaining}초 후 재연결 시도...`);
-      }
-    }, 1000);
   }
 
   /* 로딩 중: 배너 + 스켈레톤 (스펙: 로딩 중 → 스켈레톤 UI) */
@@ -65,18 +40,9 @@ function initGasWebSocket() {
     _showLeftSkeleton();
     restoreBadges(gasLeft);   // 이전 오류 상태 배지 회색화 초기화
 
-    let ws;
-    try {
-      ws = new WebSocket(GAS_WS_URL);
-    } catch {
-      _handleError();
-      return;
-    }
+    const ws = WSClient.connect('/ws/sensors/');
 
-    ws.onmessage = (e) => {
-      let data;
-      try { data = JSON.parse(e.data); } catch { return; }
-
+    ws.onMessage((data) => {
       _hideBanner();
       if (grid) clearSkeleton(grid);
 
@@ -92,20 +58,20 @@ function initGasWebSocket() {
       _clearAllOverlay();
       restoreBadges(gasLeft);
       updateGasPage(data, true);
-    };
+    });
 
-    ws.onerror = () => _handleError();
-    ws.onclose = () => _handleError();
+    /* 통신 장애 시 UI만 갱신. 재연결은 WSClient(3초)가 자동 처리. */
+    ws.onError(() => _handleError());
+    ws.onClose(() => _handleError());
   }
 
-  /* 통신 장애 (스펙: 차트 틀 유지 + 오버레이 + 배지 회색화 + 3초 재연결) */
+  /* 통신 장애 표시. 실제 재연결은 WSClient(3초)가 자동 처리. */
   function _handleError() {
-    _clearCountdown();
     if (grid) clearSkeleton(grid);
     updateGasPage({}, false);
     _showAllOverlay('error');
     grayOutBadges(gasLeft);
-    _startCountdown(3, connect);
+    _showBanner('재연결 시도 중...');
   }
 
   /* 좌측 센서·가스 테이블 스켈레톤 행 삽입 (로딩 중 전용) */

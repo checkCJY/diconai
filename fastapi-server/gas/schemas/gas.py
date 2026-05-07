@@ -108,3 +108,29 @@ class GasDataPayload(BaseModel):
         }
         self.status = calculate_gas_status(gas_values)
         return self
+
+
+# ============================================================
+# 응답 스키마 (OpenAPI 자동 문서화용)
+# ============================================================
+
+
+class DeviceInfoResponse(BaseModel):
+    """기기 식별 정보 수신 확인 응답."""
+
+    received: bool
+    device_id: str
+
+
+class GasDataResponse(BaseModel):
+    """가스 측정값 수신 확인 응답.
+
+    status는 서버에서 9가지 가스 임계치를 재평가해 결정.
+    추가로 가스별 위험도(`*_risk`: 'normal'/'warning'/'danger')가 동적으로 포함된다.
+    """
+
+    model_config = {"extra": "allow"}
+
+    received: bool
+    device_id: str
+    status: Literal["normal", "warning", "danger"]

@@ -13,14 +13,16 @@ from datetime import datetime, timezone
 
 import requests
 
+from core.config import settings
 from core.gas_thresholds import calculate_gas_status
+from dummies._scenario import get_scenario_mode
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
 )
 logger = logging.getLogger(__name__)
 
-FASTAPI_BASE_URL = "http://localhost:8001"
+FASTAPI_BASE_URL = f"http://{settings.DUMMY_TARGET_HOST}:{settings.DUMMY_TARGET_PORT}"
 FASTAPI_DEVICE_INFO_URL = f"{FASTAPI_BASE_URL}/api/sensors/info"
 FASTAPI_GAS_URL = f"{FASTAPI_BASE_URL}/api/sensors/gas"
 
@@ -28,7 +30,9 @@ DEVICE_ID = "63200c3afd12"
 DEVICE_NAME = "63200c3afd12"
 SOFTWARE_VERSION = "1.0.1"
 SENSOR_LOCATION = {"x": 140, "y": 160}
-DANGER_EVENT_PROB = 0.09   # 가스 1종당 위험 확률 (독립 적용) — 테스트 시 0.9로 올리면 위험 상태 유지
+DANGER_EVENT_PROB = (
+    settings.DUMMY_RISK_PROBABILITY
+)  # .env DUMMY_RISK_PROBABILITY로 제어
 
 GAS_NORMAL_RANGE: dict[str, tuple] = {
     "co": (0, 24),
@@ -41,6 +45,19 @@ GAS_NORMAL_RANGE: dict[str, tuple] = {
     "o3": (0.0, 0.059),
     "nh3": (0, 24),
     "voc": (0.0, 0.49),
+}
+
+GAS_WARNING_RANGE: dict[str, tuple] = {
+    "co": (26, 199),  # normal_max(25)~warning_max(200) 사이
+    "h2s": (10, 14),
+    "co2": (1001, 4999),
+    "o2": (16.0, 17.9),  # 정상하한(18)~위험하한(16)
+    "lel": (0, 5),  # lel은 임계치 미정의 → 정상 유지
+    "no2": (3.1, 4.9),
+    "so2": (2.1, 4.9),
+    "o3": (0.061, 0.119),
+    "nh3": (26, 34),
+    "voc": (0.51, 0.99),
 }
 
 GAS_DANGER_RANGE: dict[str, tuple] = {
@@ -56,10 +73,27 @@ GAS_DANGER_RANGE: dict[str, tuple] = {
     "voc": (1.0, 2.0),
 }
 
+_RANGE_BY_LEVEL = {
+    "normal": GAS_NORMAL_RANGE,
+    "warning": GAS_WARNING_RANGE,
+    "danger": GAS_DANGER_RANGE,
+}
 
-def _pick_value(gas: str, is_danger: bool) -> float | int:
-    """가스 종류와 위험 여부에 따라 해당 범위 내 랜덤값을 반환한다."""
-    low, high = (GAS_DANGER_RANGE if is_danger else GAS_NORMAL_RANGE)[gas]
+
+def _pick_level(mode: str) -> str:
+    """현재 모드를 가스별 위험도 라벨로 변환한다.
+
+    mixed면 DANGER_EVENT_PROB 확률로 danger, 아니면 normal.
+    fixed 모드(normal/warning/danger)는 그대로 반환.
+    """
+    if mode in ("normal", "warning", "danger"):
+        return mode
+    return "danger" if random.random() < DANGER_EVENT_PROB else "normal"
+
+
+def _pick_value(gas: str, level: str) -> float | int:
+    """가스 종류와 위험도 라벨에 따라 해당 범위 내 랜덤값을 반환한다."""
+    low, high = _RANGE_BY_LEVEL[level][gas]
     if isinstance(low, float) or isinstance(high, float):
         return round(random.uniform(low, high), 2)
     return random.randint(int(low), int(high))
@@ -78,13 +112,12 @@ def generate_device_info() -> dict:
 def generate_gas_data() -> dict:
     """FastAPI /api/sensors/gas 에 전송할 가스 측정값 페이로드를 생성한다.
 
-    각 가스가 독립적으로 DANGER_EVENT_PROB 확률로 위험 범위값을 가진다.
-    실제 센서처럼 특정 가스만 위험 수치를 나타내는 시나리오를 시뮬레이션한다.
+    시나리오 모드(mixed/normal/warning/danger)에 따라 범위가 결정된다.
+    mixed 모드면 가스별로 독립적으로 DANGER_EVENT_PROB 확률 기반.
+    fixed 모드(normal/warning/danger)면 모든 가스가 동일 위험도 범위에서 랜덤.
     """
-    gas_values = {
-        gas: _pick_value(gas, random.random() < DANGER_EVENT_PROB)
-        for gas in GAS_NORMAL_RANGE
-    }
+    mode = get_scenario_mode()
+    gas_values = {gas: _pick_value(gas, _pick_level(mode)) for gas in GAS_NORMAL_RANGE}
     return {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "device_id": DEVICE_ID,
@@ -128,7 +161,7 @@ def run() -> None:
     logger.info("가스 데이터 전송 시작 → %s", FASTAPI_GAS_URL)
     while True:
         send_data(FASTAPI_GAS_URL, generate_gas_data(), "GAS")
-        time.sleep(1)
+        time.sleep(settings.DUMMY_SEND_INTERVAL_SEC)
 
 
 if __name__ == "__main__":

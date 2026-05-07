@@ -12,12 +12,14 @@ from datetime import datetime, timezone
 
 import requests
 
+from core.config import settings
+
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
 )
 logger = logging.getLogger(__name__)
 
-FASTAPI_BASE_URL = "http://localhost:8001"
+FASTAPI_BASE_URL = f"http://{settings.DUMMY_TARGET_HOST}:{settings.DUMMY_TARGET_PORT}"
 FASTAPI_POSITION_URL = f"{FASTAPI_BASE_URL}/api/positioning/receive"
 
 DUMMY_WORKERS: list[dict] = [
@@ -114,14 +116,15 @@ def send_data(url: str, payload: list[dict], label: str) -> None:
 
 
 def run() -> None:
-    """더미 전송 루프를 시작한다. 1초마다 위치를 갱신하고 FastAPI에 전송한다."""
-    logger.info("=== 위치 더미 전송 시작 ===")
+    """더미 전송 루프를 시작한다. DUMMY_SEND_INTERVAL_SEC 주기로 위치를 갱신·전송한다."""
+    interval = settings.DUMMY_SEND_INTERVAL_SEC
+    logger.info("=== 위치 더미 전송 시작 (주기: %ds) ===", interval)
     while True:
         for w in DUMMY_WORKERS:
             _step_worker(w)
         payload = generate_positions()
         send_data(FASTAPI_POSITION_URL, payload, "POSITION")
-        time.sleep(1)
+        time.sleep(interval)
 
 
 if __name__ == "__main__":

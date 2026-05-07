@@ -25,8 +25,8 @@ environ.Env.read_env(BASE_DIR / ".env")
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = env("DJANGO_SECRET_KEY")
 
-# SECURITY WARNING: don"t run with debug turned on in production!
-DEBUG = True
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = env.bool("DJANGO_DEBUG", default=False)
 
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["127.0.0.1", "localhost"])
 
@@ -36,6 +36,7 @@ ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["127.0.0.1", "localhos
 INSTALLED_APPS = [
     # DRF
     "rest_framework",
+    "drf_spectacular",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -77,6 +78,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "apps.core.context_processors.frontend_config",
             ],
         },
     },
@@ -94,11 +96,13 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
+# DATABASE_URL이 없으면 로컬 개발용 sqlite로 폴백.
+# 운영: postgres://user:pass@host:5432/dbname 형식
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
+    "default": env.db(
+        "DATABASE_URL",
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+    )
 }
 
 
@@ -134,12 +138,31 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
+    # 응답 봉투 표준 {error: {code, message, details?}}로 4xx/5xx 변환.
+    "EXCEPTION_HANDLER": "apps.core.exceptions.standard_exception_handler",
+    # OpenAPI 자동 스키마 (drf-spectacular)
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+# ── drf-spectacular (OpenAPI / Swagger) ────────────────────
+SPECTACULAR_SETTINGS = {
+    "TITLE": "diconai API",
+    "DESCRIPTION": "산재 예방 통합 관제 시스템 — drf-server REST API",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    # 어드민·내부 ingest 등 도메인별로 그룹핑
+    "SCHEMA_PATH_PREFIX": r"/api/",
+    "COMPONENT_SPLIT_REQUEST": True,
 }
 
 # ── Simple JWT ────────────────────────────────────────────
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(hours=24),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=30),
+    "ACCESS_TOKEN_LIFETIME": timedelta(
+        hours=env.int("JWT_ACCESS_TOKEN_LIFETIME_HOURS", default=24)
+    ),
+    "REFRESH_TOKEN_LIFETIME": timedelta(
+        days=env.int("JWT_REFRESH_TOKEN_LIFETIME_DAYS", default=30)
+    ),
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
@@ -147,6 +170,19 @@ SIMPLE_JWT = {
 ADMIN_BACKOFFICE_URL = env(
     "ADMIN_BACKOFFICE_URL", default="/admin-panel/accounts-management/"
 )
+
+# ── FastAPI 서버 (서버 간 호출용, localhost) ──────────────
+# Celery → FastAPI WS 브리지(/internal/alarms/push/) 호출에 사용.
+# 브라우저는 별도로 FRONTEND_WS_BASE_URL을 통해 직접 fastapi와 WS 연결.
+FASTAPI_INTERNAL_URL = env("FASTAPI_INTERNAL_URL", default="http://127.0.0.1:8001")
+
+# ── 프론트엔드 노출용 URL (config.js로 주입) ───────────────
+# 브라우저가 fastapi-server에 접속할 때 사용하는 공개 주소.
+# 운영 환경에서는 도메인/HTTPS로 교체.
+FRONTEND_API_BASE_URL = env(
+    "FRONTEND_API_BASE_URL", default=""
+)  # 빈 문자열이면 same-origin (Django 호스트)
+FRONTEND_WS_BASE_URL = env("FRONTEND_WS_BASE_URL", default="ws://127.0.0.1:8001")
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
@@ -162,6 +198,42 @@ LANGUAGE_CODE = "ko-kr"
 TIME_ZONE = "Asia/Seoul"
 USE_TZ = True
 
+# ── Logging ──────────────────────────────────────────────────
+# 컨벤션 (docs/dev_convention.md §6):
+#   - 모듈별 logger: logger = logging.getLogger(__name__)
+#   - 메시지 포맷: f"[CATEGORY] key=value key=value"
+#   - 레벨: DEBUG(상세) / INFO(정상완료) / WARNING(주의·재시도) / ERROR(실패)
+LOG_LEVEL = env("DJANGO_LOG_LEVEL", default="INFO")
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "diconai": {
+            "format": "{asctime} {levelname:<7} {name}: {message}",
+            "datefmt": "%Y-%m-%d %H:%M:%S",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "diconai",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": LOG_LEVEL,
+    },
+    "loggers": {
+        "django.request": {  # 4xx/5xx 응답 시 Django가 traceback을 남김
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+    },
+}
+
 # ── Redis ─────────────────────────────────────────────────────
 # 로컬 개발: Redis 설치 후 기본 포트(6379)로 실행하면 별도 설정 없이 동작.
 # Windows: https://github.com/microsoftarchive/redis/releases
@@ -173,12 +245,12 @@ REDIS_URL = env("REDIS_URL", default="redis://localhost:6379/0")
 # ── Celery ────────────────────────────────────────────────────
 # Celery worker 실행: celery -A config worker -l info
 # (DRF 서버와 별도 터미널에서 실행해야 함)
-CELERY_BROKER_URL         = REDIS_URL        # 태스크 전달 채널 (Redis)
-CELERY_RESULT_BACKEND     = REDIS_URL        # 태스크 결과 저장 (Redis)
-CELERY_ACCEPT_CONTENT     = ["json"]
-CELERY_TASK_SERIALIZER    = "json"
-CELERY_RESULT_SERIALIZER  = "json"
-CELERY_TIMEZONE           = TIME_ZONE
+CELERY_BROKER_URL = REDIS_URL  # 태스크 전달 채널 (Redis)
+CELERY_RESULT_BACKEND = REDIS_URL  # 태스크 결과 저장 (Redis)
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_TRACK_STARTED = True
 
 # ── Cache (Redis) ─────────────────────────────────────────────

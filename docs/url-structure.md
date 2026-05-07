@@ -1,6 +1,6 @@
 # URL 구조
 
-> 기준일: 2026-05-01 / 브랜치: feature/MN-04_refactor
+> 기준일: 2026-05-07 / 브랜치: feature/project_4_refactoring_docstring
 
 ---
 
@@ -64,7 +64,7 @@
 | GET | `/dashboard/api/safety-history/` | 안전 점검 이력 |
 | GET | `/dashboard/api/workers-list/` | 작업자 목록 |
 | GET | `/dashboard/api/refresh/` | 대시보드 갱신 데이터 |
-| POST | `/dashboard/api/vr-progress/` | VR 진행률 저장 |
+| GET/POST | `/dashboard/api/vr-progress/` | VR 진행률 조회·저장 |
 
 ---
 
@@ -185,6 +185,8 @@
 | POST | `/api/power/watt` | 전력 센서 장비 | 전력(W) 수신 |
 | POST | `/api/positioning/receive` | 더미 스크립트·IoT | 작업자 위치 배열 수신 → 공유 상태 갱신 + DRF 저장 |
 | POST | `/internal/alarms/push/` | Celery (localhost) | 알람 큐에 추가 → 다음 WS 틱에 브라우저 전달 |
+| GET | `/internal/scenario/mode` | 운영자 (localhost) | 현재 시나리오 모드 조회 |
+| POST | `/internal/scenario/mode` | 운영자 (localhost) | 시나리오 모드 변경 (데모 제어) |
 | GET | `/health/` | 헬스 체크 | `{"status": "ok"}` |
 
 ---
@@ -194,6 +196,7 @@
 | Path | 접속 주체 | 설명 |
 |------|----------|------|
 | `ws://localhost:8001/ws/sensors/` | 브라우저 | 5초마다 통합 페이로드 송출 (가스+전력+알람+작업자 위치) |
+| `ws://localhost:8001/ws/worker/{user_id}/` | 브라우저 (작업자) | 작업자 개인 알림 전용 (1:1 푸시) |
 | `ws://localhost:8001/ws/position/` | IoT 위치 장비 | 위치 수신 → DRF 저장 + 공유 상태 갱신 |
 | `ws://localhost:8001/ws/positions/` | 브라우저 | 1초마다 작업자 위치 배열 스트리밍 |
 

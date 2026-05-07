@@ -7,18 +7,19 @@
      ui-exception.js   (showSkeleton, clearSkeleton, showChartOverlay,
                         clearChartOverlay, grayOutBadges, restoreBadges)
 
-   수신 페이로드 (ws://127.0.0.1:8002/ws/sensors/):
+   수신 페이로드 (/ws/sensors/, AppConfig.WS_BASE 사용):
      equipment[]: { name, watt, voltage, current, onoff,
                     sensor_status, risk_level }
        - sensor_status : 'active' | 'comm_failure'
        - risk_level    : 'normal' | 'warning' | 'danger'
      total_power_kw   : number
      power_change_pct : number
+
+   shared/ws-client.js의 WSClient를 사용해 동일 엔드포인트(/ws/sensors/)
+   중복 연결을 방지한다.
    ────────────────────────────────────────────────────────── */
 
 'use strict';
-
-const WS_URL = 'ws://127.0.0.1:8001/ws/sensors/';
 
 /* ────────────────────────────────────────────
    페이로드 → renderGrid 인자 변환
@@ -117,22 +118,9 @@ function initPowerWebSocket() {
     /* 로딩 중: 스켈레톤 표시 */
     showSkeleton(grid, 8);
 
-    let ws;
-    try {
-      ws = new WebSocket(WS_URL);
-    } catch {
-      _handleError();
-      return;
-    }
+    const ws = WSClient.connect('/ws/sensors/');
 
-    ws.onopen = () => {
-      /* 연결 성공 → 스켈레톤 제거는 첫 데이터 수신 후 */
-    };
-
-    ws.onmessage = (e) => {
-      let data;
-      try { data = JSON.parse(e.data); } catch { return; }
-
+    ws.onMessage((data) => {
       const equipment = data.equipment ?? [];
 
       /* 스켈레톤 제거 */
@@ -167,15 +155,11 @@ function initPowerWebSocket() {
       } else {
         updateStatusBar({ name: '-', msg: '-', alert: '-' });
       }
-    };
+    });
 
-    ws.onerror = () => _handleError();
-
-    /* 통신 장애: 3초 재연결 */
-    ws.onclose = () => {
-      _handleError();
-      setTimeout(connect, 3000);
-    };
+    /* 통신 장애 시 UI 갱신만. 재연결은 WSClient(3초)가 자동 처리. */
+    ws.onError(() => _handleError());
+    ws.onClose(() => _handleError());
   }
 
   function _handleError() {

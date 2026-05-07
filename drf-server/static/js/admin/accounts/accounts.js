@@ -131,7 +131,6 @@ const AccountsAdmin = {
 
   async fetchList() {
     try {
-      const token = Auth.getAccessToken();
       const params = new URLSearchParams({ page: this.page, page_size: this.pageSize, sort: this.sort });
       if (this.filters.name)       params.append('name', this.filters.name);
       if (this.filters.department) params.append('department', this.filters.department);
@@ -139,9 +138,7 @@ const AccountsAdmin = {
       if (this.filters.user_type)  params.append('user_type', this.filters.user_type);
       if (this.filters.status)     params.append('status', this.filters.status);
 
-      const res = await fetch(`/api/admin/accounts/?${params}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
+      const res = await Auth.apiFetch(`/api/admin/accounts/?${params}`);
 
       if (res.status === 403) { this._showAccessDenied(); return; }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -255,13 +252,9 @@ const AccountsAdmin = {
 
   async _deleteSelected() {
     if (!confirm(`선택한 ${this.selected.size}명의 사용자를 비활성화하시겠습니까?`)) return;
-    const token = Auth.getAccessToken();
     try {
       await Promise.all([...this.selected].map(id =>
-        fetch(`/api/admin/accounts/${id}/`, {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${token}` },
-        })
+        Auth.apiFetch(`/api/admin/accounts/${id}/`, { method: 'DELETE' })
       ));
       this.selected.clear();
       this._updateBulkButtons();
@@ -276,13 +269,9 @@ const AccountsAdmin = {
   async _lockSelected(action) {
     const label = action === 'lock' ? '잠금' : '잠금 해제';
     if (!confirm(`선택한 ${this.selected.size}명의 계정을 ${label} 처리하시겠습니까?`)) return;
-    const token = Auth.getAccessToken();
     try {
       await Promise.all([...this.selected].map(id =>
-        fetch(`/api/admin/accounts/${id}/${action}/`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` },
-        })
+        Auth.apiFetch(`/api/admin/accounts/${id}/${action}/`, { method: 'POST' })
       ));
       this.selected.clear();
       this._updateBulkButtons();
@@ -485,17 +474,12 @@ const AccountsAdmin = {
     const phone = document.getElementById('createPhone').value.trim();
     if (phone) payload.phone = phone.replace(/-/g, '');
 
-    const token = Auth.getAccessToken();
     const submitBtn = document.getElementById('btnCreateSubmit');
     submitBtn.disabled = true;
 
     try {
-      const res = await fetch('/api/admin/accounts/', {
+      const res = await Auth.apiFetch('/api/admin/accounts/', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(payload),
       });
 
@@ -543,10 +527,7 @@ const AccountsAdmin = {
     document.getElementById('btnEditSubmit').disabled = true;
 
     try {
-      const token = Auth.getAccessToken();
-      const res = await fetch(`/api/admin/accounts/${id}/`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
+      const res = await Auth.apiFetch(`/api/admin/accounts/${id}/`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const user = await res.json();
@@ -698,17 +679,12 @@ const AccountsAdmin = {
     const phone = document.getElementById('editPhone').value.trim();
     if (phone) payload.phone = phone.replace(/-/g, '');
 
-    const token = Auth.getAccessToken();
     const submitBtn = document.getElementById('btnEditSubmit');
     submitBtn.disabled = true;
 
     try {
-      const res = await fetch(`/api/admin/accounts/${id}/`, {
+      const res = await Auth.apiFetch(`/api/admin/accounts/${id}/`, {
         method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(payload),
       });
 
@@ -744,17 +720,12 @@ const AccountsAdmin = {
     const id = document.getElementById('editUserId').value;
     if (!confirm('비밀번호를 초기화하시겠습니까?\n초기화 비밀번호: 테스트123!')) return;
 
-    const token = Auth.getAccessToken();
     const resetBtn = document.getElementById('btnPasswordReset');
     resetBtn.disabled = true;
 
     try {
-      const res = await fetch(`/api/admin/accounts/${id}/`, {
+      const res = await Auth.apiFetch(`/api/admin/accounts/${id}/`, {
         method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ password: 'xptmxm123!' }),
       });
 

@@ -1,13 +1,32 @@
+"""
+유해가스 센서 관리 어드민 API.
+
+URL 프리픽스: /api/admin/gas-sensors/
+권한: 모든 엔드포인트 IsSuperAdmin (HTML 페이지는 admin_panel_urls.py의 TemplateView).
+"""
+
+import logging
 import socket as _socket
 
+from django.db import transaction
 from django.utils import timezone
-from rest_framework import status
+from django.views.generic import TemplateView
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiResponse,
+    extend_schema,
+    inline_serializer,
+)
+from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models.department import Department
 from apps.accounts.models.user import CustomUser
+from apps.core.pagination import AdminPagination
+from apps.core.permissions import IsSuperAdmin
 from apps.facilities.models import GasSensor, GasSensorInspection
+from apps.facilities.selectors.admin_devices import list_admin_gas_sensors
 from apps.facilities.serializers.gas_sensor_admin import (
     GasSensorAdminListSerializer,
     GasSensorAdminWriteSerializer,
@@ -16,35 +35,69 @@ from apps.facilities.serializers.gas_sensor_admin import (
     GasSensorInspectionWriteSerializer,
 )
 
+logger = logging.getLogger(__name__)
 
-class GasSensorAdminPageView(APIView):
-    authentication_classes = []
-    permission_classes = []
 
-    def get(self, request):
-        from django.shortcuts import render
+class GasSensorAdminPageView(TemplateView):
+    """가스 센서 관리 페이지 — HTML 셸만 반환. 데이터는 JS가 API 호출.
 
-        return render(
-            request,
-            "admin_panel/gas_sensor/gas_sensor.html",
-            {"active_nav": "gas_sensor"},
-        )
+    페이지 진입은 비인증 허용(JS가 토큰 없으면 로그인으로 리다이렉트).
+    실제 데이터 API는 IsSuperAdmin로 보호된다.
+    """
+
+    template_name = "admin_panel/gas_sensor/gas_sensor.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["active_nav"] = "gas_sensor"
+        return ctx
 
 
 # ── 드롭다운 옵션 ─────────────────────────────────────────────
 class DepartmentSelectView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Dropdowns"],
+        summary="부서 드롭다운 옵션",
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: inline_serializer(
+                name="DepartmentSelectItem",
+                fields={
+                    "id": serializers.IntegerField(),
+                    "name": serializers.CharField(),
+                },
+                many=True,
+            ),
+        },
+    )
     def get(self, request):
         depts = Department.objects.filter(is_active=True).values("id", "name")
         return Response(list(depts))
 
 
 class ManagerSelectView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Dropdowns"],
+        summary="담당자 드롭다운 옵션",
+        description="부서 선택 시(`department_id`) 해당 부서 소속만 필터링.",
+        parameters=[OpenApiParameter(name="department_id", type=int, required=False)],
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: inline_serializer(
+                name="ManagerSelectItem",
+                fields={
+                    "id": serializers.IntegerField(),
+                    "name": serializers.CharField(),
+                    "username": serializers.CharField(),
+                },
+                many=True,
+            ),
+        },
+    )
     def get(self, request):
         dept_id = request.query_params.get("department_id")
         qs = CustomUser.objects.filter(is_active=True)
@@ -63,9 +116,19 @@ class ManagerSelectView(APIView):
 
 # ── 다음 장비 코드 ─────────────────────────────────────────────
 class GasSensorNextCodeView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Gas Sensor"],
+        summary="다음 가용 가스 센서 코드 조회",
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: inline_serializer(
+                name="GasSensorNextCode",
+                fields={"code": serializers.CharField()},
+            ),
+        },
+    )
     def get(self, request):
         existing = GasSensor.objects.filter(device_code__regex=r"^\d+$").values_list(
             "device_code", flat=True
@@ -84,9 +147,31 @@ class GasSensorNextCodeView(APIView):
 
 # ── 연결 확인 ─────────────────────────────────────────────────
 class GasSensorConnectionCheckView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Gas Sensor"],
+        summary="가스 센서 통신 연결 확인 (TCP)",
+        request=inline_serializer(
+            name="GasSensorConnectionCheckRequest",
+            fields={
+                "ip_address": serializers.IPAddressField(),
+                "port": serializers.IntegerField(min_value=1, max_value=65535),
+            },
+        ),
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: inline_serializer(
+                name="GasSensorConnectionCheckResponse",
+                fields={
+                    "ok": serializers.BooleanField(),
+                    "checked_at": serializers.DateTimeField(),
+                    "detail": serializers.CharField(required=False),
+                },
+            ),
+            400: OpenApiResponse(description="IP/Port 검증 실패"),
+        },
+    )
     def post(self, request):
         ip = request.data.get("ip_address", "").strip()
         port = request.data.get("port")
@@ -117,7 +202,8 @@ class GasSensorConnectionCheckView(APIView):
             result = sock.connect_ex((ip, port))
             sock.close()
             ok = result == 0
-        except Exception:
+        except OSError as exc:
+            logger.warning(f"[gas_sensor_conn] ip={ip} port={port} error={exc}")
             ok = False
 
         checked_at = timezone.now()
@@ -134,83 +220,49 @@ class GasSensorConnectionCheckView(APIView):
 
 # ── 센서 목록 / 등록 ──────────────────────────────────────────
 class GasSensorAdminListView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Gas Sensor"],
+        summary="가스 센서 목록 (페이지네이션)",
+        parameters=[
+            OpenApiParameter(
+                name="q", type=str, required=False, description="이름/코드 검색"
+            ),
+            OpenApiParameter(name="is_active", type=str, required=False),
+            OpenApiParameter(name="connection", type=str, required=False),
+            OpenApiParameter(name="order", type=str, required=False),
+            OpenApiParameter(name="page", type=int, required=False),
+            OpenApiParameter(name="page_size", type=int, required=False),
+        ],
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: GasSensorAdminListSerializer(many=True),
+        },
+    )
     def get(self, request):
-        qs = GasSensor.objects.select_related(
-            "facility", "department", "manager"
-        ).prefetch_related("inspections")
-
-        # 검색
-        q = request.query_params.get("q", "").strip()
-        if q:
-            if q.upper().startswith("GAS-"):
-                qs = qs.filter(device_code=q[4:])
-            else:
-                qs = qs.filter(device_name__icontains=q)
-
-        # 사용 여부 필터
-        is_active = request.query_params.get("is_active", "").strip()
-        if is_active == "true":
-            qs = qs.filter(is_active=True)
-        elif is_active == "false":
-            qs = qs.filter(is_active=False)
-
-        # 연결 상태 필터 (직렬화 get_connection_status 로직과 동일하게 적용)
-        conn = request.query_params.get("connection", "").strip()
-        if conn == "normal":
-            qs = qs.filter(is_active=True).exclude(status__in=["offline", "error"])
-        elif conn == "disconnected":
-            qs = qs.filter(status__in=["offline", "error"])
-        elif conn == "inactive":
-            qs = qs.filter(is_active=False)
-
-        # 정렬 (이상 센서 최상단, 이후 선택 정렬)
-        order = request.query_params.get("order", "sensor_id_asc")
-        order_map = {
-            "sensor_id_asc": "device_code",
-            "sensor_id_desc": "-device_code",
-            "last_reading_desc": "-last_reading",
-            "last_reading_asc": "last_reading",
-            "inspection_desc": "-inspections__inspection_date",
-            "inspection_asc": "inspections__inspection_date",
-        }
-        order_field = order_map.get(order, "device_code")
-
-        # 이상 상태(연결 끊김) 우선 정렬
-        from django.db.models import Case, IntegerField, When
-
-        qs = (
-            qs.annotate(
-                priority=Case(
-                    When(status__in=["offline", "error"], then=0),
-                    default=1,
-                    output_field=IntegerField(),
-                )
-            )
-            .order_by("priority", order_field)
-            .distinct()
+        qs = list_admin_gas_sensors(
+            q=request.query_params.get("q", ""),
+            is_active=request.query_params.get("is_active", ""),
+            connection=request.query_params.get("connection", ""),
+            sort=request.query_params.get("order", "sensor_id_asc"),
         )
+        paginator = AdminPagination()
+        page = paginator.paginate_queryset(qs, request)
+        serializer = GasSensorAdminListSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
-        # 페이지네이션
-        try:
-            page = max(1, int(request.query_params.get("page", 1)))
-            page_size = max(1, min(100, int(request.query_params.get("page_size", 10))))
-        except (ValueError, TypeError):
-            page, page_size = 1, 10
-
-        total = qs.count()
-        sensors = qs[(page - 1) * page_size : page * page_size]
-        return Response(
-            {
-                "total": total,
-                "page": page,
-                "page_size": page_size,
-                "results": GasSensorAdminListSerializer(sensors, many=True).data,
-            }
-        )
-
+    @extend_schema(
+        tags=["Admin — Gas Sensor"],
+        summary="가스 센서 신규 등록",
+        request=GasSensorAdminWriteSerializer,
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            201: GasSensorAdminListSerializer,
+            400: OpenApiResponse(description="검증 실패"),
+        },
+    )
+    @transaction.atomic
     def post(self, request):
         serializer = GasSensorAdminWriteSerializer(data=request.data)
         if not serializer.is_valid():
@@ -226,8 +278,7 @@ class GasSensorAdminListView(APIView):
 
 # ── 센서 상세 / 수정 / 비활성화 ──────────────────────────────
 class GasSensorAdminDetailView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
     def _get(self, pk):
         try:
@@ -237,6 +288,15 @@ class GasSensorAdminDetailView(APIView):
         except GasSensor.DoesNotExist:
             return None
 
+    @extend_schema(
+        tags=["Admin — Gas Sensor"],
+        summary="가스 센서 상세 조회",
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: GasSensorAdminListSerializer,
+            404: OpenApiResponse(description="센서 없음"),
+        },
+    )
     def get(self, request, pk):
         sensor = self._get(pk)
         if sensor is None:
@@ -245,6 +305,18 @@ class GasSensorAdminDetailView(APIView):
             )
         return Response(GasSensorAdminListSerializer(sensor).data)
 
+    @extend_schema(
+        tags=["Admin — Gas Sensor"],
+        summary="가스 센서 수정 (Partial)",
+        request=GasSensorAdminWriteSerializer,
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: GasSensorAdminListSerializer,
+            400: OpenApiResponse(description="검증 실패"),
+            404: OpenApiResponse(description="센서 없음"),
+        },
+    )
+    @transaction.atomic
     def put(self, request, pk):
         sensor = self._get(pk)
         if sensor is None:
@@ -259,6 +331,15 @@ class GasSensorAdminDetailView(APIView):
         serializer.save()
         return Response(GasSensorAdminListSerializer(self._get(pk)).data)
 
+    @extend_schema(
+        tags=["Admin — Gas Sensor"],
+        summary="가스 센서 비활성화 (Soft Delete)",
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            204: OpenApiResponse(description="삭제 완료"),
+            404: OpenApiResponse(description="센서 없음"),
+        },
+    )
     def delete(self, request, pk):
         sensor = self._get(pk)
         if sensor is None:
@@ -271,9 +352,24 @@ class GasSensorAdminDetailView(APIView):
 
 # ── 일괄 비활성화 ─────────────────────────────────────────────
 class GasSensorAdminBulkDeleteView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Gas Sensor"],
+        summary="가스 센서 일괄 비활성화",
+        request=inline_serializer(
+            name="GasSensorBulkDeleteRequest",
+            fields={"ids": serializers.ListField(child=serializers.IntegerField())},
+        ),
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: inline_serializer(
+                name="GasSensorBulkDeleteResponse",
+                fields={"deleted": serializers.IntegerField()},
+            ),
+            400: OpenApiResponse(description="ids 누락"),
+        },
+    )
     def post(self, request):
         ids = request.data.get("ids", [])
         if not isinstance(ids, list) or not ids:
@@ -289,9 +385,16 @@ class GasSensorAdminBulkDeleteView(APIView):
 
 # ── 점검 이력 조회 / 점검 등록 ──────────────────────────────
 class GasSensorInspectionListView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Gas Sensor"],
+        summary="가스 센서 점검 이력 목록",
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: GasSensorInspectionSerializer(many=True),
+        },
+    )
     def get(self, request, sensor_pk):
         inspections = (
             GasSensorInspection.objects.filter(sensor_id=sensor_pk)
@@ -300,6 +403,16 @@ class GasSensorInspectionListView(APIView):
         )
         return Response(GasSensorInspectionSerializer(inspections, many=True).data)
 
+    @extend_schema(
+        tags=["Admin — Gas Sensor"],
+        summary="가스 센서 점검 이력 등록",
+        request=GasSensorInspectionWriteSerializer,
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            201: GasSensorInspectionSerializer,
+            400: OpenApiResponse(description="검증 실패"),
+        },
+    )
     def post(self, request, sensor_pk):
         data = request.data.copy()
         data["sensor"] = sensor_pk
@@ -317,9 +430,19 @@ class GasSensorInspectionListView(APIView):
 
 # ── 조치 등록 ─────────────────────────────────────────────────
 class GasSensorInspectionActionView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Gas Sensor"],
+        summary="가스 센서 점검에 대한 조치 등록",
+        request=GasSensorActionWriteSerializer,
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: GasSensorInspectionSerializer,
+            400: OpenApiResponse(description="이미 조치 완료 / 검증 실패"),
+            404: OpenApiResponse(description="점검 이력 없음"),
+        },
+    )
     def post(self, request, inspection_pk):
         try:
             inspection = GasSensorInspection.objects.select_related(

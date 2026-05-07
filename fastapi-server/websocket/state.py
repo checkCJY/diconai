@@ -34,3 +34,7 @@ power_latest: dict = {
     "watt": {},
     "updated_at": None,
 }
+
+# 시연 시나리오 모드 — 더미가 polling, 프론트가 POST로 변경
+# 값: "mixed" | "normal" | "warning" | "danger"
+scenario_mode: dict = {"value": "mixed"}

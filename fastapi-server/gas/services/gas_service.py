@@ -7,43 +7,18 @@
 # 알람은 Celery 태스크가 /internal/alarms/push/ 를 통해 직접 active_alarms에 추가한다.
 # HTTP Push(/internal/*) 없이 websocket/state.py를 직접 갱신하는 방식을 사용한다.
 import logging
-
-import httpx
-from fastapi import HTTPException
-
-from core.config import settings
-from core.gas_thresholds import calculate_individual_risks
-from gas.schemas.gas import GasDataPayload
 from datetime import datetime, timezone
 
+from fastapi import HTTPException
+
+from core.gas_thresholds import calculate_individual_risks
+from gas.schemas.gas import GasDataPayload
+from services.drf_client import DrfClientError, post_to_drf
 from websocket.state import gas_latest, latest_gas_snapshot
 
 logger = logging.getLogger(__name__)
 
-DRF_GAS_URL = f"{settings.DRF_BASE_URL}/api/monitoring/gas/"
-
-
-async def _forward_to_drf(drf_payload: dict) -> dict:
-    """
-    DRF 가스 저장 엔드포인트에 측정값을 전달하고 응답을 반환한다.
-    연결 실패·타임아웃·4xx 오류 시 적절한 HTTPException을 발생시켜
-    센서 장비에 오류 응답을 반환한다.
-    """
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.post(DRF_GAS_URL, json=drf_payload)
-        if response.status_code == 404:
-            raise HTTPException(status_code=404, detail="등록되지 않은 장치입니다.")
-        if response.status_code >= 400:
-            logger.error("DRF 저장 실패 | %s | %s", response.status_code, response.text)
-            raise HTTPException(status_code=502, detail="데이터 저장에 실패했습니다.")
-        return response.json()
-    except httpx.ConnectError:
-        logger.error("DRF 연결 실패 (%s)", DRF_GAS_URL)
-        raise HTTPException(status_code=503, detail="DRF 서버에 연결할 수 없습니다.")
-    except httpx.TimeoutException:
-        logger.error("DRF 응답 시간 초과")
-        raise HTTPException(status_code=504, detail="DRF 서버 응답 시간 초과.")
+DRF_GAS_PATH = "/api/monitoring/gas/"
 
 
 async def process_gas_data(payload: GasDataPayload) -> dict:
@@ -53,6 +28,8 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
     1. 가스별 위험도(individual_risks)를 계산한다.
     2. DRF에 측정값과 위험도를 저장한다 (DRF → Celery 태스크 → FastAPI /internal/alarms/push/).
     3. latest_gas_snapshot을 갱신해 WebSocket 브로드캐스트에 포함시킨다.
+
+    DRF 통신 실패는 센서 장비에 적절한 HTTP 응답을 돌려주기 위해 예외로 전파한다.
     """
     gas_values = {
         "o2": payload.o2,
@@ -84,7 +61,24 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
         "raw_payload": payload.model_dump(mode="json"),
     }
 
-    await _forward_to_drf(drf_payload)
+    try:
+        res = await post_to_drf(
+            DRF_GAS_PATH,
+            drf_payload,
+            raise_on_error=True,
+            log_category="gas_service",
+        )
+    except DrfClientError as exc:
+        # 통신 실패는 503, 4xx는 그대로, 그 외 비성공은 502로 매핑.
+        if exc.status is None:
+            raise HTTPException(status_code=503, detail=exc.detail) from exc
+        if exc.status == 404:
+            raise HTTPException(
+                status_code=404, detail="등록되지 않은 장치입니다."
+            ) from exc
+        raise HTTPException(
+            status_code=502, detail="데이터 저장에 실패했습니다."
+        ) from exc
 
     gas_snapshot = {
         "co": payload.co,
@@ -101,6 +95,10 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
     latest_gas_snapshot.update(gas_snapshot)
     gas_latest["updated_at"] = datetime.now(timezone.utc).isoformat()
 
+    logger.debug(
+        f"[gas_service] action=processed device={payload.device_id} "
+        f"saved_id={res.json().get('id') if res else '?'}"
+    )
     return {
         "received": True,
         "device_id": payload.device_id,

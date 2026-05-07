@@ -2,20 +2,15 @@
 //
 // 로그인한 작업자가 /ws/worker/{userId}/ 에 연결해
 // 지오펜스 진입 알람을 실시간으로 수신한다.
-// 의존: auth.js (Auth), alarm-popup.js (AlarmPopup)
+// 의존: auth.js (Auth), ws-client.js (WSClient), alarm-popup.js (AlarmPopup)
 (function () {
-  const WS_BASE = 'ws://127.0.0.1:8001/ws/worker/';
-  const RECONNECT_DELAY = 3000;
-  let _userId = null;
-  let _reconnectTimer = null;
+  document.addEventListener('DOMContentLoaded', async function () {
+    const user = await Auth.getMe();
+    if (!user || !user.id) return;
 
-  function connect() {
-    if (!_userId) return;
-    const ws = new WebSocket(WS_BASE + _userId + '/');
+    const ws = WSClient.connect('/ws/worker/' + user.id + '/');
 
-    ws.onmessage = function (event) {
-      let data;
-      try { data = JSON.parse(event.data); } catch { return; }
+    ws.onMessage(function (data) {
       if (data.type !== 'worker_alert') return;
 
       const alarmData = {
@@ -30,17 +25,6 @@
         AlarmPopup.show(alarmData);
         document.dispatchEvent(new CustomEvent('newAlarmEvent', { detail: alarmData }));
       }
-    };
-
-    ws.onclose = function () {
-      _reconnectTimer = setTimeout(connect, RECONNECT_DELAY);
-    };
-  }
-
-  document.addEventListener('DOMContentLoaded', async function () {
-    const user = await Auth.getMe();
-    if (!user || !user.id) return;
-    _userId = user.id;
-    connect();
+    });
   });
 })();
