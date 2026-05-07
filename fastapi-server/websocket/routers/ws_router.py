@@ -6,12 +6,13 @@
 #   WS /ws/position/ : IoT 위치 장비 연결. 위치 데이터를 수신해 DRF에 저장하고
 #                      worker_positions 공유 상태를 갱신한다.
 import asyncio
+import logging
 from datetime import datetime, timezone
 
-import httpx
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from core.config import settings
+from services.drf_client import post_to_drf
 from websocket.services.broadcast import build_broadcast_payload
 from websocket.state import (
     active_alarms,
@@ -21,10 +22,11 @@ from websocket.state import (
     worker_positions,
 )
 
-POSITION_ENDPOINT = f"{settings.DRF_BASE_URL}/api/positioning/receive/"
-BROADCAST_INTERVAL = 5  # 센서 데이터 브로드캐스트 주기(초)
+logger = logging.getLogger(__name__)
 
-router = APIRouter()
+POSITION_PATH = "/api/positioning/receive/"
+
+router = APIRouter(tags=["websocket"])
 
 
 async def _send_to_all(payload: dict) -> None:
@@ -33,7 +35,8 @@ async def _send_to_all(payload: dict) -> None:
     for ws in list(sensor_clients):
         try:
             await ws.send_json(payload)
-        except Exception:
+        except Exception as exc:
+            logger.warning(f"[ws/sensors] action=send_failed error={exc!r}")
             dead.append(ws)
     for ws in dead:
         if ws in sensor_clients:
@@ -57,37 +60,28 @@ async def alarm_flush_loop():
 
 
 async def broadcast_loop():
-    """30초마다 모든 클라이언트에 센서 통합 데이터를 브로드캐스트한다."""
+    """settings.BROADCAST_INTERVAL_SEC 마다 모든 클라이언트에 센서 통합 데이터를 송신."""
     while True:
-        await asyncio.sleep(BROADCAST_INTERVAL)
+        await asyncio.sleep(settings.BROADCAST_INTERVAL_SEC)
         if not sensor_clients:
             continue
         await _send_to_all(build_broadcast_payload())
 
 
-async def _forward_to_drf(payload: dict) -> dict:
-    """
-    IoT 장비로부터 수신한 위치 데이터를 DRF에 저장한다.
+async def _save_iot_position(payload: dict) -> dict:
+    """IoT 장비로부터 수신한 위치 데이터를 DRF에 저장.
 
-    성공 시 {"status": "ok", ...DRF 응답} 을 반환하고,
-    타임아웃·예외 발생 시 {"status": "error", "message": ...} 를 반환한다.
+    성공: {"status": "ok", ...DRF 응답}
+    실패: {"status": "error", "message": ...}
     """
-    headers = {"Content-Type": "application/json"}
-    if settings.DRF_SERVICE_TOKEN:
-        headers["Authorization"] = f"Bearer {settings.DRF_SERVICE_TOKEN}"
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            res = await client.post(POSITION_ENDPOINT, json=[payload], headers=headers)
-            print(
-                f"[position] DRF {res.status_code}: worker={payload['worker_id']} ({payload['x']}, {payload['y']})"
-            )
-            if res.status_code == 201:
-                return {"status": "ok", **res.json()}
-            return {"status": "error", "message": f"DRF {res.status_code}: {res.text}"}
-    except httpx.TimeoutException:
-        return {"status": "error", "message": "DRF 응답 타임아웃"}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+    res = await post_to_drf(
+        POSITION_PATH, [payload], raise_on_error=False, log_category="ws_position"
+    )
+    if res is None:
+        return {"status": "error", "message": "DRF 통신 실패"}
+    if res.status_code == 201:
+        return {"status": "ok", **res.json()}
+    return {"status": "error", "message": f"DRF {res.status_code}"}
 
 
 @router.websocket("/ws/sensors/")
@@ -100,18 +94,18 @@ async def sensor_stream(websocket: WebSocket):
     """
     await websocket.accept()
     sensor_clients.append(websocket)
-    print(f"[ws/sensors] 브라우저 연결됨 (총 {len(sensor_clients)}개)")
+    logger.info(f"[ws/sensors] action=connect total={len(sensor_clients)}")
     try:
         await websocket.send_json(build_broadcast_payload(include_alarms=False))
         await websocket.receive_text()  # 연결 유지 (disconnect까지 대기)
     except WebSocketDisconnect:
         pass
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning(f"[ws/sensors] action=stream_error error={exc!r}")
     finally:
         if websocket in sensor_clients:
             sensor_clients.remove(websocket)
-        print(f"[ws/sensors] 브라우저 연결 종료 (총 {len(sensor_clients)}개)")
+        logger.info(f"[ws/sensors] action=disconnect total={len(sensor_clients)}")
 
 
 @router.websocket("/ws/worker/{user_id}/")
@@ -124,16 +118,18 @@ async def worker_stream(websocket: WebSocket, user_id: int):
     """
     await websocket.accept()
     worker_clients[user_id] = websocket
-    print(f"[ws/worker] 작업자 연결됨 user_id={user_id}")
+    logger.info(f"[ws/worker] action=connect user_id={user_id}")
     try:
         await websocket.receive_text()  # 연결 유지
     except WebSocketDisconnect:
         pass
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning(
+            f"[ws/worker] action=stream_error user_id={user_id} error={exc!r}"
+        )
     finally:
         worker_clients.pop(user_id, None)
-        print(f"[ws/worker] 작업자 연결 종료 user_id={user_id}")
+        logger.info(f"[ws/worker] action=disconnect user_id={user_id}")
 
 
 @router.websocket("/ws/position/")
@@ -147,7 +143,7 @@ async def position_stream(websocket: WebSocket):
     필수 필드가 누락된 경우 에러 응답을 반환하고 다음 수신을 계속 대기한다.
     """
     await websocket.accept()
-    print("[ws/position] IoT 디바이스 연결됨")
+    logger.info("[ws/position] action=connect")
     try:
         while True:
             data = await websocket.receive_json()
@@ -167,7 +163,7 @@ async def position_stream(websocket: WebSocket):
                 "y": float(data["y"]),
                 "measured_at": datetime.now(timezone.utc).isoformat(),
             }
-            result = await _forward_to_drf(payload)
+            result = await _save_iot_position(payload)
             if result["status"] == "ok":
                 worker_positions[worker_id] = {
                     "x": payload["x"],
@@ -177,7 +173,7 @@ async def position_stream(websocket: WebSocket):
                 }
             await websocket.send_json(result)
     except WebSocketDisconnect:
-        print("[ws/position] IoT 디바이스 연결 종료")
-    except Exception as e:
-        print(f"[ws/position] 예외: {e}")
+        logger.info("[ws/position] action=disconnect")
+    except Exception as exc:
+        logger.exception(f"[ws/position] action=stream_error error={exc!r}")
         await websocket.close()

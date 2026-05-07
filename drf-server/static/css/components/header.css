@@ -14,7 +14,7 @@
 }
 .header-left  { display: flex; align-items: center; gap: 12px; }
 .hamburger    { background: none; border: none; color: var(--text2); font-size: 20px; cursor: pointer; }
-.logo-box     { width: 56px; height: 30px; background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; display: flex; align-items: center; justify-content: center; color: var(--text2); font-size: 10px; }
+.logo-img     { height: 30px; width: auto; border-radius: 4px; display: block; }
 .system-name  { font-size: 14px; font-weight: 700; }
 .header-center { display: flex; align-items: center; gap: 16px; }
 .user-info    { text-align: center; }

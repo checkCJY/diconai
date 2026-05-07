@@ -8,7 +8,7 @@
     const roleEl = document.getElementById('adminRole');
     if (nameEl) nameEl.textContent = me.username ?? '';
     if (roleEl) roleEl.textContent = me.role ?? '';
-    localStorage.setItem('role', me.role ?? '');
+    Auth.setRole(me.role);
 })();
 
 document.getElementById('btnHome').addEventListener('click', function () {
@@ -20,6 +20,19 @@ document.getElementById('btnLogout').addEventListener('click', function () {
     window.location.href = '/accounts/login/';
 });
 
+const AdminSNB = {
+    drawer:  document.getElementById('adminSnbDrawer'),
+    overlay: document.getElementById('adminSnbOverlay'),
+    open()   { this.drawer.classList.add('open');    this.overlay.classList.add('open'); },
+    close()  { this.drawer.classList.remove('open'); this.overlay.classList.remove('open'); },
+    toggle() { this.drawer.classList.contains('open') ? this.close() : this.open(); },
+    init() {
+        document.getElementById('adminHamburger')?.addEventListener('click', () => this.toggle());
+        this.overlay?.addEventListener('click', () => this.close());
+    },
+};
+AdminSNB.init();
+
 // ── 페이지 접근 권한 체크 ────────────────────────────────────
 const AdminAccess = {
   async check(allowedRoles = ['super_admin', 'facility_admin']) {
@@ -28,7 +41,7 @@ const AdminAccess = {
       const me = await Auth.getMe();
       if (!me) { Auth.redirectLogin(); return false; }
       role = me.role;
-      localStorage.setItem('role', role);
+      Auth.setRole(role);
     }
     if (!allowedRoles.includes(role)) {
       this._showDenied();

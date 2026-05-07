@@ -19,7 +19,10 @@
 
 <div class="body-wrap">
   <div class="top-row">
-    {% include 'dashboard/panels/safety_panel.html' %}
+    <div class="col-left">
+      {% include 'dashboard/panels/safety_panel.html' %}
+      {% include 'dashboard/panels/scenario_panel.html' %}
+    </div>
     {% include 'dashboard/panels/map_panel.html' %}
     {% include 'dashboard/panels/event_panel.html' %}
   </div>
@@ -33,17 +36,20 @@
 {% include 'components/alarm_popup.html' %}
 {% include 'components/geofence_modal.html' %}
 
+{% include 'components/app_config.html' %}
+<script src="{% static 'js/shared/config.js' %}"></script>
 <script src="{% static 'js/shared/util.js' %}"></script>
 <script src="{% static 'js/shared/auth.js' %}"></script>
+<script src="{% static 'js/shared/ws-client.js' %}"></script>
 <script src="{% static 'js/shared/alarm-popup.js' %}"></script>
 <script src="{% static 'js/shared/worker-ws.js' %}"></script>
 <script src="{% static 'js/dashboard/panels/event-panel.js' %}"></script>
-<script src="{% static 'js/dashboard/panels/gas-panel.js' %}"></script>
 <script src="{% static 'js/dashboard/charts.js' %}"></script>
 <script src="{% static 'js/dashboard/panels/map-panel.js' %}"></script>
 <script src="{% static 'js/shared/layout.js' %}"></script>
 <script src="{% static 'js/dashboard/panels/worker-panel.js' %}"></script>
 <script src="{% static 'js/dashboard/websocket.js' %}"></script>
+<script src="{% static 'js/dashboard/panels/scenario-panel.js' %}"></script>
 <script src="{% static 'js/dashboard/app.js' %}"></script>
 </body>
 </html>

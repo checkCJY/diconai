@@ -15,15 +15,16 @@ from fastapi import APIRouter, BackgroundTasks
 
 from power.schemas.power import (
     PowerCurrentPayload,
+    PowerIngestResponse,
     PowerOnOffPayload,
     PowerVoltagePayload,
     PowerWattPayload,
 )
 from power.services.power_service import (
-    DRF_POWER_DATA_URL,
-    DRF_POWER_EVENT_URL,
+    DRF_POWER_DATA_PATH,
+    DRF_POWER_EVENT_PATH,
     now_utc_iso,
-    post_to_drf,
+    post_power_to_drf,
     to_channel_list,
     update_power_state,
 )
@@ -31,15 +32,32 @@ from power.services.power_service import (
 router = APIRouter(prefix="/api/power", tags=["power"])
 
 
-@router.post("/onoff", status_code=201)
+_COMMON_RESPONSES = {
+    422: {"description": "페이로드 검증 실패"},
+    502: {
+        "description": "DRF 저장 실패 (BackgroundTask 비동기라 본 응답에는 영향 없음)"
+    },
+}
+
+
+@router.post(
+    "/onoff",
+    response_model=PowerIngestResponse,
+    status_code=201,
+    summary="전력 16채널 ON/OFF 스냅샷 수신",
+    description=(
+        "각 채널의 통전 여부(0/255 → bool)를 수신해 공유 상태를 갱신하고 "
+        "DRF `PowerEvent`에 비동기 저장한다. ON/OFF 변화는 이벤트성 데이터로 취급."
+    ),
+    responses=_COMMON_RESPONSES,
+)
 async def recv_onoff(payload: PowerOnOffPayload, bg: BackgroundTasks):
-    """ON/OFF 스냅샷을 수신해 공유 상태를 갱신하고 DRF PowerEvent에 비동기 저장한다."""
     snapshot = payload.to_snapshot()
     measured_at = now_utc_iso()
     update_power_state("onoff", snapshot, measured_at)
     bg.add_task(
-        post_to_drf,
-        DRF_POWER_EVENT_URL,
+        post_power_to_drf,
+        DRF_POWER_EVENT_PATH,
         {
             "device_id": payload.device_id,
             "measured_at": measured_at,
@@ -49,15 +67,21 @@ async def recv_onoff(payload: PowerOnOffPayload, bg: BackgroundTasks):
     return {"status": "ok", "updated": "onoff"}
 
 
-@router.post("/current", status_code=201)
+@router.post(
+    "/current",
+    response_model=PowerIngestResponse,
+    status_code=201,
+    summary="전력 16채널 전류(A) 수신",
+    description="각 채널의 전류값을 수신. -1은 통신 불능 채널 — DB에 저장되지만 통계에서 제외 필요.",
+    responses=_COMMON_RESPONSES,
+)
 async def recv_current(payload: PowerCurrentPayload, bg: BackgroundTasks):
-    """전류 측정값을 수신해 공유 상태를 갱신하고 DRF PowerData에 비동기 저장한다."""
     channel_values = payload.to_channel_values()
     measured_at = now_utc_iso()
     update_power_state("current", channel_values, measured_at)
     bg.add_task(
-        post_to_drf,
-        DRF_POWER_DATA_URL,
+        post_power_to_drf,
+        DRF_POWER_DATA_PATH,
         {
             "device_id": payload.device_id,
             "measured_at": measured_at,
@@ -68,15 +92,21 @@ async def recv_current(payload: PowerCurrentPayload, bg: BackgroundTasks):
     return {"status": "ok", "updated": "current"}
 
 
-@router.post("/voltage", status_code=201)
+@router.post(
+    "/voltage",
+    response_model=PowerIngestResponse,
+    status_code=201,
+    summary="전력 16채널 전압(V) 수신",
+    description="각 채널의 전압값을 수신. -1은 통신 불능 채널.",
+    responses=_COMMON_RESPONSES,
+)
 async def recv_voltage(payload: PowerVoltagePayload, bg: BackgroundTasks):
-    """전압 측정값을 수신해 공유 상태를 갱신하고 DRF PowerData에 비동기 저장한다."""
     channel_values = payload.to_channel_values()
     measured_at = now_utc_iso()
     update_power_state("voltage", channel_values, measured_at)
     bg.add_task(
-        post_to_drf,
-        DRF_POWER_DATA_URL,
+        post_power_to_drf,
+        DRF_POWER_DATA_PATH,
         {
             "device_id": payload.device_id,
             "measured_at": measured_at,
@@ -87,15 +117,24 @@ async def recv_voltage(payload: PowerVoltagePayload, bg: BackgroundTasks):
     return {"status": "ok", "updated": "voltage"}
 
 
-@router.post("/watt", status_code=201)
+@router.post(
+    "/watt",
+    response_model=PowerIngestResponse,
+    status_code=201,
+    summary="전력 16채널 전력(W) 수신",
+    description=(
+        "각 채널의 전력값을 수신. 임계치(채널별 2200W 주의 / 2860W 위험) 초과 시 "
+        "Celery 태스크가 알람 생성. -1은 통신 불능 채널."
+    ),
+    responses=_COMMON_RESPONSES,
+)
 async def recv_watt(payload: PowerWattPayload, bg: BackgroundTasks):
-    """전력(W) 측정값을 수신해 공유 상태를 갱신하고 DRF PowerData에 비동기 저장한다."""
     channel_values = payload.to_channel_values()
     measured_at = now_utc_iso()
     update_power_state("watt", channel_values, measured_at)
     bg.add_task(
-        post_to_drf,
-        DRF_POWER_DATA_URL,
+        post_power_to_drf,
+        DRF_POWER_DATA_PATH,
         {
             "device_id": payload.device_id,
             "measured_at": measured_at,

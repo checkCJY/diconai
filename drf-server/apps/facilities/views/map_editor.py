@@ -1,9 +1,14 @@
 # apps/facilities/views/map_editor.py
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiResponse,
+    extend_schema,
+    inline_serializer,
+)
+from rest_framework import serializers, status
 from rest_framework.permissions import IsAuthenticated
-from django.contrib.auth.mixins import LoginRequiredMixin
+from rest_framework.response import Response
+from rest_framework.views import APIView
 from django.views.generic import TemplateView
 from django.db import transaction
 
@@ -20,7 +25,7 @@ from apps.facilities.serializers.map_editor import (
 )
 
 
-class MapEditorPageView(LoginRequiredMixin, TemplateView):
+class MapEditorPageView(TemplateView):
     template_name = "admin_panel/map_editor/map_editor.html"
     extra_context = {"active_nav": "map_editor"}
 
@@ -33,6 +38,33 @@ class MapEditorObjectsView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=["Map Editor"],
+        summary="지도 편집 — 모든 객체 일괄 조회",
+        description="공장·가스센서·전력장치·위치노드·지오펜스를 한 번의 호출로 반환. 지도 편집기 초기 로드용.",
+        parameters=[
+            OpenApiParameter(
+                name="facility_id", type=int, required=False, description="공장 ID 필터"
+            )
+        ],
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: inline_serializer(
+                name="MapEditorObjects",
+                fields={
+                    "facilities": serializers.ListField(child=serializers.DictField()),
+                    "gas_sensors": serializers.ListField(child=serializers.DictField()),
+                    "power_devices": serializers.ListField(
+                        child=serializers.DictField()
+                    ),
+                    "position_nodes": serializers.ListField(
+                        child=serializers.DictField()
+                    ),
+                    "geofences": serializers.ListField(child=serializers.DictField()),
+                },
+            ),
+        },
+    )
     def get(self, request):
         facility_id = request.query_params.get("facility_id")
 
@@ -67,6 +99,36 @@ class MapEditorSaveView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=["Map Editor"],
+        summary="지도 편집 — 일괄 저장",
+        description=(
+            "편집 화면에서 변경된 객체 위치/크기/지오펜스를 하나의 트랜잭션으로 저장한다. "
+            "지오펜스는 신규/기존/삭제 모두 한 번에 처리. 원형 지오펜스는 polygon으로 근사."
+        ),
+        request=MapEditorSaveSerializer,
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: inline_serializer(
+                name="MapEditorSaveResponse",
+                fields={
+                    "saved": serializers.BooleanField(),
+                    "updated": inline_serializer(
+                        name="MapEditorSaveCounts",
+                        fields={
+                            "facilities": serializers.IntegerField(),
+                            "gas_sensors": serializers.IntegerField(),
+                            "power_devices": serializers.IntegerField(),
+                            "position_nodes": serializers.IntegerField(),
+                            "geofences_saved": serializers.IntegerField(),
+                            "geofences_deleted": serializers.IntegerField(),
+                        },
+                    ),
+                },
+            ),
+            400: OpenApiResponse(description="검증 실패"),
+        },
+    )
     @transaction.atomic
     def post(self, request):
         serializer = MapEditorSaveSerializer(data=request.data)

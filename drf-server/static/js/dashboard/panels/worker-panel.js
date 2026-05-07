@@ -83,7 +83,7 @@
   });
 
   async function init() {
-    const role    = localStorage.getItem('role') || 'worker';
+    const role    = Auth.getRole() || 'worker';
     const isAdmin = role === 'facility_admin' || role === 'super_admin';
 
     if (isAdmin) {

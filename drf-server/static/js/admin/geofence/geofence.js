@@ -20,10 +20,7 @@ const GeofenceAdmin = {
 
   async _loadUser() {
     try {
-      const token = Auth.getAccessToken();
-      const res = await fetch('/api/auth/me/', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await Auth.apiFetch('/api/auth/me/');
       const user = await res.json();
       document.getElementById('adminName').textContent = user.username || '';
       document.getElementById('adminRole').textContent = user.user_type || '';
@@ -73,13 +70,10 @@ const GeofenceAdmin = {
 
   async fetchList() {
     try {
-      const token = Auth.getAccessToken();
       const params = new URLSearchParams();
       if (this.filters.name) params.append('name', this.filters.name);
       if (this.filters.risk) params.append('risk_level', this.filters.risk);
-      const res = await fetch(`/api/admin/geofences/?${params}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await Auth.apiFetch(`/api/admin/geofences/?${params}`);
       const data = await res.json();
       this.total = data.total;
       this._renderTable(data.results);
@@ -145,13 +139,9 @@ const GeofenceAdmin = {
 
   async _deleteSelected() {
     if (!confirm(`선택한 ${this.selected.size}개의 위험구역을 삭제하시겠습니까?`)) return;
-    const token = Auth.getAccessToken();
     try {
       await Promise.all([...this.selected].map(id =>
-        fetch(`/api/admin/geofences/${id}/`, {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
+        Auth.apiFetch(`/api/admin/geofences/${id}/`, { method: 'DELETE' })
       ));
       this.selected.clear();
       this._updateDeleteBtn();
@@ -170,10 +160,7 @@ const GeofenceAdmin = {
 
     if (id) {
       try {
-        const token = Auth.getAccessToken();
-        const res = await fetch(`/api/admin/geofences/${id}/`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const res = await Auth.apiFetch(`/api/admin/geofences/${id}/`);
         const data = await res.json();
         document.getElementById('modalName').value = data.name;
         document.getElementById('modalRisk').value = data.risk_level;
@@ -252,17 +239,12 @@ const GeofenceAdmin = {
     if (!name) { alert('구역명을 입력해주세요.'); return; }
     if (coords.length < 3) { alert('최소 3개의 좌표를 입력해주세요.'); return; }
 
-    const token = Auth.getAccessToken();
     const method = id ? 'PUT' : 'POST';
     const url = id ? `/api/admin/geofences/${id}/` : `/api/admin/geofences/`;
 
     try {
-      const res = await fetch(url, {
+      const res = await Auth.apiFetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
         body: JSON.stringify({
           name,
           risk_level: risk,

@@ -1,14 +1,12 @@
 (function () {
-  if (localStorage.getItem('access_token')) {
-    fetch('/api/auth/me/', {
-      headers: { 'Authorization': 'Bearer ' + localStorage.getItem('access_token') },
-    })
+  // 이미 로그인 상태면 대시보드로 자동 이동. 토큰 만료/무효는 Auth.clear로 정리.
+  if (Auth.getAccessToken()) {
+    Auth.apiFetch('/api/auth/me/')
       .then(res => {
         if (res.ok) {
           window.location.href = '/dashboard/';
         } else {
-          ['access_token', 'refresh_token', 'username', 'role']
-            .forEach(k => localStorage.removeItem(k));
+          Auth.clear();
         }
       })
       .catch(() => {});
@@ -125,7 +123,9 @@
     btn.textContent = '로그인 중...';
 
     try {
-      const res = await fetch('/api/auth/login/', {
+      const url = (window.AppConfig && window.AppConfig.apiUrl)
+        ? window.AppConfig.apiUrl('/api/auth/login/') : '/api/auth/login/';
+      const res = await fetch(url, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ username, password }),
@@ -137,10 +137,12 @@
         return;
       }
 
-      localStorage.setItem('access_token',  data.access);
-      localStorage.setItem('refresh_token', data.refresh);
-      localStorage.setItem('username',      data.username);
-      localStorage.setItem('role',          data.role);
+      Auth.setTokens({
+        access:   data.access,
+        refresh:  data.refresh,
+        username: data.username,
+        role:     data.role,
+      });
 
       window.location.href = '/dashboard/';
     } catch {

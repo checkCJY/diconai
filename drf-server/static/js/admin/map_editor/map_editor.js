@@ -160,12 +160,11 @@ function _initControls() {
 
 // ── 데이터 로드 ──────────────────────────────────────────────
 async function _loadObjects() {
-  const token = Auth.getAccessToken();
   const facilityId = document.getElementById('facilitySelect').value;
   const url = API_OBJECTS + (facilityId ? `?facility_id=${facilityId}` : '');
 
   try {
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await Auth.apiFetch(url);
     const data = await res.json();
 
     _allObjects = [
@@ -641,8 +640,6 @@ async function _saveAll() {
     }
   }
 
-  const token = Auth.getAccessToken();
-
   const payload = {
     facilities:     [],
     gas_sensors:    [],
@@ -704,9 +701,8 @@ async function _saveAll() {
   });
 
   try {
-    const res = await fetch(API_SAVE, {
+    const res = await Auth.apiFetch(API_SAVE, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify(payload),
     });
     if (res.ok) {

@@ -2,17 +2,14 @@
 //
 // 대시보드(websocket.js)와 달리 가스·전력 DOM 갱신 없이
 // alarms[] 배열만 처리해 팝업·토스트를 표시한다.
+//
+// shared/ws-client.js의 WSClient를 사용해 동일 엔드포인트 중복 연결을 방지한다.
+// (대시보드와 같은 페이지에 로드되면 WSClient 캐시로 한 연결만 유지됨)
 (function () {
-  const WS_URL = 'ws://127.0.0.1:8001/ws/sensors/';
-  const RECONNECT_DELAY = 3000;
+  document.addEventListener('DOMContentLoaded', function () {
+    const ws = WSClient.connect('/ws/sensors/');
 
-  function connect() {
-    const ws = new WebSocket(WS_URL);
-
-    ws.onmessage = function (event) {
-      let data;
-      try { data = JSON.parse(event.data); } catch { return; }
-
+    ws.onMessage(function (data) {
       if (!Array.isArray(data.alarms) || data.alarms.length === 0) return;
 
       data.alarms.forEach(function (alarm) {
@@ -33,12 +30,6 @@
           AlarmToast.show(alarmData);
         }
       });
-    };
-
-    ws.onclose = function () {
-      setTimeout(connect, RECONNECT_DELAY);
-    };
-  }
-
-  document.addEventListener('DOMContentLoaded', connect);
+    });
+  });
 })();

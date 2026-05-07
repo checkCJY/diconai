@@ -5,7 +5,13 @@ URL 프리픽스: /api/admin/
 """
 
 from django.contrib.auth import get_user_model
-from rest_framework import status
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiResponse,
+    extend_schema,
+    inline_serializer,
+)
+from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -56,6 +62,20 @@ class OrgTreeView(APIView):
 
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Organization"],
+        summary="회사·부서 트리 + 조직 없음 인원 수",
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: inline_serializer(
+                name="OrgTreeResponse",
+                fields={
+                    "companies": serializers.ListField(child=serializers.DictField()),
+                    "no_dept_count": serializers.IntegerField(),
+                },
+            ),
+        },
+    )
     def get(self, request):
         companies = list(Company.objects.filter(is_active=True))
         all_depts = list(
@@ -83,6 +103,16 @@ class DeptListCreateView(APIView):
 
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Organization"],
+        summary="부서 신규 생성",
+        request=DeptCreateSerializer,
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            201: DeptDetailSerializer,
+            400: OpenApiResponse(description="검증 실패"),
+        },
+    )
     def post(self, request):
         serializer = DeptCreateSerializer(data=request.data)
         if not serializer.is_valid():
@@ -120,6 +150,15 @@ class DeptDetailView(APIView):
         except Department.DoesNotExist:
             return None
 
+    @extend_schema(
+        tags=["Admin — Organization"],
+        summary="부서 상세",
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: DeptDetailSerializer,
+            404: OpenApiResponse(description="부서 없음"),
+        },
+    )
     def get(self, request, pk):
         dept = self._get_dept(pk)
         if not dept:
@@ -128,6 +167,17 @@ class DeptDetailView(APIView):
             )
         return Response(DeptDetailSerializer(dept).data)
 
+    @extend_schema(
+        tags=["Admin — Organization"],
+        summary="부서 수정 (Partial)",
+        request=DeptUpdateSerializer,
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: DeptDetailSerializer,
+            400: OpenApiResponse(description="검증 실패"),
+            404: OpenApiResponse(description="부서 없음"),
+        },
+    )
     def patch(self, request, pk):
         dept = self._get_dept(pk)
         if not dept:
@@ -152,6 +202,15 @@ class DeptDetailView(APIView):
         )
         return Response(DeptDetailSerializer(dept).data)
 
+    @extend_schema(
+        tags=["Admin — Organization"],
+        summary="부서 비활성화 (Soft Delete)",
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            204: OpenApiResponse(description="삭제 완료"),
+            404: OpenApiResponse(description="부서 없음"),
+        },
+    )
     def delete(self, request, pk):
         dept = self._get_dept(pk)
         if not dept:
@@ -186,6 +245,25 @@ class DeptMemberListView(APIView):
 
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Organization"],
+        summary="부서 구성원 목록",
+        description=(
+            "조직장이 항상 최상단. `pk='none'`이면 어디 부서에도 속하지 않은 사용자 목록 반환."
+        ),
+        parameters=[
+            OpenApiParameter(
+                name="q", type=str, required=False, description="이름/ID 검색"
+            ),
+            OpenApiParameter(name="page", type=int, required=False),
+            OpenApiParameter(name="page_size", type=int, required=False),
+        ],
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: MemberListSerializer(many=True),
+            404: OpenApiResponse(description="부서 없음"),
+        },
+    )
     def get(self, request, pk):
         is_no_dept = str(pk) == "none"
 
@@ -246,6 +324,30 @@ class DeptMemberAddView(APIView):
 
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Organization"],
+        summary="부서 구성원 추가",
+        description="`keep_previous=true`면 이전 소속 유지(겸직), false면 주소속 변경.",
+        request=inline_serializer(
+            name="DeptMemberAddRequest",
+            fields={
+                "user_ids": serializers.ListField(child=serializers.IntegerField()),
+                "keep_previous": serializers.BooleanField(default=False),
+            },
+        ),
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: inline_serializer(
+                name="DeptMemberAddResponse",
+                fields={
+                    "ok": serializers.BooleanField(),
+                    "added": serializers.IntegerField(),
+                },
+            ),
+            400: OpenApiResponse(description="user_ids 누락"),
+            404: OpenApiResponse(description="부서 없음"),
+        },
+    )
     def post(self, request, pk):
         try:
             dept = Department.objects.get(pk=pk, is_active=True)
@@ -306,6 +408,30 @@ class DeptMemberMoveView(APIView):
 
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Organization"],
+        summary="부서 구성원 이동",
+        request=inline_serializer(
+            name="DeptMemberMoveRequest",
+            fields={
+                "user_ids": serializers.ListField(child=serializers.IntegerField()),
+                "target_dept_id": serializers.IntegerField(),
+                "keep_previous": serializers.BooleanField(default=False),
+            },
+        ),
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: inline_serializer(
+                name="DeptMemberMoveResponse",
+                fields={
+                    "ok": serializers.BooleanField(),
+                    "moved": serializers.IntegerField(),
+                },
+            ),
+            400: OpenApiResponse(description="필수 필드 누락"),
+            404: OpenApiResponse(description="대상 부서 없음"),
+        },
+    )
     def post(self, request, pk):
         user_ids = request.data.get("user_ids", [])
         target_dept_id = request.data.get("target_dept_id")
@@ -368,6 +494,29 @@ class DeptMemberRemoveView(APIView):
 
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Organization"],
+        summary="부서에서 구성원 제외",
+        description="해당 부서에서만 제외(UserDepartment 삭제). 다른 소속 없으면 '조직 없음' 상태.",
+        request=inline_serializer(
+            name="DeptMemberRemoveRequest",
+            fields={
+                "user_ids": serializers.ListField(child=serializers.IntegerField())
+            },
+        ),
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: inline_serializer(
+                name="DeptMemberRemoveResponse",
+                fields={
+                    "ok": serializers.BooleanField(),
+                    "removed": serializers.IntegerField(),
+                },
+            ),
+            400: OpenApiResponse(description="user_ids 누락"),
+            404: OpenApiResponse(description="부서 없음"),
+        },
+    )
     def post(self, request, pk):
         try:
             dept = Department.objects.get(pk=pk, is_active=True)
@@ -414,6 +563,33 @@ class DeptLeaderAssignView(APIView):
 
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=["Admin — Organization"],
+        summary="부서 조직장 임명",
+        description="단일 사용자만 허용. 부서의 leader FK를 업데이트하고 SystemLog에 이력 기록.",
+        request=inline_serializer(
+            name="DeptLeaderAssignRequest",
+            fields={"user_id": serializers.IntegerField()},
+        ),
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: inline_serializer(
+                name="DeptLeaderAssignResponse",
+                fields={
+                    "ok": serializers.BooleanField(),
+                    "leader": inline_serializer(
+                        name="DeptLeaderInfo",
+                        fields={
+                            "id": serializers.IntegerField(),
+                            "name": serializers.CharField(),
+                        },
+                    ),
+                },
+            ),
+            400: OpenApiResponse(description="user_id 누락"),
+            404: OpenApiResponse(description="부서/사용자 없음"),
+        },
+    )
     def post(self, request, pk):
         try:
             dept = Department.objects.get(pk=pk, is_active=True)

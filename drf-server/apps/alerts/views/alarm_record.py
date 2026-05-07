@@ -4,7 +4,15 @@ from datetime import timedelta
 from django.db.models import Count, Q
 from django.utils import timezone
 
-from rest_framework import viewsets
+from drf_spectacular.utils import (
+    OpenApiExample,
+    OpenApiParameter,
+    OpenApiResponse,
+    extend_schema,
+    extend_schema_view,
+    inline_serializer,
+)
+from rest_framework import serializers, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
@@ -13,7 +21,11 @@ from rest_framework.views import APIView
 
 from apps.accounts.models import CustomUser
 from apps.alerts.models import AlarmRecord, Event
-from apps.alerts.serializers import AlarmRecordSerializer
+from apps.alerts.serializers import (
+    AlarmRecordSerializer,
+    MyStatusResponseSerializer,
+    WorkerSummaryResponseSerializer,
+)
 from apps.core.constants import EventStatus, RiskLevel
 
 LEVEL_PRIORITY = {RiskLevel.DANGER: 2, RiskLevel.WARNING: 1}
@@ -28,6 +40,43 @@ class MyStatusView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=["Alerts"],
+        summary="작업자 본인의 미해결 이벤트 위험도 (최댓값)",
+        description="active 상태(EventStatus.RESOLVED 아닌) 이벤트 중 가장 높은 risk_level을 status로 반환.",
+        responses={
+            200: MyStatusResponseSerializer,
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+        },
+        examples=[
+            OpenApiExample(
+                "정상 (미해결 이벤트 없음)",
+                value={
+                    "status": "success",
+                    "code": 200,
+                    "data": {
+                        "worker_id": 5,
+                        "status": "normal",
+                        "active_risk_level": None,
+                    },
+                },
+                response_only=True,
+            ),
+            OpenApiExample(
+                "위험 이벤트 진행 중",
+                value={
+                    "status": "success",
+                    "code": 200,
+                    "data": {
+                        "worker_id": 5,
+                        "status": "danger",
+                        "active_risk_level": "danger",
+                    },
+                },
+                response_only=True,
+            ),
+        ],
+    )
     def get(self, request):
         active_levels = list(
             Event.objects.filter(
@@ -69,6 +118,34 @@ class WorkerSummaryView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=["Alerts"],
+        summary="공장 내 작업자 위험도 집계 (관리자 전용)",
+        description="자기 공장 작업자들의 미해결 이벤트를 집계해 위험도별 인원수 반환.",
+        responses={
+            200: WorkerSummaryResponseSerializer,
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            403: OpenApiResponse(description="관리자 권한 필요"),
+        },
+        examples=[
+            OpenApiExample(
+                "정상 응답 — 25명 중 위험 1, 주의 4",
+                value={
+                    "status": "success",
+                    "code": 200,
+                    "data": {
+                        "facility_id": 1,
+                        "total_count": 25,
+                        "normal_count": 20,
+                        "warning_count": 4,
+                        "danger_count": 1,
+                    },
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+        ],
+    )
     def get(self, request):
         if request.user.user_type not in ("facility_admin", "super_admin"):
             raise PermissionDenied("접근 권한이 없습니다.")
@@ -152,6 +229,21 @@ class WorkerSummaryView(APIView):
         )
 
 
+@extend_schema_view(
+    list=extend_schema(
+        tags=["Alerts"],
+        summary="알람 기록 목록 (읽기 전용)",
+        parameters=[
+            OpenApiParameter(
+                name="ordering",
+                type=str,
+                required=False,
+                description="-created_at | risk_level",
+            ),
+        ],
+    ),
+    retrieve=extend_schema(tags=["Alerts"], summary="알람 기록 상세"),
+)
 class AlarmRecordViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = AlarmRecordSerializer
     queryset = AlarmRecord.objects.all()
@@ -169,6 +261,21 @@ class AlarmRecordViewSet(viewsets.ReadOnlyModelViewSet):
 
         return queryset
 
+    @extend_schema(
+        tags=["Alerts"],
+        summary="최근 24시간 알람 요약",
+        responses={
+            401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
+            200: inline_serializer(
+                name="AlarmSummaryResponse",
+                fields={
+                    "last_24h_total": serializers.IntegerField(),
+                    "last_24h_danger": serializers.IntegerField(),
+                    "last_24h_warning": serializers.IntegerField(),
+                },
+            ),
+        },
+    )
     @action(detail=False, methods=["get"])
     def summary(self, request):
         """최근 24시간 AlarmRecord 요약"""

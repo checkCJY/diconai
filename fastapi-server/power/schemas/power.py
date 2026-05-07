@@ -196,3 +196,18 @@ class PowerWattPayload(_PowerMeasurementBase):
     """16채널 전력(W) 측정값 페이로드."""
 
     pass
+
+
+# ============================================================
+# 응답 스키마 (OpenAPI 자동 문서화용)
+# ============================================================
+
+
+class PowerIngestResponse(BaseModel):
+    """전력 측정값 수신 확인 응답.
+
+    `updated`는 어떤 측정 타입이 갱신되었는지 나타낸다 — onoff/current/voltage/watt.
+    """
+
+    status: str
+    updated: str

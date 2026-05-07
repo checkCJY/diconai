@@ -9,11 +9,6 @@ let _deleteTargetId = null;
 let _isEditMode = false;
 
 // ── 헬퍼 ─────────────────────────────────────────────────
-function _authHeaders() {
-  const token = Auth.getAccessToken();
-  return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
-}
-
 function _formatDate(iso) {
   if (!iso) return '-';
   return iso.slice(0, 10);
@@ -44,7 +39,7 @@ function _buildQuery() {
 async function _loadEquipments() {
   const qs = _buildQuery();
   try {
-    const res = await fetch(`/api/equipments/?${qs}`, { headers: _authHeaders() });
+    const res = await Auth.apiFetch(`/api/equipments/?${qs}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     _total = data.total;
@@ -59,7 +54,7 @@ async function _loadEquipments() {
 
 async function _loadFacilityOptions() {
   try {
-    const res = await fetch('/api/facilities/select/', { headers: _authHeaders() });
+    const res = await Auth.apiFetch('/api/facilities/select/');
     if (!res.ok) return;
     const facilities = await res.json();
     [document.getElementById('filterFacility'), document.getElementById('formFacility')].forEach(sel => {
@@ -83,7 +78,7 @@ async function _loadPowerDeviceOptions(currentEquipmentId = null) {
     const url = currentEquipmentId
       ? `/api/facilities/devices/select/?equipment_id=${currentEquipmentId}`
       : '/api/facilities/devices/select/';
-    const res = await fetch(url, { headers: _authHeaders() });
+    const res = await Auth.apiFetch(url);
     if (!res.ok) return;
     const devices = await res.json();
     devices.forEach(d => {
@@ -208,7 +203,7 @@ function _openCreate() {
 
 async function _openEdit(id) {
   try {
-    const res = await fetch(`/api/equipments/${id}/`, { headers: _authHeaders() });
+    const res = await Auth.apiFetch(`/api/equipments/${id}/`);
     if (!res.ok) { alert('설비 정보를 불러오지 못했습니다.'); return; }
     const e = await res.json();
     _isEditMode = true;
@@ -269,7 +264,7 @@ async function _submitForm() {
   const method = eqId ? 'PUT' : 'POST';
 
   try {
-    const res = await fetch(url, { method, headers: _authHeaders(), body: JSON.stringify(payload) });
+    const res = await Auth.apiFetch(url, { method, body: JSON.stringify(payload) });
     if (res.ok) {
       _hideModal('formModal');
       _page = eqId ? _page : 1;
@@ -297,8 +292,8 @@ function _openDelete(id) {
 async function _confirmDelete() {
   if (!_deleteTargetId) return;
   try {
-    const res = await fetch(`/api/equipments/${_deleteTargetId}/`, {
-      method: 'DELETE', headers: _authHeaders(),
+    const res = await Auth.apiFetch(`/api/equipments/${_deleteTargetId}/`, {
+      method: 'DELETE',
     });
     if (res.ok || res.status === 204) {
       _hideModal('deleteModal');
@@ -318,8 +313,8 @@ async function _bulkDelete() {
   const ids = [..._selected];
   if (!confirm(`선택한 ${ids.length}개 설비를 비활성화하시겠습니까?`)) return;
   try {
-    const res = await fetch('/api/equipments/bulk-delete/', {
-      method: 'POST', headers: _authHeaders(), body: JSON.stringify({ ids }),
+    const res = await Auth.apiFetch('/api/equipments/bulk-delete/', {
+      method: 'POST', body: JSON.stringify({ ids }),
     });
     if (res.ok) {
       _selected.clear();

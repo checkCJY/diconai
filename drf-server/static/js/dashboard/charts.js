@@ -17,9 +17,14 @@
 
 'use strict';
 
-// ── Phase A 전력 임계치 (kW) ──────────────────────────────
+// ── Phase A 전력 임계치 ───────────────────────────────────
+// 채널별 임계치 (W). 각 설비 페이지에서 사용.
 const POWER_THRESHOLD_WARNING = 2200;
 const POWER_THRESHOLD_DANGER  = Math.round(2200 * 1.3);  // 2860
+// 전체 사용량 임계치 (kW). "전체 사용량" 페이지에서 사용.
+// 16채널 동시 임계치 가정: 16 × 2200 ≈ 35.2, 16 × 2860 ≈ 45.76
+const POWER_TOTAL_THRESHOLD_WARNING_KW = 35;
+const POWER_TOTAL_THRESHOLD_DANGER_KW  = 46;
 
 // ── Chart.js 공통 기본 옵션 ───────────────────────────────
 const CHART_DEFAULTS = {
@@ -31,7 +36,7 @@ const CHART_DEFAULTS = {
   },
 };
 
-// 전력 차트 Y축 전용 옵션 — 1000 kW 단위 눈금, 3자리 콤마 포맷
+// 전력 차트 Y축 전용 옵션 — 1000 W 단위 눈금, 3자리 콤마 포맷 (채널별 페이지)
 const POWER_CHART_Y_OPTS = {
   ticks: {
     color: '#666', font: { size: 9 },
@@ -39,6 +44,18 @@ const POWER_CHART_Y_OPTS = {
     callback: value => value.toLocaleString(),
   },
   grid: { color: '#2a2a2a' },
+};
+
+// "전체 사용량" 페이지 전용 Y축 — 10 kW 단위, 0~80 kW 가시화
+const POWER_CHART_Y_OPTS_KW = {
+  ticks: {
+    color: '#666', font: { size: 9 },
+    stepSize: 10,
+    callback: value => value.toLocaleString(),
+  },
+  grid: { color: '#2a2a2a' },
+  suggestedMin: 0,
+  suggestedMax: 80,
 };
 
 let gasChart   = null;
@@ -109,4 +126,21 @@ function updatePowerThresholds(warnKw, dangerKw) {
   if (!powerChart) return;
   powerChart.options.plugins.annotation.annotations = _powerAnnotations(warnKw, dangerKw);
   powerChart.update('none');
+}
+
+// 페이지 단위(kW=전체 사용량 / W=설비별)에 따라 차트의 Y축, 임계치, 데이터셋 라벨을 교체한다.
+// _switchPowerChart()가 페이지 전환 시 호출.
+function applyPowerChartUnit(unit) {
+  if (!powerChart) return;
+  if (unit === 'kW') {
+    powerChart.options.scales.y = POWER_CHART_Y_OPTS_KW;
+    powerChart.options.plugins.annotation.annotations =
+      _powerAnnotations(POWER_TOTAL_THRESHOLD_WARNING_KW, POWER_TOTAL_THRESHOLD_DANGER_KW);
+    powerChart.data.datasets[0].label = '예상 최대 부하 (kW)';
+  } else {
+    powerChart.options.scales.y = POWER_CHART_Y_OPTS;
+    powerChart.options.plugins.annotation.annotations =
+      _powerAnnotations(POWER_THRESHOLD_WARNING, POWER_THRESHOLD_DANGER);
+    powerChart.data.datasets[0].label = '예상 최대 부하 (W)';
+  }
 }

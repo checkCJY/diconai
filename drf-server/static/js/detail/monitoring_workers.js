@@ -3,14 +3,14 @@
    데이터 소스:
      1. GET /dashboard/api/workers-list/  → 초기 작업자 목록 (이름·부서)
      2. GET /api/geofences/              → 지오펜스 영역·위험도
-     3. WS  ws://127.0.0.1:8001/ws/sensors/ → worker_positions 실시간 수신
+     3. WS  /ws/sensors/                  → worker_positions 실시간 수신
+        (AppConfig.WS_BASE 사용, shared/ws-client.js의 WSClient 경유)
    ────────────────────────────────────────────────────────── */
 
 'use strict';
 
 const API_WORKERS   = '/dashboard/api/workers-list/';
 const API_GEOFENCES = '/api/geofences/';
-const WS_SENSORS    = 'ws://127.0.0.1:8001/ws/sensors/';
 const STALE_SEC     = 10;  // 이 초 이상 위치 미수신 → 연결 끊김 처리
 
 let _allRows        = [];   // 테이블 행 원본 배열
@@ -287,9 +287,12 @@ function _processPositions(workerPositions) {
 
   entries.forEach(([wid, pos]) => {
     const workerId  = parseInt(wid);
+    // status는 백엔드가 평가한 실시간 위험도(센서 측정값 기반) 사용.
+    // 지오펜스의 정적 risk_level이 아니라 그 안 가스/전력 센서 임계치 초과 여부로 판정됨.
+    const status    = _riskToCss(pos.risk_level || 'normal');
     const geofence  = _findGeofence(pos.x, pos.y);
-    const status    = _riskToCss(geofence ? geofence.risk_level : 'normal');
-    const zone      = geofence ? geofence.name : _movementLabel(pos.movement_status);
+    const zone      = pos.zone_name
+                      || (geofence ? geofence.name : _movementLabel(pos.movement_status));
     const connected = _isConnected(pos.updated_at);
     if (connected) connectedCount++;
 
@@ -323,30 +326,15 @@ function _processPositions(workerPositions) {
 }
 
 /* ══════════════════════════════════════════════════════════
-   WebSocket 연결
+   WebSocket 연결 (재연결은 WSClient가 자동 처리)
 ══════════════════════════════════════════════════════════ */
 function _connectWebSocket() {
-  let ws;
-  try {
-    ws = new WebSocket(WS_SENSORS);
-  } catch {
-    console.warn('[작업자 현황] WebSocket 연결 불가, 3초 후 재시도');
-    setTimeout(_connectWebSocket, 3000);
-    return;
-  }
-
-  ws.onopen  = () => console.log('[작업자 현황] WebSocket 연결됨');
-  ws.onerror = () => ws.close();
-  ws.onclose = () => {
-    console.warn('[작업자 현황] 연결 끊김, 3초 후 재연결');
-    setTimeout(_connectWebSocket, 3000);
-  };
-
-  ws.onmessage = (e) => {
-    let data;
-    try { data = JSON.parse(e.data); } catch { return; }
+  const ws = WSClient.connect('/ws/sensors/');
+  ws.onOpen(() => console.log('[작업자 현황] WebSocket 연결됨'));
+  ws.onClose(() => console.warn('[작업자 현황] 연결 끊김, WSClient 자동 재연결'));
+  ws.onMessage((data) => {
     if (data.worker_positions) _processPositions(data.worker_positions);
-  };
+  });
 }
 
 /* ══════════════════════════════════════════════════════════

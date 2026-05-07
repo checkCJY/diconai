@@ -1,3 +1,4 @@
+{% load static %}
 <!-- ───────────────── SNB 오버레이 ───────────────── -->
 <div id="snbOverlay" class="snb-overlay"></div>
 
@@ -15,7 +16,7 @@
   <div class="header-left">
     <button id="hamburger" class="hamburger" aria-label="메뉴 열기">☰</button>
     <a href="/" class="logo-link">
-      <div class="logo-box">LOGO</div>
+      <img src="{% static 'img/logo.jpg' %}" alt="로고" class="logo-img">
     </a>
     <div class="system-name">산재 예방 통합 관제 시스템</div>
 
@@ -32,7 +33,6 @@
   <div class="header-center">
     <div class="user-info">
       <div class="user-name" id="headerUsername">-</div>
-      <div class="user-role" id="headerRole">-</div>
     </div>
   </div>
 

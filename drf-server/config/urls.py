@@ -1,6 +1,12 @@
 from django.contrib import admin
 from django.urls import include, path
 from django.views.generic import RedirectView
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularRedocView,
+    SpectacularSwaggerView,
+)
+
 from apps.accounts.urls import api_urlpatterns as auth_api_urlpatterns
 from apps.accounts.urls import page_urlpatterns as auth_page_urlpatterns
 
@@ -19,4 +25,16 @@ urlpatterns = [
     path("api/monitoring/", include("apps.monitoring.urls")),
     path("admin-panel/", include("config.admin_panel_urls")),
     path("api/", include("apps.facilities.urls")),
+    # OpenAPI / Swagger
+    path("api/schema/", SpectacularAPIView.as_view(), name="api-schema"),
+    path(
+        "api/schema/swagger-ui/",
+        SpectacularSwaggerView.as_view(url_name="api-schema"),
+        name="api-swagger-ui",
+    ),
+    path(
+        "api/schema/redoc/",
+        SpectacularRedocView.as_view(url_name="api-schema"),
+        name="api-redoc",
+    ),
 ]
