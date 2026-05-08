@@ -56,6 +56,16 @@ class WorkerPosition(models.Model):
         blank=True,
         related_name="worker_positions",
     )
+    # 수신 노드 FK — 어떤 PositionNode가 본 좌표를 측정·전송했는지 기록 (Phase 3-a)
+    # nullable: 펌웨어 페이로드 갱신 전 row + node_id 미상 케이스 보존
+    received_node = models.ForeignKey(
+        "facilities.PositionNode",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="received_positions",
+        verbose_name="수신 노드",
+    )
     x = models.FloatField(verbose_name="x 좌표")
     y = models.FloatField(verbose_name="y 좌표")
     movement_status = models.CharField(

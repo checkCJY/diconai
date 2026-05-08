@@ -22,6 +22,8 @@ logger = logging.getLogger(__name__)
 FASTAPI_BASE_URL = f"http://{settings.DUMMY_TARGET_HOST}:{settings.DUMMY_TARGET_PORT}"
 FASTAPI_POSITION_URL = f"{FASTAPI_BASE_URL}/api/positioning/receive"
 
+# node_id는 PositionNode.device_id 형식 (Phase 3-a). 더미는 4명 모두 NODE-001로 가정.
+# 실제 펌웨어 환경에서는 작업자 위치별로 가장 가까운 노드 ID가 동적으로 들어옴.
 DUMMY_WORKERS: list[dict] = [
     {
         "worker_id": 1,
@@ -32,6 +34,7 @@ DUMMY_WORKERS: list[dict] = [
         "dx": 4.0,
         "dy": 2.0,
         "movement_status": "moving",
+        "node_id": "NODE-001",
     },
     {
         "worker_id": 2,
@@ -42,6 +45,7 @@ DUMMY_WORKERS: list[dict] = [
         "dx": -3.0,
         "dy": 4.0,
         "movement_status": "moving",
+        "node_id": "NODE-001",
     },
     {
         "worker_id": 3,
@@ -52,6 +56,7 @@ DUMMY_WORKERS: list[dict] = [
         "dx": 0.0,
         "dy": 0.0,
         "movement_status": "stationary",
+        "node_id": "NODE-001",
     },
     {
         "worker_id": 4,
@@ -62,6 +67,7 @@ DUMMY_WORKERS: list[dict] = [
         "dx": 5.0,
         "dy": -3.0,
         "movement_status": "moving",
+        "node_id": "NODE-001",
     },
 ]
 
@@ -92,6 +98,7 @@ def generate_positions() -> list[dict]:
             "y": round(w["y"], 2),
             "movement_status": w["movement_status"],
             "measured_at": now,
+            "node_id": w.get("node_id"),
         }
         for w in DUMMY_WORKERS
     ]

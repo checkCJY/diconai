@@ -87,6 +87,7 @@ class WorkerPositionReceiveView(APIView):
                     y=item["y"],
                     movement_status=item.get("movement_status", "moving"),
                     measured_at=item["measured_at"],
+                    node_id=item.get("node_id") or None,
                 )
                 statuses.append(
                     {
