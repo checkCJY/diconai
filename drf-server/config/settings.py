@@ -272,6 +272,19 @@ CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_TRACK_STARTED = True
 
+# Phase 4-g: DataRetentionPolicy 보관 배치 — 매일 새벽 3시 실행
+# is_cycle_due()가 정책별 delete_cycle 판정 (DAILY/MONTHLY_*/QUARTERLY)
+# Celery beat 실행: celery -A config beat -l info
+from celery.schedules import crontab  # noqa: E402
+
+CELERY_BEAT_SCHEDULE = {
+    "data_retention_daily": {
+        "task": "apps.operations.tasks.data_retention_task.run_data_retention",
+        "schedule": crontab(hour=3, minute=0),
+        "args": (False,),  # dry_run=False (실제 삭제)
+    },
+}
+
 # ── Cache (Redis) ─────────────────────────────────────────────
 # 가스 알람 상태(normal/warning/danger)와 WARNING 타이머 task ID를 저장.
 # Redis가 동일하게 사용되므로 추가 인프라 없이 동작.
