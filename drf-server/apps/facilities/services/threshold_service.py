@@ -81,7 +81,6 @@ def evaluate_gas_risk(gas: str, value: float | None) -> str:
     [정책]
     - O2는 낮을수록 위험: warning_min/danger_min 사용
     - 그 외는 높을수록 위험: warning_max/danger_max 사용
-    - lel은 임계치 미정의 → NORMAL
     - DB에 미존재 시 NORMAL (graceful)
     """
     if value is None:

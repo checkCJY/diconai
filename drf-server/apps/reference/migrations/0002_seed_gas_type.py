@@ -1,9 +1,13 @@
 """
-GAS_TYPE CodeGroup + CommonCode 10종 시드 (LEL 포함 — PR-E에서 별도 제거 예정).
+GAS_TYPE CodeGroup + CommonCode 9종 시드.
 
 [2026-05-09 PR-A 회귀 점검 후속]
 원본은 call_command("loaddata", "gas_type") 호출이었으나, 동일 위험으로 historical apps 패턴
 재작성. fixture json은 보존 (수동 loaddata + 어드민 import 용).
+
+[2026-05-09 PR-E 갱신]
+LEL dead code 제거 — 센서 정의서(2026-04-01) 9종에 LEL 미포함. 본 시드에서도 LEL 제외
+(fresh migrate 시 9종만 시드). 운영 DB의 기존 LEL row는 0003_remove_lel.py에서 별도 정리.
 
 운영 DB는 이미 0002 적용 완료라 본 변경 영향 없음.
 """
@@ -20,7 +24,6 @@ GAS_TYPES = [
     {"pk": 7, "code": "o3", "name": "O3 (오존)", "sort_order": 7},
     {"pk": 8, "code": "nh3", "name": "NH3 (암모니아)", "sort_order": 8},
     {"pk": 9, "code": "voc", "name": "VOC (휘발성유기화합물)", "sort_order": 9},
-    {"pk": 10, "code": "lel", "name": "LEL (폭발하한계)", "sort_order": 10},
 ]
 
 
@@ -33,7 +36,7 @@ def seed(apps, schema_editor):
         defaults={
             "code": "GAS_TYPE",
             "name": "가스 종류",
-            "description": "유해가스 9종 + LEL — GasTypeChoices 이넘과 1:1",
+            "description": "유해가스 9종 — GasTypeChoices 이넘과 1:1",
             "is_active": True,
         },
     )

@@ -103,9 +103,13 @@ class SensorStatus(models.TextChoices):
 
 class GasTypeChoices(models.TextChoices):
     """
-    가스 종류 — 9종 유해가스 + LEL
+    가스 종류 — 9종 유해가스 (센서 정의서 2026-04-01 기준)
 
-    사용 모델: AlarmRecord.gas_type, Event.gas_type, (4차) LegalThreshold, FacilityThreshold
+    사용 모델: AlarmRecord.gas_type, Event.gas_type, facilities.Threshold
+
+    [PR-E 변경 — LEL dead code 제거]
+    이전: 9종 + LEL = 10종. 그러나 센서 정의서에 LEL 측정값 미포함, threshold/모델 컬럼
+    부재로 dead code 상태 → 메모리 `sensor_spec_truth_source.md` 결정 따라 제거.
 
     법적 근거: 산업안전보건기준에 관한 규칙 제618조 (밀폐공간 공기 상태)
     """
@@ -119,7 +123,6 @@ class GasTypeChoices(models.TextChoices):
     O3 = "o3", "O3 (오존)"
     NH3 = "nh3", "NH3 (암모니아)"
     VOC = "voc", "VOC (휘발성유기화합물)"
-    LEL = "lel", "LEL (폭발하한계)"
 
 
 # 로그인 화면 문의처 — 운영 연락처로 변경 필요
