@@ -65,6 +65,15 @@ class AlertPolicy(BaseModel):
         default="",
         help_text="목록 화면 캐시 — service 레이어에서 갱신 (Phase 4-e)",
     )
+    # Phase 4-f: Notification.message 렌더 템플릿. Django Template 문법.
+    # 예: "{{ source_label }}에서 {% if level == 'danger' %}🚨 긴급{% else %}⚠️ 주의{% endif %} — {{ gas_name }} {{ value }}{{ unit }}"
+    # 빈 문자열이면 Event.summary를 그대로 사용 (graceful fallback).
+    message_template = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="알림 메시지 템플릿",
+        help_text="Django Template 문법. 빈 값이면 Event.summary 사용",
+    )
     is_active = models.BooleanField(default=True)
     description = models.TextField(blank=True, default="")
 
