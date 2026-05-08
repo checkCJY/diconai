@@ -9,17 +9,32 @@
 - "주석 어떻게 달아?"
 - 새 파일/함수 생성 및 코드 리뷰(code-review 스킬 연계) 시
 
-## 1. PYTHON BASIC STYLE (PEP 8)
+## 1. PYTHON BASIC STYLE
+
+> **자동 강제 — pre-commit (ruff + ruff-format)**
+> `[.pre-commit-config.yaml](../../.pre-commit-config.yaml)`이 `drf-server/`, `fastapi-server/` 하위 `.py` 파일에 대해 §1.1을 자동 적용한다.
+> commit 시 양식이 어긋나면 ruff-format이 파일을 **자동 수정 → commit 거부**하므로, `git add` 후 다시 commit 해야 통과한다.
+> 별도 ruff 설정 파일이 없으므로 ruff **기본값**으로 동작한다 (line-length=88, double-quote, lint=E4/E7/E9/F).
+
+### 1.1 ruff·ruff-format 자동 적용 (양식)
 - **들여쓰기**: 스페이스 4칸 (Tab 금지).
-- **줄 길이**: 최대 79자. 긴 문자열/인자는 줄바꿈 적용.
-- **문자열**: 큰따옴표(`""`) 기본 사용. 문자열 포매팅은 `f-string`만 사용.
+- **줄 길이**: 최대 **88자** (`ruff-format` 기본값, Black 호환). 79자 PEP 8 권장값보다 완화된 값 — 더 짧게 써도 ruff가 88자 안에서 한 줄로 합칠 수 있다.
+- **문자열 인용부호**: 큰따옴표(`"`) — 작은따옴표는 자동 변환됨.
 - **빈 줄(Blank Lines)**:
   - 클래스 및 최상단 함수 위아래: 2줄
   - 클래스 내부 메서드 사이: 1줄
-- **Import 순서**: 그룹 간 빈 줄 1개, 그룹 내 알파벳 정렬.
+- **trailing comma**: 다중 인자·리스트·dict 마지막 요소에 자동 추가.
+- **trailing whitespace / 파일 끝 줄바꿈**: 자동 정리 (`pre-commit-hooks`).
+- **lint 기본 활성**: `F`(Pyflakes — 미사용 import·정의되지 않은 변수), `E4/E7/E9`(import 위치·문장·런타임 오류). `args: [--fix]`로 자동 수정 가능한 항목은 수정.
+
+### 1.2 작성자 책임 (ruff가 강제하지 않음)
+- **문자열 포매팅**: `f-string`만 사용 (`%`, `.format()` 금지).
+- **Import 순서**: 그룹 간 빈 줄 1개, 그룹 내 알파벳 정렬. *(ruff `I` 룰 미활성 — 자동 정렬 안 됨)*
   1. 표준 라이브러리 (ex: `os`, `datetime`)
   2. 서드파티 (ex: `fastapi`, `pydantic`)
   3. 내부 모듈 (ex: `app.schemas`)
+- **네이밍 (§2)**: ruff `N` 룰 미활성 — 컨벤션은 §2를 따른다.
+- **줄 길이 lint**: ruff `E501` 미활성 — `ruff-format`이 자동 줄바꿈해 주지만, 문자열·주석은 88자 초과해도 lint 에러가 나지 않으므로 작성자가 끊는다.
 
 ## 2. NAMING CONVENTIONS
 - **변수 (Variables)**: `snake_case`. 의미를 담을 것 (ex: `gas_value` O, `v` X).
@@ -141,12 +156,20 @@
 - **포맷**: `logger.LEVEL(f"[CATEGORY] key=value")`
 - **레벨**: `DEBUG`(상세), `INFO`(정상완료), `WARNING`(주의/재시도), `ERROR`(실패).
 
-## 7. PRE-PR CHECKLIST (자주 하는 실수 방지)
+## 7. PRE-PR CHECKLIST
+
+### 7.1 자동 (pre-commit이 처리)
+들여쓰기·88자 줄바꿈·큰따옴표·빈 줄·trailing comma·trailing whitespace·파일 끝 줄바꿈·미사용 import 제거.
+> commit 시 ruff-format이 파일을 수정하면 거부됨 → `git add <수정된 파일>` 후 다시 commit.
+> 로컬 사전 점검: `pre-commit run --all-files` 또는 `ruff check . && ruff format .`
+
+### 7.2 수동 점검 (작성자 책임)
 1. 변수명 의미 명확성 (`tmp`, `data` 배제).
 2. 함수명 "동사 + 목적어" 규칙 준수.
-3. Import 순서 (표준 -> 서드파티 -> 내부).
-4. 신규 함수 Docstring 작성 여부.
+3. Import 순서 (표준 → 서드파티 → 내부, 알파벳 정렬). *(ruff `I` 미활성)*
+4. 신규 함수 Docstring 작성 여부 (§6.3).
 5. `None`과 `0`의 구분 (센서 데이터에서 `0`은 유효값).
 6. 하드코딩된 비밀번호/API 키 부재 확인.
-7. `print()` 대신 `logging` 사용 여부.
+7. `print()` 대신 `logging` 사용 여부 (§6.7).
 8. 단일 함수 30줄 초과 여부 (초과 시 분리 고려).
+9. 인라인 주석이 §6.4 WHY 4종 분류에 해당하는지 (그 외엔 코드로 표현).

@@ -86,8 +86,8 @@
 }
 ```
 
-> **주의**: `status`는 센서 전송값을 그대로 사용하지 않는다.  
-> FastAPI가 수신된 가스값으로 서버에서 직접 재계산하여 덮어쓴다.  
+> **주의**: `status`는 센서 전송값을 그대로 사용하지 않는다.
+> FastAPI가 수신된 가스값으로 서버에서 직접 재계산하여 덮어쓴다.
 > 센서 오작동 또는 조작으로 인한 잘못된 상태값을 방어하기 위함.
 
 **응답**
@@ -132,8 +132,8 @@ source .venv/bin/activate
 uvicorn main:app --reload --port 8000
 ```
 
-> COMMANDS.md의 기존 포트는 8001(websocket 전용)이고,  
-> gas HTTP 수신은 `main.py`를 **8000**으로 실행한다.  
+> COMMANDS.md의 기존 포트는 8001(websocket 전용)이고,
+> gas HTTP 수신은 `main.py`를 **8000**으로 실행한다.
 > 두 서버를 동시에 쓸 경우 포트를 분리해서 실행.
 
 ### 2. Swagger UI 확인

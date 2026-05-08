@@ -1,4 +1,4 @@
-**/home/cjy/diconai/docs/COMMANDS.md**
+**/home/cjy/diconai/docs/conventions/COMMANDS.md**
 
 ### 공통 명령어
 uv venv
