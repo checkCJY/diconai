@@ -95,3 +95,40 @@ def test_admin_threshold_change_invalidates_cache(db):
     assert after["warning_max"] == 1500
     # 위험도 판정도 즉시 반영
     assert evaluate_power_risk(1800) == RiskLevel.WARNING
+
+
+@pytest.mark.django_db
+def test_facility_specific_threshold_overrides_legal(db, facility):
+    """PR-G: facility specific 정책이 gas_legal보다 우선 매칭."""
+    from decimal import Decimal
+
+    from apps.facilities.models import Threshold, ThresholdGroup
+    from apps.facilities.services.threshold_service import evaluate_gas_risk
+
+    # gas_legal: co warning_max=25, danger_max=200 (시드)
+    # facility specific: co warning_max=10 (강화)
+    facility_group = ThresholdGroup.objects.get(code="gas_facility_default")
+    Threshold.objects.create(
+        group=facility_group,
+        facility=facility,
+        measurement_item="co",
+        warning_max=Decimal("10"),
+        danger_max=Decimal("50"),
+        unit="ppm",
+    )
+
+    # facility 미지정 → gas_legal fallback (warning_max=25)
+    assert evaluate_gas_risk("co", 15, facility_id=None) == RiskLevel.NORMAL  # 15 < 25
+    # facility 지정 → facility_default 우선 (warning_max=10)
+    assert evaluate_gas_risk("co", 15, facility_id=facility.id) == RiskLevel.WARNING
+
+
+@pytest.mark.django_db
+def test_facility_without_specific_falls_back_to_legal(db, facility):
+    """PR-G: facility specific row 부재 → gas_legal fallback."""
+    from apps.facilities.services.threshold_service import evaluate_gas_risk
+
+    # facility specific row 미존재 (h2s) — gas_legal로 fallback
+    # gas_legal h2s: warning_max=10, danger_max=15
+    assert evaluate_gas_risk("h2s", 12, facility_id=facility.id) == RiskLevel.WARNING
+    assert evaluate_gas_risk("h2s", 20, facility_id=facility.id) == RiskLevel.DANGER

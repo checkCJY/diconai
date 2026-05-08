@@ -10,7 +10,9 @@ from apps.facilities.services.threshold_service import invalidate_threshold_cach
 @receiver([post_save, post_delete], sender=Threshold)
 def invalidate_threshold_cache_on_change(sender, instance, **kwargs):
     """
-    Threshold 모델 변경 시 해당 (group_code, measurement_item) 캐시 무효화.
-    save/delete 양쪽 모두 처리.
+    Threshold 모델 변경 시 해당 (group_code, measurement_item, facility) 캐시 무효화.
+    save/delete 양쪽 모두 처리. PR-G: facility 차원 추가.
     """
-    invalidate_threshold_cache(instance.group.code, instance.measurement_item)
+    invalidate_threshold_cache(
+        instance.group.code, instance.measurement_item, instance.facility_id
+    )

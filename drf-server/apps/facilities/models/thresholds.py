@@ -59,6 +59,17 @@ class Threshold(BaseModel):
         on_delete=models.PROTECT,
         related_name="thresholds",
     )
+    # PR-G: facility 우선순위 정책 — None이면 group 기본 (전사), specific facility는
+    # 해당 공장에만 적용. evaluate_gas_risk가 facility specific 우선 후 legal fallback.
+    facility = models.ForeignKey(
+        "facilities.Facility",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="thresholds",
+        verbose_name="대상 공장",
+        help_text="None=전사 정책. specific facility는 해당 공장에만 적용",
+    )
     measurement_item = models.CharField(
         max_length=50,
         validators=[validate_measurement_item],
@@ -94,9 +105,11 @@ class Threshold(BaseModel):
     class Meta:
         db_table = "threshold"
         constraints = [
+            # PR-G: (group, measurement_item, facility) 3필드 UNIQUE.
+            # facility=NULL은 전사 1개. facility별 specific 정책은 해당 공장 1개씩.
             models.UniqueConstraint(
-                fields=["group", "measurement_item"],
-                name="uq_threshold_group_item",
+                fields=["group", "measurement_item", "facility"],
+                name="uq_threshold_group_item_facility",
             ),
         ]
-        ordering = ["group", "measurement_item"]
+        ordering = ["group", "measurement_item", "facility"]

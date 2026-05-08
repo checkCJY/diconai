@@ -132,17 +132,26 @@ class GasData(models.Model):
         이후: DRF가 raw 값만 신뢰. risk는 facilities.Threshold DB로 재계산.
               fastapi와 DRF의 임계치 분기 위험 제거.
 
+        [PR-G facility 우선순위]
+        gas_sensor.facility_id를 evaluate_gas_risk에 전달 → facility specific 정책 우선
+        매칭 후 gas_legal fallback. facility별 보수적 임계치 도입 가능.
+
         측정값이 None인 가스는 *_risk도 None으로 유지(미측정 표시).
         """
         from apps.facilities.services.threshold_service import evaluate_gas_risk
 
+        facility_id = self.gas_sensor.facility_id
         gas_names = ["co", "h2s", "co2", "o2", "no2", "so2", "o3", "nh3", "voc"]
         for gas in gas_names:
             value = getattr(self, gas)
             if value is None:
                 setattr(self, f"{gas}_risk", None)
             else:
-                setattr(self, f"{gas}_risk", evaluate_gas_risk(gas, value))
+                setattr(
+                    self,
+                    f"{gas}_risk",
+                    evaluate_gas_risk(gas, value, facility_id=facility_id),
+                )
 
     def save(self, *args, **kwargs):
         # 단일 진실 공급원: raw 측정값 기반으로 *_risk + max_risk_level 재계산
