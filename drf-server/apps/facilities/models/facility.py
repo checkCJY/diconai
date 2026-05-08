@@ -3,8 +3,10 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
+from apps.core.models.base import BaseModel
 
-class Facility(models.Model):
+
+class Facility(BaseModel):
     """
     공장 마스터 — 시스템 최상위 단위
 
@@ -44,8 +46,7 @@ class Facility(models.Model):
     notes = models.TextField(blank=True, default="", verbose_name="비고")
     is_active = models.BooleanField(default=True, verbose_name="운영 여부")
     deactivated_at = models.DateTimeField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    # created_at / updated_at / updated_by 는 BaseModel 상속
 
     def deactivate(self):
         """공장 비활성화"""

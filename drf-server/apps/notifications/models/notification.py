@@ -3,9 +3,10 @@ from django.conf import settings
 from django.db import models
 
 from apps.core.constants import RiskLevel
+from apps.core.models.base import BaseModel
 
 
-class Notification(models.Model):
+class Notification(BaseModel):
     """
     알림 발송 레코드
 
@@ -106,8 +107,7 @@ class Notification(models.Model):
     # is_read는 3차 레거시 — 개인 알림용
     is_read = models.BooleanField(default=False)
     read_at = models.DateTimeField(null=True, blank=True)
-
-    created_at = models.DateTimeField(auto_now_add=True)
+    # created_at / updated_at / updated_by 는 BaseModel 상속
 
     def mark_as_read(self):
         """알림 읽음 처리"""

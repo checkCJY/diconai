@@ -2,10 +2,11 @@
 from django.conf import settings
 from django.db import models
 
-from apps.core.constants import AlarmType, RiskLevel, GasTypeChoices
+from apps.core.constants import AlarmType, GasTypeChoices, RiskLevel
+from apps.core.models.base import BaseModel
 
 
-class AlarmRecord(models.Model):
+class AlarmRecord(BaseModel):
     """
     센서 자동 판정 결과 — 원자적 불변 기록
 
@@ -91,7 +92,7 @@ class AlarmRecord(models.Model):
     risk_level = models.CharField(
         max_length=10, choices=RiskLevel.choices, verbose_name="위험도"
     )
-    created_at = models.DateTimeField(auto_now_add=True)
+    # created_at / updated_at / updated_by 는 BaseModel 상속 (save override로 수정 차단)
 
     def save(self, *args, **kwargs):
         """생성만 허용 — 수정 차단"""

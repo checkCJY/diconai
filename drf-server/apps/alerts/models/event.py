@@ -3,9 +3,10 @@ from django.conf import settings
 from django.db import models
 
 from apps.core.constants import AlarmType, EventStatus, RiskLevel
+from apps.core.models.base import BaseModel
 
 
-class Event(models.Model):
+class Event(BaseModel):
     """
     업무 워크플로우 단위 — 여러 AlarmRecord를 묶음
 
@@ -126,8 +127,7 @@ class Event(models.Model):
     last_notified_at = models.DateTimeField(
         null=True, blank=True, verbose_name="마지막 알림 발송 시각"
     )
-
-    created_at = models.DateTimeField(auto_now_add=True)
+    # created_at / updated_at / updated_by 는 BaseModel 상속
 
     def clean(self):
         """발생원 FK 정확히 하나만 NOT NULL 강제"""

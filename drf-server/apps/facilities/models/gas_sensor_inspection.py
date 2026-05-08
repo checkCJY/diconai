@@ -2,8 +2,10 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
+from apps.core.models.base import BaseModel
 
-class GasSensorInspection(models.Model):
+
+class GasSensorInspection(BaseModel):
     class InspectionType(models.TextChoices):
         REGULAR = "regular", "정기 점검"
         ABNORMAL = "abnormal", "이상 점검"
@@ -52,9 +54,7 @@ class GasSensorInspection(models.Model):
         verbose_name="조치 담당자",
     )
     action_notes = models.TextField(blank=True, default="", verbose_name="조치 의견")
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    # created_at / updated_at / updated_by 는 BaseModel 상속
 
     class Meta:
         db_table = "gas_sensor_inspection"

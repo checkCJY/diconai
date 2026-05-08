@@ -83,7 +83,7 @@ class SafetyCheckItem(BaseModel):
         ]
 
 
-class SafetyStatus(models.Model):
+class SafetyStatus(BaseModel):
     """
     작업자 체크 이력
 
@@ -129,8 +129,7 @@ class SafetyStatus(models.Model):
     is_checked = models.BooleanField(default=False)
     checked_at = models.DateTimeField(null=True, blank=True)
     note = models.TextField(blank=True, default="", verbose_name="작업자 메모")
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    # created_at / updated_at / updated_by 는 BaseModel 상속
 
     def mark_checked(self, session, note: str | None = None):
         """

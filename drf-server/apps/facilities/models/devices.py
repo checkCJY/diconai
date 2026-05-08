@@ -1,11 +1,14 @@
 # facilities/models/devices.py
+from datetime import timedelta
+
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
-from datetime import timedelta
+
+from apps.core.models.base import BaseModel
 
 
-class DeviceBase(models.Model):
+class DeviceBase(BaseModel):
     """
     현장 장비 공통 추상 모델 — GasSensor, PowerDevice가 상속
 
@@ -46,8 +49,7 @@ class DeviceBase(models.Model):
     last_reading = models.DateTimeField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
     deactivated_at = models.DateTimeField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    # created_at / updated_at / updated_by 는 BaseModel 상속
 
     @property
     def is_communication_lost(self) -> bool:
