@@ -182,3 +182,97 @@ docs/phases/post_phase4_regression_plan.md §3 영향 영역 표를 참조해 gr
 
 **다음 세션 입장 멘트 예시**:
 > "Phase 1~4 회귀 점검 진행할게요. `docs/phases/post_phase4_regression_plan.md` §5의 Explore 에이전트 프롬프트 그대로 띄워주세요."
+
+---
+
+## 9. 다음 세션 정확성을 높이는 질문 가이드
+
+새 세션의 Claude는 이전 컨텍스트가 없습니다. 정확성을 높이려면 명시적으로 가이드해주세요.
+
+### 9-1. 세션 진입 시 (가장 먼저)
+
+```
+이전 세션에서 Phase 1~4를 완료했고, post_phase4_regression_plan.md에 회귀
+점검 plan을 남겼습니다. 다음 순서로 진행해주세요:
+
+1. docs/phases/post_phase4_regression_plan.md 전체 먼저 읽기
+2. docs/phases/phase_1_plan.md ~ phase_4_pr3_report.md 까지의 보고서들 훑어서
+   Phase 1~4에서 무엇이 바뀌었는지 머리에 넣기
+3. git log --oneline -10 으로 commit history 확인 (51f8cae 직전 8 commits)
+4. 그 후 §5의 Explore 프롬프트로 영향 분석 시작
+```
+
+### 9-2. Step 1 (Explore 영향 분석) 보고서 받은 후
+
+```
+영향 분석 결과 받았습니다. 다음을 확인해주세요:
+
+A. 발견된 깨진 곳들의 위험도를 다시 분류해주세요:
+   - 즉시 깨짐 (현재 import error / 마이그 미적용 / runtime crash)
+   - 회귀 가능 (특정 흐름에서만 발현, 평소엔 모름)
+   - 컨벤션 불일치 (동작은 하지만 스타일/일관성 문제)
+
+B. fix 작업을 본 PR에 묶을지, 별도 PR로 분리할지 추천 (Phase 1~4와 동일하게
+   결정문 형식: 옵션 / 채택 / 장단점).
+
+C. fastapi-server와 drf-server 양쪽 다 영향 받는 항목이 있다면 따로 표시.
+   특히 fastapi/core/gas_thresholds.py vs DRF threshold_default.json 임계치
+   값 일치 여부는 반드시 확인.
+```
+
+### 9-3. Step 2 (fix) 진행 중
+
+```
+fix 진행 전 다음을 확인해주세요:
+
+- 각 fix가 Phase 1~4의 결정문/plan에서 정한 컨벤션과 일치하는가?
+  (예: BaseModel 직접 정의 패턴 유지, fixture+RunPython 시드 패턴, signal로
+  cache invalidate 등)
+- fix 후 reverse 검증 가능한가? (마이그 변경 시)
+- 기존 단위 테스트 29건이 그대로 통과하는가?
+```
+
+### 9-4. Step 3 (회귀 테스트 5개) 진행 중
+
+```
+회귀 테스트 작성 전 다음을 결정:
+
+- 단위 테스트 vs 통합 테스트 레벨 — 흐름별 어느 쪽이 적합한가?
+  (가스 알람 흐름은 통합 권장, 메뉴 트리는 단위 권장 등)
+- 5개를 한 PR에 묶을지 흐름별 분리 PR로 갈지 (Phase 4-ef 패턴 참조)
+- pytest 미설치 상태인데 (Phase 1 탐색 보고서) Django TestCase로 충분한지
+
+각 테스트 작성 시 Phase 1~4 보고서의 "변경 내용" 섹션을 다시 읽고
+회귀가 발현될 수 있는 케이스를 우선 커버.
+```
+
+### 9-5. 마무리 시 (각 PR commit 직전)
+
+```
+PR commit 전 다음 자체 검증을 부탁:
+
+- python manage.py check
+- python manage.py makemigrations --dry-run --check
+- python manage.py test <전체>  (이전 29건 + 새로 추가된 것)
+- pre-commit run --files <변경 파일>
+- 마이그 추가됐다면 reverse 검증: migrate <app> <이전번호> → migrate <app>
+- commit 메시지는 docs/conventions/github_convention.md 컨벤션 (한글, 50자
+  이내, 본문은 자유)
+- 보고서를 docs/phases/post_phase4_<step>_report.md 형식으로 작성
+```
+
+### 9-6. 추가 컨텍스트 명시 (혼동 방지용)
+
+새 세션 Claude가 자주 혼동할 수 있는 점들:
+
+- **`apps.facilities.services.threshold_service`는 Phase 4-d에서 전면 재작성됨** —
+  기존 LEGAL_THRESHOLDS / FACILITY_THRESHOLDS 상수 제거. import한 곳 깨졌을 수
+  있음.
+- **`dashboard/menu.py`도 Phase 4-a에서 전면 재작성됨** — 기존 _MENU_WORKER /
+  _MENU_ADMIN_EXTRA dict 제거. ID는 'SNB-XX' → snake_case로 변경.
+- **`SafetyStatus.mark_checked()` 시그니처 변경** — `mark_checked(session, note)`
+  키워드 인자 필수. 기존 `mark_checked(note=...)` 호출은 깨짐.
+- **`Notification.event` CASCADE → SET_NULL** — Event 삭제 시 알림 자동 정리 동작
+  사라짐. 단 Soft Delete 정책상 운영 중 Event 삭제는 거의 없음.
+- **POWER_THRESHOLDS 상수는 Phase 4 PR1에서 제거 안 됨** — power_alarm.py에서만
+  쓰던 import 제거. 다른 곳에서 import 잔존 가능 → grep 필요.
