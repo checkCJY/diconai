@@ -41,11 +41,29 @@ def _push_to_ws(alarm_data: dict) -> None:
 
     실패해도 태스크 자체는 성공으로 처리 — DB 기록이 우선이고
     WS 알림 누락은 다음 틱에서 Event 목록으로 확인 가능.
+
+    [IntegrationLog 기록 — Phase 2-e]
+    호출 결과(성공/실패)를 IntegrationLog ORM 직접 INSERT로 영속화.
+    fire-and-forget 정책: 기록 실패해도 본 흐름 비차단.
     """
+    result = "success"
     try:
         httpx.post(FASTAPI_INTERNAL_URL, json=alarm_data, timeout=3.0)
     except Exception as e:
         logger.warning("FastAPI WS 알람 푸시 실패 (WS 알림 누락): %s", e)
+        result = "failure"
+
+    try:
+        from apps.operations.models import IntegrationLog
+
+        IntegrationLog.objects.create(
+            integration_type=IntegrationLog.IntegrationType.TRANSMIT,
+            target_system="DRF→FastAPI",
+            result=result,
+            description=f"alarm_type={alarm_data.get('alarm_type', '')}",
+        )
+    except Exception:
+        pass  # silent fail — 본 흐름 비차단
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=5)

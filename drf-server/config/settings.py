@@ -56,6 +56,8 @@ INSTALLED_APPS = [
     "apps.dashboard",
     "apps.operations",
     "apps.reference",
+    "apps.notices",
+    "apps.training",
 ]
 
 MIDDLEWARE = [
@@ -222,9 +224,17 @@ LOGGING = {
             "class": "logging.StreamHandler",
             "formatter": "diconai",
         },
+        # AppLog 영속화 — Phase 2-d.
+        # ERROR 이상만 캡처 (level=ERROR). 동기 INSTALL — 부하 측정 후 Phase 4에서 비동기 검토.
+        # 재귀 가드는 핸들러 내부 thread-local 플래그로 처리.
+        "applog_db": {
+            "class": "apps.operations.logging.db_handler.DBLogHandler",
+            "level": "ERROR",
+            "formatter": "diconai",
+        },
     },
     "root": {
-        "handlers": ["console"],
+        "handlers": ["console", "applog_db"],
         "level": LOG_LEVEL,
     },
     "loggers": {

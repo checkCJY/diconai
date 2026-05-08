@@ -7,6 +7,11 @@ gas/power/positioning service에서 중복으로 작성하던 httpx POST 호출 
     True  → ConnectError/TimeoutException/4xx/5xx 시 DrfClientError 예외 발생 (gas: 센서에 4xx/5xx 응답 필요)
     False → 실패해도 None 반환, 호출자가 후속 흐름 계속 (power/positioning: 비동기 fire-and-forget)
 어떤 경우든 실패는 logger.warning/error로 남긴다.
+
+[IntegrationLog 기록 — Phase 2-e]
+post_to_drf 호출 결과를 DRF의 /api/internal/integration-logs/ 엔드포인트로 1건 기록.
+fire-and-forget — 기록 실패해도 본 흐름 비차단(silent fail).
+재귀 회피: INTEGRATION_LOG_PATH 호출 자체는 IntegrationLog 기록 안 함.
 """
 
 import logging
@@ -16,6 +21,8 @@ import httpx
 from core.config import settings
 
 logger = logging.getLogger(__name__)
+
+INTEGRATION_LOG_PATH = "/api/internal/integration-logs/"
 
 
 class DrfClientError(Exception):
@@ -32,6 +39,30 @@ def _auth_headers() -> dict:
     if settings.DRF_SERVICE_TOKEN:
         headers["Authorization"] = f"Bearer {settings.DRF_SERVICE_TOKEN}"
     return headers
+
+
+async def _record_integration_log(
+    *,
+    integration_type: str,
+    target_system: str,
+    result: str,
+    description: str = "",
+) -> None:
+    """fire-and-forget IntegrationLog 기록. 실패해도 silent."""
+    try:
+        async with httpx.AsyncClient(timeout=2) as client:
+            await client.post(
+                f"{settings.DRF_BASE_URL}{INTEGRATION_LOG_PATH}",
+                json={
+                    "integration_type": integration_type,
+                    "target_system": target_system,
+                    "result": result,
+                    "description": description,
+                },
+            )
+    except Exception:
+        # silent fail — 본 흐름 비차단. AppLog에 기록하면 또 재귀 위험.
+        pass
 
 
 async def post_to_drf(
@@ -82,5 +113,19 @@ async def post_to_drf(
         )
         if raise_on_error:
             raise DrfClientError(res.status_code, body_preview or "DRF 응답 오류")
+
+    # IntegrationLog 기록 (재귀 회피: 본 엔드포인트는 제외)
+    if path != INTEGRATION_LOG_PATH:
+        integration_type = (
+            "collect"
+            if any(seg in path for seg in ("/monitoring/", "/positioning/"))
+            else "transmit"
+        )
+        await _record_integration_log(
+            integration_type=integration_type,
+            target_system="FastAPI→DRF",
+            result="success" if res.status_code < 400 else "failure",
+            description=f"path={path} status={res.status_code}",
+        )
 
     return res

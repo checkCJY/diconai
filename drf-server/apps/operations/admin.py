@@ -1,6 +1,61 @@
 from django.contrib import admin
 
-from apps.operations.models import DataRetentionPolicy
+from apps.operations.models import AppLog, DataRetentionPolicy, IntegrationLog
+
+
+@admin.register(AppLog)
+class AppLogAdmin(admin.ModelAdmin):
+    list_display = ("log_category", "level", "service_module", "created_at")
+    list_filter = ("log_category", "level")
+    search_fields = ("service_module", "message")
+    readonly_fields = (
+        "log_category",
+        "service_module",
+        "level",
+        "message",
+        "extra",
+        "created_at",
+    )
+    ordering = ("-created_at",)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(IntegrationLog)
+class IntegrationLogAdmin(admin.ModelAdmin):
+    list_display = (
+        "integration_type",
+        "target_system",
+        "result",
+        "created_at",
+    )
+    list_filter = ("integration_type", "result")
+    search_fields = ("target_system", "description")
+    readonly_fields = (
+        "integration_type",
+        "target_system",
+        "result",
+        "description",
+        "extra",
+        "created_at",
+    )
+    ordering = ("-created_at",)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(DataRetentionPolicy)
