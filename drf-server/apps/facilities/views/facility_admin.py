@@ -319,10 +319,10 @@ class EquipmentAdminListView(APIView):
             "facility", "facility__manager", "power_device"
         ).all()
 
-        # 검색 (설비코드 EQP-XXX 또는 설비명)
+        # 검색 (설비코드 FAC-XXX 또는 설비명)
         q = request.query_params.get("q", "").strip()
         if q:
-            if q.upper().startswith("EQP-"):
+            if q.upper().startswith("FAC-"):
                 try:
                     qs = qs.filter(id=int(q[4:]))
                 except ValueError:
@@ -367,7 +367,7 @@ class EquipmentAdminListView(APIView):
         serializer = EquipmentAdminWriteSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        equipment = serializer.save()
+        equipment = serializer.save(updated_by=request.user)
         out = Equipment.objects.select_related(
             "facility", "facility__manager", "power_device"
         ).get(pk=equipment.pk)
@@ -430,7 +430,7 @@ class EquipmentAdminDetailView(APIView):
         )
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        updated = serializer.save()
+        updated = serializer.save(updated_by=request.user)
 
         # 활성 설비에 장치가 연결된 경우(신규 연결 포함) → 장치도 재활성화
         if updated.is_active and updated.power_device_id:
@@ -467,7 +467,7 @@ class EquipmentAdminDetailView(APIView):
             return Response(
                 {"detail": "설비를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND
             )
-        equipment.deactivate()
+        equipment.deactivate(updated_by=request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -495,7 +495,7 @@ class EquipmentAdminBulkDeleteView(APIView):
         ).select_related("power_device")
         count = 0
         for equipment in equipments:
-            equipment.deactivate()
+            equipment.deactivate(updated_by=request.user)
             count += 1
         return Response({"deleted": count})
 

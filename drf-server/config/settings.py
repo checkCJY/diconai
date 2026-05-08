@@ -54,6 +54,8 @@ INSTALLED_APPS = [
     "apps.safety",
     "apps.core",
     "apps.dashboard",
+    "apps.operations",
+    "apps.reference",
 ]
 
 MIDDLEWARE = [

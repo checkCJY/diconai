@@ -1,10 +1,12 @@
 # safety/models/safety.py
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
-from django.conf import settings
+
+from apps.core.models.base import BaseModel
 
 
-class SafetyCheckItem(models.Model):
+class SafetyCheckItem(BaseModel):
     """
     체크리스트 항목 마스터
 
@@ -43,13 +45,21 @@ class SafetyCheckItem(models.Model):
     is_required = models.BooleanField(default=True, verbose_name="필수 여부")
     is_active = models.BooleanField(default=True)
     deactivated_at = models.DateTimeField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    # created_at / updated_at / updated_by 는 BaseModel 상속
 
-    def deactivate(self):
+    def deactivate(self, updated_by=None):
         self.is_active = False
         self.deactivated_at = timezone.now()
-        self.save(update_fields=["is_active", "deactivated_at", "updated_at"])
+        if updated_by is not None:
+            self.updated_by = updated_by
+        self.save(
+            update_fields=[
+                "is_active",
+                "deactivated_at",
+                "updated_at",
+                "updated_by",
+            ]
+        )
 
     def __str__(self):
         return self.title

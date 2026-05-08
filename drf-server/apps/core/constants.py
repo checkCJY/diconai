@@ -38,13 +38,39 @@ class AlarmType(models.TextChoices):
     - GAS_THRESHOLD      → GasSensor
     - POWER_OVERLOAD     → PowerDevice
     - GEOFENCE_INTRUSION → GeoFence + CustomUser (worker)
-    - SENSOR_FAULT       → GasSensor 또는 PowerDevice
+    - SENSOR_FAULT       → GasSensor 또는 PowerDevice (시스템 분류, 정책 화면 비노출)
+
+    SENSOR_FAULT는 USER_FACING_ALARM_TYPES에서 제외 — 사용자가 정책으로
+    설정하는 알람이 아니라 센서 자체의 통신/오류 상태.
     """
 
-    GAS_THRESHOLD = "gas_threshold", "가스 임계치 초과"
-    POWER_OVERLOAD = "power_overload", "전력 과부하"
+    # 기존 4종 (키/값 변경 없음)
+    GAS_THRESHOLD = "gas_threshold", "가스 경보"
+    POWER_OVERLOAD = "power_overload", "전력 이상"
     GEOFENCE_INTRUSION = "geofence_intrusion", "위험구역 진입"
-    SENSOR_FAULT = "sensor_fault", "센서 오류"
+    SENSOR_FAULT = "sensor_fault", "센서 이상"
+
+    # 신규 6종 (CJY 화면 요구)
+    PPE_VIOLATION = "ppe_violation", "PPE 미착용"
+    VR_TRAINING_NOT_DONE = "vr_training_not_done", "VR 교육 미이수"
+    SAFETY_CHECK_PENDING = "safety_check_pending", "작업 안전 체크리스트 미완료"
+    INSPECTION_SCHEDULED = "inspection_scheduled", "점검 예정"
+    BATCH_FAILED = "batch_failed", "배치 실패"
+    STORAGE_OVERDUE = "storage_overdue", "보관 주기 실패"
+
+
+# 정책 화면 노출 9종 (SENSOR_FAULT 제외) — AlertPolicy.event_type 선택지
+USER_FACING_ALARM_TYPES = [
+    AlarmType.GAS_THRESHOLD,
+    AlarmType.POWER_OVERLOAD,
+    AlarmType.GEOFENCE_INTRUSION,
+    AlarmType.PPE_VIOLATION,
+    AlarmType.VR_TRAINING_NOT_DONE,
+    AlarmType.SAFETY_CHECK_PENDING,
+    AlarmType.INSPECTION_SCHEDULED,
+    AlarmType.BATCH_FAILED,
+    AlarmType.STORAGE_OVERDUE,
+]
 
 
 class UserType(models.TextChoices):
