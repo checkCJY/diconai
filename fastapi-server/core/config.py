@@ -25,7 +25,9 @@ class Settings(BaseSettings):
     DATA_STALE_THRESHOLD_SEC: float = 8.0
 
     # ── 전력 임계치 (단위: W, Phase A 기준) ──────────────────────
-    # DRF apps.core.constants.POWER_THRESHOLDS와 동일 값을 유지해야 한다.
+    # 표시용 fallback. 실제 알람 판정은 DRF가 수행 (단일 진실 공급원: DRF
+    # facilities.Threshold(group="power_default", item="power_w")). 어드민에서 변경 시
+    # 본 env도 동기화 의무 (운영 진입 시 DRF API fetch 캐시 검토).
     POWER_THRESHOLD_CAUTION: int = 2200
     POWER_THRESHOLD_DANGER: int = 2860
 

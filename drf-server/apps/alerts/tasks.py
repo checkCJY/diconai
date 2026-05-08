@@ -293,10 +293,13 @@ def fire_power_danger_task(
 ):
     """전력 DANGER 즉각 알람 — AlarmRecord/Event 생성 후 FastAPI WS 큐에 푸시."""
     from apps.alerts.services.event_service import create_alarm_and_event
-    from apps.core.constants import AlarmType, POWER_THRESHOLDS
+    from apps.core.constants import AlarmType
+    from apps.facilities.services.threshold_service import get_threshold
 
     try:
-        threshold = POWER_THRESHOLDS["danger"]
+        power_threshold = get_threshold("power_default", "power_w") or {}
+        danger_max = power_threshold.get("danger_max")
+        threshold = float(danger_max) if danger_max is not None else None
         summary = (
             f"[긴급] {source_label} 전력 과부하 ({value}W)"
             " — 즉시 확인하고 관리자에게 보고하세요."
@@ -349,10 +352,13 @@ def fire_power_warning_task(
 ):
     """전력 WARNING 30초 지속 후 알람 — AlarmRecord/Event 생성 후 FastAPI WS 큐에 푸시."""
     from apps.alerts.services.event_service import create_alarm_and_event
-    from apps.core.constants import AlarmType, POWER_THRESHOLDS
+    from apps.core.constants import AlarmType
+    from apps.facilities.services.threshold_service import get_threshold
 
     try:
-        threshold = POWER_THRESHOLDS["caution"]
+        power_threshold = get_threshold("power_default", "power_w") or {}
+        warning_max = power_threshold.get("warning_max")
+        threshold = float(warning_max) if warning_max is not None else None
         summary = (
             f"[주의] {source_label} 전력 경고 수준 {WARNING_DURATION_SEC}초 지속 ({value}W)"
             " — 설비 상태를 확인하세요."

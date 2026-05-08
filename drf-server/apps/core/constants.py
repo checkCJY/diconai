@@ -122,14 +122,5 @@ class GasTypeChoices(models.TextChoices):
     LEL = "lel", "LEL (폭발하한계)"
 
 
-# 전력 임계치 (단위: W) — Phase A 기준
-# caution: 정상→주의 경계, danger: 주의→위험 경계 (caution × 1.3), maxY: 차트 Y축 기본 최대값
-POWER_THRESHOLDS: dict = {
-    "caution": 2200,
-    "danger": 2860,
-    "maxY": 3500,
-    "unit": "W",
-}
-
 # 로그인 화면 문의처 — 운영 연락처로 변경 필요
 CONTACT_INFO = "담당 관리자에게 문의하세요."

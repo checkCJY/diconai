@@ -77,6 +77,14 @@ class Threshold(BaseModel):
         max_digits=12, decimal_places=4, null=True, blank=True
     )
     unit = models.CharField(max_length=10, default="ppm")
+    chart_max = models.DecimalField(
+        max_digits=12,
+        decimal_places=4,
+        null=True,
+        blank=True,
+        verbose_name="차트 Y축 최대값",
+        help_text="프론트 차트 스케일링용. 운영자가 어드민에서 조정",
+    )
     description = models.TextField(blank=True, default="")
     is_active = models.BooleanField(default=True)
 

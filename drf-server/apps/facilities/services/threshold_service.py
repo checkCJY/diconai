@@ -40,6 +40,7 @@ def get_threshold(group_code: str, item: str) -> dict | None:
             "warning_max": Decimal | None,
             "danger_min":  Decimal | None,
             "danger_max":  Decimal | None,
+            "chart_max":   Decimal | None,
             "unit": str,
         }
     또는 미존재 시 None.
@@ -66,6 +67,7 @@ def get_threshold(group_code: str, item: str) -> dict | None:
         "warning_max": threshold.warning_max,
         "danger_min": threshold.danger_min,
         "danger_max": threshold.danger_max,
+        "chart_max": threshold.chart_max,
         "unit": threshold.unit,
     }
     cache.set(key, payload, _CACHE_TTL)
