@@ -47,6 +47,12 @@ class IsCycleDueTest(TestCase):
 
 
 class RunDataRetentionTest(TestCase):
+    def setUp(self):
+        # PR-C 마이그 시드(5종 기본 정책) 제거 — 본 테스트는 정책을 직접 만들어 검증
+        from apps.operations.models import DataRetentionPolicy
+
+        DataRetentionPolicy.objects.all().delete()
+
     def test_no_active_policy_returns_empty(self):
         """활성 정책 없음 → 빈 dict"""
         result = run_data_retention(dry_run=True)

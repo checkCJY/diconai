@@ -15,6 +15,8 @@ from apps.facilities.models import Facility
 class PolicyMatcherTest(TestCase):
     @classmethod
     def setUpTestData(cls):
+        # PR-C 마이그 시드(9종 전사 정책) 제거 — 본 테스트는 정책을 직접 만들어 검증
+        AlertPolicy.objects.all().delete()
         cls.facility_a = Facility.objects.create(name="공장 A")
         cls.facility_b = Facility.objects.create(name="공장 B")
 
