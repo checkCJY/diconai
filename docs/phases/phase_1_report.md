@@ -3,7 +3,7 @@
 > 작업일: 2026-05-08
 > 브랜치: `feature/0508_refactory`
 > 부모 plan: [.claude/plans/swirling-mixing-torvalds.md](../../.claude/plans/swirling-mixing-torvalds.md)
-> 구현 plan: [.claude/plans/verdant-cascading-nebula.md](../../.claude/plans/verdant-cascading-nebula.md)
+> 구현 plan: [phase_1_plan.md](phase_1_plan.md)
 
 ---
 
@@ -217,7 +217,7 @@ CHECKLIST_REVISION_PUBLISHED / CHECKLIST_SECTION_CREATED / CHECKLIST_ITEM_DEACTI
 
 ## 8. 다음 Phase
 
-[verdant-cascading-nebula.md](../../.claude/plans/verdant-cascading-nebula.md) §3 의존 그래프에 따라 **Phase 2 도메인 모델 PR**들이 병렬 가능 상태:
+[phase_1_plan.md](phase_1_plan.md) §3 의존 그래프에 따라 **Phase 2 도메인 모델 PR**들이 병렬 가능 상태:
 
 - Phase 2-a: HazardType / HazardTypeGroup (alerts) + seed + AlarmType↔HazardType CI 활성화
 - Phase 2-b: Threshold / ThresholdGroup (facilities)

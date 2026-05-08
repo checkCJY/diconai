@@ -57,11 +57,13 @@ class EventAdmin(admin.ModelAdmin):
         "event_type",
         "risk_level",
         "status",
+        "policy",
         "first_detected_at",
     )
-    list_filter = ("status", "risk_level", "event_type", "facility")
-    search_fields = ("summary", "source_label")
+    list_filter = ("status", "risk_level", "event_type", "facility", "policy")
+    search_fields = ("summary", "source_label", "description", "status_note")
     readonly_fields = ("created_at",)
+    list_select_related = ("facility", "policy")
     ordering = ("-created_at",)
 
 

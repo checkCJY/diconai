@@ -39,6 +39,13 @@ class SafetyCheckItem(BaseModel):
         on_delete=models.CASCADE,  # 공장 소멸 시 체크리스트도 소멸 (예외적 허용)
         related_name="safety_check_items",
     )
+    # Phase 3-b: SafetyCheckSection 그룹화. 1단계 nullable → 2단계 백필 → 3단계 NOT NULL.
+    # 모든 row가 facility별 "기본" Section으로 자동 매핑된 후 NOT NULL로 전환.
+    section = models.ForeignKey(
+        "safety.SafetyCheckSection",
+        on_delete=models.PROTECT,
+        related_name="items",
+    )
     title = models.CharField(max_length=200, verbose_name="항목 제목")
     description = models.TextField(blank=True, default="", verbose_name="상세 설명")
     order = models.PositiveSmallIntegerField(default=0, verbose_name="표시 순서")

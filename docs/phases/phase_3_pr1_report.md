@@ -3,7 +3,7 @@
 > 작업일: 2026-05-08
 > 브랜치: `feature/0508_refactory`
 > 부모 plan: [.claude/plans/swirling-mixing-torvalds.md](../../.claude/plans/swirling-mixing-torvalds.md)
-> 결정문: [skill/Phase3_단독결정문.md](../../skill/Phase3_단독결정문.md) §3a
+> 결정문: [phase_3_plan.md](phase_3_plan.md) §3a
 > 직전 Phase: [phase_2_report.md](phase_2_report.md)
 
 ---

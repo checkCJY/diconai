@@ -175,6 +175,13 @@ ADMIN_BACKOFFICE_URL = env(
     "ADMIN_BACKOFFICE_URL", default="/admin-panel/accounts-management/"
 )
 
+# Phase 3-e: Notification "지연" 동적 판정 임계값.
+# delivery_status=PENDING + (now - last_attempted_at > N분) 이면 화면에 "지연" 라벨.
+# enum 5종으로 비대화 안 함 — 동적 판정만.
+NOTIFICATION_DELAY_THRESHOLD_MINUTES = env.int(
+    "NOTIFICATION_DELAY_THRESHOLD_MINUTES", default=5
+)
+
 # ── FastAPI 서버 (서버 간 호출용, localhost) ──────────────
 # Celery → FastAPI WS 브리지(/internal/alarms/push/) 호출에 사용.
 # 브라우저는 별도로 FRONTEND_WS_BASE_URL을 통해 직접 fastapi와 WS 연결.
