@@ -42,9 +42,10 @@ def _push_to_ws(alarm_data: dict) -> None:
     실패해도 태스크 자체는 성공으로 처리 — DB 기록이 우선이고
     WS 알림 누락은 다음 틱에서 Event 목록으로 확인 가능.
 
-    [IntegrationLog 기록 — Phase 2-e]
-    호출 결과(성공/실패)를 IntegrationLog ORM 직접 INSERT로 영속화.
-    fire-and-forget 정책: 기록 실패해도 본 흐름 비차단.
+    [IntegrationLog 비동기 기록 — PR-D 변경]
+    호출 결과(성공/실패)를 Celery task delay()로 비동기 INSERT.
+    이전: ORM 직접 create (web pod 부담). 이후: Celery worker 분리 → web latency 0.
+    broker 다운 시 silent fail — 본 흐름 비차단.
     """
     result = "success"
     try:
@@ -54,16 +55,18 @@ def _push_to_ws(alarm_data: dict) -> None:
         result = "failure"
 
     try:
-        from apps.operations.models import IntegrationLog
+        from apps.operations.tasks.integration_log_task import (
+            integration_log_create_task,
+        )
 
-        IntegrationLog.objects.create(
-            integration_type=IntegrationLog.IntegrationType.TRANSMIT,
+        integration_log_create_task.delay(
+            integration_type="transmit",
             target_system="DRF→FastAPI",
             result=result,
             description=f"alarm_type={alarm_data.get('alarm_type', '')}",
         )
     except Exception:
-        pass  # silent fail — 본 흐름 비차단
+        pass  # broker 다운 silent fail — 본 흐름 비차단
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=5)
