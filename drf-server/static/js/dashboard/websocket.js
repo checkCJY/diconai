@@ -267,7 +267,7 @@ function initWebSocket() {
   // shared/ws-client.js의 WSClient를 사용해 alarm-ws.js와 동일 엔드포인트
   // 중복 연결을 방지한다.
   function connect() {
-    const ws = WSClient.connect('/ws/sensors/');
+    const ws = WSClient.connect('/ws/sensors/', { attachToken: true });
 
     ws.onOpen(() => {
       setWsStatus('● 실시간 연결', 'connected');
@@ -446,7 +446,7 @@ function initWebSocket() {
   // sensors 페이로드에도 worker_positions가 포함되어 있으나,
   // 이 채널은 위치 전용 고빈도 갱신을 위해 분리 운영한다.
   function connectPositions() {
-    const wsPos = WSClient.connect('/ws/positions/');
+    const wsPos = WSClient.connect('/ws/positions/', { attachToken: true });
     wsPos.onMessage((data) => {
       if (data.worker_positions && typeof MapPanel.updateWorkerPositions === 'function') {
         MapPanel.updateWorkerPositions(data.worker_positions);

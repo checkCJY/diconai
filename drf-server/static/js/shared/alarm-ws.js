@@ -7,7 +7,7 @@
 // (대시보드와 같은 페이지에 로드되면 WSClient 캐시로 한 연결만 유지됨)
 (function () {
   document.addEventListener('DOMContentLoaded', function () {
-    const ws = WSClient.connect('/ws/sensors/');
+    const ws = WSClient.connect('/ws/sensors/', { attachToken: true });
 
     ws.onMessage(function (data) {
       if (!Array.isArray(data.alarms) || data.alarms.length === 0) return;

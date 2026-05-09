@@ -8,7 +8,8 @@
    - 라이프사이클 콜백(onOpen/onClose/onError)도 다중 구독 지원.
 
    사용 예:
-     const ws = WSClient.connect('/ws/sensors/');
+     // 인증 활성화된 채널은 attachToken: true 옵션으로 토큰 자동 부착
+     const ws = WSClient.connect('/ws/sensors/', { attachToken: true });
      const off = ws.onMessage((data) => { ... });
      ws.onOpen(() => setStatus('connected'));
      ws.onClose(() => setStatus('disconnected'));
@@ -16,7 +17,8 @@
 
    상위 호환:
      - 기존 alarm-ws.js, dashboard/websocket.js의 별개 연결을 통합
-     - 토큰 부착이 필요한 엔드포인트는 옵션으로 ?token=... 쿼리 추가
+     - attachToken: true 옵션이면 ?token=<access_token> 쿼리 자동 부착
+       (서버는 settings.JWT_SIGNING_KEY 설정 시 query token 검증 — Phase 5)
    ========================================================== */
 
 'use strict';

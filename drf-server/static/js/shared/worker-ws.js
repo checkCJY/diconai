@@ -8,7 +8,7 @@
     const user = await Auth.getMe();
     if (!user || !user.id) return;
 
-    const ws = WSClient.connect('/ws/worker/' + user.id + '/');
+    const ws = WSClient.connect('/ws/worker/' + user.id + '/', { attachToken: true });
 
     ws.onMessage(function (data) {
       if (data.type !== 'worker_alert') return;
