@@ -187,6 +187,11 @@ NOTIFICATION_DELAY_THRESHOLD_MINUTES = env.int(
 # 브라우저는 별도로 FRONTEND_WS_BASE_URL을 통해 직접 fastapi와 WS 연결.
 FASTAPI_INTERNAL_URL = env("FASTAPI_INTERNAL_URL", default="http://127.0.0.1:8001")
 
+# ── 서비스 간 인증 토큰 (Phase 5) ──────────────────────────
+# fastapi → drf 인입 엔드포인트, drf Celery → fastapi /internal/alarms/push/ 양방향에 사용.
+# 빈 문자열이면 인증 비활성 (기존 동작 유지). 운영에서는 양 서비스에 동일 값 설정.
+INTERNAL_SERVICE_TOKEN = env("INTERNAL_SERVICE_TOKEN", default="")
+
 # ── 프론트엔드 노출용 URL (config.js로 주입) ───────────────
 # 브라우저가 fastapi-server에 접속할 때 사용하는 공개 주소.
 # 운영 환경에서는 도메인/HTTPS로 교체.

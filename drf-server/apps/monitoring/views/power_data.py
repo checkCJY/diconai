@@ -10,6 +10,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.authentication import ServiceTokenAuthentication
 from apps.facilities.services.threshold_service import get_threshold
 from apps.monitoring.serializers.power_data import (
     PowerDataBulkIngestSerializer,
@@ -72,10 +73,12 @@ class PowerEventIngestView(APIView):
     요청 바디: { device_id, measured_at, snapshot }
     응답: { "id": <PowerEvent.id> }
 
-    의도적 무인증: 서버-서버(fastapi → drf) 호출 전용 ingest 엔드포인트.
-    Phase 5에서 서비스 토큰 또는 IP 화이트리스트 기반 보호 추가 예정.
+    서버-서버(fastapi → drf) 호출 전용 ingest 엔드포인트.
+    settings.INTERNAL_SERVICE_TOKEN 설정 시 Bearer 토큰 검증 (Phase 5),
+    미설정 시 기존 무인증 동작 유지 (옵트인).
     """
 
+    authentication_classes = [ServiceTokenAuthentication]
     permission_classes = [AllowAny]
 
     @extend_schema(
@@ -106,10 +109,12 @@ class PowerDataBulkIngestView(APIView):
     요청 바디: { device_id, measured_at, data_type, channels: [...] }
     응답: { "created": <저장된 행 수> }
 
-    의도적 무인증: 서버-서버(fastapi → drf) 호출 전용 ingest 엔드포인트.
-    Phase 5에서 서비스 토큰 또는 IP 화이트리스트 기반 보호 추가 예정.
+    서버-서버(fastapi → drf) 호출 전용 ingest 엔드포인트.
+    settings.INTERNAL_SERVICE_TOKEN 설정 시 Bearer 토큰 검증 (Phase 5),
+    미설정 시 기존 무인증 동작 유지 (옵트인).
     """
 
+    authentication_classes = [ServiceTokenAuthentication]
     permission_classes = [AllowAny]
 
     @extend_schema(

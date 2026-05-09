@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     DRF_SERVICE_TOKEN: str = ""  # 빈 문자열이면 Authorization 헤더 미포함
     DRF_REQUEST_TIMEOUT_SEC: float = 5.0
 
+    # ── 서비스 간 인증 토큰 (Phase 5) ──────────────────────────
+    # /internal/alarms/push/ (Celery → FastAPI) 검증용. 빈 문자열이면 비활성.
+    # 운영에서는 drf의 INTERNAL_SERVICE_TOKEN과 동일 값으로 설정.
+    INTERNAL_SERVICE_TOKEN: str = ""
+
     # ── WebSocket 브로드캐스트 ─────────────────────────────────
     # 메인 broadcast 주기. 너무 짧으면 클라이언트 부하 증가.
     BROADCAST_INTERVAL_SEC: float = 5.0

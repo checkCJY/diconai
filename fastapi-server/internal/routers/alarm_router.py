@@ -9,6 +9,7 @@
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from core.config import settings
 from websocket.state import active_alarms, alarm_signal, worker_clients
 
 router = APIRouter(prefix="/internal", tags=["internal"])
@@ -49,6 +50,17 @@ async def push_alarm(request: Request, alarm: AlarmPayload):
     client_host = request.client.host if request.client else ""
     if client_host not in ("127.0.0.1", "::1", "localhost"):
         raise HTTPException(status_code=403, detail="내부 전용 엔드포인트입니다.")
+
+    # Phase 5: 서비스 토큰 검증 (옵트인 — 미설정 시 기존 동작 유지)
+    expected_token = settings.INTERNAL_SERVICE_TOKEN
+    if expected_token:
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="서비스 토큰이 필요합니다.")
+        if auth_header[7:].strip() != expected_token:
+            raise HTTPException(
+                status_code=403, detail="유효하지 않은 서비스 토큰입니다."
+            )
 
     payload = alarm.model_dump(exclude_none=True)
     active_alarms.append(payload)

@@ -11,6 +11,7 @@ import logging
 
 import httpx
 from celery import shared_task
+from django.conf import settings
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
@@ -47,9 +48,14 @@ def _push_to_ws(alarm_data: dict) -> None:
     이전: ORM 직접 create (web pod 부담). 이후: Celery worker 분리 → web latency 0.
     broker 다운 시 silent fail — 본 흐름 비차단.
     """
+    headers = {}
+    token = getattr(settings, "INTERNAL_SERVICE_TOKEN", "") or ""
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
     result = "success"
     try:
-        httpx.post(FASTAPI_INTERNAL_URL, json=alarm_data, timeout=3.0)
+        httpx.post(FASTAPI_INTERNAL_URL, json=alarm_data, headers=headers, timeout=3.0)
     except Exception as e:
         logger.warning("FastAPI WS 알람 푸시 실패 (WS 알림 누락): %s", e)
         result = "failure"
