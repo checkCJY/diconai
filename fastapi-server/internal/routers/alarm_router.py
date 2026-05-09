@@ -15,7 +15,8 @@ router = APIRouter(prefix="/internal", tags=["internal"])
 
 
 class AlarmPayload(BaseModel):
-    model_config = {"extra": "allow"}  # 필드가 추가되어도 유연하게 수용
+    # 미정의 필드는 통과시키지 않음 — DRF Celery 측이 명시 필드만 보내야 함
+    model_config = {"extra": "ignore"}
 
     alarm_type: str
     risk_level: str
