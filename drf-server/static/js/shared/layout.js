@@ -196,7 +196,12 @@ const Header = {
     logoutCancel ?.addEventListener('click', () => { modal.style.display = 'none'; });
     logoutConfirm?.addEventListener('click', async () => {
       try {
-        await Auth.apiFetch('/api/auth/logout/', { method: 'POST' });
+        // Phase 5: refresh 토큰을 body로 동봉 → 서버가 blacklist 등록
+        const refresh = Auth.getRefreshToken();
+        await Auth.apiFetch('/api/auth/logout/', {
+          method: 'POST',
+          body: JSON.stringify(refresh ? { refresh } : {}),
+        });
       } finally {
         modal.style.display = 'none';
         successModal.style.display = 'flex';
