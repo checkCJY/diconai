@@ -13,6 +13,7 @@ idna==3.11
 pydantic==2.13.0
 pydantic-core==2.46.0
 pydantic-settings==2.13.1
+pyjwt==2.10.1
 python-dotenv==1.2.2
 pyyaml==6.0.3
 starlette==1.0.0

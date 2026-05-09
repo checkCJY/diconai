@@ -175,6 +175,9 @@ SIMPLE_JWT = {
     "AUTH_HEADER_TYPES": ("Bearer",),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
+    # Phase 5 WS 인증: fastapi가 같은 키로 검증할 수 있도록 명시.
+    # 기본값 SECRET_KEY는 SimpleJWT 기본 동작과 동일 (호환 유지).
+    "SIGNING_KEY": env("JWT_SIGNING_KEY", default=SECRET_KEY),
 }
 
 # ── 백오피스 URL (관리자 메뉴 이동) ───────────────────────

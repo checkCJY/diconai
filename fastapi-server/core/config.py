@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     # 운영에서는 drf의 INTERNAL_SERVICE_TOKEN과 동일 값으로 설정.
     INTERNAL_SERVICE_TOKEN: str = ""
 
+    # ── WebSocket JWT 인증 (Phase 5) ──────────────────────────
+    # drf SimpleJWT가 발급한 access 토큰을 같은 SIGNING_KEY로 검증.
+    # 빈 문자열이면 비활성 (기존 무인증 동작 유지). 운영에서는 drf의 JWT_SIGNING_KEY와 동일 값.
+    JWT_SIGNING_KEY: str = ""
+    JWT_ALGORITHM: str = "HS256"  # drf SimpleJWT 기본 알고리즘과 일치
+
     # ── WebSocket 브로드캐스트 ─────────────────────────────────
     # 메인 broadcast 주기. 너무 짧으면 클라이언트 부하 증가.
     BROADCAST_INTERVAL_SEC: float = 5.0
