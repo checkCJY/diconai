@@ -51,7 +51,11 @@ const Menu = {
       const li          = document.createElement('li');
       li.className      = 'snb-depth1-item';
       const hasChildren = menu.children && menu.children.length > 0;
-      const icon        = this.iconMap[menu.icon] || '•';
+      let icon = this.iconMap[menu.icon];
+      if (!icon) {
+        if (menu.icon) console.warn('[Menu] icon not defined:', menu.icon);
+        icon = '•';
+      }
 
       const btn = document.createElement('button');
       btn.className = 'snb-depth1-btn';
@@ -106,9 +110,17 @@ const Menu = {
 // ──────────────────────────────────────────────────────────
 // CM-02 — 시계 / 새로고침 / 홈 / 관리자 / 로그아웃
 // ──────────────────────────────────────────────────────────
+const ROLE_LABEL = Object.freeze({
+  worker:         '작업자',
+  facility_admin: '공장관리자',
+  super_admin:    '슈퍼관리자',
+  viewer:         '열람자',
+});
+
 const Header = {
   isRefreshing: false,
   adminUrl:     null,
+  _refreshErrTimer: null,
 
   initClock() {
     const clockEl = document.getElementById('clock');
@@ -148,11 +160,14 @@ const Header = {
       // H-2: 이벤트 패널 REST 재조회 (가스/전력/지도는 WebSocket 실시간, 작업자는 30s 폴링)
       if (typeof EventPanel !== 'undefined') EventPanel.loadEventList();
     } catch {
-      // M-2: 실패 시 버튼 시각적 피드백
+      // M-2: 실패 시 버튼 시각적 피드백 (timer 누적 방지)
       if (btn) {
         btn.style.color = 'var(--danger)';
         btn.title = '새로고침 실패 — 잠시 후 다시 시도하세요';
-        setTimeout(() => { btn.style.color = ''; btn.title = '새로고침'; }, 3000);
+        clearTimeout(this._refreshErrTimer);
+        this._refreshErrTimer = setTimeout(() => {
+          btn.style.color = ''; btn.title = '새로고침';
+        }, 3000);
       }
     }
     finally {
@@ -197,14 +212,12 @@ const Header = {
   renderUser(username, role) {
     const nameEl = document.getElementById('headerUsername');
     const roleEl = document.getElementById('headerRole');
-    const roleLabel = {
-      worker:         '작업자',
-      facility_admin: '공장관리자',
-      super_admin:    '슈퍼관리자',
-      viewer:         '열람자',
-    };
     if (nameEl) nameEl.textContent = username ? `${username}님 환영합니다` : '-';
-    if (roleEl) roleEl.textContent = roleLabel[role] || '-';
+    if (roleEl) {
+      const label = ROLE_LABEL[role];
+      if (!label && role) console.warn('[Header] unknown role:', role);
+      roleEl.textContent = label || '-';
+    }
   },
 
   showAdminBtn(role) {

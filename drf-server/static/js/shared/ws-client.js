@@ -30,13 +30,20 @@ const WSClient = (function () {
     if (window.AppConfig && typeof window.AppConfig.wsUrl === 'function') {
       base = window.AppConfig.wsUrl(path);
     } else {
+      console.warn('[WSClient] AppConfig.wsUrl unavailable, using same-origin fallback for', path);
       base = path;
     }
-    if (opts && opts.attachToken && typeof Auth !== 'undefined') {
-      const token = Auth.getAccessToken();
-      if (token) {
-        const sep = base.includes('?') ? '&' : '?';
-        base += `${sep}token=${encodeURIComponent(token)}`;
+    if (opts && opts.attachToken) {
+      if (typeof Auth === 'undefined') {
+        console.warn('[WSClient] attachToken requested but Auth module not loaded');
+      } else {
+        const token = Auth.getAccessToken();
+        if (!token) {
+          console.warn('[WSClient] attachToken requested but no token in storage');
+        } else {
+          const sep = base.includes('?') ? '&' : '?';
+          base += `${sep}token=${encodeURIComponent(token)}`;
+        }
       }
     }
     return base;
