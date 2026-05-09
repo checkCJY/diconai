@@ -36,6 +36,7 @@ ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["127.0.0.1", "localhos
 INSTALLED_APPS = [
     # DRF
     "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",
     "drf_spectacular",
     "django.contrib.admin",
     "django.contrib.auth",
@@ -160,14 +161,20 @@ SPECTACULAR_SETTINGS = {
 }
 
 # ── Simple JWT ────────────────────────────────────────────
+# Phase 5: blacklist 도입 + access lifetime 단축 + refresh 회전
+# - access 1h: XSS 노출 시간 95% 감소 (24h → 1h). env로 운영별 조정 가능.
+# - ROTATE_REFRESH_TOKENS: refresh 사용 시 새 refresh 발급 (1회용)
+# - BLACKLIST_AFTER_ROTATION: 회전된 refresh는 blacklist 등록 → 재사용 차단
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(
-        hours=env.int("JWT_ACCESS_TOKEN_LIFETIME_HOURS", default=24)
+        hours=env.int("JWT_ACCESS_TOKEN_LIFETIME_HOURS", default=1)
     ),
     "REFRESH_TOKEN_LIFETIME": timedelta(
         days=env.int("JWT_REFRESH_TOKEN_LIFETIME_DAYS", default=30)
     ),
     "AUTH_HEADER_TYPES": ("Bearer",),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
 }
 
 # ── 백오피스 URL (관리자 메뉴 이동) ───────────────────────
