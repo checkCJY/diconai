@@ -355,5 +355,6 @@ apps/<app>/
 - [docs/conventions/dev_convention.md](docs/conventions/dev_convention.md) — 코딩 컨벤션
 - [docs/conventions/github_convention.md](docs/conventions/github_convention.md) — 이슈/PR/커밋 컨벤션
 - [docs/changelog/](docs/changelog/) — 페이즈별 변경 이력
+- [docs/refactor/waves/2026_05_09/CHANGES_REVIEW.md](docs/refactor/waves/2026_05_09/CHANGES_REVIEW.md) — **이번 브랜치 종합 변경 인벤토리** (5 카테고리 + 리뷰어 체크리스트)
 - [docs/refactor/waves/2026_05_09/TEAM_BRIEF.md](docs/refactor/waves/2026_05_09/TEAM_BRIEF.md) — 이번 브랜치 팀 공유용 진입 문서 (5분 cheatsheet 포함)
 - [docs/refactor/waves/2026_05_09/MIGRATION_GUIDE.md](docs/refactor/waves/2026_05_09/MIGRATION_GUIDE.md) — 머지·적용 5단계 + 트러블슈팅

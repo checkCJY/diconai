@@ -159,6 +159,7 @@ cd ../fastapi-server && python -m pytest -q     # fast 22 passed
 
 | 문서 | 한 줄 |
 |---|---|
+| [CHANGES_REVIEW.md](docs/refactor/waves/2026_05_09/CHANGES_REVIEW.md) | **🌟 종합 변경 인벤토리** (47 commits / 5 카테고리 / 리뷰어 체크리스트) |
 | [MIGRATION_GUIDE.md](docs/refactor/waves/2026_05_09/MIGRATION_GUIDE.md) | 머지·적용 5단계 (의존성/DB/env) |
 | [post_phase4_b_track_overview.md](docs/phases/post_phase4_b_track_overview.md) | Phase 1~4 + 회귀 + B 트랙 한 페이지 |
 | [team_decisions_summary.md](docs/phases/team_decisions_summary.md) | 33+건 의사결정 옵션·채택·근거 |
