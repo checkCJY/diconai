@@ -174,7 +174,7 @@ python -m dummies.position_dummy   # 작업자 4명 위치 (worker_id=1~4)
 | DRF Swagger UI | http://localhost:8000/api/schema/swagger-ui/ |
 | FastAPI Docs | http://localhost:8001/docs |
 
-> 전체 명령어 모음은 [docs/COMMANDS.md](docs/COMMANDS.md) 참고.
+> 전체 명령어 모음은 [docs/conventions/COMMANDS.md](docs/conventions/COMMANDS.md) 참고.
 
 ---
 
@@ -190,8 +190,10 @@ python -m dummies.position_dummy   # 작업자 4명 위치 (worker_id=1~4)
 | `DJANGO_LOG_LEVEL` | `INFO` | DEBUG/INFO/WARNING/ERROR |
 | `DATABASE_URL` | `postgres://user:pw@host:5432/db` | 미설정 시 SQLite (`db.sqlite3`) 폴백 |
 | `REDIS_URL` | `redis://localhost:6379/0` | Celery 브로커 + 캐시 |
-| `JWT_ACCESS_TOKEN_LIFETIME_HOURS` | `24` | JWT 액세스 토큰 만료 |
+| `JWT_ACCESS_TOKEN_LIFETIME_HOURS` | `24` | JWT 액세스 토큰 만료. **Phase 5 옵트인 활성화 시 `1` 권장** |
 | `JWT_REFRESH_TOKEN_LIFETIME_DAYS` | `30` | JWT 리프레시 토큰 만료 |
+| `JWT_SIGNING_KEY` | (빈 문자열) | **옵트인 (Phase 5)** — 빈 값 = `SECRET_KEY` 폴백. fastapi 와 동일 값 필수 |
+| `INTERNAL_SERVICE_TOKEN` | (빈 문자열) | **옵트인 (Phase 5)** — drf ingest + Celery → fastapi 인증 토큰 |
 | `ADMIN_BACKOFFICE_URL` | `/admin-panel/accounts-management/` | 어드민 백오피스 진입 URL |
 | `FASTAPI_INTERNAL_URL` | `http://127.0.0.1:8001` | Celery → FastAPI 알람 브리지 |
 | `FRONTEND_API_BASE_URL` | (빈 문자열) | 빈 값 = same-origin. 운영 시 별도 도메인 지정 |
@@ -203,18 +205,23 @@ python -m dummies.position_dummy   # 작업자 4명 위치 (worker_id=1~4)
 |---|---|---|
 | `LOG_LEVEL` | `INFO` | DEBUG/INFO/WARNING/ERROR |
 | `DRF_BASE_URL` | `http://localhost:8000` | DRF 호출용 |
-| `DRF_SERVICE_TOKEN` | (빈 문자열) | DRF 내부 인증 토큰. 빈 값이면 헤더 미부착 |
+| `DRF_SERVICE_TOKEN` | (빈 문자열) | fastapi → drf 호출 시 `Authorization: Bearer` 헤더 부착. **옵트인 활성화 시 `INTERNAL_SERVICE_TOKEN` 과 동일 값 필수** |
 | `DRF_REQUEST_TIMEOUT_SEC` | `5.0` | DRF 호출 타임아웃 |
+| `INTERNAL_SERVICE_TOKEN` | (빈 문자열) | **옵트인 (Phase 5)** — drf 가 보내는 헤더 검증용. drf 와 동일 값 |
+| `JWT_SIGNING_KEY` | (빈 문자열) | **옵트인 (Phase 5)** — WS JWT 검증용. drf 와 동일 값 |
+| `JWT_ALGORITHM` | `HS256` | JWT 서명 알고리즘. 기본값 그대로 사용 권장 |
 | `BROADCAST_INTERVAL_SEC` | `5.0` | 센서 WebSocket 브로드캐스트 주기 |
 | `DATA_STALE_THRESHOLD_SEC` | `8.0` | 데이터 미수신 판정 임계 |
-| `POWER_THRESHOLD_CAUTION` | `2200` | 전력 주의 임계 (W) — DRF 상수와 동일 값 유지 |
-| `POWER_THRESHOLD_DANGER` | `2860` | 전력 위험 임계 (W) — DRF 상수와 동일 값 유지 |
+| `POWER_THRESHOLD_CAUTION` | `2200` | (Phase 4 이후 deprecated — DB `Threshold` 모델로 이전, fallback 폴백용으로만 유지) |
+| `POWER_THRESHOLD_DANGER` | `2860` | (위와 동일) |
 | `DUMMY_TARGET_HOST` | `127.0.0.1` | 더미 송출 대상 호스트 |
 | `DUMMY_TARGET_PORT` | `8001` | 더미 송출 대상 포트 |
 | `DUMMY_SEND_INTERVAL_SEC` | `1.0` | 더미 송출 주기 (초) |
 | `DUMMY_RISK_PROBABILITY` | `0.1` | 더미 위험 발생 확률 (0~1) |
 
 > 모든 변수는 [drf-server/.env.example](drf-server/.env.example), [fastapi-server/.env.example](fastapi-server/.env.example)에 동일한 키/기본값으로 정의되어 있습니다 — `cp .env.example .env` 후 필요한 값만 수정하세요.
+>
+> **이번 브랜치 적용 가이드**: 5분 cheatsheet [docs/refactor/waves/2026_05_09/TEAM_BRIEF.md §2-bis](docs/refactor/waves/2026_05_09/TEAM_BRIEF.md), 머지·운영자용 상세 절차 [docs/refactor/waves/2026_05_09/MIGRATION_GUIDE.md](docs/refactor/waves/2026_05_09/MIGRATION_GUIDE.md). Phase 5 옵트인 활성화 매트릭스는 TEAM_BRIEF §6 참조.
 
 ---
 
@@ -245,7 +252,7 @@ python -m dummies.position_dummy   # 작업자 4명 위치 (worker_id=1~4)
 | WS | `/ws/positions/` | 작업자 위치 스트림 (1초 주기) |
 | WS | `/ws/worker/{user_id}/` | 개인 작업자 푸시 |
 
-> 전체 엔드포인트는 [docs/api_specification.md](docs/api_specification.md) 문서, 또는 서버 실행 후 다음 두 곳에서 확인할 수 있습니다.
+> 전체 엔드포인트는 [docs/specs/api_specification.md](docs/specs/api_specification.md) 문서, 또는 서버 실행 후 다음 두 곳에서 확인할 수 있습니다.
 >
 > - **DRF Swagger UI** — http://localhost:8000/api/schema/swagger-ui/
 > - **FastAPI Docs** — http://localhost:8001/docs
@@ -305,8 +312,8 @@ apps/<app>/
 └── views/         # 요청 → 서비스 호출 → 응답 (로직 금지)
 ```
 
-> 디렉토리 상세는 [docs/directory-structure.md](docs/directory-structure.md),
-> 코딩 컨벤션은 [docs/dev_convention.md](docs/dev_convention.md) 참고.
+> 디렉토리 상세는 [docs/specs/directory-structure.md](docs/specs/directory-structure.md),
+> 코딩 컨벤션은 [docs/conventions/dev_convention.md](docs/conventions/dev_convention.md) 참고.
 
 ---
 
@@ -343,8 +350,10 @@ apps/<app>/
 
 ## 📚 관련 문서
 
-- [docs/api_specification.md](docs/api_specification.md) — API 상세 명세
-- [docs/url-structure.md](docs/url-structure.md) — 전체 URL 맵
-- [docs/dev_convention.md](docs/dev_convention.md) — 코딩 컨벤션
-- [docs/github_convention.md](docs/github_convention.md) — 이슈/PR/커밋 컨벤션
+- [docs/specs/api_specification.md](docs/specs/api_specification.md) — API 상세 명세
+- [docs/specs/url-structure.md](docs/specs/url-structure.md) — 전체 URL 맵
+- [docs/conventions/dev_convention.md](docs/conventions/dev_convention.md) — 코딩 컨벤션
+- [docs/conventions/github_convention.md](docs/conventions/github_convention.md) — 이슈/PR/커밋 컨벤션
 - [docs/changelog/](docs/changelog/) — 페이즈별 변경 이력
+- [docs/refactor/waves/2026_05_09/TEAM_BRIEF.md](docs/refactor/waves/2026_05_09/TEAM_BRIEF.md) — 이번 브랜치 팀 공유용 진입 문서 (5분 cheatsheet 포함)
+- [docs/refactor/waves/2026_05_09/MIGRATION_GUIDE.md](docs/refactor/waves/2026_05_09/MIGRATION_GUIDE.md) — 머지·적용 5단계 + 트러블슈팅
