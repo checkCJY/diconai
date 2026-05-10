@@ -28,8 +28,11 @@ async function initApp() {
 // ──────────────────────────────────────────────────────────
 async function loadMySafetyStatus() {
   try {
-    const res = await fetch('/dashboard/api/safety-status/');
-    if (!res.ok) return;
+    const res = await Auth.apiFetch('/dashboard/api/safety-status/');
+    if (!res.ok) {
+      console.warn('[loadMySafetyStatus] http error:', res.status);
+      return;
+    }
     const data = await res.json();
 
     const checklistEl = document.getElementById('safety-checklist-status');

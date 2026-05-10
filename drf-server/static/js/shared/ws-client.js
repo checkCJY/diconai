@@ -3,7 +3,7 @@
    ==========================================================
    - URL은 AppConfig.WS_BASE를 자동 prefix (path만 넘기면 됨).
    - 동일 path의 연결은 캐시되어 한 페이지에서 중복 연결되지 않는다.
-   - 자동 재연결(기본 3초). onclose 후 재시도.
+   - 자동 재연결: 지수 백오프 (1s → 2s → ... → 30s 상한, ±30% 지터). 최대 20회 후 포기.
    - 콜백은 add/remove로 다중 구독 가능 (한 ws가 여러 핸들러에 분배).
    - 라이프사이클 콜백(onOpen/onClose/onError)도 다중 구독 지원.
 
@@ -24,7 +24,12 @@
 'use strict';
 
 const WSClient = (function () {
-  const RECONNECT_DELAY = 3000;
+  // 지수 백오프: 1s → 2s → 4s → ... → 30s 상한, ±30% 지터로 분산.
+  // MAX_ATTEMPTS 도달 시 재연결 포기 → onError("max_reconnect_attempts").
+  const INITIAL_DELAY = 1000;
+  const MAX_DELAY     = 30000;
+  const MAX_ATTEMPTS  = 20;
+  const JITTER        = 0.3;
   const _cache = new Map(); // key: full URL → instance
 
   function _resolveUrl(path, opts) {
@@ -64,6 +69,7 @@ const WSClient = (function () {
     let ws = null;
     let closed = false;
     let reconnectTimer = null;
+    let attempts = 0;
 
     function _dispatch(set, ...args) {
       set.forEach((fn) => {
@@ -71,17 +77,31 @@ const WSClient = (function () {
       });
     }
 
+    function _scheduleReconnect() {
+      if (closed) return;
+      attempts += 1;
+      if (attempts > MAX_ATTEMPTS) {
+        console.warn('[WSClient] max reconnect attempts reached for', path);
+        _dispatch(errorHandlers, new Error('max_reconnect_attempts'));
+        return;
+      }
+      const base = Math.min(INITIAL_DELAY * Math.pow(2, attempts - 1), MAX_DELAY);
+      const delay = base * (1 + (Math.random() - 0.5) * JITTER);
+      reconnectTimer = setTimeout(_open, delay);
+    }
+
     function _open() {
       try {
         ws = new WebSocket(url);
       } catch (e) {
         _dispatch(errorHandlers, e);
-        if (!closed) {
-          reconnectTimer = setTimeout(_open, opts.reconnectDelay || RECONNECT_DELAY);
-        }
+        _scheduleReconnect();
         return;
       }
-      ws.onopen = function () { _dispatch(openHandlers); };
+      ws.onopen = function () {
+        attempts = 0; // 정상 연결 → 백오프 리셋
+        _dispatch(openHandlers);
+      };
       ws.onmessage = function (event) {
         let data;
         try { data = JSON.parse(event.data); } catch { return; }
@@ -93,8 +113,7 @@ const WSClient = (function () {
       };
       ws.onclose = function (e) {
         _dispatch(closeHandlers, e);
-        if (closed) return;
-        reconnectTimer = setTimeout(_open, opts.reconnectDelay || RECONNECT_DELAY);
+        _scheduleReconnect();
       };
     }
 

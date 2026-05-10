@@ -29,6 +29,9 @@ class AlarmPayload(BaseModel):
     measured_value: float | None = None
     threshold_value: float | None = None
     worker_id: int | None = None  # 지오펜스 알람 시 타겟 작업자
+    # 서버(DRF Celery) 발신 시각 — 클라이언트가 우선 사용 (JS 03 R3).
+    # 누락 시 클라이언트는 도착 시각(new Date())으로 fallback.
+    created_at: str | None = None
 
 
 @router.post(

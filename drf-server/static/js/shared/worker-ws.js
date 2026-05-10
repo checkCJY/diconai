@@ -13,14 +13,7 @@
     ws.onMessage(function (data) {
       if (data.type !== 'worker_alert') return;
 
-      const alarmData = {
-        alarm_level:  data.risk_level,
-        is_new_event: data.is_new_event,
-        message:      data.summary,
-        sensor_name:  data.source_label,
-        timestamp:    new Date().toISOString(),
-        event_id:     data.event_id,
-      };
+      const alarmData = AlarmMapper.fromWorkerAlert(data);
       if (typeof AlarmPopup !== 'undefined') {
         AlarmPopup.show(alarmData);
         document.dispatchEvent(new CustomEvent('newAlarmEvent', { detail: alarmData }));

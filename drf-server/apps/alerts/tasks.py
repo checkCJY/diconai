@@ -47,7 +47,15 @@ def _push_to_ws(alarm_data: dict) -> None:
     호출 결과(성공/실패)를 Celery task delay()로 비동기 INSERT.
     이전: ORM 직접 create (web pod 부담). 이후: Celery worker 분리 → web latency 0.
     broker 다운 시 silent fail — 본 흐름 비차단.
+
+    [created_at 주입 — JS 03 R3]
+    호출자가 명시하지 않으면 이 시점(UTC ISO-8601)을 알람 생성 시각으로 기록.
+    클라이언트는 매퍼에서 이 값을 우선 사용 (fallback: new Date()).
     """
+    from datetime import datetime, timezone
+
+    alarm_data.setdefault("created_at", datetime.now(timezone.utc).isoformat())
+
     headers = {}
     token = getattr(settings, "INTERNAL_SERVICE_TOKEN", "") or ""
     if token:

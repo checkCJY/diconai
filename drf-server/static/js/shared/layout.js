@@ -60,11 +60,21 @@ const Menu = {
       const btn = document.createElement('button');
       btn.className = 'snb-depth1-btn';
       btn.setAttribute('data-id', menu.id);
-      btn.innerHTML = `
-        <span class="menu-icon">${icon}</span>
-        <span class="menu-label">${menu.label}</span>
-        ${hasChildren ? '<span class="menu-arrow">▶</span>' : ''}
-      `;
+      // 사용자 데이터(menu.label)는 textContent로 안전 처리. icon은 인하우스 정의 SVG/텍스트만.
+      const iconSpan = document.createElement('span');
+      iconSpan.className = 'menu-icon';
+      iconSpan.innerHTML = icon;
+      btn.appendChild(iconSpan);
+      const labelSpan = document.createElement('span');
+      labelSpan.className = 'menu-label';
+      labelSpan.textContent = menu.label;
+      btn.appendChild(labelSpan);
+      if (hasChildren) {
+        const arrowSpan = document.createElement('span');
+        arrowSpan.className = 'menu-arrow';
+        arrowSpan.textContent = '▶';
+        btn.appendChild(arrowSpan);
+      }
       li.appendChild(btn);
 
       if (hasChildren) {
@@ -75,7 +85,12 @@ const Menu = {
         menu.children.forEach((child) => {
           const subLi = document.createElement('li');
           const isActive = this.currentPath === child.path;
-          subLi.innerHTML = `<a href="${child.path}" class="${isActive ? 'active' : ''}" data-path="${child.path}">${child.label}</a>`;
+          const a = document.createElement('a');
+          a.href = child.path;
+          if (isActive) a.classList.add('active');
+          a.dataset.path = child.path;
+          a.textContent = child.label;
+          subLi.appendChild(a);
           subUl.appendChild(subLi);
         });
         li.appendChild(subUl);
