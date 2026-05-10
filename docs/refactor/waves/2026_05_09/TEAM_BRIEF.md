@@ -26,6 +26,64 @@
 
 ---
 
+## 2-bis. 5분 Apply Cheatsheet — 팀원 즉시 적용용
+
+> 이 섹션만 보고도 머지 후 적용 끝낼 수 있도록 정리. 상세 옵션·문제 해결은 §6 / [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md).
+
+### 적용 명령 (pull 후 4단계)
+
+```bash
+# 1) 의존성 갱신 (drf + fastapi 양쪽)
+cd drf-server      && uv pip install -r requirements.txt && cd ..
+cd fastapi-server  && uv pip install -r requirements.txt && cd ..
+
+# 2) DB 마이그레이션 (drf 만 — Phase 1~4 + B 트랙 + token_blacklist 13개)
+cd drf-server && python manage.py migrate
+
+# 3) 검증
+python -m pytest -q                             # drf  62 passed
+cd ../fastapi-server && python -m pytest -q     # fast 22 passed
+
+# 4) 양 서버 + Celery 재시작
+```
+
+### 주요 변경 (한 줄씩)
+
+- **신규 앱 5개** — `dashboard` / `notices` / `operations` / `reference` / `training` (모델만 신설, 운영 진입 시 즉시 동작)
+- **신규 모델 28개** — `BaseModel` / `AlertPolicy` / `Threshold` / `Menu` / `DataRetentionPolicy` 등 → 어드민에서 편집 가능
+- **임계치 DB 일원화** — 가스/전력 임계치가 상수 → DB `Threshold` 모델 (facility 별 정책 가능)
+- **알림 정책 시스템** — `AlertPolicy` + 9종 시드: Event 발생 시 자동 매칭 → Notification 생성
+- **JWT 보안 강화 (옵트인)** — blacklist + ROTATE + access lifetime 1h (env 미설정 시 기존 동작)
+- **WS 인증 (옵트인)** — `/ws/sensors/`, `/ws/worker/{id}/` JWT 검증
+- **알람 파이프라인 정리** — `alarm-mapper.js` 추출 + `AlarmPopup` 그룹핑 + 서버 timestamp
+
+### 신규 .env 변수 (모두 옵트인 — 빈 값이면 비활성)
+
+| 변수 | drf | fastapi | 효과 |
+|---|:---:|:---:|---|
+| `INTERNAL_SERVICE_TOKEN` | ✅ | ✅ | drf ingest + fastapi alarm-push 양방향 토큰 |
+| `JWT_SIGNING_KEY` | ✅ | ✅ | WS JWT 검증 (drf 의 `SIGNING_KEY` 와 동일 값) |
+| `DRF_SERVICE_TOKEN` | — | ✅ | fastapi → drf 호출 시 헤더 부착 (= `INTERNAL_SERVICE_TOKEN`) |
+| `JWT_ACCESS_TOKEN_LIFETIME_HOURS` | ✅ | — | 기본 24, 활성화 시 1~4 권장 |
+
+> ⚠️ **양쪽 동일 값 필수**. 한쪽만 설정 시 모든 통신 차단. 활성화 절차는 §6.
+
+### 작동 시 주의점 4가지
+
+1. **마이그 비가역** — `token_blacklist` 13개 마이그. 운영 적용 시 백업 후 진행
+2. **기존 refresh 토큰 재로그인 필요** — `ROTATE_REFRESH_TOKENS=True` 활성 시 기존 토큰 1회 사용 후 무효화. 사전 공지
+3. **양 서버 + Celery 동시 재시작** — 토큰 옵트인 켤 때 한쪽만 재시작 시 통신 끊김
+4. **WS access log token 노출 가능** — `?token=...` 쿼리 파라미터. 운영 시 access log filter 또는 WARN 레벨 권장
+
+### 더 자세한 가이드
+
+- 적용 절차 상세: [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md) (Step 1~5 + 트러블슈팅)
+- 옵트인 활성화 매트릭스 + 5분 절차: 본 문서 §6
+- 변경 사유·설계 배경: [wave_1.md](wave_1.md) / [wave_2.md](wave_2.md) / [wave_3.md](wave_3.md) / [wave_4.md](wave_4.md)
+- JS 권고 60건 적용 현황: 본 문서 §7
+
+---
+
 ## 3. 5단계 흐름 — 왜 이 순서였는가
 
 각 단계가 직전 단계의 변경을 검증·보강합니다.
