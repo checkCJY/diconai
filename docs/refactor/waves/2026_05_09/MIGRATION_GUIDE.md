@@ -179,28 +179,65 @@ JWT_SIGNING_KEY=<위에서 생성한 두 번째 값>
 JWT_ACCESS_TOKEN_LIFETIME_HOURS=1   # 1h가 무리면 2~4h로 조정 가능
 ```
 
-**c) fastapi-server/.env 추가**:
+**c) fastapi-server/.env 추가/수정**:
 ```bash
 INTERNAL_SERVICE_TOKEN=<drf와 동일 값>
 JWT_SIGNING_KEY=<drf와 동일 값>
 # JWT_ALGORITHM은 기본 HS256, 변경 불필요
+
+# ⚠️ 기존 DRF_SERVICE_TOKEN(빈 문자열)도 같은 값으로 채워야 함.
+# fastapi → drf 호출(가스/전력 ingest)에서 Authorization 헤더로 부착되는 값으로,
+# 비워두면 옵트인 켠 drf가 401 반환 → 알람/모니터링 흐름 끊김.
+DRF_SERVICE_TOKEN=<drf의 INTERNAL_SERVICE_TOKEN과 동일 값>
 ```
 
 > ⚠️ **양 서비스 동일 값 필수**. 한쪽만 설정 시 인증 실패 → 모든 통신 차단.
+>
+> ⚠️ **fastapi 측 토큰 변수 2개 모두 채울 것** (`INTERNAL_SERVICE_TOKEN` = 인입 검증용 / `DRF_SERVICE_TOKEN` = drf로 나갈 때 헤더 부착용). 단일 토큰 운영이면 둘 다 같은 값.
 
 ### Step 4. 양 서버 재시작 (env 변경 반영)
 
+> 양쪽 동시 재시작 권장 (옵트인 활성화는 양쪽 동시에 켜져야 함).
+> Celery는 drf-server의 venv를 사용 (`apps/alerts/tasks.py`에서 토큰 헤더 사용).
+
+#### 4-A. 로컬 개발 (uv)
+
+각 서버 venv가 분리돼 있으므로 **터미널 3개**에서 각각 실행:
+
 ```bash
-# 양쪽 동시 재시작 권장 (옵트인 활성화는 양쪽 동시에 켜져야 함)
-# drf-server
-sudo systemctl restart drf-server  # 또는 운영 환경별 재시작 명령
+# 터미널 1: drf-server
+cd drf-server
+source .venv/bin/activate
+python manage.py runserver 0.0.0.0:8000
 
-# fastapi-server
+# 터미널 2: fastapi-server
+cd fastapi-server
+source .venv/bin/activate
+uvicorn app:app --reload --port 8001
+
+# 터미널 3: celery (drf-server venv)
+cd drf-server
+source .venv/bin/activate
+celery -A config worker -l info
+```
+
+또는 `uv run`으로 activate 생략:
+
+```bash
+cd drf-server     && uv run manage.py runserver 0.0.0.0:8000
+cd fastapi-server && uv run uvicorn app:app --reload --port 8001
+cd drf-server     && uv run celery -A config worker -l info
+```
+
+#### 4-B. 운영 (systemd 등 프로세스 매니저)
+
+```bash
+sudo systemctl restart drf-server
 sudo systemctl restart fastapi-server
-
-# Celery (drf의 alerts/tasks.py에서 토큰 헤더 사용)
 sudo systemctl restart celery-worker
 ```
+
+> 서비스 유닛명은 환경에 따라 다를 수 있음. supervisor/pm2 등을 쓰는 경우 해당 매니저의 restart 명령으로 대체.
 
 ### Step 5. 회귀 검증
 
