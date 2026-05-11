@@ -11,6 +11,7 @@ revision_data를 읽어 렌더 (결정문 §3c-4 패턴).
 
 from django.db import transaction
 from django.db.models import F, Max
+from django.utils import timezone
 
 from apps.core.models import SystemLog
 from apps.safety.models import (
@@ -73,12 +74,26 @@ def update_section(
 
 @transaction.atomic
 def soft_delete_section(section: SafetyCheckSection, updated_by=None) -> None:
-    """섹션 + 하위 활성 문항 일괄 비활성화."""
+    """
+    섹션 + 하위 활성 문항 일괄 비활성화.
+
+    [감사 추적성]
+    동일 timestamp(`now`)를 섹션과 하위 문항 모두에 적용해, "어느 시점에 함께
+    비활성화됐는지"를 명확히 남긴다. 이전 구현은 items 업데이트 시점에 section의
+    deactivated_at이 아직 None이라 하위 문항이 NULL로 비활성화되는 버그가 있었음.
+    """
+    now = timezone.now()
     SafetyCheckItem.objects.filter(section=section, is_active=True).update(
         is_active=False,
-        deactivated_at=section.deactivated_at or None,
+        deactivated_at=now,
     )
-    section.deactivate(updated_by=updated_by)
+    section.is_active = False
+    section.deactivated_at = now
+    if updated_by is not None:
+        section.updated_by = updated_by
+    section.save(
+        update_fields=["is_active", "deactivated_at", "updated_at", "updated_by"]
+    )
 
 
 @transaction.atomic
