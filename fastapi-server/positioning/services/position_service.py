@@ -37,6 +37,7 @@ async def save_positions_to_drf(
             "y": p.y,
             "movement_status": p.movement_status,
             "measured_at": p.measured_at.isoformat(),
+            "node_id": p.node_id,
         }
         for p in positions
     ]

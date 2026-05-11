@@ -335,8 +335,9 @@ class LogoutView(APIView):
     """
     POST /api/auth/logout/
 
-    로그아웃 이력을 LoginLog에 기록하고 세션을 초기화.
-    JWT는 stateless이므로 클라이언트에서 토큰을 직접 폐기해야 한다.
+    로그아웃 이력을 LoginLog에 기록 + 세션 초기화 + (Phase 5) refresh 토큰 블랙리스트.
+    클라이언트는 body에 `refresh` 토큰을 동봉해야 서버 측 폐기가 가능하다.
+    refresh가 누락·무효해도 200을 반환 (UX) — 클라이언트는 access/refresh를 직접 정리해야 한다.
     """
 
     permission_classes = [IsAuthenticated]
@@ -345,10 +346,14 @@ class LogoutView(APIView):
         tags=["Auth"],
         summary="로그아웃",
         description=(
-            "LoginLog에 LOGOUT 이력 기록 + Django 세션 초기화. "
-            "JWT는 stateless라 서버 측에서 토큰을 폐기하지 않으므로 클라이언트가 직접 토큰을 삭제해야 한다."
+            "LoginLog에 LOGOUT 이력 기록 + Django 세션 초기화 + refresh 토큰 블랙리스트(옵션).\n\n"
+            "**body** `{ refresh: <token> }` 동봉 시 서버 측에서 refresh를 무효화한다 "
+            "(SIMPLE_JWT.BLACKLIST_AFTER_ROTATION 설정 필요). 누락·무효 시도 200 반환."
         ),
-        request=None,
+        request=inline_serializer(
+            name="LogoutRequest",
+            fields={"refresh": serializers.CharField(required=False)},
+        ),
         responses={
             200: inline_serializer(
                 name="LogoutOk", fields={"ok": serializers.BooleanField()}
@@ -364,5 +369,17 @@ class LogoutView(APIView):
             ip_address=_get_client_ip(request),
             user_agent=request.META.get("HTTP_USER_AGENT", "")[:300],
         )
+
+        # Phase 5: refresh 토큰 블랙리스트 (body에 동봉된 경우만)
+        refresh_token = (
+            request.data.get("refresh") if isinstance(request.data, dict) else None
+        )
+        if refresh_token:
+            try:
+                RefreshToken(refresh_token).blacklist()
+            except Exception:
+                # 잘못된 토큰·만료·이미 블랙리스트 → 무시 (UX 우선)
+                pass
+
         request.session.flush()
         return Response({"ok": True})

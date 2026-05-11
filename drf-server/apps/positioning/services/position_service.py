@@ -128,11 +128,16 @@ def handle_position_receive(
     y: float,
     movement_status: str,
     measured_at,
+    node_id: str | None = None,
 ) -> dict:
     """
     FastAPI로부터 위치 데이터 수신
     → 지오펜스 30픽셀 이내 접근 시에만 DB 저장
     → 그 외는 저장 안 함 (WebSocket 표시만)
+
+    [node_id — Phase 3-a]
+    PositionNode.device_id 문자열. lookup 실패 시 received_node=None으로 저장
+    (데이터 손실보다 NULL 허용 우선).
 
     반환: {
         "worker_id": int,
@@ -150,6 +155,15 @@ def handle_position_receive(
             "zone_name": None,
         }
 
+    # PositionNode lookup (node_id 미수신 또는 미존재 → None)
+    received_node = None
+    if node_id:
+        from apps.facilities.models import PositionNode
+
+        received_node = PositionNode.objects.filter(
+            device_id=node_id, is_active=True
+        ).first()
+
     # 근접 시에만 저장
     pos = WorkerPosition.objects.create(
         worker_id=worker_id,
@@ -158,6 +172,7 @@ def handle_position_receive(
         y=y,
         movement_status=movement_status,
         measured_at=measured_at,
+        received_node=received_node,
     )
 
     # 구역 캐시 갱신

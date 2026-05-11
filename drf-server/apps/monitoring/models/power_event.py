@@ -2,8 +2,10 @@
 from django.core.exceptions import ValidationError
 from django.db import models
 
+from apps.core.models.base import BaseModel
 
-class PowerEvent(models.Model):
+
+class PowerEvent(BaseModel):
     """
     16채널 ON/OFF 상태 스냅샷 — 이벤트성 기록
 
@@ -64,7 +66,7 @@ class PowerEvent(models.Model):
     # 장치 측정 시각 — PowerData.measured_at과 JOIN 기준 통일
     # null=True: 0002 마이그레이션 이전 기존 row 호환
     measured_at = models.DateTimeField(verbose_name="측정 시각")
-    created_at = models.DateTimeField(auto_now_add=True)
+    # created_at / updated_at / updated_by 는 BaseModel 상속
 
     @staticmethod
     def validate_snapshot(data: dict) -> None:

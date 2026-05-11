@@ -4,6 +4,7 @@ from django.db import models
 from django.utils import timezone
 
 from apps.core.constants import RiskLevel
+from apps.core.models.base import BaseModel
 
 
 def validate_polygon(data):
@@ -19,7 +20,7 @@ def validate_polygon(data):
             raise ValidationError(f"{i}번째 꼭짓점에 숫자가 아닌 값이 있습니다.")
 
 
-class GeoFence(models.Model):
+class GeoFence(BaseModel):
     """
     위험구역 다각형 — 서버 판정 로직의 기준 데이터
 
@@ -74,8 +75,7 @@ class GeoFence(models.Model):
     description = models.TextField(blank=True, default="", verbose_name="설명")
     is_active = models.BooleanField(default=True)
     deactivated_at = models.DateTimeField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    # created_at / updated_at / updated_by 는 BaseModel 상속
 
     def contains_point(self, x: float, y: float) -> bool:
         """좌표 (x, y)가 이 polygon 내부에 있는지 판정 (Ray casting)"""

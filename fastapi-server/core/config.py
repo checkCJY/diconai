@@ -18,6 +18,17 @@ class Settings(BaseSettings):
     DRF_SERVICE_TOKEN: str = ""  # 빈 문자열이면 Authorization 헤더 미포함
     DRF_REQUEST_TIMEOUT_SEC: float = 5.0
 
+    # ── 서비스 간 인증 토큰 (Phase 5) ──────────────────────────
+    # /internal/alarms/push/ (Celery → FastAPI) 검증용. 빈 문자열이면 비활성.
+    # 운영에서는 drf의 INTERNAL_SERVICE_TOKEN과 동일 값으로 설정.
+    INTERNAL_SERVICE_TOKEN: str = ""
+
+    # ── WebSocket JWT 인증 (Phase 5) ──────────────────────────
+    # drf SimpleJWT가 발급한 access 토큰을 같은 SIGNING_KEY로 검증.
+    # 빈 문자열이면 비활성 (기존 무인증 동작 유지). 운영에서는 drf의 JWT_SIGNING_KEY와 동일 값.
+    JWT_SIGNING_KEY: str = ""
+    JWT_ALGORITHM: str = "HS256"  # drf SimpleJWT 기본 알고리즘과 일치
+
     # ── WebSocket 브로드캐스트 ─────────────────────────────────
     # 메인 broadcast 주기. 너무 짧으면 클라이언트 부하 증가.
     BROADCAST_INTERVAL_SEC: float = 5.0
@@ -25,7 +36,9 @@ class Settings(BaseSettings):
     DATA_STALE_THRESHOLD_SEC: float = 8.0
 
     # ── 전력 임계치 (단위: W, Phase A 기준) ──────────────────────
-    # DRF apps.core.constants.POWER_THRESHOLDS와 동일 값을 유지해야 한다.
+    # 표시용 fallback. 실제 알람 판정은 DRF가 수행 (단일 진실 공급원: DRF
+    # facilities.Threshold(group="power_default", item="power_w")). 어드민에서 변경 시
+    # 본 env도 동기화 의무 (운영 진입 시 DRF API fetch 캐시 검토).
     POWER_THRESHOLD_CAUTION: int = 2200
     POWER_THRESHOLD_DANGER: int = 2860
 

@@ -21,9 +21,7 @@
 
 'use strict';
 
-// ── 전력 테이블 위험도 레이블·클래스 상수 ───────────────────
-const _riskLabel = { normal: '정상', warning: '주의', danger: '위험' };
-const _riskClass = { normal: 'safe', warning: 'caution', danger: 'danger' };
+// ── 전력 테이블 위험도 레이블·클래스 상수 (LevelMapper 위임 — 05 R3) ─
 
 // ── AI 가스 네비게이션 상태 ──────────────────────────────────
 const _GAS_META = [
@@ -37,7 +35,6 @@ const _GAS_META = [
   { key: 'nh3', name: 'NH₃ (암모니아)',         unit: 'ppm' },
   { key: 'voc', name: 'VOC (휘발성유기화합물)', unit: 'ppm' },
 ];
-const _RISK_LABEL = { danger: '위험', warning: '주의', normal: '정상', safe: '정상' };
 
 let _aiGasIdx  = 0;           // 현재 선택된 가스 인덱스
 let _aiGasData = {};          // 최근 수신 가스 데이터 캐시
@@ -180,9 +177,9 @@ function _renderPowerRow(eq) {
 
   const riskBadge = isComm
     ? '<span class="brisk gray">-</span>'
-    : `<span class="brisk ${_riskClass[eq.risk_level] || 'safe'}">${_riskLabel[eq.risk_level] || '-'}</span>`;
+    : `<span class="brisk ${LevelMapper.toCssClass(eq.risk_level)}">${LevelMapper.toLabel(eq.risk_level)}</span>`;
 
-  const rowClass = isComm ? '' : ` class="risk-row risk-${_riskClass[eq.risk_level] || 'safe'}"`;
+  const rowClass = isComm ? '' : ` class="risk-row risk-${LevelMapper.toCssClass(eq.risk_level)}"`;
 
   return `<tr${rowClass}>
     <td>${eq.name}</td>
@@ -267,7 +264,7 @@ function initWebSocket() {
   // shared/ws-client.js의 WSClient를 사용해 alarm-ws.js와 동일 엔드포인트
   // 중복 연결을 방지한다.
   function connect() {
-    const ws = WSClient.connect('/ws/sensors/');
+    const ws = WSClient.connect('/ws/sensors/', { attachToken: true });
 
     ws.onOpen(() => {
       setWsStatus('● 실시간 연결', 'connected');
@@ -296,18 +293,18 @@ function initWebSocket() {
         const gasWorstRisk = document.getElementById('gasWorstRisk');
         if (gasWorstName) gasWorstName.textContent = worstGas ? worstGas.name : '이상 없음';
         if (gasWorstRisk) {
-          gasWorstRisk.textContent = _RISK_LABEL[worstRisk];
-          gasWorstRisk.className   = worstRisk === 'normal' ? 'safe-text' : `${worstRisk}-text`;
+          gasWorstRisk.textContent = LevelMapper.toLabel(worstRisk);
+          gasWorstRisk.className   = `${LevelMapper.toCssClass(worstRisk)}-text`;
         }
 
         // 가스 리스트 테이블 갱신
         gasTableBody.innerHTML = _GAS_META.map(g => {
           const val      = data[g.key] ?? '-';
           const risk     = data[`${g.key}_risk`] || 'normal';
-          const riskCls  = _riskClass[risk] || 'safe';   // normal → safe, warning → caution
+          const riskCls  = LevelMapper.toCssClass(risk);   // normal → safe, warning → caution
           return `<tr class="gas-row ${riskCls}">
             <td>${g.name}</td><td>${val}</td><td>${g.unit}</td>
-            <td><span class="brisk ${riskCls}">${_RISK_LABEL[risk] || risk}</span></td>
+            <td><span class="brisk ${riskCls}">${LevelMapper.toLabel(risk)}</span></td>
           </tr>`;
         }).join('');
       }
@@ -407,15 +404,7 @@ function initWebSocket() {
       if (Array.isArray(data.alarms) && data.alarms.length > 0) {
         console.log('[알람 수신]', data.alarms.map(a => `${a.risk_level}(new=${a.is_new_event})`));
         data.alarms.forEach(alarm => {
-          const alarmData = {
-            alarm_level:  alarm.risk_level,
-            is_new_event: alarm.is_new_event,
-            message:      alarm.summary,
-            sensor_name:  alarm.source_label,
-            timestamp:    new Date().toISOString(),
-            gas_type:     alarm.gas_type,
-            event_id:     alarm.event_id,
-          };
+          const alarmData = AlarmMapper.fromSensorsAlarm(alarm);
           // 새 이벤트(danger/warning)만 중앙 팝업 — 조치완료 전 동일 이벤트 재발화는 팝업 없음
           if (alarm.is_new_event) AlarmPopup.show(alarmData);
           // 정상화는 우하단 토스트
@@ -446,7 +435,7 @@ function initWebSocket() {
   // sensors 페이로드에도 worker_positions가 포함되어 있으나,
   // 이 채널은 위치 전용 고빈도 갱신을 위해 분리 운영한다.
   function connectPositions() {
-    const wsPos = WSClient.connect('/ws/positions/');
+    const wsPos = WSClient.connect('/ws/positions/', { attachToken: true });
     wsPos.onMessage((data) => {
       if (data.worker_positions && typeof MapPanel.updateWorkerPositions === 'function') {
         MapPanel.updateWorkerPositions(data.worker_positions);

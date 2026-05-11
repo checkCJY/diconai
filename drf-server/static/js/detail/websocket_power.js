@@ -118,7 +118,7 @@ function initPowerWebSocket() {
     /* 로딩 중: 스켈레톤 표시 */
     showSkeleton(grid, 8);
 
-    const ws = WSClient.connect('/ws/sensors/');
+    const ws = WSClient.connect('/ws/sensors/', { attachToken: true });
 
     ws.onMessage((data) => {
       const equipment = data.equipment ?? [];

@@ -7,6 +7,19 @@ gas/power/positioning service에서 중복으로 작성하던 httpx POST 호출 
     True  → ConnectError/TimeoutException/4xx/5xx 시 DrfClientError 예외 발생 (gas: 센서에 4xx/5xx 응답 필요)
     False → 실패해도 None 반환, 호출자가 후속 흐름 계속 (power/positioning: 비동기 fire-and-forget)
 어떤 경우든 실패는 logger.warning/error로 남긴다.
+
+[IntegrationLog 기록 — Phase 2-e + PR-D 갱신]
+post_to_drf 호출 결과를 DRF의 /api/internal/integration-logs/ 엔드포인트로 1건 기록.
+fire-and-forget — 기록 실패해도 본 흐름 비차단(silent fail). httpx.AsyncClient를
+BackgroundTask 패턴으로 사용 — fastapi 응답 latency 영향 0.
+재귀 회피: INTEGRATION_LOG_PATH 호출 자체는 IntegrationLog 기록 안 함.
+
+[PR-D: DRF 측은 Celery 비동기 INSERT로 전환됨 — apps/operations/tasks/integration_log_task.py]
+fastapi 측은 이미 async fire-and-forget이라 web latency 영향 없음. 단일 진실 공급원
+정책상 fastapi → DRF 호출 빈도가 높으므로 운영 진입 시 batch endpoint 도입 검토:
+- 옵션: DRF에 /api/internal/integration-logs/batch/ POST endpoint 추가
+- 또는: fastapi가 in-memory queue + N건/M초 flush
+본 PR은 양측 비동기화로 부담 완화 우선. batch endpoint는 운영 데이터 형성 후 결정.
 """
 
 import logging
@@ -16,6 +29,8 @@ import httpx
 from core.config import settings
 
 logger = logging.getLogger(__name__)
+
+INTEGRATION_LOG_PATH = "/api/internal/integration-logs/"
 
 
 class DrfClientError(Exception):
@@ -32,6 +47,30 @@ def _auth_headers() -> dict:
     if settings.DRF_SERVICE_TOKEN:
         headers["Authorization"] = f"Bearer {settings.DRF_SERVICE_TOKEN}"
     return headers
+
+
+async def _record_integration_log(
+    *,
+    integration_type: str,
+    target_system: str,
+    result: str,
+    description: str = "",
+) -> None:
+    """fire-and-forget IntegrationLog 기록. 실패해도 silent."""
+    try:
+        async with httpx.AsyncClient(timeout=2) as client:
+            await client.post(
+                f"{settings.DRF_BASE_URL}{INTEGRATION_LOG_PATH}",
+                json={
+                    "integration_type": integration_type,
+                    "target_system": target_system,
+                    "result": result,
+                    "description": description,
+                },
+            )
+    except Exception:
+        # silent fail — 본 흐름 비차단. AppLog에 기록하면 또 재귀 위험.
+        pass
 
 
 async def post_to_drf(
@@ -82,5 +121,19 @@ async def post_to_drf(
         )
         if raise_on_error:
             raise DrfClientError(res.status_code, body_preview or "DRF 응답 오류")
+
+    # IntegrationLog 기록 (재귀 회피: 본 엔드포인트는 제외)
+    if path != INTEGRATION_LOG_PATH:
+        integration_type = (
+            "collect"
+            if any(seg in path for seg in ("/monitoring/", "/positioning/"))
+            else "transmit"
+        )
+        await _record_integration_log(
+            integration_type=integration_type,
+            target_system="FastAPI→DRF",
+            result="success" if res.status_code < 400 else "failure",
+            description=f"path={path} status={res.status_code}",
+        )
 
     return res

@@ -3,9 +3,10 @@ from django.conf import settings
 from django.db import models
 
 from apps.core.constants import AlarmType, EventStatus, RiskLevel
+from apps.core.models.base import BaseModel
 
 
-class Event(models.Model):
+class Event(BaseModel):
     """
     업무 워크플로우 단위 — 여러 AlarmRecord를 묶음
 
@@ -86,6 +87,20 @@ class Event(models.Model):
     )
 
     summary = models.CharField(max_length=200, verbose_name="이벤트 요약")
+    # Phase 3-d: summary는 한 줄 요약(목록), description은 상세 본문(상세 팝업)
+    description = models.TextField(blank=True, default="", verbose_name="상세 본문")
+    # Phase 3-d: 현재 상태에 대한 처리자 메모. 상태 전환 시 EventLog.note에 직전값 복사 보존.
+    status_note = models.TextField(blank=True, default="", verbose_name="상태 메모")
+    # Phase 3-d: 트리거 정책 추적. AlertPolicy 비활성/삭제 시 SET_NULL로 이력 보존.
+    # 자동 매칭은 Phase 4-e policy_matcher가 채움 (본 PR은 FK만).
+    policy = models.ForeignKey(
+        "alerts.AlertPolicy",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="events",
+        verbose_name="트리거 정책",
+    )
 
     # 시간 추적
     first_detected_at = models.DateTimeField(verbose_name="최초 감지")
@@ -112,8 +127,7 @@ class Event(models.Model):
     last_notified_at = models.DateTimeField(
         null=True, blank=True, verbose_name="마지막 알림 발송 시각"
     )
-
-    created_at = models.DateTimeField(auto_now_add=True)
+    # created_at / updated_at / updated_by 는 BaseModel 상속
 
     def clean(self):
         """발생원 FK 정확히 하나만 NOT NULL 강제"""

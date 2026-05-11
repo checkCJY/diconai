@@ -12,10 +12,11 @@ class NotificationAdmin(admin.ModelAdmin):
         "severity",
         "channel",
         "delivery_status",
+        "retry_count",
         "is_read",
         "created_at",
     )
     list_filter = ("delivery_status", "severity", "channel", "is_broadcast", "is_read")
     search_fields = ("title", "message", "target_user__username")
-    readonly_fields = ("created_at",)
+    readonly_fields = ("created_at", "last_attempted_at")
     ordering = ("-created_at",)

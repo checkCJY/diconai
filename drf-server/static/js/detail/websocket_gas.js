@@ -40,7 +40,7 @@ function initGasWebSocket() {
     _showLeftSkeleton();
     restoreBadges(gasLeft);   // 이전 오류 상태 배지 회색화 초기화
 
-    const ws = WSClient.connect('/ws/sensors/');
+    const ws = WSClient.connect('/ws/sensors/', { attachToken: true });
 
     ws.onMessage((data) => {
       _hideBanner();

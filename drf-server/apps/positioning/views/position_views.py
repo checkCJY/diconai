@@ -1,12 +1,17 @@
 # apps/positioning/views/position_views.py
+import logging
+
 from drf_spectacular.utils import OpenApiResponse, extend_schema, inline_serializer
 from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 
+from apps.core.authentication import ServiceTokenAuthentication
 from apps.positioning.serializers import WorkerPositionReceiveSerializer
 from apps.positioning.services.position_service import handle_position_receive
+
+logger = logging.getLogger(__name__)
 
 
 class WorkerPositionReceiveView(APIView):
@@ -25,9 +30,14 @@ class WorkerPositionReceiveView(APIView):
         },
         ...
     ]
+
+    서버-서버(fastapi → drf) 호출 전용 ingest 엔드포인트.
+    settings.INTERNAL_SERVICE_TOKEN 설정 시 Bearer 토큰 검증 (Phase 5),
+    미설정 시 기존 무인증 동작 유지 (옵트인).
     """
 
-    permission_classes = [AllowAny]  # FastAPI 내부 통신이므로 인증 생략
+    authentication_classes = [ServiceTokenAuthentication]
+    permission_classes = [AllowAny]
 
     @extend_schema(
         tags=["Positioning (Ingest)"],
@@ -87,6 +97,7 @@ class WorkerPositionReceiveView(APIView):
                     y=item["y"],
                     movement_status=item.get("movement_status", "moving"),
                     measured_at=item["measured_at"],
+                    node_id=item.get("node_id") or None,
                 )
                 statuses.append(
                     {
@@ -97,8 +108,8 @@ class WorkerPositionReceiveView(APIView):
                 )
                 if result["position_id"] is not None:
                     saved_ids.append(result["position_id"])
-            except Exception as e:
-                print(f"[positioning] 저장 오류: {e}")
+            except Exception:
+                logger.exception("[positioning] 저장 오류 (item ignored)")
 
         return Response(
             {

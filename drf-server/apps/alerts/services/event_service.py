@@ -113,6 +113,17 @@ def create_alarm_and_event(
 
     # 새 Event 생성 (활성 이벤트가 없거나, 타임 윈도우 초과로 강제 분리된 경우 실행됨)
     if not active_event:
+        # Phase 4-e: AlertPolicy 자동 매칭 → Event.policy FK 채움
+        from apps.alerts.services.policy_matcher import match_policy
+
+        policy = match_policy(
+            event_type=alarm_type,
+            facility_id=facility_id,
+            sensor_id=sensor_id,
+            device_id=power_device_id,
+            geofence_id=geofence_id,
+        )
+
         event = Event.objects.create(
             facility_id=facility_id,
             event_type=alarm_type,
@@ -124,6 +135,7 @@ def create_alarm_and_event(
             worker_id=worker_id,
             source_label=source_label,
             summary=summary,
+            policy=policy,
             first_detected_at=detected_at,
             last_detected_at=detected_at,
             last_notified_at=timezone.now(),

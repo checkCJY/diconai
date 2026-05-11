@@ -1,6 +1,36 @@
 from django.contrib import admin
 
-from apps.facilities.models import Facility, GasSensor, PowerDevice
+from apps.facilities.models import (
+    Facility,
+    GasSensor,
+    PowerDevice,
+    Threshold,
+    ThresholdGroup,
+)
+
+
+@admin.register(ThresholdGroup)
+class ThresholdGroupAdmin(admin.ModelAdmin):
+    list_display = ("code", "name", "is_active", "updated_at")
+    list_filter = ("is_active",)
+    search_fields = ("code", "name", "description")
+
+
+@admin.register(Threshold)
+class ThresholdAdmin(admin.ModelAdmin):
+    list_display = (
+        "group",
+        "measurement_item",
+        "warning_min",
+        "warning_max",
+        "danger_min",
+        "danger_max",
+        "unit",
+        "is_active",
+    )
+    list_filter = ("group", "is_active")
+    search_fields = ("measurement_item", "description")
+    list_select_related = ("group",)
 
 
 @admin.register(Facility)

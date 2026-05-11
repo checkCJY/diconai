@@ -23,7 +23,7 @@ from apps.alerts.tasks import (
     fire_power_danger_task,
     fire_power_warning_task,
 )
-from apps.core.constants import POWER_THRESHOLDS
+from apps.facilities.services.threshold_service import evaluate_power_risk
 
 # 채널 번호 → 설비명 (power_service.py의 CHANNEL_TO_DEVICE와 동기화)
 _CHANNEL_NAME: dict[int, str] = {
@@ -63,12 +63,12 @@ def _channel_label(channel: int) -> str:
 
 
 def _evaluate(watt: float) -> str:
-    """watt 값을 POWER_THRESHOLDS 기준으로 위험도 문자열로 변환한다."""
-    if watt > POWER_THRESHOLDS["danger"]:
-        return "danger"
-    if watt > POWER_THRESHOLDS["caution"]:
-        return "warning"
-    return "normal"
+    """watt 값을 Threshold DB(power_default 그룹) 기준으로 위험도 문자열로 변환.
+
+    Phase 4-b: 이전 POWER_THRESHOLDS 상수 → DB Threshold + Redis 캐시.
+    threshold_service.evaluate_power_risk()에 위임.
+    """
+    return evaluate_power_risk(watt)
 
 
 def trigger_power_alarms(objs: list, device) -> None:

@@ -46,22 +46,35 @@ const Auth = {
   },
 
   // ── 토큰 갱신 ───────────────────────────────────────
+  // 동시성 가드: 진행 중인 refresh가 있으면 같은 Promise 반환 (다중 401 race 차단).
+  // ROTATE_REFRESH_TOKENS 활성화 시 응답의 새 refresh도 저장해 다음 회전 대비.
+  _refreshing: null,
   async _refresh() {
-    const refreshToken = this.getRefreshToken();
-    if (!refreshToken) return false;
-    try {
-      const res = await fetch(this._resolveUrl('/api/auth/token/refresh/'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh: refreshToken }),
-      });
-      if (!res.ok) return false;
-      const data = await res.json();
-      localStorage.setItem('access_token', data.access);
-      return true;
-    } catch {
-      return false;
-    }
+    if (this._refreshing) return this._refreshing;
+
+    this._refreshing = (async () => {
+      const refreshToken = this.getRefreshToken();
+      if (!refreshToken) return false;
+      try {
+        const res = await fetch(this._resolveUrl('/api/auth/token/refresh/'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh: refreshToken }),
+        });
+        if (!res.ok) return false;
+        const data = await res.json();
+        localStorage.setItem('access_token', data.access);
+        // ROTATE_REFRESH_TOKENS=true면 새 refresh가 응답에 포함됨 → 갱신
+        if (data.refresh) localStorage.setItem('refresh_token', data.refresh);
+        return true;
+      } catch (e) {
+        console.warn('[Auth._refresh]', e);
+        return false;
+      }
+    })();
+
+    try { return await this._refreshing; }
+    finally { this._refreshing = null; }
   },
 
   // ── API 호출 단일 진입점 ─────────────────────────────
@@ -94,7 +107,8 @@ const Auth = {
       const res = await this.apiFetch('/api/auth/me/');
       if (!res.ok) return null;
       return await res.json();
-    } catch {
+    } catch (e) {
+      console.warn('[Auth.getMe]', e);
       return null;
     }
   },

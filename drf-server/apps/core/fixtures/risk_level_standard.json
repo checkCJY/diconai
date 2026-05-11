@@ -1,0 +1,47 @@
+[
+  {
+    "model": "core.risklevelstandard",
+    "pk": 1,
+    "fields": {
+      "code": "normal",
+      "name": "정상",
+      "display_color": "green",
+      "alert_intensity": "normal",
+      "event_priority": 1,
+      "is_active": true,
+      "description": "정상 운영 상태",
+      "created_at": "2026-01-01T00:00:00+09:00",
+      "updated_at": "2026-01-01T00:00:00+09:00"
+    }
+  },
+  {
+    "model": "core.risklevelstandard",
+    "pk": 2,
+    "fields": {
+      "code": "warning",
+      "name": "주의",
+      "display_color": "orange",
+      "alert_intensity": "warning",
+      "event_priority": 2,
+      "is_active": true,
+      "description": "임계치 근접 — 모니터링 강화 필요",
+      "created_at": "2026-01-01T00:00:00+09:00",
+      "updated_at": "2026-01-01T00:00:00+09:00"
+    }
+  },
+  {
+    "model": "core.risklevelstandard",
+    "pk": 3,
+    "fields": {
+      "code": "danger",
+      "name": "위험",
+      "display_color": "red",
+      "alert_intensity": "urgent",
+      "event_priority": 3,
+      "is_active": true,
+      "description": "임계치 초과 — 즉시 조치 필요",
+      "created_at": "2026-01-01T00:00:00+09:00",
+      "updated_at": "2026-01-01T00:00:00+09:00"
+    }
+  }
+]

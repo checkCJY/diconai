@@ -8,4 +8,6 @@ async function initApp() {
   await initHeaderAndSNB();
 }
 
-initApp();
+initApp().catch(err => {
+  console.error('[app-sub] initialization failed:', err);
+});
