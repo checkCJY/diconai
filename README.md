@@ -261,6 +261,8 @@ curl -s http://localhost:9090/api/v1/targets | python -m json.tool | grep -E '"j
 
 > SQLite 다중 컨테이너 동시 쓰기는 가벼운 부하에서만 안전합니다. 부하가 늘면 `SQLITE_BUSY` 가능 — 다음 스프린트의 Postgres 전환에서 해소.
 
+> 📘 도커 도입 배경 · 7-서비스 구조 · 서버별 일상 워크플로우 · 트러블슈팅 · 남은 과제는 [docs/infra/docker_setup.md](docs/infra/docker_setup.md) 에 정리되어 있습니다. 명령어 모음은 [docs/conventions/COMMANDS.md](docs/conventions/COMMANDS.md).
+
 ---
 
 ## ⚙️ 환경 변수
