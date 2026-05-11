@@ -3,12 +3,13 @@
    ==========================================================
    - URL은 AppConfig.WS_BASE를 자동 prefix (path만 넘기면 됨).
    - 동일 path의 연결은 캐시되어 한 페이지에서 중복 연결되지 않는다.
-   - 자동 재연결(기본 3초). onclose 후 재시도.
+   - 자동 재연결: 지수 백오프 (1s → 2s → ... → 30s 상한, ±30% 지터). 최대 20회 후 포기.
    - 콜백은 add/remove로 다중 구독 가능 (한 ws가 여러 핸들러에 분배).
    - 라이프사이클 콜백(onOpen/onClose/onError)도 다중 구독 지원.
 
    사용 예:
-     const ws = WSClient.connect('/ws/sensors/');
+     // 인증 활성화된 채널은 attachToken: true 옵션으로 토큰 자동 부착
+     const ws = WSClient.connect('/ws/sensors/', { attachToken: true });
      const off = ws.onMessage((data) => { ... });
      ws.onOpen(() => setStatus('connected'));
      ws.onClose(() => setStatus('disconnected'));
@@ -16,13 +17,19 @@
 
    상위 호환:
      - 기존 alarm-ws.js, dashboard/websocket.js의 별개 연결을 통합
-     - 토큰 부착이 필요한 엔드포인트는 옵션으로 ?token=... 쿼리 추가
+     - attachToken: true 옵션이면 ?token=<access_token> 쿼리 자동 부착
+       (서버는 settings.JWT_SIGNING_KEY 설정 시 query token 검증 — Phase 5)
    ========================================================== */
 
 'use strict';
 
 const WSClient = (function () {
-  const RECONNECT_DELAY = 3000;
+  // 지수 백오프: 1s → 2s → 4s → ... → 30s 상한, ±30% 지터로 분산.
+  // MAX_ATTEMPTS 도달 시 재연결 포기 → onError("max_reconnect_attempts").
+  const INITIAL_DELAY = 1000;
+  const MAX_DELAY     = 30000;
+  const MAX_ATTEMPTS  = 20;
+  const JITTER        = 0.3;
   const _cache = new Map(); // key: full URL → instance
 
   function _resolveUrl(path, opts) {
@@ -30,13 +37,20 @@ const WSClient = (function () {
     if (window.AppConfig && typeof window.AppConfig.wsUrl === 'function') {
       base = window.AppConfig.wsUrl(path);
     } else {
+      console.warn('[WSClient] AppConfig.wsUrl unavailable, using same-origin fallback for', path);
       base = path;
     }
-    if (opts && opts.attachToken && typeof Auth !== 'undefined') {
-      const token = Auth.getAccessToken();
-      if (token) {
-        const sep = base.includes('?') ? '&' : '?';
-        base += `${sep}token=${encodeURIComponent(token)}`;
+    if (opts && opts.attachToken) {
+      if (typeof Auth === 'undefined') {
+        console.warn('[WSClient] attachToken requested but Auth module not loaded');
+      } else {
+        const token = Auth.getAccessToken();
+        if (!token) {
+          console.warn('[WSClient] attachToken requested but no token in storage');
+        } else {
+          const sep = base.includes('?') ? '&' : '?';
+          base += `${sep}token=${encodeURIComponent(token)}`;
+        }
       }
     }
     return base;
@@ -55,6 +69,7 @@ const WSClient = (function () {
     let ws = null;
     let closed = false;
     let reconnectTimer = null;
+    let attempts = 0;
 
     function _dispatch(set, ...args) {
       set.forEach((fn) => {
@@ -62,17 +77,31 @@ const WSClient = (function () {
       });
     }
 
+    function _scheduleReconnect() {
+      if (closed) return;
+      attempts += 1;
+      if (attempts > MAX_ATTEMPTS) {
+        console.warn('[WSClient] max reconnect attempts reached for', path);
+        _dispatch(errorHandlers, new Error('max_reconnect_attempts'));
+        return;
+      }
+      const base = Math.min(INITIAL_DELAY * Math.pow(2, attempts - 1), MAX_DELAY);
+      const delay = base * (1 + (Math.random() - 0.5) * JITTER);
+      reconnectTimer = setTimeout(_open, delay);
+    }
+
     function _open() {
       try {
         ws = new WebSocket(url);
       } catch (e) {
         _dispatch(errorHandlers, e);
-        if (!closed) {
-          reconnectTimer = setTimeout(_open, opts.reconnectDelay || RECONNECT_DELAY);
-        }
+        _scheduleReconnect();
         return;
       }
-      ws.onopen = function () { _dispatch(openHandlers); };
+      ws.onopen = function () {
+        attempts = 0; // 정상 연결 → 백오프 리셋
+        _dispatch(openHandlers);
+      };
       ws.onmessage = function (event) {
         let data;
         try { data = JSON.parse(event.data); } catch { return; }
@@ -84,8 +113,7 @@ const WSClient = (function () {
       };
       ws.onclose = function (e) {
         _dispatch(closeHandlers, e);
-        if (closed) return;
-        reconnectTimer = setTimeout(_open, opts.reconnectDelay || RECONNECT_DELAY);
+        _scheduleReconnect();
       };
     }
 

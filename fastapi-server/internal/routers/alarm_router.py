@@ -9,13 +9,15 @@
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from core.config import settings
 from websocket.state import active_alarms, alarm_signal, worker_clients
 
 router = APIRouter(prefix="/internal", tags=["internal"])
 
 
 class AlarmPayload(BaseModel):
-    model_config = {"extra": "allow"}  # 필드가 추가되어도 유연하게 수용
+    # 미정의 필드는 통과시키지 않음 — DRF Celery 측이 명시 필드만 보내야 함
+    model_config = {"extra": "ignore"}
 
     alarm_type: str
     risk_level: str
@@ -27,6 +29,9 @@ class AlarmPayload(BaseModel):
     measured_value: float | None = None
     threshold_value: float | None = None
     worker_id: int | None = None  # 지오펜스 알람 시 타겟 작업자
+    # 서버(DRF Celery) 발신 시각 — 클라이언트가 우선 사용 (JS 03 R3).
+    # 누락 시 클라이언트는 도착 시각(new Date())으로 fallback.
+    created_at: str | None = None
 
 
 @router.post(
@@ -48,6 +53,17 @@ async def push_alarm(request: Request, alarm: AlarmPayload):
     client_host = request.client.host if request.client else ""
     if client_host not in ("127.0.0.1", "::1", "localhost"):
         raise HTTPException(status_code=403, detail="내부 전용 엔드포인트입니다.")
+
+    # Phase 5: 서비스 토큰 검증 (옵트인 — 미설정 시 기존 동작 유지)
+    expected_token = settings.INTERNAL_SERVICE_TOKEN
+    if expected_token:
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="서비스 토큰이 필요합니다.")
+        if auth_header[7:].strip() != expected_token:
+            raise HTTPException(
+                status_code=403, detail="유효하지 않은 서비스 토큰입니다."
+            )
 
     payload = alarm.model_dump(exclude_none=True)
     active_alarms.append(payload)

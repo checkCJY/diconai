@@ -3,9 +3,10 @@ from django.conf import settings
 from django.db import models
 
 from apps.core.constants import RiskLevel
+from apps.core.models.base import BaseModel
 
 
-class Notification(models.Model):
+class Notification(BaseModel):
     """
     알림 발송 레코드
 
@@ -47,11 +48,26 @@ class Notification(models.Model):
         SMS = "sms", "SMS"  # 4차
         EMAIL = "email", "이메일"  # 4차
 
+    # Phase 3-e: CASCADE → SET_NULL + nullable.
+    # 이유: 점검 일정/배치 실패 등 비-Event 알림 허용. Event 삭제 시 알림 이력 보존.
+    # clean()에서 event/policy 중 하나는 필수로 강제.
     event = models.ForeignKey(
         "alerts.Event",
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="notifications",
         verbose_name="원천 이벤트",
+    )
+    # Phase 3-e: 트리거 정책 추적. Event 없는 알림(점검 사전 알림 등)도 policy로 추적 가능.
+    # AlertPolicy 비활성/삭제 시 SET_NULL.
+    policy = models.ForeignKey(
+        "alerts.AlertPolicy",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="notifications",
+        verbose_name="트리거 정책",
     )
     target_user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -80,12 +96,18 @@ class Notification(models.Model):
         max_length=300, blank=True, default="", verbose_name="발송 실패 사유"
     )
     sent_at = models.DateTimeField(null=True, blank=True)
+    # Phase 3-e: 재시도 추적. retry_count는 발송 시도 횟수 (initial 0).
+    retry_count = models.PositiveIntegerField(default=0, verbose_name="재시도 횟수")
+    # Phase 3-e: created_at(생성)과 분리. last_attempted_at은 최근 발송 시도 시각.
+    # NULL = 시도 전. (now - last_attempted_at > NOTIFICATION_DELAY_THRESHOLD_MINUTES) 이면 화면 "지연" 라벨.
+    last_attempted_at = models.DateTimeField(
+        null=True, blank=True, verbose_name="최근 발송 시도 시각"
+    )
 
     # is_read는 3차 레거시 — 개인 알림용
     is_read = models.BooleanField(default=False)
     read_at = models.DateTimeField(null=True, blank=True)
-
-    created_at = models.DateTimeField(auto_now_add=True)
+    # created_at / updated_at / updated_by 는 BaseModel 상속
 
     def mark_as_read(self):
         """알림 읽음 처리"""
@@ -97,7 +119,11 @@ class Notification(models.Model):
             self.save(update_fields=["is_read", "read_at"])
 
     def clean(self):
-        """target_user와 is_broadcast 상호 배타 검증"""
+        """
+        검증:
+        1. target_user와 is_broadcast 상호 배타 (개인 vs 브로드캐스트)
+        2. event/policy 중 하나는 필수 — Phase 3-e (출처 없는 알림 차단)
+        """
         from django.core.exceptions import ValidationError
 
         if self.is_broadcast and self.target_user is not None:
@@ -106,6 +132,10 @@ class Notification(models.Model):
             )
         if not self.is_broadcast and self.target_user is None:
             raise ValidationError("개인 알림은 target_user가 필수입니다.")
+        if self.event_id is None and self.policy_id is None:
+            raise ValidationError(
+                "Notification은 event 또는 policy 중 하나는 필수입니다."
+            )
 
     class Meta:
         db_table = "notification"

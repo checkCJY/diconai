@@ -77,7 +77,7 @@ print('Phase 1 fastapi: OK')
 "
 
 # (4) 응답 표준 문서 존재
-test -f docs/api_response_convention.md && echo "convention OK"
+test -f docs/conventions/api_response_convention.md && echo "convention OK"
 
 # (5) frontend config 주입 partial 존재
 test -f drf-server/templates/components/app_config.html && \

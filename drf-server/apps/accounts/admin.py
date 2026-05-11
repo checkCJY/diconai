@@ -7,8 +7,16 @@ from apps.accounts.models import (
     Department,
     LoginLog,
     Position,
+    RoleProfile,
     UserDepartment,
 )
+
+
+@admin.register(RoleProfile)
+class RoleProfileAdmin(admin.ModelAdmin):
+    list_display = ("code", "name", "base_user_type", "platform_type", "is_active")
+    list_filter = ("base_user_type", "platform_type", "is_active")
+    search_fields = ("code", "name", "description")
 
 
 @admin.register(CustomUser)

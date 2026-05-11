@@ -10,11 +10,17 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.core.constants import POWER_THRESHOLDS
+from apps.core.authentication import ServiceTokenAuthentication
+from apps.facilities.services.threshold_service import get_threshold
 from apps.monitoring.serializers.power_data import (
     PowerDataBulkIngestSerializer,
     PowerEventIngestSerializer,
 )
+
+
+def _to_float(value):
+    """Decimal/None → float/None (JSON 직렬화 호환)."""
+    return float(value) if value is not None else None
 
 
 class PowerThresholdView(APIView):
@@ -22,7 +28,11 @@ class PowerThresholdView(APIView):
     GET /monitoring/api/power/thresholds/
 
     전력 임계치(W)를 반환한다. 프론트엔드 차트 주석 라인 및 위험도 판정에 사용.
-    공개 데이터(상수)이므로 인증 불필요.
+    공개 데이터이므로 인증 불필요.
+
+    [단일 진실 공급원]
+    Threshold(group_code="power_default", measurement_item="power_w") DB 조회.
+    어드민에서 변경 시 다음 요청부터 반영 (Redis 캐시 1시간 TTL + signal invalidate).
     """
 
     permission_classes = [AllowAny]
@@ -30,19 +40,29 @@ class PowerThresholdView(APIView):
     @extend_schema(
         tags=["Monitoring (Public)"],
         summary="전력 임계치(W) 조회",
-        description="채널별 주의/위험 임계치(W). 프론트 차트 주석 라인 및 위험도 판정에 사용.",
+        description="채널별 주의/위험 임계치(W) + 차트 Y축 최대값. DB Threshold 기반 응답.",
         responses={
             200: inline_serializer(
                 name="PowerThresholds",
                 fields={
-                    "warning": serializers.FloatField(help_text="주의 임계치 (W)"),
+                    "caution": serializers.FloatField(help_text="주의 임계치 (W)"),
                     "danger": serializers.FloatField(help_text="위험 임계치 (W)"),
+                    "maxY": serializers.FloatField(help_text="차트 Y축 최대값 (W)"),
+                    "unit": serializers.CharField(help_text="단위"),
                 },
             )
         },
     )
     def get(self, request):
-        return Response(POWER_THRESHOLDS)
+        threshold = get_threshold("power_default", "power_w") or {}
+        return Response(
+            {
+                "caution": _to_float(threshold.get("warning_max")),
+                "danger": _to_float(threshold.get("danger_max")),
+                "maxY": _to_float(threshold.get("chart_max")),
+                "unit": threshold.get("unit", "W"),
+            }
+        )
 
 
 class PowerEventIngestView(APIView):
@@ -53,10 +73,12 @@ class PowerEventIngestView(APIView):
     요청 바디: { device_id, measured_at, snapshot }
     응답: { "id": <PowerEvent.id> }
 
-    의도적 무인증: 서버-서버(fastapi → drf) 호출 전용 ingest 엔드포인트.
-    Phase 5에서 서비스 토큰 또는 IP 화이트리스트 기반 보호 추가 예정.
+    서버-서버(fastapi → drf) 호출 전용 ingest 엔드포인트.
+    settings.INTERNAL_SERVICE_TOKEN 설정 시 Bearer 토큰 검증 (Phase 5),
+    미설정 시 기존 무인증 동작 유지 (옵트인).
     """
 
+    authentication_classes = [ServiceTokenAuthentication]
     permission_classes = [AllowAny]
 
     @extend_schema(
@@ -87,10 +109,12 @@ class PowerDataBulkIngestView(APIView):
     요청 바디: { device_id, measured_at, data_type, channels: [...] }
     응답: { "created": <저장된 행 수> }
 
-    의도적 무인증: 서버-서버(fastapi → drf) 호출 전용 ingest 엔드포인트.
-    Phase 5에서 서비스 토큰 또는 IP 화이트리스트 기반 보호 추가 예정.
+    서버-서버(fastapi → drf) 호출 전용 ingest 엔드포인트.
+    settings.INTERNAL_SERVICE_TOKEN 설정 시 Bearer 토큰 검증 (Phase 5),
+    미설정 시 기존 무인증 동작 유지 (옵트인).
     """
 
+    authentication_classes = [ServiceTokenAuthentication]
     permission_classes = [AllowAny]
 
     @extend_schema(

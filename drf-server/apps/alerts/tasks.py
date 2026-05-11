@@ -11,6 +11,7 @@ import logging
 
 import httpx
 from celery import shared_task
+from django.conf import settings
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
@@ -41,11 +42,45 @@ def _push_to_ws(alarm_data: dict) -> None:
 
     실패해도 태스크 자체는 성공으로 처리 — DB 기록이 우선이고
     WS 알림 누락은 다음 틱에서 Event 목록으로 확인 가능.
+
+    [IntegrationLog 비동기 기록 — PR-D 변경]
+    호출 결과(성공/실패)를 Celery task delay()로 비동기 INSERT.
+    이전: ORM 직접 create (web pod 부담). 이후: Celery worker 분리 → web latency 0.
+    broker 다운 시 silent fail — 본 흐름 비차단.
+
+    [created_at 주입 — JS 03 R3]
+    호출자가 명시하지 않으면 이 시점(UTC ISO-8601)을 알람 생성 시각으로 기록.
+    클라이언트는 매퍼에서 이 값을 우선 사용 (fallback: new Date()).
     """
+    from datetime import datetime, timezone
+
+    alarm_data.setdefault("created_at", datetime.now(timezone.utc).isoformat())
+
+    headers = {}
+    token = getattr(settings, "INTERNAL_SERVICE_TOKEN", "") or ""
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    result = "success"
     try:
-        httpx.post(FASTAPI_INTERNAL_URL, json=alarm_data, timeout=3.0)
+        httpx.post(FASTAPI_INTERNAL_URL, json=alarm_data, headers=headers, timeout=3.0)
     except Exception as e:
         logger.warning("FastAPI WS 알람 푸시 실패 (WS 알림 누락): %s", e)
+        result = "failure"
+
+    try:
+        from apps.operations.tasks.integration_log_task import (
+            integration_log_create_task,
+        )
+
+        integration_log_create_task.delay(
+            integration_type="transmit",
+            target_system="DRF→FastAPI",
+            result=result,
+            description=f"alarm_type={alarm_data.get('alarm_type', '')}",
+        )
+    except Exception:
+        pass  # broker 다운 silent fail — 본 흐름 비차단
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=5)
@@ -275,10 +310,13 @@ def fire_power_danger_task(
 ):
     """전력 DANGER 즉각 알람 — AlarmRecord/Event 생성 후 FastAPI WS 큐에 푸시."""
     from apps.alerts.services.event_service import create_alarm_and_event
-    from apps.core.constants import AlarmType, POWER_THRESHOLDS
+    from apps.core.constants import AlarmType
+    from apps.facilities.services.threshold_service import get_threshold
 
     try:
-        threshold = POWER_THRESHOLDS["danger"]
+        power_threshold = get_threshold("power_default", "power_w") or {}
+        danger_max = power_threshold.get("danger_max")
+        threshold = float(danger_max) if danger_max is not None else None
         summary = (
             f"[긴급] {source_label} 전력 과부하 ({value}W)"
             " — 즉시 확인하고 관리자에게 보고하세요."
@@ -331,10 +369,13 @@ def fire_power_warning_task(
 ):
     """전력 WARNING 30초 지속 후 알람 — AlarmRecord/Event 생성 후 FastAPI WS 큐에 푸시."""
     from apps.alerts.services.event_service import create_alarm_and_event
-    from apps.core.constants import AlarmType, POWER_THRESHOLDS
+    from apps.core.constants import AlarmType
+    from apps.facilities.services.threshold_service import get_threshold
 
     try:
-        threshold = POWER_THRESHOLDS["caution"]
+        power_threshold = get_threshold("power_default", "power_w") or {}
+        warning_max = power_threshold.get("warning_max")
+        threshold = float(warning_max) if warning_max is not None else None
         summary = (
             f"[주의] {source_label} 전력 경고 수준 {WARNING_DURATION_SEC}초 지속 ({value}W)"
             " — 설비 상태를 확인하세요."

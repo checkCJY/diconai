@@ -31,17 +31,38 @@ const _POPUP_CFG = {
 // AlarmPopup — 위험/주의 전용 중앙 차단형 팝업
 // ──────────────────────────────────────────────────────────
 const AlarmPopup = {
-  queue:       [],
-  isOpen:      false,
-  _inited:     false,
-  _currentId:  null,
-  MAX_QUEUE: 5,
+  queue:        [],
+  isOpen:       false,
+  _inited:      false,
+  _currentId:   null,
+  droppedCount: 0,           // 큐 풀 시 누적 (운영 가시성 — 03 R2)
+  MAX_QUEUE:    5,
+  GROUP_WINDOW_MS: 5000,     // 같은 센서·동일 레벨 연속 알람 그룹핑 윈도우
 
   show(data) {
     const level = data.alarm_level;
     if (level !== 'danger' && level !== 'warning') return;
 
-    if (this.queue.length >= this.MAX_QUEUE) return;
+    // 옵션 B: 같은 센서·동일 레벨 5초 내 연속 알람은 마지막 큐 항목에 카운트만 누적
+    const last = this.queue[this.queue.length - 1];
+    if (last && last.sensor_name === data.sensor_name && last.alarm_level === data.alarm_level) {
+      const lastTs = new Date(last.timestamp).getTime();
+      if (Number.isFinite(lastTs) && (Date.now() - lastTs) < this.GROUP_WINDOW_MS) {
+        last.groupCount = (last.groupCount || 1) + 1;
+        return;
+      }
+    }
+
+    // 큐 풀 — silent drop 대신 카운트 노출 (옵션 A 보강)
+    if (this.queue.length >= this.MAX_QUEUE) {
+      this.droppedCount += 1;
+      console.warn('[AlarmPopup] queue full, dropping alarm', {
+        droppedTotal: this.droppedCount,
+        sensor: data.sensor_name,
+        level: data.alarm_level,
+      });
+      return;
+    }
     this.queue.push(data);
     if (!this.isOpen) this._process();
   },
@@ -88,7 +109,8 @@ const AlarmPopup = {
     if (msgEl) {
       const sensor = data.sensor_name || data.source_label || '';
       const msg    = data.message     || data.summary      || '';
-      msgEl.textContent = sensor ? `${sensor} — ${msg}` : msg;
+      const suffix = data.groupCount > 1 ? ` (×${data.groupCount})` : '';
+      msgEl.textContent = (sensor ? `${sensor} — ${msg}` : msg) + suffix;
     }
 
     popup.style.display = 'block';

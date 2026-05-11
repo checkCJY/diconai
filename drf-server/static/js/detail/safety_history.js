@@ -1,7 +1,7 @@
 /* safety_history.js — 안전 확인 이력 월간 캘린더 */
 
 (function () {
-  function pad(n) { return String(n).padStart(2, '0'); }
+  // pad는 shared/util.js의 글로벌 함수 사용
 
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;

@@ -4,7 +4,11 @@ from datetime import datetime
 
 
 class WorkerPositionSchema(BaseModel):
-    """작업자 위치 데이터 스키마 — Pydantic 검증"""
+    """작업자 위치 데이터 스키마 — Pydantic 검증
+
+    [node_id — Phase 3-a]
+    PositionNode.device_id 그대로 (예: "NODE-001"). 펌웨어 페이로드 갱신 전에는 None.
+    """
 
     worker_id: int
     worker_name: str
@@ -13,6 +17,7 @@ class WorkerPositionSchema(BaseModel):
     y: float = Field(..., ge=0)  # 0 이상
     movement_status: str = Field(default="moving")
     measured_at: datetime
+    node_id: str | None = None
 
 
 class WorkerPositionPayload(BaseModel):

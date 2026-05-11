@@ -1,83 +1,107 @@
-import copy
+"""
+dashboard 메뉴 트리 조회 — Phase 4-a에서 DB 조회로 전환.
 
-# ──────────────────────────────────────────────────────────
-# 권한별 메뉴 트리 정의
-# ──────────────────────────────────────────────────────────
-_MENU_WORKER = [
-    {
-        "id": "safety",
-        "label": "나의 정보 확인",
-        "icon": "shield",
-        "children": [
-            {
-                "id": "SNB-01",
-                "label": "나의 프로필",
-                "path": "/dashboard/profile/",
-            },
-            {
-                "id": "SNB-02",
-                "label": "작업 전 안전 확인",
-                "path": "/dashboard/safety/checklist/",
-            },
-            {
-                "id": "SNB-04",
-                "label": "안전 확인 이력",
-                "path": "/dashboard/safety/history/",
-            },
-        ],
-    },
-    {
-        "id": "monitoring",
-        "label": "모니터링",
-        "icon": "monitor",
-        "children": [
-            {
-                "id": "SNB-06",
-                "label": "실시간 모니터링",
-                "path": "/dashboard/monitoring/realtime/",
-            },
-            {
-                "id": "SNB-07",
-                "label": "실시간/AI 예측 유해가스 현황",
-                "path": "/dashboard/monitoring/gas/",
-            },
-            {
-                "id": "SNB-08",
-                "label": "실시간/AI 예측 스마트 전력 현황",
-                "path": "/dashboard/monitoring/power/",
-            },
-            {
-                "id": "SNB-09",
-                "label": "작업자 현황",
-                "path": "/dashboard/monitoring/workers/",
-            },
-            {
-                "id": "SNB-10",
-                "label": "이벤트 현황",
-                "path": "/dashboard/monitoring/events/",
-            },
-        ],
-    },
-]
+[변경 전 (3차)]
+하드코딩 _MENU_WORKER + _MENU_ADMIN_EXTRA dict.
 
-_MENU_ADMIN_EXTRA = {
-    "id": "admin_only",
-    "label": "관리자 전용",
-    "icon": "settings",
-    "children": [
-        # SNB-05 구현 시 전용 URL로 교체 필요
-        {
-            "id": "SNB-05",
-            "label": "전체 이력 현황",
-            "path": "/admin-panel/accounts-management/",
-        },
-    ],
-}
+[변경 후 (Phase 4-a)]
+Menu / RoleMenuVisibility / RoleProfile DB 조회 + Redis 캐시 (role별 5분 TTL).
+운영자가 어드민에서 메뉴 추가/삭제하면 캐시 invalidate 후 즉시 반영.
+
+[캐시 키]
+"menu_tree:role:{role}"
+
+[invalidate]
+Menu / RoleMenuVisibility post_save / post_delete signal에서 모든 role 캐시 무효화.
+"""
+
+from django.core.cache import cache
+
+_CACHE_PREFIX = "menu_tree"
+_CACHE_TTL = 300  # 5분
+
+
+def _cache_key(role: str) -> str:
+    return f"{_CACHE_PREFIX}:role:{role}"
 
 
 def get_menu_tree(role: str) -> list:
-    menus = copy.deepcopy(_MENU_WORKER)
-    if role in ("facility_admin", "super_admin"):
-        menus.append(copy.deepcopy(_MENU_ADMIN_EXTRA))
-    # viewer는 worker와 동일 메뉴 (읽기 전용 권한은 API 레벨에서 제어)
-    return menus
+    """
+    role(문자열, UserType.values 또는 RoleProfile.code)에 노출 가능한 SNB 메뉴 트리 반환.
+
+    반환 형식 (3차와 동일하게 유지 — 프론트 영향 0):
+        [
+            {"id": "<menu.code>", "label": "<menu.name>", "icon": "...",
+             "children": [
+                 {"id": "...", "label": "...", "path": "..."},
+                 ...
+             ]},
+            ...
+        ]
+    """
+    cached = cache.get(_cache_key(role))
+    if cached is not None:
+        return cached
+
+    tree = _build_menu_tree(role)
+    cache.set(_cache_key(role), tree, _CACHE_TTL)
+    return tree
+
+
+def _build_menu_tree(role: str) -> list:
+    """DB 조회 → role 기반 visibility 필터 → 트리 구성."""
+    from apps.accounts.models import RoleProfile
+    from apps.dashboard.models import Menu, RoleMenuVisibility
+
+    # role 문자열을 RoleProfile.code로 매핑 (UserType과 동일 값)
+    role_profile = RoleProfile.objects.filter(code=role, is_active=True).first()
+    if role_profile is None:
+        # RoleProfile 미존재 시 worker 기준 fallback
+        role_profile = RoleProfile.objects.filter(code="worker", is_active=True).first()
+    if role_profile is None:
+        return []
+
+    visible_menu_ids = set(
+        RoleMenuVisibility.objects.filter(
+            role_profile=role_profile, is_visible=True
+        ).values_list("menu_id", flat=True)
+    )
+    if not visible_menu_ids:
+        return []
+
+    snb_menus = (
+        Menu.objects.filter(
+            id__in=visible_menu_ids, menu_type=Menu.MenuType.SNB, is_active=True
+        )
+        .select_related("parent")
+        .order_by("sort_order", "code")
+    )
+
+    # 트리 구성: parent NULL이 최상위, 나머지는 children
+    by_parent: dict[int | None, list] = {}
+    for menu in snb_menus:
+        by_parent.setdefault(menu.parent_id, []).append(menu)
+
+    def to_node(menu):
+        node: dict = {
+            "id": menu.code,
+            "label": menu.name,
+        }
+        if menu.icon:
+            node["icon"] = menu.icon
+        if menu.url_path:
+            node["path"] = menu.url_path
+        children = by_parent.get(menu.id)
+        if children:
+            node["children"] = [to_node(c) for c in children]
+        return node
+
+    return [to_node(m) for m in by_parent.get(None, [])]
+
+
+def invalidate_menu_tree_cache() -> None:
+    """Menu/RoleMenuVisibility 변경 시 모든 role 캐시 invalidate."""
+    from apps.accounts.models import RoleProfile
+
+    for code in RoleProfile.objects.values_list("code", flat=True):
+        cache.delete(_cache_key(code))

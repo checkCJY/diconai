@@ -81,7 +81,7 @@ class EquipmentAdminListSerializer(serializers.ModelSerializer):
     power_device_id = serializers.SerializerMethodField()
 
     def get_equipment_code(self, obj):
-        return f"EQP-{obj.id:03d}"
+        return f"FAC-{obj.id:03d}"
 
     def get_facility_code(self, obj):
         return f"FAC-{obj.facility_id:03d}"

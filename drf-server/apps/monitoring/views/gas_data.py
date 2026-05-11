@@ -5,9 +5,11 @@ from drf_spectacular.utils import (
     inline_serializer,
 )
 from rest_framework import serializers, status
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.authentication import ServiceTokenAuthentication
 from apps.monitoring.serializers import GasDataCreateSerializer
 
 
@@ -16,12 +18,13 @@ class GasDataCreateView(APIView):
     POST /api/monitoring/gas/
     FastAPI로부터 가스 측정값을 수신하여 DB에 저장하고 알람을 생성한다.
 
-    의도적 무인증: 서버-서버(fastapi → drf) 호출 전용 ingest 엔드포인트.
-    Phase 5에서 fastapi 측 서비스 토큰 또는 IP 화이트리스트 기반 보호 추가 예정.
+    서버-서버(fastapi → drf) 호출 전용 ingest 엔드포인트.
+    settings.INTERNAL_SERVICE_TOKEN 설정 시 Bearer 토큰 검증 (Phase 5),
+    미설정 시 기존 무인증 동작 유지 (옵트인).
     """
 
-    authentication_classes = []
-    permission_classes = []
+    authentication_classes = [ServiceTokenAuthentication]
+    permission_classes = [AllowAny]
 
     @extend_schema(
         tags=["Monitoring (Ingest)"],

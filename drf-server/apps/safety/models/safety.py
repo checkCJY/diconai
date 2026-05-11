@@ -1,10 +1,12 @@
 # safety/models/safety.py
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
-from django.conf import settings
+
+from apps.core.models.base import BaseModel
 
 
-class SafetyCheckItem(models.Model):
+class SafetyCheckItem(BaseModel):
     """
     체크리스트 항목 마스터
 
@@ -37,19 +39,34 @@ class SafetyCheckItem(models.Model):
         on_delete=models.CASCADE,  # 공장 소멸 시 체크리스트도 소멸 (예외적 허용)
         related_name="safety_check_items",
     )
+    # Phase 3-b: SafetyCheckSection 그룹화. 1단계 nullable → 2단계 백필 → 3단계 NOT NULL.
+    # 모든 row가 facility별 "기본" Section으로 자동 매핑된 후 NOT NULL로 전환.
+    section = models.ForeignKey(
+        "safety.SafetyCheckSection",
+        on_delete=models.PROTECT,
+        related_name="items",
+    )
     title = models.CharField(max_length=200, verbose_name="항목 제목")
     description = models.TextField(blank=True, default="", verbose_name="상세 설명")
     order = models.PositiveSmallIntegerField(default=0, verbose_name="표시 순서")
     is_required = models.BooleanField(default=True, verbose_name="필수 여부")
     is_active = models.BooleanField(default=True)
     deactivated_at = models.DateTimeField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    # created_at / updated_at / updated_by 는 BaseModel 상속
 
-    def deactivate(self):
+    def deactivate(self, updated_by=None):
         self.is_active = False
         self.deactivated_at = timezone.now()
-        self.save(update_fields=["is_active", "deactivated_at", "updated_at"])
+        if updated_by is not None:
+            self.updated_by = updated_by
+        self.save(
+            update_fields=[
+                "is_active",
+                "deactivated_at",
+                "updated_at",
+                "updated_by",
+            ]
+        )
 
     def __str__(self):
         return self.title
@@ -66,23 +83,17 @@ class SafetyCheckItem(models.Model):
         ]
 
 
-class SafetyStatus(models.Model):
+class SafetyStatus(BaseModel):
     """
     작업자 체크 이력
 
-    [⚠️ 3차 한계 — 1인 1항목 영구 고정]
-    복합 UNIQUE (worker, check_item) 때문에 "매일 체크" 불가능
-    한 작업자가 한 항목을 한 번만 체크 가능, 이력 누적 불가
+    [Phase 3-c 변경 — 1세션 1항목으로 매일 체크 지원]
+    이전 UNIQUE(worker, check_item) → UNIQUE(session, check_item)
+    SafetyCheckSession 도입으로 (worker, date, revision) 단위 분리. 매일 체크 가능.
 
-    이 제약은 규제 대응(일일 점검 의무)과 충돌하며, 4차에 해결 예정:
-    - SafetyCheckSession 모델 추가 (session, date 기반 관리)
-    - SafetyStatus.session FK 도입 → UNIQUE(session, check_item)
-    - 1일 1세션으로 "매일 체크" 지원
-
-    [3차 운영 방법]
-    - 작업자가 항목을 체크 → SafetyStatus 1개 생성 (is_checked=True)
-    - 재체크 시 기존 레코드의 checked_at만 업데이트 (UNIQUE 위반 방지)
-    - "오늘 체크 여부"는 checked_at의 날짜로만 판단
+    [운영 방법]
+    - 서비스 레이어 check_service.check_item()이 today 세션 get_or_create + mark_checked
+    - mark_checked(session, note=None) — session 필수 키워드 인자
 
     [worker SET_NULL]
     CustomUser Soft Delete 정책 일관성
@@ -103,6 +114,13 @@ class SafetyStatus(models.Model):
         blank=True,
         related_name="statuses",
     )
+    # Phase 3-c: 5단계 마이그 완료 후 NOT NULL.
+    # UNIQUE(session, check_item)이 (worker, check_item)을 대체.
+    session = models.ForeignKey(
+        "safety.SafetyCheckSession",
+        on_delete=models.PROTECT,
+        related_name="statuses",
+    )
     check_item_title = models.CharField(
         max_length=200,
         verbose_name="체크 당시 항목 제목 (스냅샷)",
@@ -111,24 +129,38 @@ class SafetyStatus(models.Model):
     is_checked = models.BooleanField(default=False)
     checked_at = models.DateTimeField(null=True, blank=True)
     note = models.TextField(blank=True, default="", verbose_name="작업자 메모")
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    # created_at / updated_at / updated_by 는 BaseModel 상속
 
-    def mark_checked(self, note: str = ""):
+    def mark_checked(self, session, note: str | None = None):
+        """
+        체크 완료 처리 (Phase 3-c).
+
+        [session 필수 키워드 인자] (결정문 §3c-8)
+        session 도입 후 명시적 전달 — 자동 추론 금지 (silent error 위험).
+        """
         from django.utils import timezone
 
+        self.session = session
         self.is_checked = True
         self.checked_at = timezone.now()
-        if note:
+        if note is not None:
             self.note = note
-        self.save(update_fields=["is_checked", "checked_at", "note", "updated_at"])
+        self.save(
+            update_fields=[
+                "session",
+                "is_checked",
+                "checked_at",
+                "note",
+                "updated_at",
+            ]
+        )
 
     class Meta:
         db_table = "safety_status"
         constraints = [
-            # 3차 제약 — 1인 1항목 고정
+            # Phase 3-c: 1인 1항목 고정 → 1세션 1항목 (매일 체크 지원)
             models.UniqueConstraint(
-                fields=["worker", "check_item"], name="uq_safety_worker_item"
+                fields=["session", "check_item"], name="uq_safety_session_item"
             ),
         ]
         indexes = [

@@ -14,7 +14,6 @@ from drf_spectacular.utils import (
 )
 from rest_framework import serializers, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -27,6 +26,7 @@ from apps.alerts.serializers import (
     WorkerSummaryResponseSerializer,
 )
 from apps.core.constants import EventStatus, RiskLevel
+from apps.core.permissions import IsSuperAdminOrFacilityAdmin
 
 LEVEL_PRIORITY = {RiskLevel.DANGER: 2, RiskLevel.WARNING: 1}
 
@@ -116,7 +116,7 @@ class WorkerSummaryView(APIView):
     구버전의 AlarmRecord.is_active → Event.status != resolved 로 대체.
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsSuperAdminOrFacilityAdmin]
 
     @extend_schema(
         tags=["Alerts"],
@@ -147,9 +147,7 @@ class WorkerSummaryView(APIView):
         ],
     )
     def get(self, request):
-        if request.user.user_type not in ("facility_admin", "super_admin"):
-            raise PermissionDenied("접근 권한이 없습니다.")
-
+        # 권한 체크는 permission_classes(IsSuperAdminOrFacilityAdmin)가 처리
         facility = request.user.facility
         if facility is None:
             return Response(

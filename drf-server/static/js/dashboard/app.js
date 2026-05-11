@@ -28,8 +28,11 @@ async function initApp() {
 // ──────────────────────────────────────────────────────────
 async function loadMySafetyStatus() {
   try {
-    const res = await fetch('/dashboard/api/safety-status/');
-    if (!res.ok) return;
+    const res = await Auth.apiFetch('/dashboard/api/safety-status/');
+    if (!res.ok) {
+      console.warn('[loadMySafetyStatus] http error:', res.status);
+      return;
+    }
     const data = await res.json();
 
     const checklistEl = document.getElementById('safety-checklist-status');
@@ -43,7 +46,11 @@ async function loadMySafetyStatus() {
       vrEl.textContent = data.vr_done ? '완료' : '미완료';
       vrEl.className   = data.vr_done ? 'done' : 'todo';
     }
-  } catch { /* 실패 시 기본값(미완료) 유지 */ }
+  } catch (e) {
+    console.warn('[loadMySafetyStatus] fetch failed:', e);
+  }
 }
 
-initApp();
+initApp().catch(err => {
+  console.error('[app] initialization failed:', err);
+});

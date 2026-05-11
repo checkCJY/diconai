@@ -13,6 +13,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from core.config import settings
 from services.drf_client import post_to_drf
+from websocket.auth import verify_jwt_from_ws_query
 from websocket.services.broadcast import build_broadcast_payload
 from websocket.state import (
     active_alarms,
@@ -91,8 +92,15 @@ async def sensor_stream(websocket: WebSocket):
 
     연결 즉시 첫 페이로드를 전송하고, 이후 broadcast_loop 가 주기적으로 전송한다.
     클라이언트별 루프를 두지 않아 active_alarms 중복 소비를 방지한다.
+
+    [Phase 5] settings.JWT_SIGNING_KEY 설정 시 query string의 ?token=<access>로 JWT 검증.
+    빈 값(미설정)이면 인증 비활성 (옵트인 — 기존 동작 유지).
     """
     await websocket.accept()
+    payload = verify_jwt_from_ws_query(websocket)
+    if payload is None:
+        await websocket.close(code=1008, reason="unauthenticated")
+        return
     sensor_clients.append(websocket)
     logger.info(f"[ws/sensors] action=connect total={len(sensor_clients)}")
     try:
@@ -115,8 +123,29 @@ async def worker_stream(websocket: WebSocket, user_id: int):
 
     작업자가 로그인 후 본인 user_id로 연결한다.
     지오펜스 진입 알람 발생 시 해당 작업자에게만 전송된다.
+
+    [Phase 5] settings.JWT_SIGNING_KEY 설정 시:
+      1) query string의 token으로 JWT 검증
+      2) 토큰 payload의 user_id가 path의 user_id와 일치하는지 검증
+         (다른 사용자의 알람 가로채기 차단 — 분석 04 D2 / 07 G1)
+    빈 값(미설정)이면 인증 비활성 (옵트인 — 기존 동작 유지).
     """
     await websocket.accept()
+    payload = verify_jwt_from_ws_query(websocket)
+    if payload is None:
+        await websocket.close(code=1008, reason="unauthenticated")
+        return
+
+    # 옵트인 활성 시 (payload truthy) path user_id 일치 확인.
+    # 비활성 시 payload는 빈 dict라 user_id 검증 skip (기존 동작).
+    if payload and payload.get("user_id") != user_id:
+        logger.warning(
+            f"[ws/worker] action=forbidden token_user={payload.get('user_id')} "
+            f"path_user={user_id}"
+        )
+        await websocket.close(code=1008, reason="forbidden")
+        return
+
     worker_clients[user_id] = websocket
     logger.info(f"[ws/worker] action=connect user_id={user_id}")
     try:
@@ -136,6 +165,10 @@ async def worker_stream(websocket: WebSocket, user_id: int):
 async def position_stream(websocket: WebSocket):
     """
     IoT 위치 장비용 수신 스트림.
+
+    [Phase 5 미적용] IoT 장비 인증은 펌웨어 협업 별도 작업.
+    분석 06 F2 / 07 G2 — 장비별 cert/secret 도입은 다음 sprint.
+    현재는 무인증 유지 (`/ws/sensors/`, `/ws/worker/`와 달리 JWT 적용 안 됨).
 
     장비로부터 worker_id, facility_id, x, y 를 수신해 DRF에 저장하고
     worker_positions 공유 상태를 갱신한다.

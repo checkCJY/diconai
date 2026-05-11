@@ -35,8 +35,16 @@ function nowDateLabel() {
  * @param {...number} values 각 dataset 에 추가할 값
  */
 function pushData(chart, label, ...values) {
+  if (!chart || !chart.data || !chart.data.datasets) return;
+  if (values.length > chart.data.datasets.length) {
+    console.warn('[pushData] values.length > datasets.length',
+      { values: values.length, datasets: chart.data.datasets.length });
+  }
   chart.data.labels.push(label);
-  values.forEach((v, i) => chart.data.datasets[i].data.push(v));
+  values.forEach((v, i) => {
+    const ds = chart.data.datasets[i];
+    if (ds) ds.data.push(v);
+  });
   if (chart.data.labels.length > MAX_POINTS) {
     chart.data.labels.shift();
     chart.data.datasets.forEach(ds => ds.data.shift());
@@ -46,6 +54,3 @@ function pushData(chart, label, ...values) {
 
 /** 차트 최대 보관 포인트 수 */
 const MAX_POINTS = 30;
-
-/** 위험도 한글 레이블 (danger·caution·safe 공통) */
-const levelLabel = { danger: '위험', caution: '주의', safe: '정상' };

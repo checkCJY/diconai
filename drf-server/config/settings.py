@@ -36,6 +36,7 @@ ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["127.0.0.1", "localhos
 INSTALLED_APPS = [
     # DRF
     "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",
     "drf_spectacular",
     "django.contrib.admin",
     "django.contrib.auth",
@@ -54,6 +55,10 @@ INSTALLED_APPS = [
     "apps.safety",
     "apps.core",
     "apps.dashboard",
+    "apps.operations",
+    "apps.reference",
+    "apps.notices",
+    "apps.training",
 ]
 
 MIDDLEWARE = [
@@ -156,14 +161,23 @@ SPECTACULAR_SETTINGS = {
 }
 
 # ── Simple JWT ────────────────────────────────────────────
+# Phase 5: blacklist 도입 + access lifetime 단축 + refresh 회전
+# - access 1h: XSS 노출 시간 95% 감소 (24h → 1h). env로 운영별 조정 가능.
+# - ROTATE_REFRESH_TOKENS: refresh 사용 시 새 refresh 발급 (1회용)
+# - BLACKLIST_AFTER_ROTATION: 회전된 refresh는 blacklist 등록 → 재사용 차단
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(
-        hours=env.int("JWT_ACCESS_TOKEN_LIFETIME_HOURS", default=24)
+        hours=env.int("JWT_ACCESS_TOKEN_LIFETIME_HOURS", default=1)
     ),
     "REFRESH_TOKEN_LIFETIME": timedelta(
         days=env.int("JWT_REFRESH_TOKEN_LIFETIME_DAYS", default=30)
     ),
     "AUTH_HEADER_TYPES": ("Bearer",),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    # Phase 5 WS 인증: fastapi가 같은 키로 검증할 수 있도록 명시.
+    # 기본값 SECRET_KEY는 SimpleJWT 기본 동작과 동일 (호환 유지).
+    "SIGNING_KEY": env("JWT_SIGNING_KEY", default=SECRET_KEY),
 }
 
 # ── 백오피스 URL (관리자 메뉴 이동) ───────────────────────
@@ -171,10 +185,22 @@ ADMIN_BACKOFFICE_URL = env(
     "ADMIN_BACKOFFICE_URL", default="/admin-panel/accounts-management/"
 )
 
+# Phase 3-e: Notification "지연" 동적 판정 임계값.
+# delivery_status=PENDING + (now - last_attempted_at > N분) 이면 화면에 "지연" 라벨.
+# enum 5종으로 비대화 안 함 — 동적 판정만.
+NOTIFICATION_DELAY_THRESHOLD_MINUTES = env.int(
+    "NOTIFICATION_DELAY_THRESHOLD_MINUTES", default=5
+)
+
 # ── FastAPI 서버 (서버 간 호출용, localhost) ──────────────
 # Celery → FastAPI WS 브리지(/internal/alarms/push/) 호출에 사용.
 # 브라우저는 별도로 FRONTEND_WS_BASE_URL을 통해 직접 fastapi와 WS 연결.
 FASTAPI_INTERNAL_URL = env("FASTAPI_INTERNAL_URL", default="http://127.0.0.1:8001")
+
+# ── 서비스 간 인증 토큰 (Phase 5) ──────────────────────────
+# fastapi → drf 인입 엔드포인트, drf Celery → fastapi /internal/alarms/push/ 양방향에 사용.
+# 빈 문자열이면 인증 비활성 (기존 동작 유지). 운영에서는 양 서비스에 동일 값 설정.
+INTERNAL_SERVICE_TOKEN = env("INTERNAL_SERVICE_TOKEN", default="")
 
 # ── 프론트엔드 노출용 URL (config.js로 주입) ───────────────
 # 브라우저가 fastapi-server에 접속할 때 사용하는 공개 주소.
@@ -220,9 +246,17 @@ LOGGING = {
             "class": "logging.StreamHandler",
             "formatter": "diconai",
         },
+        # AppLog 영속화 — Phase 2-d.
+        # ERROR 이상만 캡처 (level=ERROR). 동기 INSTALL — 부하 측정 후 Phase 4에서 비동기 검토.
+        # 재귀 가드는 핸들러 내부 thread-local 플래그로 처리.
+        "applog_db": {
+            "class": "apps.operations.logging.db_handler.DBLogHandler",
+            "level": "ERROR",
+            "formatter": "diconai",
+        },
     },
     "root": {
-        "handlers": ["console"],
+        "handlers": ["console", "applog_db"],
         "level": LOG_LEVEL,
     },
     "loggers": {
@@ -252,6 +286,19 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_TRACK_STARTED = True
+
+# Phase 4-g: DataRetentionPolicy 보관 배치 — 매일 새벽 3시 실행
+# is_cycle_due()가 정책별 delete_cycle 판정 (DAILY/MONTHLY_*/QUARTERLY)
+# Celery beat 실행: celery -A config beat -l info
+from celery.schedules import crontab  # noqa: E402
+
+CELERY_BEAT_SCHEDULE = {
+    "data_retention_daily": {
+        "task": "apps.operations.tasks.data_retention_task.run_data_retention",
+        "schedule": crontab(hour=3, minute=0),
+        "args": (False,),  # dry_run=False (실제 삭제)
+    },
+}
 
 # ── Cache (Redis) ─────────────────────────────────────────────
 # 가스 알람 상태(normal/warning/danger)와 WARNING 타이머 task ID를 저장.

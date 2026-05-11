@@ -72,6 +72,47 @@ class SystemLog(models.Model):
         MEMBER_MOVE = "member_move", "부서 이동"
         LEADER_ASSIGN = "leader_assign", "조직장 임명"
 
+        # 지도 편집 (4차 — ISH 갭 분석)
+        MAP_GEOFENCE_CREATE = "map_geofence_create", "위험구역 생성 (지도)"
+        MAP_SENSOR_MOVE = "map_sensor_move", "센서 이동"
+        MAP_FACILITY_UPDATE = "map_facility_update", "설비 수정"
+        MAP_POSITION_NODE_REGISTER = "map_position_node_register", "위치 노드 등록"
+        MAP_OBJECT_DELETE = "map_object_delete", "객체 삭제"
+
+        # 알림 정책 (4차 — CJY 화면)
+        # 정책은 Soft Delete — DELETED 대신 DEACTIVATED 사용
+        POLICY_CREATED = "policy_created", "알림 정책 생성"
+        POLICY_UPDATED = "policy_updated", "알림 정책 수정"
+        POLICY_DEACTIVATED = "policy_deactivated", "알림 정책 비활성화"
+
+        # 공지사항 (4차 — CJY 화면)
+        NOTICE_CREATE = "notice_create", "공지 생성"
+        NOTICE_UPDATE = "notice_update", "공지 수정"
+        NOTICE_DELETE = "notice_delete", "공지 삭제"
+
+        # VR 교육 (4차 — CJY 화면)
+        VR_CONTENT_CREATED = "vr_content_created", "VR 콘텐츠 등록"
+        VR_CONTENT_REPLACED = "vr_content_replaced", "VR 콘텐츠 교체"
+        VR_CONTENT_TOGGLED = "vr_content_toggled", "VR 콘텐츠 활성화 전환"
+
+        # 체크리스트 — CHECKLIST_ prefix 통일
+        CHECKLIST_REVISION_PUBLISHED = (
+            "checklist_revision_published",
+            "체크리스트 개정 발행",
+        )
+        CHECKLIST_SECTION_CREATED = (
+            "checklist_section_created",
+            "체크리스트 섹션 생성",
+        )
+        CHECKLIST_ITEM_DEACTIVATED = (
+            "checklist_item_deactivated",
+            "체크리스트 항목 비활성화",
+        )
+
+    class Result(models.TextChoices):
+        SUCCESS = "success", "성공"
+        FAILURE = "failure", "실패"
+
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -79,12 +120,32 @@ class SystemLog(models.Model):
         blank=True,
         related_name="system_logs",
     )
-    action_type = models.CharField(max_length=30, choices=ActionType.choices)
+    action_type = models.CharField(max_length=40, choices=ActionType.choices)
     target_model = models.CharField(
         max_length=50, blank=True, default="", verbose_name="대상 모델 이름"
     )
     target_id = models.CharField(
         max_length=50, blank=True, default="", verbose_name="대상 레코드 ID"
+    )
+    target_menu = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        verbose_name="대상 메뉴",
+        help_text="Menu.code 문자열 참조 (FK 아님, 이력 보존)",
+    )
+    target_name = models.CharField(
+        max_length=200,
+        blank=True,
+        default="",
+        verbose_name="대상 이름",
+        help_text="삭제된 객체 이름 복원용 스냅샷",
+    )
+    result = models.CharField(
+        max_length=10,
+        choices=Result.choices,
+        default=Result.SUCCESS,
+        verbose_name="결과",
     )
     old_value = models.JSONField(null=True, blank=True)
     new_value = models.JSONField(null=True, blank=True)

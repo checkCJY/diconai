@@ -1,7 +1,9 @@
 from django.db import models
 
+from apps.core.models.base import BaseModel
 
-class PowerDeviceInspection(models.Model):
+
+class PowerDeviceInspection(BaseModel):
     class InspectionType(models.TextChoices):
         REGULAR = "regular", "정기"
         ABNORMAL = "abnormal", "이상"
@@ -52,8 +54,7 @@ class PowerDeviceInspection(models.Model):
         verbose_name="조치자",
     )
     action_notes = models.TextField(blank=True, default="", verbose_name="조치 내용")
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    # created_at / updated_at / updated_by 는 BaseModel 상속
 
     class Meta:
         db_table = "power_device_inspection"

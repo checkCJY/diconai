@@ -329,7 +329,7 @@ function _processPositions(workerPositions) {
    WebSocket 연결 (재연결은 WSClient가 자동 처리)
 ══════════════════════════════════════════════════════════ */
 function _connectWebSocket() {
-  const ws = WSClient.connect('/ws/sensors/');
+  const ws = WSClient.connect('/ws/sensors/', { attachToken: true });
   ws.onOpen(() => console.log('[작업자 현황] WebSocket 연결됨'));
   ws.onClose(() => console.warn('[작업자 현황] 연결 끊김, WSClient 자동 재연결'));
   ws.onMessage((data) => {

@@ -83,7 +83,14 @@ def build_equipment() -> tuple[list[dict], float]:
 
     WebSocket 브로드캐스트 페이로드의 equipment[] 필드를 생성하는 데 사용된다.
     watt/current/voltage가 모두 비어있으면 데이터 미수신 상태로 간주해 빈 리스트를 반환한다.
-    채널별 위험도: watt > POWER_THRESHOLDS["danger"] → danger, > POWER_THRESHOLDS["caution"] → warning, 그 외 → normal
+
+    [risk_level 표시용 fallback — Phase 4 회귀 점검 fix]
+    채널별 위험도: watt > POWER_THRESHOLDS["danger"] → danger, > POWER_THRESHOLDS["caution"]
+    → warning, 그 외 → normal.
+
+    본 risk_level은 표시용이며 실제 알람 판정 + DB 저장은 DRF의
+    `apps.alerts.tasks.fire_power_*_task`가 담당 (Phase 4-b에서 DB Threshold 전환 완료).
+    DRF GasData.save() 패턴과 일관: fastapi 측 risk는 페이로드 표시용, DRF가 단일 진실 공급원.
     """
     if not any(
         [power_latest["watt"], power_latest["current"], power_latest["voltage"]]
