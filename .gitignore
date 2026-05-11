@@ -17,6 +17,7 @@ drf-server/staticfiles/
 # Environment
 .env
 *.env
+.env.docker
 
 # IDE
 .vscode/

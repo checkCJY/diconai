@@ -1,0 +1,121 @@
+name: diconai
+
+services:
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  drf:
+    build:
+      context: ./drf-server
+    image: diconai/drf:dev
+    env_file: ./.env.docker
+    environment:
+      DATABASE_URL: sqlite:////app/db.sqlite3
+      REDIS_URL: redis://redis:6379/0
+      FASTAPI_INTERNAL_URL: http://fastapi:8001
+    volumes:
+      - ./drf-server/db.sqlite3:/app/db.sqlite3
+      - ./drf-server/media:/app/media
+      - drf_static:/app/staticfiles
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  fastapi:
+    build:
+      context: ./fastapi-server
+    image: diconai/fastapi:dev
+    env_file: ./.env.docker
+    environment:
+      DRF_BASE_URL: http://drf:8000
+    depends_on:
+      drf:
+        condition: service_healthy
+    ports:
+      - "8001:8001"
+    restart: unless-stopped
+
+  celery-worker:
+    image: diconai/drf:dev
+    command: ["celery", "-A", "config", "worker", "-l", "info", "--concurrency=2"]
+    env_file: ./.env.docker
+    environment:
+      DATABASE_URL: sqlite:////app/db.sqlite3
+      REDIS_URL: redis://redis:6379/0
+      FASTAPI_INTERNAL_URL: http://fastapi:8001
+      RUN_MIGRATIONS: "0"
+      COLLECT_STATIC: "0"
+    volumes:
+      - ./drf-server/db.sqlite3:/app/db.sqlite3
+      - ./drf-server/media:/app/media
+    depends_on:
+      drf:
+        condition: service_healthy
+      fastapi:
+        condition: service_healthy
+    restart: unless-stopped
+
+  celery-beat:
+    image: diconai/drf:dev
+    command: ["celery", "-A", "config", "beat", "-l", "info"]
+    env_file: ./.env.docker
+    environment:
+      DATABASE_URL: sqlite:////app/db.sqlite3
+      REDIS_URL: redis://redis:6379/0
+      RUN_MIGRATIONS: "0"
+      COLLECT_STATIC: "0"
+    volumes:
+      - ./drf-server/db.sqlite3:/app/db.sqlite3
+    depends_on:
+      drf:
+        condition: service_healthy
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prom_data:/prometheus
+    depends_on:
+      - drf
+      - fastapi
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    env_file: ./.env.docker
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  drf_static:
+  prom_data:
+  grafana_data:

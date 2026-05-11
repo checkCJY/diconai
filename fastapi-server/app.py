@@ -4,12 +4,19 @@
 # 실행: uvicorn app:app --reload --port 8001
 import asyncio
 import logging
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    Counter,
+    Histogram,
+    generate_latest,
+)
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from core.config import settings
@@ -90,6 +97,40 @@ app.include_router(positioning_router)
 app.include_router(ws_router)
 app.include_router(internal_alarm_router)  # Celery → WS 브리지 (localhost 전용)
 app.include_router(internal_scenario_router)  # 시연 시나리오 모드 컨트롤
+
+
+# ── Prometheus 메트릭 (직접 노출, 외부 instrumentator 패키지 미사용) ──
+# label에 raw path를 쓰면 path-param이 많은 라우트(/ws/worker/{user_id}/)에서
+# 카디널리티 폭발 → request.scope["route"].path (라우트 템플릿) 사용.
+_HTTP_REQUESTS_TOTAL = Counter(
+    "http_requests_total",
+    "Total HTTP requests",
+    ["method", "path", "status"],
+)
+_HTTP_REQUEST_DURATION = Histogram(
+    "http_request_duration_seconds",
+    "HTTP request latency in seconds",
+    ["method", "path"],
+)
+
+
+@app.middleware("http")
+async def prometheus_metrics_middleware(request: Request, call_next):
+    if request.url.path == "/metrics":
+        return await call_next(request)
+    start = time.perf_counter()
+    response = await call_next(request)
+    elapsed = time.perf_counter() - start
+    route = request.scope.get("route")
+    path = getattr(route, "path", request.url.path)
+    _HTTP_REQUESTS_TOTAL.labels(request.method, path, response.status_code).inc()
+    _HTTP_REQUEST_DURATION.labels(request.method, path).observe(elapsed)
+    return response
+
+
+@app.get("/metrics", include_in_schema=False)
+def prometheus_metrics() -> Response:
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 # ── 전역 예외 핸들러 ────────────────────────────────────────────
