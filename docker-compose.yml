@@ -22,10 +22,19 @@ services:
       DATABASE_URL: sqlite:////app/db.sqlite3
       REDIS_URL: redis://redis:6379/0
       FASTAPI_INTERNAL_URL: http://fastapi:8001
+      DJANGO_DEBUG: "True"      # 개발: 템플릿/정적 핫리로드 활성
+      COLLECT_STATIC: "0"       # WHITENOISE_USE_FINDERS=True → collectstatic 불필요
     volumes:
-      - ./drf-server/db.sqlite3:/app/db.sqlite3
+      - ./drf-server:/app                            # 소스 핫리로드 (코드/템플릿/정적 즉시 반영)
+      - ./drf-server/db.sqlite3:/app/db.sqlite3      # 영속 데이터 명시적 마운트
       - ./drf-server/media:/app/media
-      - drf_static:/app/staticfiles
+    command:
+      - gunicorn
+      - config.wsgi:application
+      - --bind=0.0.0.0:8000
+      - --workers=1
+      - --reload
+      - --access-logfile=-
     depends_on:
       redis:
         condition: service_healthy
