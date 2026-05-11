@@ -178,6 +178,91 @@ python -m dummies.position_dummy   # 작업자 4명 위치 (worker_id=1~4)
 
 ---
 
+## 🐳 Docker 통합 환경 (대안)
+
+위 1~6번을 한 번에 띄우는 Docker Compose 환경입니다. 7개 서비스(`drf` + `fastapi` + `redis` + `celery-worker` + `celery-beat` + `prometheus` + `grafana`)가 함께 기동됩니다. **DB는 SQLite를 그대로 사용**하며 `drf-server/db.sqlite3`를 호스트와 공유합니다 (Postgres 전환은 다음 스프린트).
+
+### 사전 요구사항
+
+- Docker Engine 24+ / Docker Compose v2
+- WSL2: Docker Desktop의 **Settings → Resources → WSL Integration**에서 현재 배포 토글 ON
+- 호스트에 빈 디렉토리 미리 생성 (bind mount 자동 생성 시 root 소유 문제 방지):
+  ```bash
+  mkdir -p drf-server/media
+  ```
+
+### 첫 실행
+
+```bash
+# 1) 환경변수 작성
+cp .env.docker.example .env.docker
+python -c "import secrets; print(secrets.token_urlsafe(50))"   # DJANGO_SECRET_KEY 용
+python -c "import secrets; print(secrets.token_urlsafe(32))"   # INTERNAL_SERVICE_TOKEN 용
+python -c "import secrets; print(secrets.token_urlsafe(32))"   # JWT_SIGNING_KEY 용
+# .env.docker 에 위 값들 채워넣기 (DRF_SERVICE_TOKEN = INTERNAL_SERVICE_TOKEN 동일 값 권장)
+
+# 2) 빌드 + 기동
+docker compose build
+docker compose up -d
+
+# 3) 상태 확인
+docker compose ps
+docker compose logs -f drf fastapi
+```
+
+기동되면 마이그레이션 + collectstatic이 `drf` 컨테이너 entrypoint에서 자동 실행됩니다 (`celery-worker`/`celery-beat`는 `RUN_MIGRATIONS=0`로 중복 방지).
+
+### 접속
+
+| 서비스 | URL | 비고 |
+|---|---|---|
+| 대시보드 (DRF) | http://localhost:8000/dashboard/ | |
+| FastAPI Docs | http://localhost:8001/docs | |
+| WebSocket | `ws://localhost:8001/ws/worker/{user_id}/` | 브라우저 직접 연결 |
+| DRF `/metrics` | http://localhost:8000/metrics | django-prometheus |
+| FastAPI `/metrics` | http://localhost:8001/metrics | prometheus-fastapi-instrumentator |
+| Prometheus | http://localhost:9090 | targets 모두 UP 확인 |
+| Grafana | http://localhost:3000 | id `admin` / pw `.env.docker`의 `GRAFANA_PASSWORD` |
+
+### 자주 쓰는 명령
+
+```bash
+# Django 명령 (시드, createsuperuser 등)
+docker compose exec drf python manage.py seed_dummy_data
+docker compose exec drf python manage.py createsuperuser
+docker compose exec drf python manage.py showmigrations
+
+# 테스트
+docker compose exec drf pytest -q
+docker compose exec fastapi pytest -q
+
+# 한 서비스만 재기동 (코드 수정 후)
+docker compose build drf && docker compose up -d drf
+
+# 로그 모니터링
+docker compose logs -f celery-worker
+docker compose logs -f --tail=50 fastapi
+
+# 정리
+docker compose down              # 컨테이너만 제거 (볼륨 유지)
+docker compose down -v           # 볼륨까지 제거 (Redis/Prometheus/Grafana 데이터 삭제)
+```
+
+### 검증 체크리스트
+
+```bash
+curl -fsS http://localhost:8000/health/ && echo OK
+curl -fsS http://localhost:8001/health/ && echo OK
+curl -s http://localhost:8000/metrics | head -5
+curl -s http://localhost:8001/metrics | head -5
+# Prometheus targets — 모두 state="up"
+curl -s http://localhost:9090/api/v1/targets | python -m json.tool | grep -E '"job"|"health"'
+```
+
+> SQLite 다중 컨테이너 동시 쓰기는 가벼운 부하에서만 안전합니다. 부하가 늘면 `SQLITE_BUSY` 가능 — 다음 스프린트의 Postgres 전환에서 해소.
+
+---
+
 ## ⚙️ 환경 변수
 
 ### `drf-server/.env`
