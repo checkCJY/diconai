@@ -1,5 +1,6 @@
 from django.urls import path
 
+from apps.operations.views.admin import AppLogAdminListView, IntegrationLogAdminListView
 from apps.operations.views.internal.integration_log import (
     IntegrationLogInternalCreateView,
 )
@@ -7,9 +8,19 @@ from apps.operations.views.internal.integration_log import (
 app_name = "operations"
 
 urlpatterns = [
+    # ── 내부 호출 (FastAPI → DRF) ───────────────────────────────────────────
     path(
         "internal/integration-logs/",
         IntegrationLogInternalCreateView.as_view(),
         name="internal-integration-log-create",
     ),
+
+    # ── 관리자 조회 ─────────────────────────────────────────────────────────
+    # GET /api/admin/system-logs/     — AppLog 조회
+    # GET /api/admin/integration-logs/ — IntegrationLog 조회
+    #
+    # config/urls.py에서 "api/" 아래에 이 파일을 include하므로
+    # 여기서 "admin/"을 붙이면 최종 URL은 /api/admin/...이 된다.
+    path("admin/system-logs/", AppLogAdminListView.as_view(), name="admin-system-logs"),
+    path("admin/integration-logs/", IntegrationLogAdminListView.as_view(), name="admin-integration-logs"),
 ]

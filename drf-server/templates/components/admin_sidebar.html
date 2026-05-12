@@ -9,8 +9,19 @@
         <a href="/admin-panel/map-editor/" {% if active_nav == 'map_editor' %}class="active"{% endif %}><span class="icon">지도 편집</span></a>
         <a href="/admin-panel/data/gas/" {% if active_nav == 'data' %}class="active"{% endif %}><span class="icon">가스 데이터</span></a>
         <a href="/admin-panel/data/power/" {% if active_nav == 'power_data' %}class="active"{% endif %}><span class="icon">전력 데이터</span></a>
-        <a href="#" {% if active_nav == 'log' %}class="active"{% endif %}><span class="icon">로그</span></a>
-        <a href="#" {% if active_nav == 'notice' %}class="active"{% endif %}><span class="icon">공지사항</span></a>
+        <div class="snb-group {% if active_nav in 'system_log,activity_log,integration_log,map_edit_log' %}open{% endif %}" id="snbLogGroup">
+            <button class="snb-group-btn" id="snbLogToggle">
+                <span class="icon">로그</span>
+                <span class="snb-arrow">▾</span>
+            </button>
+            <div class="snb-sub">
+                <a href="/admin-panel/logs/system/"      {% if active_nav == 'system_log'      %}class="active"{% endif %}>시스템 로그</a>
+                <a href="/admin-panel/logs/activity/"    {% if active_nav == 'activity_log'    %}class="active"{% endif %}>사용자 활동 로그</a>
+                <a href="/admin-panel/logs/integration/" {% if active_nav == 'integration_log' %}class="active"{% endif %}>연동 로그</a>
+                <a href="/admin-panel/logs/map-edit/"    {% if active_nav == 'map_edit_log'    %}class="active"{% endif %}>지도 편집 로그</a>
+            </div>
+        </div>
+        <a href="/admin-panel/notices/" {% if active_nav == 'notice' %}class="active"{% endif %}><span class="icon">공지사항</span></a>
         <a href="#" {% if active_nav == 'event' %}class="active"{% endif %}><span class="icon">이벤트</span></a>
         <a href="#" {% if active_nav == 'policy' %}class="active"{% endif %}><span class="icon">안전 정책/기준 관리</span></a>
     </nav>
