@@ -21,6 +21,22 @@ let _dirtySet     = new Set();   // 변경된 객체 id 추적 (type:id)
 let _pendingGeofences = [];      // 신규/수정 지오펜스
 let _deletedGeofences = new Set();
 
+// 이성현 작업
+// 설비 크기 조정 핸들 상태
+let _resizeHandles     = [];
+let _resizeMapHandlers = null;
+// 이성현 작업 — 삭제: pane 방식 제거 (공장 이미지 위에 렌더링 불가 문제)
+// let _geofenceRenderer = null;
+
+// 이성현 작업
+// 객체 선택 상태 (불투명화용)
+let _selectedKey = null;
+
+// 이성현 작업 — 위험구역 편집 핸들/이벤트 상태
+let _geofenceEditHandles    = [];
+let _geofenceEditMapHandlers = null;
+let _pendingDeleteGeofenceId = null;
+
 // 그리기 상태
 let _drawMode     = null;        // null | { shape, risk, name }
 let _drawPoints   = [];
@@ -58,12 +74,14 @@ function _initMap() {
   if (mapUrl) L.imageOverlay(mapUrl, MAP_BOUNDS).addTo(_map);
   _map.fitBounds(MAP_BOUNDS);
 
+  // 이성현 작업 — pane 방식 제거: 지오펜스를 geofences 레이어그룹에 먼저 추가해 SVG 스택 바닥에 배치
+  // (지오펜스 먼저 addTo → 센서/설비가 위에 쌓여 클릭 이벤트 자연히 센서가 잡힘)
   _layers = {
+    geofence:      L.layerGroup().addTo(_map),
     facility:      L.layerGroup().addTo(_map),
     gas_sensor:    L.layerGroup().addTo(_map),
     power_device:  L.layerGroup().addTo(_map),
     position_node: L.layerGroup().addTo(_map),
-    geofence:      L.layerGroup().addTo(_map),
   };
 
   // 지도 클릭 → 그리기 모드 처리
@@ -80,6 +98,11 @@ function _initControls() {
   document.getElementById('btnResetAll').addEventListener('click', () => _showModal('resetConfirmModal'));
   document.getElementById('btnResetConfirm').addEventListener('click', _resetAll);
   document.getElementById('btnResetCancel').addEventListener('click', () => _hideModal('resetConfirmModal'));
+  // 이성현 작업
+  document.getElementById('btnSaveCompleteConfirm').addEventListener('click', () => { _hideModal('saveCompleteModal'); _loadObjects(); });
+  // 이성현 작업 — 위험구역 삭제 확인 모달
+  document.getElementById('btnGeofenceDeleteCancel').addEventListener('click', () => { _pendingDeleteGeofenceId = null; _hideModal('geofenceDeleteModal'); });
+  document.getElementById('btnGeofenceDeleteConfirm').addEventListener('click', () => MapEditor.doDeleteGeofence());
 
   // 위험구역 추가
   document.getElementById('btnAddGeofence').addEventListener('click', _openGeofenceModal);
@@ -167,12 +190,13 @@ async function _loadObjects() {
     const res = await Auth.apiFetch(url);
     const data = await res.json();
 
+    // 이성현 작업 — geofences 먼저: SVG 렌더링 순서상 바닥에 깔려 센서/설비가 위에서 클릭됨
     _allObjects = [
+      ...data.geofences.map(o => ({ ...o, _objType: 'geofence' })),
       ...data.facilities.map(o => ({ ...o, _objType: 'facility' })),
       ...data.gas_sensors.map(o => ({ ...o, _objType: 'gas_sensor' })),
       ...data.power_devices.map(o => ({ ...o, _objType: 'power_device' })),
       ...data.position_nodes.map(o => ({ ...o, _objType: 'position_node' })),
-      ...data.geofences.map(o => ({ ...o, _objType: 'geofence' })),
     ];
 
     _populateFacilitySelect(data.facilities);
@@ -182,14 +206,18 @@ async function _loadObjects() {
   }
 }
 
+// 이성현 작업
 function _populateFacilitySelect(facilities) {
   const sel = document.getElementById('facilitySelect');
+  const prevValue = sel.value;
+  sel.innerHTML = '';
   facilities.forEach(f => {
     const opt = document.createElement('option');
     opt.value = f.id;
     opt.textContent = f.name || f.code;
     sel.appendChild(opt);
   });
+  if (prevValue) sel.value = prevValue;
 }
 
 // ── 렌더링 ───────────────────────────────────────────────────
@@ -226,13 +254,16 @@ function _renderFacility(obj) {
   });
   rect.bindPopup(_facilityPopupHtml(obj));
   rect.addTo(_layers.facility);
-  rect.on('click', () => _selectObject(obj));
+  // 이성현 작업 — 클릭이 맵으로 전파되면 _clearSelection 즉시 호출되므로 차단
+  rect.on('click', (e) => { L.DomEvent.stopPropagation(e); _selectObject(obj); });
   // 드래그
   _makeDraggableRect(rect, obj);
   _layerMap[`facility:${obj.id}`] = rect;
 }
 
+// 이성현 작업
 function _renderDevice(obj, color, _label) {
+  if (!obj.placed) return;
   const x = obj.x ?? 0, y = obj.y ?? 0;
   const marker = L.circleMarker([y, x], {
     radius: 8, fillColor: color, color: '#fff',
@@ -240,32 +271,35 @@ function _renderDevice(obj, color, _label) {
   });
   marker.bindPopup(_devicePopupHtml(obj));
   marker.addTo(_layers[obj._objType]);
-  marker.on('click', () => _selectObject(obj));
+  // 이성현 작업 — 클릭 전파 차단
+  marker.on('click', (e) => { L.DomEvent.stopPropagation(e); _selectObject(obj); });
   _makeDraggableMarker(marker, obj);
   _layerMap[`${obj._objType}:${obj.id}`] = marker;
 }
 
 function _renderGeofence(obj) {
   let layer;
+  // 이성현 작업 — pane 제거: 기본 렌더러 사용, _allObjects에서 geofences를 먼저 처리하므로 SVG 바닥에 배치됨
+  const geofenceStyle = {
+    color: RISK_COLOR[obj.risk_level] || '#888',
+    fillColor: RISK_COLOR[obj.risk_level] || '#888',
+    fillOpacity: 0.15, weight: 2,
+  };
   if (obj.shape_type === 'circle' && obj.circle_cx != null) {
     layer = L.circle([obj.circle_cy, obj.circle_cx], {
-      radius: obj.circle_radius,
-      color: RISK_COLOR[obj.risk_level] || '#888',
-      fillColor: RISK_COLOR[obj.risk_level] || '#888',
-      fillOpacity: 0.15, weight: 2,
+      radius: obj.circle_radius, ...geofenceStyle,
     });
   } else {
     const latlngs = (obj.polygon || []).map(([px, py]) => [py, px]);
     if (latlngs.length < 3) return;
-    layer = L.polygon(latlngs, {
-      color: RISK_COLOR[obj.risk_level] || '#888',
-      fillColor: RISK_COLOR[obj.risk_level] || '#888',
-      fillOpacity: 0.15, weight: 2,
-    });
+    layer = L.polygon(latlngs, geofenceStyle);
   }
   layer.bindPopup(_geofencePopupHtml(obj));
   layer.addTo(_layers.geofence);
-  layer.on('click', () => _selectObject(obj));
+  // 이성현 작업 — 클릭 전파 차단
+  layer.on('click', (e) => { L.DomEvent.stopPropagation(e); _selectObject(obj); });
+  // 이성현 작업 — 위험구역 위치 이동 드래그
+  _makeGeofenceDraggable(layer, obj);
   _layerMap[`geofence:${obj.id}`] = layer;
 }
 
@@ -294,13 +328,24 @@ function _devicePopupHtml(obj) {
     </div>`;
 }
 
+// 이성현 작업
 function _geofencePopupHtml(obj) {
   const riskLabel = { danger: '위험', warning: '주의', normal: '정상' }[obj.risk_level] || obj.risk_level;
   const shape = obj.shape_type === 'circle' ? '원형' : '폴리곤';
+  const editLabel = obj.shape_type === 'circle' ? '크기 편집' : '편집';
   return `<div class="me-popup-title">위험구역 ${obj.name}</div>
     <div class="me-popup-row">위험도: ${riskLabel} | ${shape}</div>
     <div class="me-popup-actions">
-      <button class="btn-popup-delete" onclick="MapEditor.deleteGeofence(${obj.id})">삭제</button>
+      <button class="btn-popup-edit" onclick="MapEditor.editGeofence(${obj.id})">${editLabel}</button>
+      <button class="btn-popup-delete" onclick="MapEditor.confirmDeleteGeofence(${obj.id})">삭제</button>
+    </div>`;
+}
+
+// 이성현 작업 — 꼭짓점/반경 편집 중 팝업
+function _geofenceEditingPopupHtml(obj) {
+  return `<div class="me-popup-title">위험구역 편집 중</div>
+    <div class="me-popup-actions">
+      <button class="btn-popup-edit" onclick="MapEditor.finishGeofenceEdit(${obj.id})">완료</button>
     </div>`;
 }
 
@@ -355,6 +400,11 @@ function _makeDraggableRect(rect, obj) {
     const w = obj.map_width || 200, h = obj.map_height || 120;
     rect.setBounds([[ny, nx], [ny + h, nx + w]]);
     obj.map_x = nx; obj.map_y = ny;
+    // 이성현 작업 — 리사이즈 핸들 위치 동기화
+    if (_resizeHandles.length) {
+      [[ny, nx], [ny, nx + w], [ny + h, nx], [ny + h, nx + w]]
+        .forEach((pos, i) => _resizeHandles[i].setLatLng(pos));
+    }
   });
 
   _map.on('mouseup', () => {
@@ -364,6 +414,223 @@ function _makeDraggableRect(rect, obj) {
     _markDirty('facility', obj.id);
     rect.setPopupContent(_facilityPopupHtml(obj));
   });
+}
+
+// 이성현 작업 — 위험구역 편집 핸들 정리
+function _clearGeofenceEditHandles() {
+  _geofenceEditHandles.forEach(h => _map.removeLayer(h));
+  _geofenceEditHandles = [];
+  if (_geofenceEditMapHandlers) {
+    _map.off('mousemove', _geofenceEditMapHandlers.move);
+    _map.off('mouseup',   _geofenceEditMapHandlers.up);
+    _geofenceEditMapHandlers = null;
+  }
+}
+
+// 이성현 작업 — 위험구역 전체 이동 드래그
+function _makeGeofenceDraggable(layer, obj) {
+  let dragging = false, startLatlng, startCx, startCy, startPoly;
+
+  layer.on('mousedown', (e) => {
+    if (_geofenceEditHandles.length) return; // 꼭짓점 편집 중엔 이동 불가
+    dragging = true;
+    startLatlng = e.latlng;
+    if (obj.shape_type === 'circle') {
+      startCx = obj.circle_cx; startCy = obj.circle_cy;
+    } else {
+      startPoly = obj.polygon.map(([x, y]) => [x, y]);
+    }
+    _map.dragging.disable();
+    L.DomEvent.stop(e);
+  });
+
+  _map.on('mousemove', (e) => {
+    if (!dragging) return;
+    const dx = e.latlng.lng - startLatlng.lng;
+    const dy = e.latlng.lat - startLatlng.lat;
+    if (obj.shape_type === 'circle') {
+      obj.circle_cx = startCx + dx;
+      obj.circle_cy = startCy + dy;
+      layer.setLatLng([obj.circle_cy, obj.circle_cx]);
+    } else {
+      obj.polygon = startPoly.map(([x, y]) => [x + dx, y + dy]);
+      layer.setLatLngs(obj.polygon.map(([x, y]) => [y, x]));
+    }
+  });
+
+  _map.on('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    _map.dragging.enable();
+    if (obj.id) _markDirty('geofence', obj.id);
+  });
+}
+
+// 이성현 작업 — 원형 위험구역 반경 핸들 편집
+function _startResizeGeofenceCircle(obj) {
+  _clearGeofenceEditHandles();
+  const layer = _layerMap[`geofence:${obj.id}`];
+  if (!layer) return;
+
+  const handle = L.circleMarker(
+    [obj.circle_cy, obj.circle_cx + obj.circle_radius],
+    { radius: 7, fillColor: '#fff', color: RISK_COLOR[obj.risk_level] || '#888', weight: 2, fillOpacity: 1 }
+  ).addTo(_map);
+  _geofenceEditHandles.push(handle);
+
+  let resizing = false;
+  handle.on('mousedown', (e) => { resizing = true; _map.dragging.disable(); L.DomEvent.stop(e); });
+  handle.on('click', (e) => { L.DomEvent.stopPropagation(e); }); // 이성현 작업 — 지도 click 전파 차단
+
+  const onMove = (e) => {
+    if (!resizing) return;
+    const dx = e.latlng.lng - obj.circle_cx;
+    const dy = e.latlng.lat - obj.circle_cy;
+    obj.circle_radius = Math.max(10, Math.sqrt(dx * dx + dy * dy));
+    layer.setRadius(obj.circle_radius);
+    handle.setLatLng([e.latlng.lat, e.latlng.lng]);
+  };
+  const onUp = () => {
+    if (!resizing) return;
+    resizing = false;
+    _map.dragging.enable();
+    if (obj.id) _markDirty('geofence', obj.id);
+  };
+  _map.on('mousemove', onMove);
+  _map.on('mouseup', onUp);
+  _geofenceEditMapHandlers = { move: onMove, up: onUp };
+
+  layer.setPopupContent(_geofenceEditingPopupHtml(obj));
+}
+
+// 이성현 작업 — 폴리곤 위험구역 꼭짓점 핸들 편집
+function _startEditGeofencePolygon(obj) {
+  _clearGeofenceEditHandles();
+  const layer = _layerMap[`geofence:${obj.id}`];
+  if (!layer) return;
+
+  let activeIdx = null;
+
+  obj.polygon.forEach(([px, py], idx) => {
+    const h = L.circleMarker([py, px], {
+      radius: 7, fillColor: '#fff', color: RISK_COLOR[obj.risk_level] || '#888', weight: 2, fillOpacity: 1,
+    }).addTo(_map);
+    h.on('mousedown', (e) => { activeIdx = idx; _map.dragging.disable(); L.DomEvent.stop(e); });
+    h.on('click', (e) => { L.DomEvent.stopPropagation(e); }); // 이성현 작업 — 지도 click 전파 차단
+    // 더블클릭으로 꼭짓점 삭제 (최소 3개 유지)
+    h.on('dblclick', (e) => {
+      L.DomEvent.stop(e);
+      if (obj.polygon.length <= 3) return;
+      obj.polygon.splice(idx, 1);
+      layer.setLatLngs(obj.polygon.map(([x, y]) => [y, x]));
+      if (obj.id) _markDirty('geofence', obj.id);
+      _startEditGeofencePolygon(obj); // 핸들 재생성
+    });
+    _geofenceEditHandles.push(h);
+  });
+
+  const onMove = (e) => {
+    if (activeIdx === null) return;
+    obj.polygon[activeIdx] = [e.latlng.lng, e.latlng.lat];
+    _geofenceEditHandles[activeIdx].setLatLng([e.latlng.lat, e.latlng.lng]);
+    layer.setLatLngs(obj.polygon.map(([x, y]) => [y, x]));
+  };
+  const onUp = () => {
+    if (activeIdx === null) return;
+    activeIdx = null;
+    _map.dragging.enable();
+    if (obj.id) _markDirty('geofence', obj.id);
+  };
+  _map.on('mousemove', onMove);
+  _map.on('mouseup', onUp);
+  _geofenceEditMapHandlers = { move: onMove, up: onUp };
+
+  layer.setPopupContent(_geofenceEditingPopupHtml(obj));
+}
+
+// 이성현 작업
+// ── 설비 크기 조정 핸들 ──────────────────────────────────────
+function _clearResizeHandles() {
+  _resizeHandles.forEach(h => _map.removeLayer(h));
+  _resizeHandles = [];
+  if (_resizeMapHandlers) {
+    _map.off('mousemove', _resizeMapHandlers.move);
+    _map.off('mouseup',   _resizeMapHandlers.up);
+    _resizeMapHandlers = null;
+  }
+}
+
+function _startResizeFacility(obj) {
+  _clearResizeHandles();
+  const rect = _layerMap[`facility:${obj.id}`];
+  if (!rect) return;
+
+  // 인덱스 순서: 0=SW 1=SE 2=NW 3=NE, 각 모서리의 반대쪽 인덱스
+  const OPPOSITE = [3, 2, 1, 0];
+  let activeIdx = null;
+
+  function cornerPositions() {
+    const b = rect.getBounds();
+    return [
+      { lat: b.getSouth(), lng: b.getWest() },
+      { lat: b.getSouth(), lng: b.getEast() },
+      { lat: b.getNorth(), lng: b.getWest() },
+      { lat: b.getNorth(), lng: b.getEast() },
+    ];
+  }
+
+  cornerPositions().forEach((pos, i) => {
+    const h = L.circleMarker([pos.lat, pos.lng], {
+      radius: 6, fillColor: '#fff', color: '#58a6ff', weight: 2, fillOpacity: 1,
+    }).addTo(_map);
+    h.on('mousedown', (e) => {
+      activeIdx = i;
+      _map.dragging.disable();
+      L.DomEvent.stop(e);
+    });
+    _resizeHandles.push(h);
+  });
+
+  const onMove = (e) => {
+    if (activeIdx === null) return;
+    const opp = cornerPositions()[OPPOSITE[activeIdx]];
+    const minLat = Math.min(opp.lat, e.latlng.lat);
+    const maxLat = Math.max(opp.lat, e.latlng.lat);
+    const minLng = Math.min(opp.lng, e.latlng.lng);
+    const maxLng = Math.max(opp.lng, e.latlng.lng);
+    rect.setBounds([[minLat, minLng], [maxLat, maxLng]]);
+    obj.map_x = minLng; obj.map_y = minLat;
+    obj.map_width  = maxLng - minLng;
+    obj.map_height = maxLat - minLat;
+    cornerPositions().forEach((p, i) => _resizeHandles[i].setLatLng([p.lat, p.lng]));
+  };
+
+  const onUp = () => {
+    if (activeIdx === null) return;
+    activeIdx = null;
+    _map.dragging.enable();
+    _markDirty('facility', obj.id);
+    rect.setPopupContent(_facilityResizePopupHtml(obj));
+  };
+
+  _map.on('mousemove', onMove);
+  _map.on('mouseup',   onUp);
+  _resizeMapHandlers = { move: onMove, up: onUp };
+
+  rect.setPopupContent(_facilityResizePopupHtml(obj));
+  rect.openPopup();
+}
+
+function _facilityResizePopupHtml(obj) {
+  const code = obj.code || `FAC-${obj.id}`;
+  const x = (obj.map_x ?? 0).toFixed(0), y = (obj.map_y ?? 0).toFixed(0);
+  const w = (obj.map_width ?? 0).toFixed(0), h = (obj.map_height ?? 0).toFixed(0);
+  return `<div class="me-popup-title">설비 ${code}</div>
+    <div class="me-popup-row">현재 좌표: X ${x} / Y ${y}</div>
+    <div class="me-popup-row">가로 ${w}px / 세로 ${h}px</div>
+    <div class="me-popup-actions">
+      <button class="btn-popup-edit" onclick="MapEditor.finishResizeFacility(${obj.id})">완료</button>
+    </div>`;
 }
 
 // ── 지오펜스 그리기 ──────────────────────────────────────────
@@ -409,7 +676,8 @@ function _cancelDraw() {
 }
 
 function _onMapClick(e) {
-  if (!_drawMode) return;
+  // 이성현 작업 — 빈 곳 클릭 시 선택 해제 (지오펜스 편집 핸들 활성 중엔 제외)
+  if (!_drawMode) { if (!_geofenceEditHandles.length) _clearSelection(); return; }
   const { lat, lng } = e.latlng;
 
   if (_drawMode.shape === 'circle') {
@@ -509,6 +777,7 @@ function _finishCircleDraw(radius) {
   _renderList();
 }
 
+// 이성현 작업
 // ── 체크박스로 미배치 객체 지도에 추가 ─────────────────────
 function _onObjectCheck(obj, checked) {
   if (obj._objType === 'geofence') return;
@@ -520,11 +789,15 @@ function _onObjectCheck(obj, checked) {
       delete _layerMap[key];
     }
     if (obj._objType === 'facility') { obj.map_x = null; obj.map_y = null; }
-    else { obj.x = 650; obj.y = 300; }
+    else {
+      obj._savedX = obj.x; obj._savedY = obj.y;
+      obj.x = 0; obj.y = 0;
+    }
+    obj.placed = false;
+    _markDirty(obj._objType, obj.id);
     return;
   }
-  // 지도 중앙에 배치
-  const center = _map.getCenter();
+  const center = _map.getBounds().getCenter();
   if (obj._objType === 'facility') {
     obj.map_x = center.lng - 100;
     obj.map_y = center.lat - 60;
@@ -532,8 +805,10 @@ function _onObjectCheck(obj, checked) {
     obj.map_height = 120;
     obj.placed = true;
   } else {
-    obj.x = center.lng;
-    obj.y = center.lat;
+    const hasSaved = obj._savedX != null && (obj._savedX !== 0 || obj._savedY !== 0);
+    obj.x = hasSaved ? obj._savedX : center.lng;
+    obj.y = hasSaved ? obj._savedY : center.lat;
+    delete obj._savedX; delete obj._savedY;
     obj.placed = true;
   }
   _renderObject(obj);
@@ -595,9 +870,10 @@ function _renderList() {
       ${!obj.placed ? '<span class="me-object-unplaced">미배치</span>' : ''}
     `;
 
-    // 체크박스
+    // 이성현 작업 — 체크박스
     const cb = item.querySelector('input[type=checkbox]');
     if (cb) {
+      cb.addEventListener('click', e => e.stopPropagation());
       cb.addEventListener('change', e => {
         e.stopPropagation();
         _onObjectCheck(obj, e.target.checked);
@@ -623,8 +899,32 @@ function _markDirty(type, id) {
   _dirtySet.add(`${type}:${id}`);
 }
 
+// 이성현 작업
 function _selectObject(obj) {
-  // 클릭 시 팝업 표시는 Leaflet이 자동 처리
+  const key = `${obj._objType}:${obj.id}`;
+  _selectedKey = key;
+  Object.entries(_layerMap).forEach(([k, layer]) => {
+    _setLayerDim(layer, k.split(':')[0], k !== key);
+  });
+}
+
+function _clearSelection() {
+  if (!_selectedKey && !_geofenceEditHandles.length) return;
+  _selectedKey = null;
+  // 이성현 작업 — 지오펜스 편집 핸들도 함께 해제
+  _clearGeofenceEditHandles();
+  Object.entries(_layerMap).forEach(([k, layer]) => {
+    _setLayerDim(layer, k.split(':')[0], false);
+  });
+}
+
+function _setLayerDim(layer, type, dimmed) {
+  if (type === 'geofence') return;  // 이성현 작업 — 지오펜스는 dim 효과 제외
+  if (type === 'facility') {
+    layer.setStyle({ fillOpacity: dimmed ? 0.03 : 0.08, opacity: dimmed ? 0.2 : 1 });
+  } else {
+    layer.setStyle({ fillOpacity: dimmed ? 0.1 : 0.9, opacity: dimmed ? 0.2 : 1 });
+  }
 }
 
 // ── 저장 ─────────────────────────────────────────────────────
@@ -667,6 +967,19 @@ async function _saveAll() {
       case 'position_node':
         payload.position_nodes.push({ id, x: obj.x, y: obj.y });
         break;
+      // 이성현 작업 — 기존 위험구역 이동/크기 변경 저장
+      case 'geofence':
+        payload.geofences.push({
+          id, name: obj.name, risk_level: obj.risk_level,
+          shape_type: obj.shape_type,
+          polygon: obj.polygon || [],
+          circle_cx: obj.circle_cx ?? null,
+          circle_cy: obj.circle_cy ?? null,
+          circle_radius: obj.circle_radius ?? null,
+          facility_id: obj.facility_id || 1,
+          deleted: false,
+        });
+        break;
     }
   });
 
@@ -705,12 +1018,12 @@ async function _saveAll() {
       method: 'POST',
       body: JSON.stringify(payload),
     });
+    // 이성현 작업
     if (res.ok) {
       _dirtySet.clear();
       _pendingGeofences = [];
       _deletedGeofences.clear();
-      alert('저장되었습니다.');
-      _loadObjects();
+      _showModal('saveCompleteModal');
     } else {
       const err = await res.json();
       console.error('[MapEditor] 저장 실패', err);
@@ -732,20 +1045,65 @@ function _resetAll() {
   _loadObjects();
 }
 
-// ── 지오펜스 삭제 (팝업 버튼) ───────────────────────────────
+// 이성현 작업 ── 지오펜스 팝업 액션
 window.MapEditor = {
-  deleteGeofence(id) {
-    if (!confirm('이 위험구역을 삭제하시겠습니까?')) return;
-    _deletedGeofences.add(id);
-    const layer = _layerMap[`geofence:${id}`];
-    if (layer) _layers.geofence.removeLayer(layer);
-    _allObjects = _allObjects.filter(o => !(o._objType === 'geofence' && o.id === id));
+  // 이성현 작업 — 위험구역 편집 (반경/꼭짓점 핸들 활성화)
+  editGeofence(id) {
+    const obj = _allObjects.find(o => o._objType === 'geofence' && o.id === id);
+    if (!obj) return;
     _map.closePopup();
+    if (obj.shape_type === 'circle') {
+      _startResizeGeofenceCircle(obj);
+    } else {
+      _startEditGeofencePolygon(obj);
+    }
+  },
+  // 이성현 작업 — 위험구역 삭제 모달 열기
+  confirmDeleteGeofence(id) {
+    _pendingDeleteGeofenceId = id;
+    _map.closePopup();
+    _showModal('geofenceDeleteModal');
+  },
+  // 이성현 작업 — 위험구역 삭제 실행 (모달 확인 버튼)
+  doDeleteGeofence() {
+    const id = _pendingDeleteGeofenceId;
+    _pendingDeleteGeofenceId = null;
+    _hideModal('geofenceDeleteModal');
+    const obj = _allObjects.find(o => o._objType === 'geofence' && o.id === id);
+    if (!obj) return;
+    if (id !== null && id !== undefined) _deletedGeofences.add(id);
+    const key = `geofence:${id}`;
+    const layer = _layerMap[key];
+    if (layer) _layers.geofence.removeLayer(layer);
+    delete _layerMap[key];
+    _allObjects = _allObjects.filter(o => o !== obj);
+    _pendingGeofences = _pendingGeofences.filter(o => o !== obj);
+    _clearGeofenceEditHandles();
     _renderList();
   },
-  startEditFacility(id) {
-    // 추후 크기 조정 핸들 구현
+  // 이성현 작업 — 위험구역 편집 완료
+  finishGeofenceEdit(id) {
+    _clearGeofenceEditHandles();
     _map.closePopup();
+    const obj = _allObjects.find(o => o._objType === 'geofence' && o.id === id);
+    if (obj) {
+      const layer = _layerMap[`geofence:${id}`];
+      if (layer) layer.setPopupContent(_geofencePopupHtml(obj));
+    }
+  },
+  startEditFacility(id) {
+    _map.closePopup();
+    const obj = _allObjects.find(o => o._objType === 'facility' && o.id === id);
+    if (obj) _startResizeFacility(obj);
+  },
+  finishResizeFacility(id) {
+    _clearResizeHandles();
+    _map.closePopup();
+    const obj = _allObjects.find(o => o._objType === 'facility' && o.id === id);
+    if (obj) {
+      const rect = _layerMap[`facility:${obj.id}`];
+      if (rect) rect.setPopupContent(_facilityPopupHtml(obj));
+    }
   },
 };
 
