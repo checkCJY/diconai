@@ -204,10 +204,11 @@
     document.getElementById('doneModalOk').addEventListener('click', async () => {
       /* VR 완료 상태를 먼저 저장하고, 이후 진행 위치를 0으로 초기화한다.
          순서를 지키지 않으면 keepalive fetch와 세션 경쟁이 발생해
-         vr_done_date 키가 덮어쓰여 '미완료'로 표시되는 버그가 생긴다. */
-      await fetch('/dashboard/api/safety-status/', {
+         vr_done_date 키가 덮어쓰여 '미완료'로 표시되는 버그가 생긴다.
+         Auth.apiFetch 사용 — 일반 fetch는 JWT Authorization 헤더가 빠져
+         request.user가 AnonymousUser로 잡혀 DB dual-write가 silent skip된다. */
+      await Auth.apiFetch('/dashboard/api/safety-status/', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key: 'vr' }),
       }).catch(() => {});
       await Auth.apiFetch(VR_PROGRESS_API, {

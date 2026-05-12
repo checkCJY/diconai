@@ -180,9 +180,11 @@
   });
 
   document.getElementById('btnConfirm').addEventListener('click', async () => {
-    await fetch('/dashboard/api/safety-status/', {
+    /* Auth.apiFetch 사용 — 일반 fetch는 JWT Authorization 헤더가 빠져
+       request.user가 AnonymousUser로 잡혀 DB dual-write(SafetyCheckSession)가
+       silent skip된다. 그러면 안전 확인 이력 캘린더에 ✓가 안 찍힌다. */
+    await Auth.apiFetch('/dashboard/api/safety-status/', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key: 'checklist' }),
     }).catch(() => {});
     window.location.href = '/dashboard/safety/vr/';
