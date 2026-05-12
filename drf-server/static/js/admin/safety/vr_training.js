@@ -14,7 +14,6 @@
 'use strict';
 
 const VRTrainingAdmin = {
-  facilityId: null,
   current: null, // detail or {empty:true,...}
   role: null,
 
@@ -22,31 +21,11 @@ const VRTrainingAdmin = {
     if (!(await AdminAccess.check())) return;
     this.role = Auth.getRole();
     this._bindEvents();
-    await this._initFacilityScope();
     await this._load();
   },
 
-  // ── 초기 facility 선택 ─────────────────────────────────
-  async _initFacilityScope() {
-    if (this.role !== 'super_admin') return;
-    const wrap = document.getElementById('facilitySelectWrap');
-    const sel = document.getElementById('facilitySelect');
-    if (!sel || sel.options.length === 0) return;
-    wrap.hidden = false;
-    this.facilityId = Number(sel.value);
-    sel.addEventListener('change', async () => {
-      this.facilityId = Number(sel.value);
-      await this._load();
-    });
-  },
-
   _bindEvents() {
-    document.getElementById('btnReplaceVideo').addEventListener('click', () =>
-      this._openEdit({ pickFileImmediately: true }),
-    );
-    document.getElementById('btnEditMeta').addEventListener('click', () =>
-      this._openEdit({ pickFileImmediately: false }),
-    );
+    document.getElementById('btnEditMeta').addEventListener('click', () => this._openEdit());
     document.getElementById('vrEditClose').addEventListener('click', () => this._closeEdit());
     document.getElementById('vrEditCancel').addEventListener('click', () => this._closeEdit());
     document.getElementById('btnPickVideo').addEventListener('click', () =>
@@ -59,8 +38,9 @@ const VRTrainingAdmin = {
   },
 
   // ── API ────────────────────────────────────────────────
+  // 단일 공장 운영 가정 — 서버가 user.facility_id || default로 결정.
   _qs() {
-    return this.facilityId ? `?facility_id=${this.facilityId}` : '';
+    return '';
   },
 
   async _api(path, opts = {}) {
@@ -175,7 +155,8 @@ const VRTrainingAdmin = {
   },
 
   // ── 모달 ───────────────────────────────────────────────
-  _openEdit({ pickFileImmediately }) {
+  // 영상 파일 선택은 모달 안의 [영상 업로드] 버튼으로 일원화한다.
+  _openEdit() {
     const data = this.current || {};
     document.getElementById('editName').value = data.name || '';
     document.getElementById('editDescription').value = data.description || '';
@@ -186,9 +167,6 @@ const VRTrainingAdmin = {
     document.getElementById('pickedName').textContent = '선택된 파일 없음';
     document.getElementById('videoInput').value = '';
     document.getElementById('vrEditModal').hidden = false;
-    if (pickFileImmediately) {
-      setTimeout(() => document.getElementById('videoInput').click(), 0);
-    }
   },
 
   _closeEdit() {
@@ -224,7 +202,6 @@ const VRTrainingAdmin = {
         if (name) fd.append('name', name);
         fd.append('description', description);
         fd.append('operation_note', operationNote);
-        if (this.facilityId) fd.append('facility_id', String(this.facilityId));
         this.current = await this._apiUpload(`/vr-training/replace/${this._qs()}`, fd);
       } else {
         // 메타만 수정.

@@ -46,16 +46,6 @@
     background: #2563eb;
 }
 
-.facility-select {
-    height: 36px;
-    border-radius: 6px;
-    border: 1px solid #cbd5e1;
-    background: #fff;
-    padding: 0 10px;
-    font-size: 14px;
-    color: #0f172a;
-}
-
 /* ── 상단 요약 카드 ────────────────────────────────────── */
 .vr-summary {
     margin: 20px 0;
