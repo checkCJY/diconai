@@ -38,6 +38,16 @@
                     <span class="field-error" id="editErrDepartment"></span>
                 </div>
                 <div class="form-field">
+                    <label>소속 공장</label>
+                    <select id="editFacility">
+                        <option value="">공장을 선택하세요 (선택)</option>
+                        {% for f in facilities %}
+                        <option value="{{ f.id }}">{{ f.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <span class="field-error" id="editErrFacility"></span>
+                </div>
+                <div class="form-field">
                     <label>직위</label>
                     <select id="editPosition">
                         <option value="">직급을 입력하세요</option>

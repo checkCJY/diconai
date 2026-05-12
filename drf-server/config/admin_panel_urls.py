@@ -17,6 +17,7 @@ from apps.facilities.views.map_editor import MapEditorPageView
 from apps.facilities.views.gas_sensor_admin import GasSensorAdminPageView
 from apps.facilities.views.power_device_admin import PowerDeviceAdminPageView
 from apps.facilities.models.devices import GasSensor
+from apps.facilities.models.facility import Facility
 
 
 class AccountsAdminPageView(TemplateView):
@@ -35,6 +36,9 @@ class AccountsAdminPageView(TemplateView):
             "id", "name"
         )
         ctx["positions"] = Position.objects.filter(is_active=True).values("id", "name")
+        ctx["facilities"] = (
+            Facility.objects.filter(is_active=True).order_by("id").values("id", "name")
+        )
         return ctx
 
 

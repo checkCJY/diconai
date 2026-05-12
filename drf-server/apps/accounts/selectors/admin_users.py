@@ -45,7 +45,7 @@ def list_admin_users(
     """
     qs = (
         User.objects.prefetch_related("dept_memberships__department")
-        .select_related("position")
+        .select_related("position", "facility")
         .all()
     )
 
