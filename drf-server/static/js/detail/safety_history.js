@@ -228,7 +228,7 @@
       const rows = [['날짜', '안전 확인 체크리스트', 'VR 교육']];
       Object.keys(allRecords).sort().forEach(dateStr => {
         const r = allRecords[dateStr];
-        rows.push([dateStr, r.checklist_done ? '완료' : '미완료', '미연동']);
+        rows.push([dateStr, r.checklist_done ? '완료' : '미완료', r.vr_done ? '완료' : '미완료']);
       });
       if (rows.length === 1) { alert('해당 월에 기록된 이력이 없습니다.'); return; }
       const wb = XLSX.utils.book_new();
@@ -321,23 +321,18 @@
       wrap.appendChild(absent);
       return wrap;
     }
-    wrap.appendChild(makeIndicatorRow(rec.checklist_done, '안전 체크리스트', false));
-    wrap.appendChild(makeIndicatorRow(rec.vr_done,        'VR 교육',         true));
+    wrap.appendChild(makeIndicatorRow(rec.checklist_done, '안전 체크리스트'));
+    wrap.appendChild(makeIndicatorRow(rec.vr_done,        'VR 교육'));
     return wrap;
   }
 
-  function makeIndicatorRow(done, label, notLinked) {
+  function makeIndicatorRow(done, label) {
     const row = document.createElement('div');
     row.className = 'cal-indicator';
 
     const ic = document.createElement('span');
-    if (notLinked) {
-      ic.className = 'ic ic-na';
-      ic.textContent = '✕';
-    } else {
-      ic.className = done ? 'ic ic-done' : 'ic ic-undone';
-      ic.textContent = done ? '○' : '✕';
-    }
+    ic.className = done ? 'ic ic-done' : 'ic ic-undone';
+    ic.textContent = done ? '○' : '✕';
 
     const lbl = document.createElement('span');
     lbl.textContent = label;
@@ -355,7 +350,7 @@
       const rows = [['날짜', '안전 확인 체크리스트', 'VR 교육']];
       Object.keys(records).sort().forEach(dateStr => {
         const r = records[dateStr];
-        rows.push([dateStr, r.checklist_done ? '완료' : '미완료', '미연동']);
+        rows.push([dateStr, r.checklist_done ? '완료' : '미완료', r.vr_done ? '완료' : '미완료']);
       });
       if (rows.length === 1) { alert('해당 월에 기록된 이력이 없습니다.'); return; }
       const wb = XLSX.utils.book_new();
