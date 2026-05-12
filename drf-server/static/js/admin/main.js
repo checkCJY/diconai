@@ -77,3 +77,13 @@ const AdminAccess = {
     });
   },
 };
+
+// 사이드바 그룹 토글
+document.addEventListener('DOMContentLoaded', () => {
+    const toggle = document.getElementById('snbLogToggle');
+    if (toggle) {
+        toggle.addEventListener('click', () => {
+            document.getElementById('snbLogGroup').classList.toggle('open');
+        });
+    }
+});

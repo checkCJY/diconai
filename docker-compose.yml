@@ -104,7 +104,7 @@ services:
       RUN_MIGRATIONS: "0"
       COLLECT_STATIC: "0"
     volumes:
-      - ./drf-server/db.sqlite3:/app/db.sqlite3
+      - ./drf-server:/app          # 소스코드 실시간 반영
     depends_on:
       drf:
         condition: service_healthy

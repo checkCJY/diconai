@@ -1,0 +1,310 @@
+/* admin/notices.css — 공지사항 관리 페이지 전용 스타일 */
+
+/* ── 카테고리 뱃지 ───────────────────────────────────────── */
+.badge-general     { background: #eff6ff; color: #3b82f6; }
+.badge-urgent      { background: #fef2f2; color: #dc2626; }
+.badge-maintenance { background: #f0fdf4; color: #16a34a; }
+
+/* ── 노출 여부 뱃지 ─────────────────────────────────────── */
+.badge-visible { background: #f0fdf4; color: #16a34a; }
+.badge-hidden  { background: #f1f5f9; color: #64748b; }
+
+/* ── 고정 뱃지 ──────────────────────────────────────────── */
+.pin-icon { color: #f59e0b; font-size: 12px; margin-left: 4px; }
+
+/* ── 공지 제목 셀 ───────────────────────────────────────── */
+.notice-title-cell {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    text-align: left;
+}
+.notice-title-link {
+    color: #1e293b;
+    text-decoration: none;
+    font-weight: 500;
+}
+.notice-title-link:hover { color: #3b82f6; text-decoration: underline; }
+
+/* ── 상세 페이지 ─────────────────────────────────────────── */
+.notice-detail-card {
+    background: #fff;
+    border-radius: 8px;
+    padding: 32px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    margin-bottom: 16px;
+}
+
+.notice-detail-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.notice-detail-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0 0 8px 0;
+}
+
+.notice-detail-meta {
+    font-size: 13px;
+    color: #64748b;
+    display: flex;
+    gap: 16px;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.notice-detail-body {
+    font-size: 15px;
+    line-height: 1.8;
+    color: #334155;
+    white-space: pre-wrap;
+    min-height: 200px;
+}
+
+/* ── 첨부파일 영역 ───────────────────────────────────────── */
+.attachment-section {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid #f1f5f9;
+}
+
+.attachment-section h4 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #475569;
+    margin: 0 0 12px 0;
+}
+
+.attachment-list { display: flex; flex-direction: column; gap: 8px; }
+
+.attachment-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+}
+
+.attachment-info { display: flex; align-items: center; gap: 10px; }
+.attachment-icon { font-size: 18px; }
+.attachment-name { font-size: 13px; font-weight: 500; color: #334155; }
+.attachment-size { font-size: 12px; color: #94a3b8; }
+.btn-download {
+    padding: 5px 12px;
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #475569;
+    cursor: pointer;
+    text-decoration: none;
+}
+.btn-download:hover { background: #f1f5f9; }
+
+/* ── 이전글/다음글 네비 ─────────────────────────────────── */
+.notice-nav {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    overflow: hidden;
+    margin-bottom: 16px;
+}
+
+.notice-nav-item {
+    display: flex;
+    align-items: center;
+    padding: 14px 20px;
+    border-bottom: 1px solid #f1f5f9;
+    text-decoration: none;
+    color: #334155;
+    font-size: 14px;
+    gap: 12px;
+    transition: background 0.15s;
+}
+.notice-nav-item:last-child { border-bottom: none; }
+.notice-nav-item:hover { background: #f8fafc; }
+.notice-nav-label { font-size: 12px; color: #94a3b8; min-width: 40px; }
+.notice-nav-title { flex: 1; }
+.notice-nav-empty { color: #94a3b8; font-style: italic; }
+
+/* ── 하단 액션 버튼 영역 ─────────────────────────────────── */
+.detail-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.detail-actions-right { display: flex; gap: 8px; }
+
+/* ── 등록/수정 폼 ────────────────────────────────────────── */
+.form-layout {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 20px;
+    align-items: start;
+}
+
+.form-card {
+    background: #fff;
+    border-radius: 8px;
+    padding: 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    margin-bottom: 20px;
+}
+
+.form-card h3 {
+    font-size: 15px;
+    font-weight: 600;
+    color: #1e293b;
+    margin: 0 0 16px 0;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 200px 160px;
+    gap: 16px;
+    margin-bottom: 16px;
+    align-items: end;
+}
+
+.form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.form-field label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+}
+
+.form-field label .required { color: #dc2626; margin-left: 2px; }
+
+.form-field input,
+.form-field select,
+.form-field textarea {
+    padding: 9px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    font-size: 14px;
+    color: #1e293b;
+    background: #fff;
+    outline: none;
+    transition: border-color 0.15s;
+    font-family: inherit;
+}
+
+.form-field input:focus,
+.form-field select:focus,
+.form-field textarea:focus { border-color: #3b82f6; }
+
+.form-field textarea { resize: vertical; min-height: 280px; }
+
+/* ── 노출 여부 토글 ─────────────────────────────────────── */
+.toggle-group {
+    display: flex;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.toggle-btn {
+    flex: 1;
+    padding: 9px 16px;
+    border: none;
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.toggle-btn.active {
+    background: #3b82f6;
+    color: #fff;
+    font-weight: 600;
+}
+
+/* ── 파일 업로드 영역 ────────────────────────────────────── */
+.upload-drop-zone {
+    border: 2px dashed #cbd5e1;
+    border-radius: 6px;
+    padding: 24px 16px;
+    text-align: center;
+    background: #f8fafc;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: 12px;
+}
+
+.upload-drop-zone:hover,
+.upload-drop-zone.dragover { border-color: #3b82f6; background: #eff6ff; }
+
+.upload-drop-zone p { margin: 0; color: #64748b; font-size: 13px; }
+.upload-drop-zone .upload-hint { font-size: 11px; color: #94a3b8; margin-top: 4px; }
+
+.selected-files { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+
+.selected-file-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    background: #f1f5f9;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.selected-file-name { color: #334155; flex: 1; }
+.selected-file-size { color: #94a3b8; font-size: 11px; margin: 0 8px; }
+.btn-remove-file {
+    background: none;
+    border: none;
+    color: #dc2626;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 0 4px;
+}
+
+/* ── 등록 정보 ──────────────────────────────────────────── */
+.reg-info { font-size: 13px; color: #64748b; }
+.reg-info-row { display: flex; justify-content: space-between; padding: 6px 0; }
+.reg-info-label { color: #94a3b8; }
+
+/* ── 폼 하단 버튼 ────────────────────────────────────────── */
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+/* ── 삭제 확인 모달 ─────────────────────────────────────── */
+.modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 9999;
+    display: flex; align-items: center; justify-content: center;
+}
+.modal-container {
+    background: #fff;
+    border-radius: 8px;
+    padding: 28px 32px;
+    width: 420px;
+    max-width: 92vw;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+}
+.modal-container h3 { margin: 0 0 12px; font-size: 17px; color: #1e293b; }
+.modal-container p  { margin: 0 0 24px; font-size: 14px; color: #64748b; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; }

@@ -59,3 +59,14 @@ th{background-color:#f8fafc;color:#64748b;font-weight:600;font-size:13px}
 .pagination{display:flex;gap:4px}
 .pagination button{width:32px;height:32px;border:1px solid #cbd5e1;background:#fff;border-radius:4px;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .pagination button.active{background:#1e293b;color:#fff;border-color:#1e293b}
+
+/* ── 사이드바 그룹 (로그 등 하위 메뉴) ─────────────────────── */
+.snb-group-btn{display:flex;align-items:center;width:100%;padding:10px 20px;background:none;border:none;color:#64748b;font-size:13px;gap:10px;cursor:pointer;text-align:left;white-space:nowrap}
+.snb-group-btn:hover{background:#f8fafc}
+.snb-group-btn .snb-arrow{margin-left:auto;font-size:10px;transition:transform .2s}
+.snb-group.open .snb-arrow{transform:rotate(180deg)}
+.snb-sub{display:none;padding-left:16px}
+.snb-group.open .snb-sub{display:block}
+.snb-sub a{display:flex;align-items:center;padding:8px 20px;color:#94a3b8;text-decoration:none;font-size:12px;gap:8px;white-space:nowrap}
+.snb-sub a:hover{background:#f8fafc;color:#64748b}
+.snb-sub a.active{background:#eff6ff;color:#3b82f6}

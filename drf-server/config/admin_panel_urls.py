@@ -133,10 +133,105 @@ class VRTrainingAdminPageView(TemplateView):
         ctx["facilities"] = (
             Facility.objects.filter(is_active=True).order_by("id").values("id", "name")
         )
+
+
+class NoticesAdminPageView(TemplateView):
+    template_name = "admin_panel/notices/notices_main.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["active_nav"] = "notice"
+        return ctx
+
+
+class NoticeDetailPageView(TemplateView):
+    template_name = "admin_panel/notices/notice_detail.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["active_nav"] = "notice"
+        ctx["notice_id"] = kwargs["pk"]
+        return ctx
+
+
+class NoticeCreatePageView(TemplateView):
+    template_name = "admin_panel/notices/notice_form.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["active_nav"] = "notice"
+        ctx["form_mode"] = "공지사항 등록"
+        ctx["form_mode_key"] = "create"
+        ctx["is_edit"] = False
+        return ctx
+
+
+class NoticeEditPageView(TemplateView):
+    template_name = "admin_panel/notices/notice_form.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["active_nav"] = "notice"
+        ctx["form_mode"] = "공지사항 수정"
+        ctx["form_mode_key"] = "edit"
+        ctx["is_edit"] = True
+        ctx["notice_id"] = kwargs["pk"]
+        return ctx
+
+
+class SystemLogPageView(TemplateView):
+    template_name = "admin_panel/logs/system_log.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["active_nav"] = "system_log"
+        return ctx
+
+
+class ActivityLogPageView(TemplateView):
+    template_name = "admin_panel/logs/activity_log.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["active_nav"] = "activity_log"
+        return ctx
+
+
+class IntegrationLogPageView(TemplateView):
+    template_name = "admin_panel/logs/integration_log.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["active_nav"] = "integration_log"
+        return ctx
+
+
+class MapEditLogPageView(TemplateView):
+    template_name = "admin_panel/logs/map_edit_log.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["active_nav"] = "map_edit_log"
         return ctx
 
 
 urlpatterns = [
+    path("logs/system/", SystemLogPageView.as_view(), name="admin-log-system"),
+    path("logs/activity/", ActivityLogPageView.as_view(), name="admin-log-activity"),
+    path(
+        "logs/integration/",
+        IntegrationLogPageView.as_view(),
+        name="admin-log-integration",
+    ),
+    path("logs/map-edit/", MapEditLogPageView.as_view(), name="admin-log-map-edit"),
+    path("notices/", NoticesAdminPageView.as_view(), name="admin-notices-page"),
+    path("notices/create/", NoticeCreatePageView.as_view(), name="admin-notice-create"),
+    path(
+        "notices/<int:pk>/", NoticeDetailPageView.as_view(), name="admin-notice-detail"
+    ),
+    path(
+        "notices/<int:pk>/edit/", NoticeEditPageView.as_view(), name="admin-notice-edit"
+    ),
     path(
         "accounts-management/",
         AccountsAdminPageView.as_view(),
