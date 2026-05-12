@@ -120,8 +120,8 @@ class SafetyChecklistAdminPageView(TemplateView):
 class VRTrainingAdminPageView(TemplateView):
     """
     VR 교육 관리 페이지 — facility별 단일 콘텐츠 조회/교체.
-    단일 공장 운영 가정으로 facility 선택 UI는 노출하지 않고, 서버가
-    user.facility_id || default_facility_id 폴백으로 결정한다.
+    super_admin은 facility 드롭다운으로 다른 공장 콘텐츠도 조회 가능
+    (사용자 관리 어드민의 facility 드롭다운과 동일 패턴).
     실제 데이터는 JS가 /api/admin/training/ 엔드포인트를 fetch해 렌더링한다.
     """
 
@@ -130,6 +130,9 @@ class VRTrainingAdminPageView(TemplateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["active_nav"] = "vr_training"
+        ctx["facilities"] = (
+            Facility.objects.filter(is_active=True).order_by("id").values("id", "name")
+        )
         return ctx
 
 

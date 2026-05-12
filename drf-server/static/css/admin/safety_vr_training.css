@@ -1,10 +1,51 @@
-/* admin/safety_vr_training.css — VR 교육 관리 페이지 */
+/* admin/safety_vr_training.css — VR 교육 관리 페이지
+   ※ 헤더 영역은 safety_checklist.css 와 동일한 톤·간격으로 통일했습니다. */
 
 /* ── 페이지 헤더(공통) ─────────────────────────────────── */
 .page-header .header-actions {
     display: flex;
     align-items: stretch;
     gap: 8px;
+}
+
+/* 헤더 메타 박스 — 라벨 + 값(또는 select) 두 줄.
+   체크리스트의 "최근 반영일 / 날짜"와 동일한 스타일. */
+.header-meta {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    padding: 8px 16px;
+    background: #f1f5f9;
+    border-radius: 8px;
+    min-width: 160px;
+    line-height: 1.2;
+}
+
+.header-meta .meta-label {
+    font-size: 11px;
+    color: #94a3b8;
+    font-weight: 500;
+}
+
+/* 박스 안에 들어가는 facility 드롭다운 — 박스 폭에 맞추고 톤은
+   화이트 카드 위 select 컨벤션을 따른다. */
+.facility-select {
+    width: 100%;
+    height: 28px;
+    padding: 0 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #0f172a;
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.facility-select:focus {
+    outline: none;
+    border-color: #3b82f6;
 }
 
 .page-header .header-actions .btn-outline,

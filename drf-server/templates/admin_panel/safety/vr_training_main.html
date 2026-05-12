@@ -18,6 +18,14 @@ CSS:   static/css/admin/safety_vr_training.css
         <p class="page-desc">단일 VR 교육 콘텐츠를 수정하고 운영 상태를 관리합니다.</p>
     </div>
     <div class="header-actions">
+        <div class="header-meta" id="facilitySelectWrap" hidden>
+            <label class="meta-label" for="facilitySelect">공장</label>
+            <select id="facilitySelect" class="facility-select">
+                {% for f in facilities %}
+                <option value="{{ f.id }}">{{ f.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
         <button class="btn-primary" id="btnEditMeta">내용 수정</button>
     </div>
 </section>

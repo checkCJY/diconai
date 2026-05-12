@@ -14,6 +14,7 @@
 'use strict';
 
 const VRTrainingAdmin = {
+  facilityId: null,
   current: null, // detail or {empty:true,...}
   role: null,
 
@@ -21,7 +22,30 @@ const VRTrainingAdmin = {
     if (!(await AdminAccess.check())) return;
     this.role = Auth.getRole();
     this._bindEvents();
+    await this._initFacilityScope();
     await this._load();
+  },
+
+  // ── super_admin 한정 facility 선택 ─────────────────────
+  // facility_admin은 본인 공장으로 강제되므로 드롭다운 미노출.
+  //
+  // [다중 공장 운영 전까지 UI 비활성]
+  // 공장 확장 정책이 확정되지 않아 super_admin에게도 드롭다운을 노출하지
+  // 않는다. 템플릿·CSS·이벤트 바인딩은 그대로 살아 있고, 다중 공장 전환
+  // 결정 시 본 함수의 `wrap.hidden = false;` 한 줄만 풀면 즉시 활성화된다.
+  // 그동안 facilityId는 null로 유지되어 서버가 user.facility_id || default로
+  // 자동 결정한다.
+  async _initFacilityScope() {
+    if (this.role !== 'super_admin') return;
+    const wrap = document.getElementById('facilitySelectWrap');
+    const sel = document.getElementById('facilitySelect');
+    if (!sel || sel.options.length === 0) return;
+    // wrap.hidden = false;   // 다중 공장 운영 결정 시 활성화
+    this.facilityId = Number(sel.value);
+    sel.addEventListener('change', async () => {
+      this.facilityId = Number(sel.value);
+      await this._load();
+    });
   },
 
   _bindEvents() {
@@ -38,9 +62,8 @@ const VRTrainingAdmin = {
   },
 
   // ── API ────────────────────────────────────────────────
-  // 단일 공장 운영 가정 — 서버가 user.facility_id || default로 결정.
   _qs() {
-    return '';
+    return this.facilityId ? `?facility_id=${this.facilityId}` : '';
   },
 
   async _api(path, opts = {}) {
@@ -202,6 +225,7 @@ const VRTrainingAdmin = {
         if (name) fd.append('name', name);
         fd.append('description', description);
         fd.append('operation_note', operationNote);
+        if (this.facilityId) fd.append('facility_id', String(this.facilityId));
         this.current = await this._apiUpload(`/vr-training/replace/${this._qs()}`, fd);
       } else {
         // 메타만 수정.
