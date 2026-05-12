@@ -20,8 +20,11 @@ logger = logging.getLogger(__name__)
 # 이 값만 바꾸면 두 도메인의 countdown이 함께 변경된다.
 WARNING_DURATION_SEC = 10
 
-# FastAPI 내부 알람 푸시 엔드포인트
-FASTAPI_INTERNAL_URL = "http://127.0.0.1:8001/internal/alarms/push/"
+# FastAPI 내부 알람 푸시 엔드포인트.
+# 호스트는 settings.FASTAPI_INTERNAL_URL (env 주입) — 도커에선 `http://fastapi:8001`,
+# 로컬에선 기본값 `http://127.0.0.1:8001`. 컨테이너 안에서 localhost로 붙으면
+# Connection refused 가 나기 때문에 반드시 settings를 거쳐 가져온다.
+_ALARM_PUSH_PATH = "/internal/alarms/push/"
 
 # 가스 종류별 한글 표시명
 _GAS_NAME = {
@@ -61,9 +64,12 @@ def _push_to_ws(alarm_data: dict) -> None:
     if token:
         headers["Authorization"] = f"Bearer {token}"
 
+    base = getattr(settings, "FASTAPI_INTERNAL_URL", "") or "http://127.0.0.1:8001"
+    url = base.rstrip("/") + _ALARM_PUSH_PATH
+
     result = "success"
     try:
-        httpx.post(FASTAPI_INTERNAL_URL, json=alarm_data, headers=headers, timeout=3.0)
+        httpx.post(url, json=alarm_data, headers=headers, timeout=3.0)
     except Exception as e:
         logger.warning("FastAPI WS 알람 푸시 실패 (WS 알림 누락): %s", e)
         result = "failure"
