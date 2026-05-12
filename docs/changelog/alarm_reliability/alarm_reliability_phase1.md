@@ -2,7 +2,7 @@
 
 > **요약 한 줄**: 알람이 "안 뜨거나/늦거나/중복으로 뜨거나/DB locked 에러가 나던" 4가지 증상을 5단계 백엔드 변경으로 한 번에 해소.
 
-**브랜치**: `feature/alarm_refactory` · **커밋**: 5개 (C1~C5) · **머지 PR 단위**: 단일 PR · **상세 plan**: [skill/plan/alarm-reliability-phase1.md](../../skill/plan/alarm-reliability-phase1.md) (gitignore 영역)
+**브랜치**: `feature/alarm_refactory` · **커밋**: 5개 (C1~C5) · **머지 PR 단위**: 단일 PR · **상세 plan**: [skill/plan/alarm-reliability-phase1.md](../../../skill/plan/alarm-reliability-phase1.md) (gitignore 영역)
 
 ---
 
@@ -44,12 +44,12 @@
 ### C1 — SQLite WAL 모드 활성화 ([7efb9cd](#))
 
 **무엇**
-- 신규 [drf-server/apps/core/sqlite_pragmas.py](../../drf-server/apps/core/sqlite_pragmas.py) — Django `connection_created` signal에 receiver 등록. 매 connection 생성 시 PRAGMA 4종 적용:
+- 신규 [drf-server/apps/core/sqlite_pragmas.py](../../../drf-server/apps/core/sqlite_pragmas.py) — Django `connection_created` signal에 receiver 등록. 매 connection 생성 시 PRAGMA 4종 적용:
   - `journal_mode=WAL` — 동시 reader / single writer 허용
   - `busy_timeout=5000` — lock 충돌 시 최대 5초 재시도
   - `synchronous=NORMAL` — WAL과 짝, fsync 부담 감소
   - `foreign_keys=ON` — SQLite 기본 OFF인 FK 강제 (Django ORM 의존)
-- 수정 [drf-server/apps/core/apps.py](../../drf-server/apps/core/apps.py) — `CoreConfig.ready()`에서 위 모듈 import
+- 수정 [drf-server/apps/core/apps.py](../../../drf-server/apps/core/apps.py) — `CoreConfig.ready()`에서 위 모듈 import
 
 **왜**
 - 기존 journal_mode=DELETE는 한 번에 1 writer만 허용 → 다중 Celery 워커 + 동시 센서 수신 시 `database is locked` 자주 발생
@@ -68,11 +68,11 @@ docker exec diconai-drf-1 python -c "..." # plan §검증 참조
 ### C2 — 알람 dedupe 원자화 ([314c1c0](#))
 
 **무엇**
-- 신규 [drf-server/apps/alerts/services/alarm_dedupe.py](../../drf-server/apps/alerts/services/alarm_dedupe.py)
+- 신규 [drf-server/apps/alerts/services/alarm_dedupe.py](../../../drf-server/apps/alerts/services/alarm_dedupe.py)
   - Redis Lua로 `GET → CMP → SET`을 단일 원자 명령으로 실행
   - `cache.make_key()` + `pickle.dumps()`로 Django RedisCache와 동일 키 공간/직렬화 사용 (기존 `cache.get`/`cache.add` 코드와 호환)
   - 3개 헬퍼: `try_transition`, `get_state`, `clear_state`
-- 수정 [gas_alarm.py](../../drf-server/apps/monitoring/services/gas_alarm.py), [power_alarm.py](../../drf-server/apps/monitoring/services/power_alarm.py)
+- 수정 [gas_alarm.py](../../../drf-server/apps/monitoring/services/gas_alarm.py), [power_alarm.py](../../../drf-server/apps/monitoring/services/power_alarm.py)
   - DANGER: `if try_transition(state_key, "danger"): fire_*_task.delay(...)` — fire와 상태 갱신이 1 연산
   - WARNING: `cache.add(task_key, ..., ttl)` SETNX 가드로 첫 도착자만 타이머 시작
   - NORMAL: `clear_state(state_key)`로 명시적 키 삭제
@@ -96,7 +96,7 @@ docker exec diconai-drf-1 python -c "..." # plan §검증 참조
 ### C3 — PowerData bulk_create 정합성 ([06f7e91](#))
 
 **무엇**
-- 수정 [drf-server/apps/monitoring/serializers/power_data.py](../../drf-server/apps/monitoring/serializers/power_data.py)
+- 수정 [drf-server/apps/monitoring/serializers/power_data.py](../../../drf-server/apps/monitoring/serializers/power_data.py)
   - `bulk_create(objs, ignore_conflicts=True)` 직후 unique 조건으로 `filter()` 재조회
   - `(power_device, channel, data_type, measured_at)` 복합 UNIQUE 기반
   - 실제 저장된 행(`saved`)만 `trigger_power_alarms`에 전달
@@ -118,18 +118,18 @@ docker exec diconai-drf-1 python -c "..." # plan §검증 참조
 가장 큰 변경. 9개 파일 영향.
 
 **무엇**
-- 신규 [fastapi-server/core/redis_client.py](../../fastapi-server/core/redis_client.py) — `redis.asyncio` 싱글톤 클라이언트 (`get_redis()`, `close_redis()`)
-- 신규 [fastapi-server/websocket/services/alarm_queue.py](../../fastapi-server/websocket/services/alarm_queue.py) — Redis LIST 추상화
+- 신규 [fastapi-server/core/redis_client.py](../../../fastapi-server/core/redis_client.py) — `redis.asyncio` 싱글톤 클라이언트 (`get_redis()`, `close_redis()`)
+- 신규 [fastapi-server/websocket/services/alarm_queue.py](../../../fastapi-server/websocket/services/alarm_queue.py) — Redis LIST 추상화
   - `push_alarm(payload)` — `LPUSH diconai:ws:alarms` + `LTRIM 0 9999` (10k건 cap)
   - `pop_alarm_blocking(timeout=0)` — `BRPOP` 무한 대기 + ConnectionError 안전 처리
   - `queue_len()` — 메트릭/모니터링용
-- 수정 [websocket/state.py](../../fastapi-server/websocket/state.py) — `active_alarms`, `alarm_signal`, `import asyncio` 삭제
-- 수정 [internal/routers/alarm_router.py](../../fastapi-server/internal/routers/alarm_router.py) — `list.append + signal.set()` → `await push_alarm()` (LPUSH). Redis 장애 시 503 응답으로 Celery retry 유도. 핸들러 함수명 `push_alarm` → `push_alarm_handler` (헬퍼와 충돌 회피)
-- 수정 [websocket/routers/ws_router.py](../../fastapi-server/websocket/routers/ws_router.py) `alarm_flush_loop` — `asyncio.Event.wait/clear` 패턴 → `pop_alarm_blocking()` (BRPOP) 패턴으로 재작성. `is_new_event` 필터 제거
-- 수정 [websocket/services/broadcast.py](../../fastapi-server/websocket/services/broadcast.py) — `"alarms": list(active_alarms)[:5]` 슬라이스 제거. `"alarms": []` 고정 (주기 broadcast는 더 이상 알람 전달 책임 없음, `alarm_flush_loop`이 단독 담당)
-- 수정 [app.py](../../fastapi-server/app.py) lifespan finally — `await close_redis()` 추가
-- 의존성 [requirements.txt](../../fastapi-server/requirements.txt) — `redis==5.2.1` 추가
-- 컴포즈 [docker-compose.yml](../../docker-compose.yml) — fastapi 서비스에 `REDIS_URL=redis://redis:6379/0` + `depends_on: redis: condition: service_healthy`
+- 수정 [websocket/state.py](../../../fastapi-server/websocket/state.py) — `active_alarms`, `alarm_signal`, `import asyncio` 삭제
+- 수정 [internal/routers/alarm_router.py](../../../fastapi-server/internal/routers/alarm_router.py) — `list.append + signal.set()` → `await push_alarm()` (LPUSH). Redis 장애 시 503 응답으로 Celery retry 유도. 핸들러 함수명 `push_alarm` → `push_alarm_handler` (헬퍼와 충돌 회피)
+- 수정 [websocket/routers/ws_router.py](../../../fastapi-server/websocket/routers/ws_router.py) `alarm_flush_loop` — `asyncio.Event.wait/clear` 패턴 → `pop_alarm_blocking()` (BRPOP) 패턴으로 재작성. `is_new_event` 필터 제거
+- 수정 [websocket/services/broadcast.py](../../../fastapi-server/websocket/services/broadcast.py) — `"alarms": list(active_alarms)[:5]` 슬라이스 제거. `"alarms": []` 고정 (주기 broadcast는 더 이상 알람 전달 책임 없음, `alarm_flush_loop`이 단독 담당)
+- 수정 [app.py](../../../fastapi-server/app.py) lifespan finally — `await close_redis()` 추가
+- 의존성 [requirements.txt](../../../fastapi-server/requirements.txt) — `redis==5.2.1` 추가
+- 컴포즈 [docker-compose.yml](../../../docker-compose.yml) — fastapi 서비스에 `REDIS_URL=redis://redis:6379/0` + `depends_on: redis: condition: service_healthy`
 
 **왜**
 3가지 결함을 한 번에 해결:
@@ -151,7 +151,7 @@ docker exec diconai-drf-1 python -c "..." # plan §검증 참조
 ### C5 — `_push_to_ws` 신뢰성 보강 ([5e80144](#))
 
 **무엇**
-- 수정 [drf-server/apps/alerts/tasks.py](../../drf-server/apps/alerts/tasks.py) `_push_to_ws`
+- 수정 [drf-server/apps/alerts/tasks.py](../../../drf-server/apps/alerts/tasks.py) `_push_to_ws`
   - timeout `3.0 → 10.0`초
   - HTTP 5xx 또는 `httpx.RequestError`/`HTTPStatusError` 시 `RuntimeError` raise
   - 4xx(페이로드 검증 실패)는 retry 의미 없어 raise 안 함
@@ -167,7 +167,7 @@ docker exec diconai-drf-1 python -c "..." # plan §검증 참조
 **중복 발송 트레이드오프**
 - DB는 이미 commit + WS push만 실패한 케이스에서 retry 시 동일 페이로드 2회 전송 가능
 - Phase 1에선 허용 — 현재의 silent drop이 더 큰 문제
-- 완전한 idempotency는 IF §2-3-a에서 `event_id` 기반 dedupe로 보강 예정 ([skill/plan/if-integration-guide.md](../../skill/plan/if-integration-guide.md) §2-3-a)
+- 완전한 idempotency는 IF §2-3-a에서 `event_id` 기반 dedupe로 보강 예정 ([skill/plan/if-integration-guide.md](../../../skill/plan/if-integration-guide.md) §2-3-a)
 
 **검증** (3 시나리오)
 1. FastAPI 살아있음 + 정상 push → 예외 없음 (200 OK)
@@ -235,7 +235,7 @@ docker compose logs --since 1h celery-worker 2>&1 | grep -ciE "Retry in 5"
 
 ## 다음 단계 (Phase 1 머지 후)
 
-[skill/plan/alarm-reliability-phase1.md](../../skill/plan/alarm-reliability-phase1.md) "추천 진행 순서" ②~⑦ 참조.
+[skill/plan/alarm-reliability-phase1.md](../../../skill/plan/alarm-reliability-phase1.md) "추천 진행 순서" ②~⑦ 참조.
 
 ```
 ①  Phase 1 (완료)
@@ -257,22 +257,22 @@ docker compose logs --since 1h celery-worker 2>&1 | grep -ciE "Retry in 5"
 
 | 단계 | 파일 | 변경 |
 |---|---|---|
-| C1 | [drf-server/apps/core/sqlite_pragmas.py](../../drf-server/apps/core/sqlite_pragmas.py) | 신규 |
-| C1 | [drf-server/apps/core/apps.py](../../drf-server/apps/core/apps.py) | 수정 |
-| C2 | [drf-server/apps/alerts/services/alarm_dedupe.py](../../drf-server/apps/alerts/services/alarm_dedupe.py) | 신규 |
-| C2 | [drf-server/apps/monitoring/services/gas_alarm.py](../../drf-server/apps/monitoring/services/gas_alarm.py) | 수정 |
-| C2 | [drf-server/apps/monitoring/services/power_alarm.py](../../drf-server/apps/monitoring/services/power_alarm.py) | 수정 |
-| C3 | [drf-server/apps/monitoring/serializers/power_data.py](../../drf-server/apps/monitoring/serializers/power_data.py) | 수정 |
-| C4 | [fastapi-server/core/redis_client.py](../../fastapi-server/core/redis_client.py) | 신규 |
-| C4 | [fastapi-server/websocket/services/alarm_queue.py](../../fastapi-server/websocket/services/alarm_queue.py) | 신규 |
-| C4 | [fastapi-server/websocket/state.py](../../fastapi-server/websocket/state.py) | 수정 |
-| C4 | [fastapi-server/internal/routers/alarm_router.py](../../fastapi-server/internal/routers/alarm_router.py) | 수정 |
-| C4 | [fastapi-server/websocket/routers/ws_router.py](../../fastapi-server/websocket/routers/ws_router.py) | 수정 |
-| C4 | [fastapi-server/websocket/services/broadcast.py](../../fastapi-server/websocket/services/broadcast.py) | 수정 |
-| C4 | [fastapi-server/app.py](../../fastapi-server/app.py) | 수정 |
-| C4 | [fastapi-server/core/config.py](../../fastapi-server/core/config.py) | 수정 (REDIS_URL) |
-| C4 | [fastapi-server/requirements.txt](../../fastapi-server/requirements.txt) | 수정 (redis 추가) |
-| C4 | [docker-compose.yml](../../docker-compose.yml) | 수정 (REDIS_URL + depends_on) |
-| C5 | [drf-server/apps/alerts/tasks.py](../../drf-server/apps/alerts/tasks.py) | 수정 |
+| C1 | [drf-server/apps/core/sqlite_pragmas.py](../../../drf-server/apps/core/sqlite_pragmas.py) | 신규 |
+| C1 | [drf-server/apps/core/apps.py](../../../drf-server/apps/core/apps.py) | 수정 |
+| C2 | [drf-server/apps/alerts/services/alarm_dedupe.py](../../../drf-server/apps/alerts/services/alarm_dedupe.py) | 신규 |
+| C2 | [drf-server/apps/monitoring/services/gas_alarm.py](../../../drf-server/apps/monitoring/services/gas_alarm.py) | 수정 |
+| C2 | [drf-server/apps/monitoring/services/power_alarm.py](../../../drf-server/apps/monitoring/services/power_alarm.py) | 수정 |
+| C3 | [drf-server/apps/monitoring/serializers/power_data.py](../../../drf-server/apps/monitoring/serializers/power_data.py) | 수정 |
+| C4 | [fastapi-server/core/redis_client.py](../../../fastapi-server/core/redis_client.py) | 신규 |
+| C4 | [fastapi-server/websocket/services/alarm_queue.py](../../../fastapi-server/websocket/services/alarm_queue.py) | 신규 |
+| C4 | [fastapi-server/websocket/state.py](../../../fastapi-server/websocket/state.py) | 수정 |
+| C4 | [fastapi-server/internal/routers/alarm_router.py](../../../fastapi-server/internal/routers/alarm_router.py) | 수정 |
+| C4 | [fastapi-server/websocket/routers/ws_router.py](../../../fastapi-server/websocket/routers/ws_router.py) | 수정 |
+| C4 | [fastapi-server/websocket/services/broadcast.py](../../../fastapi-server/websocket/services/broadcast.py) | 수정 |
+| C4 | [fastapi-server/app.py](../../../fastapi-server/app.py) | 수정 |
+| C4 | [fastapi-server/core/config.py](../../../fastapi-server/core/config.py) | 수정 (REDIS_URL) |
+| C4 | [fastapi-server/requirements.txt](../../../fastapi-server/requirements.txt) | 수정 (redis 추가) |
+| C4 | [docker-compose.yml](../../../docker-compose.yml) | 수정 (REDIS_URL + depends_on) |
+| C5 | [drf-server/apps/alerts/tasks.py](../../../drf-server/apps/alerts/tasks.py) | 수정 |
 
 총 17 파일 (신규 5, 수정 12).

@@ -7,7 +7,7 @@
 | 항목 | 본 검증 환경 | 프로덕션과의 일치 여부 |
 |---|---|---|
 | DB 엔진 | SQLite + WAL | ✅ 동일 ([docker_infra_decision_2026_05_11 메모](#) 참조) |
-| PowerDevice 수 | 1대 (device_id=`63200c3afd12`) | 프로덕션도 단일 디바이스. 멀티 디바이스 동작은 단위 테스트(`test_axis_caches_independently_per_channel`) + 코드 리뷰 ([channel_meta_cache 모듈](../../fastapi-server/power/services/channel_meta_cache.py))로 커버 |
+| PowerDevice 수 | 1대 (device_id=`63200c3afd12`) | 프로덕션도 단일 디바이스. 멀티 디바이스 동작은 단위 테스트(`test_axis_caches_independently_per_channel`) + 코드 리뷰 ([channel_meta_cache 모듈](../../../fastapi-server/power/services/channel_meta_cache.py))로 커버 |
 | 채널 수 | 16 (시드 기본값) | 동일 |
 | 더미 활성 | 미사용 | 프로덕션도 더미 미사용 |
 | Celery 워커 | concurrency 기본(=N core) | 동일 |
@@ -395,7 +395,7 @@ for r in qs[:5]: print(f'  {r[\"event__source_label\"]} {r[\"risk_level\"]}: {r[
 
 | 이슈 | 발견 시점 | planB 항목 | 영향 | 본 PR 머지 차단? |
 |---|---|---|---|---|
-| Event 그룹화로 ch15 위험이 운영자 화면에 안 보임 | #4 검증 시 | [L. Event 그룹화 정책 재설계](../../skill/planB/power-phase1-2-followups.md) | 본 PR 효과(저전압/고전압/다채널 위험 탐지) 가시성 ↓ | ❌ 차단 안 함 (기존 알람 시스템의 한계) |
+| Event 그룹화로 ch15 위험이 운영자 화면에 안 보임 | #4 검증 시 | [L. Event 그룹화 정책 재설계](../../../skill/planB/power-phase1-2-followups.md) | 본 PR 효과(저전압/고전압/다채널 위험 탐지) 가시성 ↓ | ❌ 차단 안 함 (기존 알람 시스템의 한계) |
 | SQLite 동시 fire `database is locked` | #4 Celery 로그 | M. SQLite 경합 개선 | 5초 지연, 알람 손실 없음 | ❌ 차단 안 함 (Celery retry로 자동 복구) |
 
 두 이슈 모두 **본 PR 변경과 무관한 기존 시스템의 한계**이며, planB의 후속 PR로 처리됩니다.
