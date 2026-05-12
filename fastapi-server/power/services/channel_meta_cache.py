@@ -18,6 +18,8 @@ from core.config import settings
 logger = logging.getLogger(__name__)
 
 REFRESH_INTERVAL_SEC = 300
+FAILURE_INITIAL_BACKOFF_SEC = 5
+FAILURE_MAX_BACKOFF_SEC = 60
 DRF_CHANNEL_META_PATH = "/api/monitoring/power/channel-meta/"
 
 # {device_id_str: {"1": {"name": ..., "rated_w": ..., "rated_a": ..., "rated_v": ...}, ...}}
@@ -40,8 +42,8 @@ def _first_channel_entry(channel: int) -> dict[str, Any]:
     return {}
 
 
-async def refresh_channel_meta() -> None:
-    """DRF에서 channel_meta를 가져와 모듈 캐시 갱신. 1회 호출."""
+async def refresh_channel_meta() -> bool:
+    """DRF에서 channel_meta를 가져와 모듈 캐시 갱신. 성공/실패 bool 반환."""
     url = f"{settings.DRF_BASE_URL}{DRF_CHANNEL_META_PATH}"
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
@@ -50,7 +52,7 @@ async def refresh_channel_meta() -> None:
             payload = resp.json()
     except (httpx.HTTPError, ValueError) as exc:
         logger.warning(f"[channel_meta_cache] fetch failed: {exc!r}")
-        return
+        return False
 
     _channel_meta_by_device.clear()
     _channel_meta_by_device.update(payload)
@@ -58,10 +60,23 @@ async def refresh_channel_meta() -> None:
         f"[channel_meta_cache] refreshed devices={len(payload)} "
         f"channels={sum(len(m or {}) for m in payload.values())}"
     )
+    return True
 
 
 async def channel_meta_refresh_loop() -> None:
-    """lifespan background task. 시작 즉시 1회 + REFRESH_INTERVAL_SEC마다 갱신."""
+    """lifespan background task.
+
+    [정책]
+    - 성공 시 REFRESH_INTERVAL_SEC(5분) 주기
+    - 실패 시 지수 backoff (5s → 10s → 20s → 40s → 60s 상한) — 부팅 순서로 DRF가
+      아직 안 뜬 경우에도 1분 내 복구.
+    """
+    backoff = FAILURE_INITIAL_BACKOFF_SEC
     while True:
-        await refresh_channel_meta()
-        await asyncio.sleep(REFRESH_INTERVAL_SEC)
+        ok = await refresh_channel_meta()
+        if ok:
+            backoff = FAILURE_INITIAL_BACKOFF_SEC
+            await asyncio.sleep(REFRESH_INTERVAL_SEC)
+        else:
+            await asyncio.sleep(backoff)
+            backoff = min(backoff * 2, FAILURE_MAX_BACKOFF_SEC)
