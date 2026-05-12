@@ -31,6 +31,42 @@ const _POPUP_CFG = {
 const _AUTO_CLOSE_MS = { danger: 15000, warning: 10000 };
 const _PULSE_COUNT_THRESHOLD = 10;  // 그룹 카운트 ≥ 이 값이면 펄스 애니메이션
 
+// 위험도별 비프음 — Web Audio API로 합성 (외부 mp3 의존 없음).
+// danger: 880Hz × 3펄스 / warning: 660Hz × 2펄스.
+// 브라우저 자동재생 정책 — AudioContext는 user gesture 후에만 시작되므로
+// 첫 클릭/키 입력 후부터 작동. 페이지 로드 직후 알람은 silent fallback.
+const _SOUND_CFG = {
+  danger:  { freq: 880, repeat: 3, interval: 0.22, duration: 0.18, volume: 0.32 },
+  warning: { freq: 660, repeat: 2, interval: 0.28, duration: 0.20, volume: 0.22 },
+};
+let _audioCtx = null;
+function _playAlarmSound(level) {
+  const cfg = _SOUND_CFG[level];
+  if (!cfg) return;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  try {
+    if (!_audioCtx) _audioCtx = new AC();
+    if (_audioCtx.state === 'suspended') _audioCtx.resume();  // gesture 후 unlock
+    const now = _audioCtx.currentTime;
+    for (let i = 0; i < cfg.repeat; i++) {
+      const t = now + i * cfg.interval;
+      const osc = _audioCtx.createOscillator();
+      const gain = _audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = cfg.freq;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(cfg.volume, t + 0.01);
+      gain.gain.linearRampToValueAtTime(0, t + cfg.duration);
+      osc.connect(gain).connect(_audioCtx.destination);
+      osc.start(t);
+      osc.stop(t + cfg.duration + 0.02);
+    }
+  } catch (e) {
+    console.warn('[AlarmPopup] sound play failed:', e);
+  }
+}
+
 // ──────────────────────────────────────────────────────────
 // AlarmPopup — 위험/주의 전용 중앙 차단형 팝업
 // ──────────────────────────────────────────────────────────
@@ -111,7 +147,10 @@ const AlarmPopup = {
     const popup = document.getElementById('alarm-popup');
     if (!popup) { this.isOpen = false; return; }
 
-    popup.style.borderLeftColor = cfg.borderColor;
+    // 위험도별 테두리·글로우 펄스 + 비프음 (P2 추가).
+    popup.classList.remove('level-danger', 'level-warning');
+    popup.classList.add(`level-${level}`);
+    _playAlarmSound(level);
 
     const timeEl = document.getElementById('alarm-popup-time');
     if (timeEl) {
@@ -167,7 +206,11 @@ const AlarmPopup = {
     }
     this._currentId = null;
     const popup = document.getElementById('alarm-popup');
-    if (popup) popup.style.display = 'none';
+    if (popup) {
+      popup.style.display = 'none';
+      // 글로우 펄스 애니메이션이 숨겨진 상태에서도 CPU 점유하지 않도록 정리
+      popup.classList.remove('level-danger', 'level-warning');
+    }
     this.isOpen = false;
     this._process();
   },

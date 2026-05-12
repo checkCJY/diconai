@@ -436,10 +436,30 @@ a.more {
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
   z-index: 1100;
-  width: 340px; border-radius: 10px; padding: 18px 16px 14px;
-  box-shadow: 0 6px 24px rgba(0,0,0,.5);
-  background: #1e1e2e; border-left: 4px solid var(--danger);
-  transition: border-left-color .2s;
+  width: 440px; border-radius: 12px; padding: 20px 20px 16px;
+  background: #1e1e2e;
+  border: 2px solid var(--danger);
+  border-left-width: 6px;  /* 좌측 강조 유지하면서 4면 모두 테두리 */
+  box-shadow: 0 6px 24px rgba(0,0,0,.5), 0 0 20px rgba(248,81,73,.35);
+  transition: border-color .2s, box-shadow .2s;
+}
+/* danger 레벨 — 빨간 글로우 펄스로 운영자 시선 강제 (P2 추가) */
+#alarm-popup.level-danger {
+  animation: alarm-popup-glow-danger 1.4s ease-in-out infinite;
+}
+@keyframes alarm-popup-glow-danger {
+  0%, 100% { box-shadow: 0 6px 24px rgba(0,0,0,.5), 0 0 16px rgba(248,81,73,.4); }
+  50%      { box-shadow: 0 6px 24px rgba(0,0,0,.5), 0 0 36px rgba(248,81,73,.85); }
+}
+/* warning 레벨 — 노란 테두리 + 약한 펄스 */
+#alarm-popup.level-warning {
+  border-color: var(--caution);
+  box-shadow: 0 6px 24px rgba(0,0,0,.5), 0 0 18px rgba(227,179,65,.35);
+  animation: alarm-popup-glow-warning 1.8s ease-in-out infinite;
+}
+@keyframes alarm-popup-glow-warning {
+  0%, 100% { box-shadow: 0 6px 24px rgba(0,0,0,.5), 0 0 14px rgba(227,179,65,.35); }
+  50%      { box-shadow: 0 6px 24px rgba(0,0,0,.5), 0 0 28px rgba(227,179,65,.65); }
 }
 /* 상단 행: 발생 시간 + 닫기 */
 .alarm-popup-top {
@@ -514,7 +534,7 @@ a.more {
   display: flex; align-items: flex-start; gap: 8px;
   margin-bottom: 14px; font-size: 12px; color: var(--text);
 }
-.alarm-popup-desc { line-height: 1.5; flex: 1; }
+.alarm-popup-desc { line-height: 1.65; flex: 1; font-size: 13px; word-break: keep-all; }
 /* 하단 버튼 행 */
 .alarm-popup-btn-row {
   display: flex; gap: 8px;
