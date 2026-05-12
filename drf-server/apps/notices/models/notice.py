@@ -51,6 +51,20 @@ class Notice(BaseModel):
     is_active = models.BooleanField(default=True)
     published_at = models.DateTimeField(null=True, blank=True)
 
+    # ── 소프트 삭제 ──────────────────────────────────────────────────────────
+    # 관리자가 공지를 삭제했을 때 누가/언제/무엇을 삭제했는지 추적 가능.
+    # 실수 삭제 시 복구 가능. SET_NULL로 삭제자 탈퇴 후에도 이력 보존.
+    is_deleted = models.BooleanField(default=False, verbose_name="삭제 여부")
+    deleted_at = models.DateTimeField(null=True, blank=True, verbose_name="삭제 일시")
+    deleted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="notices_deleted",
+        verbose_name="삭제자",
+    )
+
     def __str__(self):
         return self.title
 

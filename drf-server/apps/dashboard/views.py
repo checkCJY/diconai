@@ -1,9 +1,11 @@
 import calendar
+import logging
 from datetime import date
 
 from django.conf import settings
 from django.db.models import Exists, OuterRef
 from django.shortcuts import render
+from django.utils import timezone
 from drf_spectacular.utils import (
     OpenApiParameter,
     OpenApiResponse,
@@ -15,7 +17,12 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.facilities.selectors.facility import get_default_facility_id
+from apps.training.services.vr_admin_service import get_vr_content_for_facility
+
 from .menu import get_menu_tree
+
+logger = logging.getLogger(__name__)
 
 ADMIN_TYPES = ("super_admin", "facility_admin")
 
@@ -40,6 +47,18 @@ def safety_history_page(request):
 
 
 def safety_vr_page(request):
+    """작업자 VR 교육 페이지 (HTML 셸).
+
+    [동적 영상 연동]
+    템플릿은 빈 셸만 렌더하고, 실제 콘텐츠 URL은 JS가 페이지 로드 후
+    `GET /dashboard/api/vr-content/active/`로 fetch해 video src를 주입한다.
+
+    [SSR을 안 쓰는 이유 — JWT-only 환경 대응]
+    본 시스템은 `JWTAuthentication`만 사용하므로 Django 페이지 뷰에서는
+    `request.user`가 항상 AnonymousUser가 된다. context로 콘텐츠를 직접
+    주입하면 모든 사용자에게 빈 화면이 노출되는 버그가 발생했다. 다른
+    페이지(체크리스트/이력 등)와 동일하게 클라이언트 fetch 패턴으로 통일.
+    """
     return render(request, "snb_details/safety_vr.html")
 
 
@@ -104,9 +123,26 @@ class MenuView(APIView):
 # GET/POST /api/vr-progress/ — VR 시청 위치 임시 저장 (세션)
 # ──────────────────────────────────────────────────────────
 class VRProgressView(APIView):
+    """VR 시청 위치 임시 저장 (세션).
+
+    [user_id 가드]
+    Django 세션은 브라우저 단위라 같은 PC에서 사용자 A가 보던 위치가 사용자 B
+    로그인 후에도 남아 즉시 ended로 점프하는 버그가 있다. 세션에 user_id를
+    함께 저장하고, GET 시 현재 인증 사용자와 일치하지 않으면 빈 값으로 응답해
+    누설을 차단한다.
+
+    [content_id 가드]
+    어드민이 영상을 교체했을 때 이전 영상의 position이 새 영상에 잘못 적용되어
+    검은 화면이나 즉시 종료가 일어나는 버그를 막는다. 클라이언트가 페이지의
+    현재 content_id와 응답의 content_id가 일치할 때만 position을 복원한다.
+    """
+
     permission_classes = [AllowAny]
 
     SESSION_KEY = "vr_safety_progress"
+
+    def _current_user_id(self, request) -> int | None:
+        return request.user.id if request.user.is_authenticated else None
 
     @extend_schema(
         tags=["Dashboard"],
@@ -114,20 +150,34 @@ class VRProgressView(APIView):
         responses={
             200: inline_serializer(
                 name="VRProgressGet",
-                fields={"position": serializers.FloatField()},
+                fields={
+                    "content_id": serializers.IntegerField(allow_null=True),
+                    "position": serializers.FloatField(),
+                },
             )
         },
     )
     def get(self, request):
-        position = request.session.get(self.SESSION_KEY, 0)
-        return Response({"position": position})
+        stored = request.session.get(self.SESSION_KEY) or {}
+        if stored.get("user_id") != self._current_user_id(request):
+            # 다른 사용자가 같은 브라우저 세션을 쓴 경우 — 진행도 누설 차단.
+            return Response({"content_id": None, "position": 0})
+        return Response(
+            {
+                "content_id": stored.get("content_id"),
+                "position": stored.get("position", 0),
+            }
+        )
 
     @extend_schema(
         tags=["Dashboard"],
         summary="VR 안전교육 시청 위치 저장 (세션)",
         request=inline_serializer(
             name="VRProgressPost",
-            fields={"position": serializers.FloatField()},
+            fields={
+                "content_id": serializers.IntegerField(allow_null=True),
+                "position": serializers.FloatField(),
+            },
         ),
         responses={
             200: inline_serializer(
@@ -141,22 +191,128 @@ class VRProgressView(APIView):
             position = float(request.data.get("position", 0))
         except (TypeError, ValueError):
             position = 0
-        request.session[self.SESSION_KEY] = position
+        raw_cid = request.data.get("content_id")
+        try:
+            content_id = int(raw_cid) if raw_cid not in (None, "", "null") else None
+        except (TypeError, ValueError):
+            content_id = None
+        request.session[self.SESSION_KEY] = {
+            "user_id": self._current_user_id(request),
+            "content_id": content_id,
+            "position": position,
+        }
         return Response({"saved": position})
 
 
 # ──────────────────────────────────────────────────────────
 # GET/POST /api/safety-status/ — 나의 안전확인 완료 상태 (세션 기반)
 # ──────────────────────────────────────────────────────────
+class WorkerVRContentView(APIView):
+    """작업자 페이지용 VR 콘텐츠 조회 — 인증 사용자 누구나.
+
+    [JWT 인증 + 작업자 공용]
+    `safety_vr_page`(SSR)가 JWT-only 환경에서 `request.user`가 비어 발생한
+    버그를 회피하기 위해, 페이지 렌더는 빈 셸만 보내고 클라이언트가 본 API로
+    실제 URL을 가져간다. 어드민 API(`/api/admin/training/...`)와 달리
+    `IsAuthenticated`만 요구하므로 worker도 호출 가능.
+
+    [facility 해석]
+    `user.facility_id || default` 폴백. 다중 공장 전환 시 worker 폴백은
+    제거해야 함 (후속 과제 — 본 PR에서는 단일 공장 단계에 맞춤).
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=["Dashboard"],
+        summary="작업자 페이지용 VR 콘텐츠 1건 조회",
+        responses={
+            200: inline_serializer(
+                name="WorkerVRContent",
+                fields={
+                    "id": serializers.IntegerField(allow_null=True),
+                    "name": serializers.CharField(allow_null=True),
+                    "content_url": serializers.URLField(allow_null=True),
+                    "duration_seconds": serializers.IntegerField(allow_null=True),
+                },
+            )
+        },
+    )
+    def get(self, request):
+        facility_id = (
+            getattr(request.user, "facility_id", None) or get_default_facility_id()
+        )
+        content = None
+        if facility_id is not None:
+            content = get_vr_content_for_facility(facility_id)
+        if content is None:
+            return Response(
+                {
+                    "id": None,
+                    "name": None,
+                    "content_url": None,
+                    "duration_seconds": None,
+                }
+            )
+        return Response(
+            {
+                "id": content.id,
+                "name": content.name,
+                "content_url": content.content_url,
+                "duration_seconds": content.duration_seconds,
+            }
+        )
+
+
 class MySafetyStatusView(APIView):
+    """오늘의 안전 확인 완료 상태 — 메인 대시보드 카드용 API.
+
+    [세션 + DB 이중 저장 — Phase 4 변경]
+    POST 시점에 (1) Django 세션 키, (2) `SafetyCheckSession` DB row 두 곳에
+    완료 시각을 모두 기록한다. 세션은 즉시 표시(휘발)용, DB는 이력 페이지와
+    다른 기기 일관성용. GET은 세션을 먼저 확인하고 비어 있으면 DB로 폴백.
+
+    [AllowAny 사유]
+    인증된 사용자만 의미가 있지만, 익명 호출도 200 OK로 응답하도록 두어
+    프런트의 fetch 흐름이 401 핸들링 없이 단순해진다. 실제 DB 기록은
+    `is_authenticated`일 때만 일어남.
+    """
+
     permission_classes = [AllowAny]
 
     CHECKLIST_KEY = "safety_checklist_done_date"
     VR_KEY = "safety_vr_done_date"
 
-    def _is_done_today(self, request, key):
-        stored = request.session.get(key)
-        return stored == str(date.today())
+    def _is_done_today(self, request, key) -> bool:
+        """오늘 해당 항목이 완료됐는지 — 세션 우선, DB 폴백.
+
+        세션에 오늘 날짜가 박혀 있으면 즉시 True. 그렇지 않으면 DB의
+        SafetyCheckSession을 조회해 다른 기기에서의 완료 흔적을 찾는다.
+        """
+        if request.session.get(key) == str(date.today()):
+            return True
+        return self._is_done_today_in_db(request, key)
+
+    def _is_done_today_in_db(self, request, key) -> bool:
+        """세션이 비어 있어도 DB에 오늘자 완료 기록이 있으면 True.
+
+        [폴백 동기]
+        - 다른 PC/브라우저로 로그인 → 세션은 비어 있지만 DB엔 완료가 남음
+        - 세션 만료/쿠키 삭제 후 재진입 → 동일 상황
+
+        익명 사용자에게는 항상 False (DB에 사용자 식별이 불가하므로).
+        """
+        if not request.user.is_authenticated:
+            return False
+        from apps.safety.models import SafetyCheckSession
+
+        today = date.today()
+        qs = SafetyCheckSession.objects.filter(worker=request.user, date=today)
+        if key == self.CHECKLIST_KEY:
+            return qs.filter(is_completed=True).exists()
+        if key == self.VR_KEY:
+            return qs.filter(vr_completed_at__isnull=False).exists()
+        return False
 
     @extend_schema(
         tags=["Dashboard"],
@@ -197,21 +353,81 @@ class MySafetyStatusView(APIView):
     )
     def post(self, request):
         key_name = request.data.get("key")
-        if key_name == "checklist":
-            request.session[self.CHECKLIST_KEY] = str(date.today())
-        elif key_name == "vr":
-            request.session[self.VR_KEY] = str(date.today())
-        else:
+        if key_name not in ("checklist", "vr"):
             return Response(
                 {"error": "key는 'checklist' 또는 'vr'이어야 합니다."}, status=400
             )
+
+        # 1) 기존 세션 키 — 메인 대시보드 즉시 표시용(휘발).
+        today_str = str(date.today())
+        if key_name == "checklist":
+            request.session[self.CHECKLIST_KEY] = today_str
+        else:
+            request.session[self.VR_KEY] = today_str
+
+        # 2) DB dual-write — 안전 확인 이력 페이지가 영구히 ✓로 보이게 함.
+        if request.user.is_authenticated:
+            self._record_completion_to_db(request.user, key_name)
+
         return Response({"ok": True})
+
+    def _record_completion_to_db(self, user, key_name: str) -> None:
+        """SafetyCheckSession에 완료 시각을 기록 (이력·다른 기기 일관성용).
+
+        [기록 방식]
+        - `key_name == 'checklist'`: `is_completed=True`, `completed_at=now`
+        - `key_name == 'vr'`: `vr_completed_at=now`
+        두 작업은 같은 (worker, date, revision) row의 다른 필드를 갱신하므로
+        "오늘의 안전 확인 1회" 묶음 의미가 유지된다.
+
+        [실패 허용]
+        active Revision이 없거나 facility 미지정 등으로 세션 생성이 실패하면
+        ValueError가 raise된다. 메인 대시보드 표시(세션 기반)는 이미 성공했고
+        이력 페이지에 ✗로 남는 것은 어드민이 체크리스트를 발행하지 않은
+        상태이므로 자연스러운 결과 — 로그만 남기고 예외를 삼킨다.
+        """
+        from apps.safety.services.check_service import get_or_create_today_session
+
+        facility_id = getattr(user, "facility_id", None) or get_default_facility_id()
+        if facility_id is None:
+            return
+        try:
+            session = get_or_create_today_session(
+                worker_id=user.id, facility_id=facility_id
+            )
+        except ValueError as exc:
+            logger.info("안전 세션 생성 불가 (active revision 없음): %s", exc)
+            return
+        now = timezone.now()
+        if key_name == "checklist":
+            session.is_completed = True
+            session.completed_at = now
+            session.save(update_fields=["is_completed", "completed_at", "updated_at"])
+        else:  # vr
+            session.vr_completed_at = now
+            session.save(update_fields=["vr_completed_at", "updated_at"])
 
 
 # ──────────────────────────────────────────────────────────
 # GET /api/safety-history/?month=YYYY-MM[&worker_id=X]
 # ──────────────────────────────────────────────────────────
 class SafetyHistoryAPIView(APIView):
+    """월별 안전 확인 이력 캘린더 데이터.
+
+    [데이터 소스 — Phase 4 이후]
+    체크리스트/VR 완료 모두 `SafetyCheckSession` 한 모델에서 조회한다.
+    한 row의 `is_completed`와 `vr_completed_at` 두 필드가 각각의 완료 상태를
+    표현하므로 단일 쿼리로 두 시리즈를 동시에 채울 수 있다.
+
+    [관리자 다른 작업자 조회]
+    `?worker_id=` 파라미터로 다른 작업자의 이력을 조회 가능. SUPER_ADMIN/
+    FACILITY_ADMIN(`ADMIN_TYPES`)만 허용. 일반 사용자는 본인 데이터로 강제.
+
+    [attended 시리즈]
+    출근 여부는 `LoginLog` 성공 로그인 시점 기준으로 계산. 완료 여부와 독립
+    적으로 캘린더에 색칠된다.
+    """
+
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
@@ -242,6 +458,7 @@ class SafetyHistoryAPIView(APIView):
                             name="SafetyHistoryRecord",
                             fields={
                                 "date": serializers.CharField(),
+                                "attended": serializers.BooleanField(),
                                 "checklist_done": serializers.BooleanField(),
                                 "vr_done": serializers.BooleanField(),
                             },
@@ -272,15 +489,27 @@ class SafetyHistoryAPIView(APIView):
         else:
             target = request.user
 
-        from apps.safety.models.safety import SafetyStatus
+        from apps.accounts.models import LoginLog
+        from apps.safety.models import SafetyCheckSession
 
-        checked_dates = set(
-            SafetyStatus.objects.filter(
-                worker=target,
-                is_checked=True,
-                checked_at__year=year,
-                checked_at__month=month,
-            ).values_list("checked_at__date", flat=True)
+        # 체크리스트/VR 완료 모두 SafetyCheckSession 1개 row에 기록되어 있다.
+        sessions = SafetyCheckSession.objects.filter(
+            worker=target,
+            date__year=year,
+            date__month=month,
+        ).values("date", "is_completed", "vr_completed_at")
+        checklist_dates = {s["date"] for s in sessions if s["is_completed"]}
+        vr_dates = {s["date"] for s in sessions if s["vr_completed_at"] is not None}
+
+        attended_dates = set(
+            LoginLog.objects.filter(
+                user=target,
+                login_result=LoginLog.LoginResult.SUCCESS,
+                timestamp__year=year,
+                timestamp__month=month,
+            )
+            .values_list("timestamp__date", flat=True)
+            .distinct()
         )
 
         _, days_in_month = calendar.monthrange(year, month)
@@ -290,8 +519,9 @@ class SafetyHistoryAPIView(APIView):
             records.append(
                 {
                     "date": d.isoformat(),
-                    "checklist_done": d in checked_dates,
-                    "vr_done": False,  # 4차 연동 예정
+                    "attended": d in attended_dates,
+                    "checklist_done": d in checklist_dates,
+                    "vr_done": d in vr_dates,
                 }
             )
 
@@ -315,8 +545,8 @@ class WorkerListAPIView(APIView):
         tags=["Dashboard"],
         summary="작업자 목록 + 부서 드롭다운 (관리자 전용)",
         description=(
-            "facility_admin은 자기 공장 작업자만, super_admin은 전체. "
-            "오늘 위치 데이터 유무로 `is_present` 자동 계산."
+            "facility_admin은 자기 공장 사용자만, super_admin은 전체 활성 사용자. "
+            "오늘 LoginLog 성공 기록 유무로 `is_present` 자동 계산."
         ),
         parameters=[
             OpenApiParameter(name="department_id", type=int, required=False),
@@ -361,13 +591,11 @@ class WorkerListAPIView(APIView):
         if request.user.user_type not in ADMIN_TYPES:
             return Response({"error": "권한이 없습니다."}, status=403)
 
-        from apps.accounts.models import CustomUser, Department
-        from apps.positioning.models.worker_position import WorkerPosition
+        from django.utils import timezone
 
-        workers = CustomUser.objects.filter(
-            user_type="worker",
-            deactivated_at__isnull=True,
-        )
+        from apps.accounts.models import CustomUser, Department, LoginLog
+
+        workers = CustomUser.objects.filter(deactivated_at__isnull=True)
 
         if request.user.user_type == "facility_admin":
             workers = workers.filter(facility=request.user.facility)
@@ -383,13 +611,14 @@ class WorkerListAPIView(APIView):
         if name_q:
             workers = workers.filter(name__icontains=name_q)
 
-        today = date.today()
-        today_positions = WorkerPosition.objects.filter(
-            worker=OuterRef("pk"),
-            measured_at__date=today,
+        today = timezone.localdate()
+        today_logins = LoginLog.objects.filter(
+            user=OuterRef("pk"),
+            login_result=LoginLog.LoginResult.SUCCESS,
+            timestamp__date=today,
         )
         workers = (
-            workers.annotate(is_present=Exists(today_positions))
+            workers.annotate(is_present=Exists(today_logins))
             .prefetch_related("dept_memberships__department")
             .order_by("name")
         )
@@ -410,7 +639,7 @@ class WorkerListAPIView(APIView):
             depts = (
                 Department.objects.filter(
                     memberships__user__facility=request.user.facility,
-                    memberships__user__user_type="worker",
+                    memberships__user__deactivated_at__isnull=True,
                     is_active=True,
                 )
                 .distinct()

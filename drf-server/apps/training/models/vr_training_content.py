@@ -41,6 +41,10 @@ class VRTrainingContent(BaseModel):
     name = models.CharField(max_length=200)
     content_url = models.URLField(max_length=500)
     description = models.TextField(blank=True, default="")
+    operation_note = models.TextField(blank=True, default="", verbose_name="운영 메모")
+    duration_seconds = models.IntegerField(
+        null=True, blank=True, verbose_name="재생 시간(초)"
+    )
     is_active = models.BooleanField(default=True)
 
     def __str__(self):

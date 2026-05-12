@@ -1,0 +1,99 @@
+{% extends 'admin_panel/base.html' %}
+{% load static %}
+{% comment %}
+페이지: /admin-panel/safety/vr-training/
+View:  config/admin_panel_urls.py VRTrainingAdminPageView
+JS:    static/js/admin/safety/vr_training.js  — 콘텐츠 조회 + 영상 교체 + 메타 수정
+CSS:   static/css/admin/safety_vr_training.css
+페이지 셸만 제공하고 실제 데이터는 JS가 /api/admin/training/vr-training/ 으로 fetch.
+{% endcomment %}
+
+{% block title %}VR 교육 관리{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <div class="header-titles">
+        <div class="breadcrumb">안전 확인 관리 &gt; VR 교육 관리</div>
+        <h2 class="page-title">VR 교육 관리</h2>
+        <p class="page-desc">단일 VR 교육 콘텐츠를 수정하고 운영 상태를 관리합니다.</p>
+    </div>
+    <div class="header-actions">
+        <div class="header-meta" id="facilitySelectWrap" hidden>
+            <label class="meta-label" for="facilitySelect">공장</label>
+            <select id="facilitySelect" class="facility-select">
+                {% for f in facilities %}
+                <option value="{{ f.id }}">{{ f.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button class="btn-primary" id="btnEditMeta">내용 수정</button>
+    </div>
+</section>
+
+<section class="vr-summary" id="vrSummary" hidden>
+    <div class="summary-item">
+        <label>교육명</label>
+        <div class="value" id="sumName">-</div>
+    </div>
+    <div class="summary-item">
+        <label>적용 대상</label>
+        <div class="value" id="sumFacility">-</div>
+    </div>
+    <div class="summary-item">
+        <label>사용 상태</label>
+        <div class="value" id="sumStatus">-</div>
+    </div>
+    <div class="summary-item">
+        <label>최종 수정</label>
+        <div class="value" id="sumUpdatedAt">-</div>
+    </div>
+</section>
+
+<section class="vr-empty" id="vrEmpty" hidden>
+    <h3>등록된 VR 교육 콘텐츠가 없습니다.</h3>
+    <p>[영상 교체] 버튼을 눌러 첫 콘텐츠를 등록해 주세요.</p>
+</section>
+
+<section class="vr-layout" id="vrLayout" hidden>
+    <main class="video-pane">
+        <header class="pane-header">
+            <h3>VR 교육 영상</h3>
+            <p class="pane-desc">운영 중인 단일 VR 영상을 확인하고 교체합니다.</p>
+        </header>
+        <div class="video-frame">
+            <span class="duration-badge" id="durationBadge">--:--</span>
+            <video id="vrPreview" controls preload="metadata"></video>
+        </div>
+        <footer class="pane-footer">
+            <strong id="footerName">-</strong>
+            <span class="muted">현재 작업자 앱에서 노출 중인 VR 교육 콘텐츠입니다.</span>
+        </footer>
+    </main>
+
+    <aside class="info-pane">
+        <header class="pane-header">
+            <h3>교육 정보</h3>
+            <p class="pane-desc">현재 운영 중인 VR 교육의 기본 정보를 확인합니다.</p>
+        </header>
+        <dl class="info-grid">
+            <div><dt>교육명</dt><dd id="infoName">-</dd></div>
+            <div><dt>적용 대상</dt><dd id="infoFacility">-</dd></div>
+            <div><dt>사용 상태</dt><dd id="infoStatus">-</dd></div>
+            <div><dt>재생 시간</dt><dd id="infoDuration">-</dd></div>
+            <div class="full"><dt>최종 수정</dt><dd id="infoUpdatedAt">-</dd></div>
+            <div class="full"><dt>교육 설명</dt><dd id="infoDescription">-</dd></div>
+            <div class="full"><dt>운영 메모</dt><dd id="infoOperationNote">-</dd></div>
+        </dl>
+    </aside>
+</section>
+
+{% include 'admin_panel/safety/_modal_edit.html' %}
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/admin/safety_vr_training.css' %}">
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/admin/safety/vr_training.js' %}"></script>
+{% endblock %}
