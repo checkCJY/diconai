@@ -27,6 +27,7 @@ from internal.routers.alarm_router import router as internal_alarm_router
 from internal.routers.scenario_router import router as internal_scenario_router
 from positioning.routers.position_router import router as positioning_router
 from power.routers.power_router import router as power_router
+from power.services.channel_meta_cache import channel_meta_refresh_loop
 from websocket.routers.ws_router import (
     alarm_flush_loop,
     broadcast_loop,
@@ -48,11 +49,15 @@ async def lifespan(app: FastAPI):
         broadcast_loop()
     )  # 센서 통합 페이로드 주기 브로드캐스트
     task2 = asyncio.create_task(alarm_flush_loop())  # 신규 알람 즉시 플러시
+    task3 = asyncio.create_task(
+        channel_meta_refresh_loop()
+    )  # PowerDevice.channel_meta 5분 주기 동기화
     try:
         yield
     finally:
         task1.cancel()
         task2.cancel()
+        task3.cancel()
         await close_redis()  # Phase 1 C4 — Redis 연결 풀 정리
         logger.info("[app] action=shutdown")
 
