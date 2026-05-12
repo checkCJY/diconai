@@ -40,12 +40,18 @@
     </div>
   </div>
 
-  <!-- ④ VR 교육 플레이어 -->
+  <!-- ④ VR 교육 플레이어 — 어드민이 등록한 콘텐츠만 재생. 미등록 시 안내 카드. -->
   <div class="video-wrap">
+    {% if vr_content_url %}
     <div class="video-container">
-      <!-- 실제 영상 파일 경로로 교체하세요 -->
-      <video id="vrVideo" preload="metadata">
-        <source src="{% static 'video/safety_vr.mp4' %}" type="video/mp4">
+      <video id="vrVideo"
+             preload="metadata"
+             controls
+             controlslist="nodownload noplaybackrate noremoteplayback"
+             disablepictureinpicture
+             tabindex="-1"
+             data-content-id="{{ vr_content_id|default_if_none:'' }}">
+        <source src="{{ vr_content_url }}" type="video/mp4">
       </video>
       <div class="play-overlay" id="playOverlay">
         <svg class="play-icon" viewBox="0 0 64 64" fill="none">
@@ -54,6 +60,12 @@
         </svg>
       </div>
     </div>
+    {% else %}
+    <div class="video-empty" role="status">
+      <div class="empty-title">등록된 VR 교육 영상이 없습니다.</div>
+      <div class="empty-sub">관리자가 영상을 등록한 뒤 다시 시도해 주세요.</div>
+    </div>
+    {% endif %}
   </div>
 
   <!-- ⑤⑥ 하단 버튼 -->

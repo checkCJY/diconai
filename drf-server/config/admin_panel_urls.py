@@ -117,6 +117,24 @@ class SafetyChecklistAdminPageView(TemplateView):
         return ctx
 
 
+class VRTrainingAdminPageView(TemplateView):
+    """
+    VR 교육 관리 페이지 — facility별 단일 콘텐츠 조회/교체.
+    super_admin은 facility 드롭다운으로 다른 공장 콘텐츠도 조회 가능.
+    실제 데이터는 JS가 /api/admin/training/ 엔드포인트를 fetch해 렌더링한다.
+    """
+
+    template_name = "admin_panel/safety/vr_training_main.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["active_nav"] = "vr_training"
+        ctx["facilities"] = (
+            Facility.objects.filter(is_active=True).order_by("id").values("id", "name")
+        )
+        return ctx
+
+
 urlpatterns = [
     path(
         "accounts-management/",
@@ -161,5 +179,10 @@ urlpatterns = [
         "safety/checklist/",
         SafetyChecklistAdminPageView.as_view(),
         name="admin-safety-checklist-page",
+    ),
+    path(
+        "safety/vr-training/",
+        VRTrainingAdminPageView.as_view(),
+        name="admin-vr-training-page",
     ),
 ]
