@@ -23,8 +23,10 @@ const EventPanel = {
     const dotClass   = LevelMapper.toCssClass(data.alarm_level);
     const label      = data.sensor_name || data.worker_name || '알 수 없음';
     const time       = data.created_at
-      ? new Date(data.created_at).toLocaleTimeString()
-      : (data.timestamp ? new Date(data.timestamp).toLocaleTimeString() : '');
+      ? (typeof TimeFormat !== 'undefined' ? TimeFormat.short(data.created_at) : new Date(data.created_at).toLocaleTimeString())
+      : (data.timestamp
+          ? (typeof TimeFormat !== 'undefined' ? TimeFormat.short(data.timestamp) : new Date(data.timestamp).toLocaleTimeString())
+          : '');
     const isResolved = data.status === 'resolved';
 
     const item = document.createElement('div');

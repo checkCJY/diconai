@@ -155,9 +155,8 @@ const AlarmPopup = {
     const timeEl = document.getElementById('alarm-popup-time');
     if (timeEl) {
       const ts = data.timestamp || data.created_at;
-      timeEl.textContent = ts
-        ? new Date(ts).toLocaleString('ko-KR', { hour12: false })
-        : '--';
+      // KST 라벨 + 통일 포맷 (Phase 2 P5)
+      timeEl.textContent = (typeof TimeFormat !== 'undefined') ? TimeFormat.abs(ts) : (ts || '--');
     }
 
     const iconEl = document.getElementById('alarm-popup-icon');
