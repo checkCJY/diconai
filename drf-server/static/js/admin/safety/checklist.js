@@ -250,12 +250,19 @@ const SafetyChecklistAdmin = {
       li.dataset.sectionId = section.id;
       li.innerHTML = `
         <span class="name"></span>
-        <span class="count">${section.item_count}개</span>
+        <div class="section-card-actions">
+          <span class="count">${section.item_count}개</span>
+          <button class="section-delete" type="button" aria-label="섹션 삭제" title="섹션 삭제">×</button>
+        </div>
       `;
       li.querySelector('.name').textContent = section.name;
       li.addEventListener('click', () => {
         this.currentSectionId = section.id;
         this._render();
+      });
+      li.querySelector('.section-delete').addEventListener('click', (e) => {
+        e.stopPropagation();
+        this._onDeleteSection(section);
       });
       list.appendChild(li);
     });
@@ -339,6 +346,24 @@ const SafetyChecklistAdmin = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name }),
     });
+    this._markDirty();
+    await this._loadAll();
+  },
+
+  async _onDeleteSection(section) {
+    const itemCountText = section.item_count > 0
+      ? `\n하위 문항 ${section.item_count}개도 함께 비활성화됩니다.`
+      : '';
+    const ok = await Dialog.confirm(
+      `"${section.name}" 섹션을 삭제하시겠습니까?${itemCountText}`,
+      { title: '섹션 삭제', confirmLabel: '삭제', variant: 'danger' },
+    );
+    if (!ok) return;
+    await this._api(`/sections/${section.id}/${this._qs()}`, { method: 'DELETE' });
+    // 현재 선택 섹션이 삭제됐으면 선택 초기화 — 다음 렌더에서 첫 활성 섹션으로 폴백됨
+    if (this.currentSectionId === section.id) {
+      this.currentSectionId = null;
+    }
     this._markDirty();
     await this._loadAll();
   },
