@@ -27,6 +27,10 @@ const _POPUP_CFG = {
   },
 };
 
+// 위험도별 자동닫힘 (ms) — danger는 운영자 확인 시간 충분 확보 (P2-2).
+const _AUTO_CLOSE_MS = { danger: 15000, warning: 10000 };
+const _PULSE_COUNT_THRESHOLD = 10;  // 그룹 카운트 ≥ 이 값이면 펄스 애니메이션
+
 // ──────────────────────────────────────────────────────────
 // AlarmPopup — 위험/주의 전용 중앙 차단형 팝업
 // ──────────────────────────────────────────────────────────
@@ -53,7 +57,7 @@ const AlarmPopup = {
       }
     }
 
-    // 큐 풀 — silent drop 대신 카운트 노출 (옵션 A 보강)
+    // 큐 풀 — silent drop 대신 헤더 배지로 운영자 알림 (P2-3).
     if (this.queue.length >= this.MAX_QUEUE) {
       this.droppedCount += 1;
       console.warn('[AlarmPopup] queue full, dropping alarm', {
@@ -61,17 +65,47 @@ const AlarmPopup = {
         sensor: data.sensor_name,
         level: data.alarm_level,
       });
+      this._renderDropBadge();  // 현재 팝업이 떠있으면 즉시 배지 갱신
       return;
     }
     this.queue.push(data);
     if (!this.isOpen) this._process();
   },
 
+  // 헤더 우측 "+N건 누락" 배지를 droppedCount 상태에 맞춰 갱신.
+  // _process()에서도 호출되어 새 팝업 표시 시 누적 카운트를 운영자가 확인 가능.
+  _renderDropBadge() {
+    const el    = document.getElementById('alarm-popup-drop-badge');
+    const cntEl = document.getElementById('alarm-popup-drop-count');
+    if (!el || !cntEl) return;
+    if (this.droppedCount > 0) {
+      cntEl.textContent = this.droppedCount;
+      el.style.display = 'inline-flex';
+    } else {
+      el.style.display = 'none';
+    }
+  },
+
+  // 그룹 카운트 우상단 원형 뱃지 갱신. groupCount ≥ 10이면 펄스.
+  _renderGroupCount(groupCount) {
+    const el = document.getElementById('alarm-popup-count');
+    if (!el) return;
+    if ((groupCount || 1) > 1) {
+      el.textContent = `×${groupCount}`;
+      el.style.display = 'flex';
+      el.classList.toggle('pulse', groupCount >= _PULSE_COUNT_THRESHOLD);
+    } else {
+      el.style.display = 'none';
+      el.classList.remove('pulse');
+    }
+  },
+
   _process() {
     if (this.queue.length === 0) { this.isOpen = false; return; }
     this.isOpen = true;
     const data  = this.queue.shift();
-    const cfg   = _POPUP_CFG[data.alarm_level] || _POPUP_CFG.danger;
+    const level = data.alarm_level;
+    const cfg   = _POPUP_CFG[level] || _POPUP_CFG.danger;
     this._currentId = data.event_id || data.id || null;
 
     const popup = document.getElementById('alarm-popup');
@@ -109,16 +143,28 @@ const AlarmPopup = {
     if (msgEl) {
       const sensor = data.sensor_name || data.source_label || '';
       const msg    = data.message     || data.summary      || '';
-      const suffix = data.groupCount > 1 ? ` (×${data.groupCount})` : '';
-      msgEl.textContent = (sensor ? `${sensor} — ${msg}` : msg) + suffix;
+      // 그룹 카운트는 더 이상 메시지 suffix가 아닌 우상단 뱃지로 표시 (P2-1)
+      msgEl.textContent = sensor ? `${sensor} — ${msg}` : msg;
     }
 
+    // 그룹 카운트 뱃지 + 큐 풀 누락 배지 갱신
+    this._renderGroupCount(data.groupCount);
+    this._renderDropBadge();
+
     popup.style.display = 'block';
-    this._autoCloseTimer = setTimeout(() => this.close(), 10000);
+    // 위험도별 차등 자동닫힘 — danger는 운영자 확인 시간 확보 (P2-2)
+    const closeMs = _AUTO_CLOSE_MS[level] || 10000;
+    this._autoCloseTimer = setTimeout(() => this.close(), closeMs);
   },
 
-  close() {
+  // acknowledged=true (확인 버튼): 운영자가 알람을 인지했다는 신호 → drop 카운트 reset.
+  // acknowledged=false (✕ 또는 자동닫힘): 다음 팝업까지 carry-over (운영자 미인지).
+  close({ acknowledged = false } = {}) {
     clearTimeout(this._autoCloseTimer);
+    if (acknowledged) {
+      this.droppedCount = 0;
+      this._renderDropBadge();
+    }
     this._currentId = null;
     const popup = document.getElementById('alarm-popup');
     if (popup) popup.style.display = 'none';
@@ -128,11 +174,14 @@ const AlarmPopup = {
 
   _goDetail() {
     const id = this._currentId;
-    // 큐는 유지한 채 현재 팝업만 닫고 상세 페이지로 이동
+    // 큐는 유지한 채 현재 팝업만 닫고 상세 페이지로 이동.
+    // 누락 카운트는 reset — 운영자가 이력 페이지에서 확인 의사.
     clearTimeout(this._autoCloseTimer);
     this._currentId = null;
     this.isOpen = false;
     this.queue = [];
+    this.droppedCount = 0;
+    this._renderDropBadge();
     const popup = document.getElementById('alarm-popup');
     if (popup) popup.style.display = 'none';
     window.location.href = id
@@ -143,9 +192,11 @@ const AlarmPopup = {
   init() {
     if (this._inited) return;
     this._inited = true;
-    document.getElementById('alarm-popup-close') ?.addEventListener('click', () => this.close());
-    document.getElementById('alarm-popup-confirm')?.addEventListener('click', () => this.close());
-    document.getElementById('alarm-popup-detail') ?.addEventListener('click', () => this._goDetail());
+    document.getElementById('alarm-popup-close')     ?.addEventListener('click', () => this.close());
+    document.getElementById('alarm-popup-confirm')   ?.addEventListener('click', () => this.close({ acknowledged: true }));
+    document.getElementById('alarm-popup-detail')    ?.addEventListener('click', () => this._goDetail());
+    // 누락 배지 클릭 시 이벤트 이력 페이지로 — 누락된 알람을 운영자가 확인 가능
+    document.getElementById('alarm-popup-drop-badge')?.addEventListener('click', () => this._goDetail());
   },
 };
 

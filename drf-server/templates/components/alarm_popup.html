@@ -1,12 +1,19 @@
 <!-- CM-07 실시간 알림 팝업 — 위험/주의 전용 중앙 차단형 -->
 <div id="alarm-popup" style="display:none;">
 
-  <!-- 상단: 발생 시간 + 닫기 버튼 -->
+  <!-- 그룹 카운트 뱃지 (동일 센서·레벨 연속 알람 누적, 우상단 원형) -->
+  <span id="alarm-popup-count" class="alarm-popup-count" style="display:none;">1</span>
+
+  <!-- 상단: 발생 시간 + 큐 풀 누락 배지 + 닫기 버튼 -->
   <div class="alarm-popup-top">
     <div class="alarm-popup-time-badge">
       <span class="alarm-popup-time-label">발생 시간</span>
       <span id="alarm-popup-time">--</span>
     </div>
+    <!-- 큐 풀로 인한 알람 drop 누락 누적 알림 (클릭 시 이벤트 이력 페이지로) -->
+    <button id="alarm-popup-drop-badge" class="alarm-popup-drop-badge" style="display:none;" title="누락된 알람 확인">
+      +<span id="alarm-popup-drop-count">0</span>건 누락
+    </button>
     <button id="alarm-popup-close">✕</button>
   </div>
 
