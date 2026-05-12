@@ -18,7 +18,9 @@ logger = logging.getLogger(__name__)
 
 # WARNING 타이머 — gas_alarm.py / power_alarm.py가 import해서 사용하므로
 # 이 값만 바꾸면 두 도메인의 countdown이 함께 변경된다.
-WARNING_DURATION_SEC = 10
+# 10초였으나 더미 시나리오에서 WARNING 구간이 빠르게 DANGER로 점프해
+# 거의 발화되지 않아 3초로 완화 (Phase 2 P2 운영 피드백).
+WARNING_DURATION_SEC = 3
 
 # FastAPI 내부 알람 푸시 엔드포인트.
 # 호스트는 settings.FASTAPI_INTERNAL_URL (env 주입) — 도커에선 `http://fastapi:8001`,
