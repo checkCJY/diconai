@@ -1,0 +1,126 @@
+{% extends 'admin_panel/base.html' %}
+{% load static %}
+
+{% block title %}{{ form_mode }}{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <div class="header-titles">
+        <div class="breadcrumb">공지사항 관리 &gt; {{ form_mode }}</div>
+        <h2 class="page-title">{{ form_mode }}</h2>
+        <p class="page-desc">시스템 내 공지사항을 {% if is_edit %}수정{% else %}등록{% endif %}합니다.</p>
+    </div>
+</section>
+
+<div class="form-layout">
+    <!-- 왼쪽: 제목 + 내용 -->
+    <div>
+        <div class="form-card">
+            <!-- 공지 제목 / 구분 / 노출 여부 한 줄 -->
+            <div class="form-row">
+                <div class="form-field">
+                    <label>공지 제목 <span class="required">*</span></label>
+                    <input type="text" id="inputTitle" placeholder="제목을 입력해 주세요">
+                </div>
+                <div class="form-field">
+                    <label>공지 구분 <span class="required">*</span></label>
+                    <select id="inputCategory">
+                        <option value="">운영 공지 선택</option>
+                        <option value="general">일반 공지</option>
+                        <option value="urgent">긴급 공지</option>
+                        <option value="maintenance">점검 안내</option>
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label>노출 여부 <span class="required">*</span></label>
+                    <div class="toggle-group">
+                        <button type="button" class="toggle-btn active" id="toggleVisible" data-val="true">노출</button>
+                        <button type="button" class="toggle-btn" id="toggleHidden" data-val="false">숨김</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 공지 내용 -->
+            <div class="form-field">
+                <label>공지 내용</label>
+                <textarea id="inputContent" placeholder="공지 내용을 입력해 주세요."></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- 오른쪽: 첨부파일 + 등록 정보 -->
+    <div>
+        <!-- 첨부파일 -->
+        <div class="form-card">
+            <h3>첨부파일</h3>
+
+            <div class="upload-drop-zone" id="dropZone">
+                <p>파일을 끌어오거나 선택해 첨부합니다.</p>
+                <p class="upload-hint">PDF, JPG, PNG, XLSX, HWP 첨부가능 / 파일 1개 10MB</p>
+                <input type="file" id="fileInput" style="display:none"
+                       accept=".pdf,.jpg,.jpeg,.png,.xlsx,.hwp" multiple>
+                <button type="button" class="btn-outline" id="btnFileSelect"
+                        style="margin-top:10px; font-size:13px;">파일 선택</button>
+            </div>
+
+            <!-- 기존 첨부파일 (수정 모드에서만 표시) -->
+            <div id="existingFilesWrap" style="display:none">
+                <p style="font-size:12px; color:#94a3b8; margin:0 0 6px;">기존 첨부파일</p>
+                <div class="selected-files" id="existingFileList"></div>
+            </div>
+
+            <!-- 새로 선택한 파일 -->
+            <div class="selected-files" id="newFileList"></div>
+        </div>
+
+        <!-- 등록 정보 -->
+        <div class="form-card">
+            <h3>등록 정보</h3>
+            <div class="reg-info">
+                <div class="reg-info-row">
+                    <span class="reg-info-label">등록자</span>
+                    <span id="regAuthor">-</span>
+                </div>
+                <div class="reg-info-row">
+                    <span class="reg-info-label">등록일</span>
+                    <span id="regCreatedAt">저장 시 자동 입력</span>
+                </div>
+                <div class="reg-info-row">
+                    <span class="reg-info-label">수정일</span>
+                    <span id="regUpdatedAt">저장 시 자동 입력</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 버튼 -->
+        <div class="form-actions">
+            <button class="btn-outline" id="btnCancel">취소</button>
+            <button class="btn-primary" id="btnSubmit">{% if is_edit %}수정{% else %}등록{% endif %}</button>
+        </div>
+    </div>
+</div>
+
+<!-- 제출 확인 모달 -->
+<div id="confirmModal" class="modal-overlay" style="display:none">
+    <div class="modal-container">
+        <h3 id="confirmTitle">공지사항을 등록하시겠습니까?</h3>
+        <p id="confirmMsg"></p>
+        <div class="modal-actions">
+            <button class="btn-outline" id="btnConfirmCancel">취소</button>
+            <button class="btn-primary" id="btnConfirmOk">확인</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/admin/notices.css' %}">
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const NOTICE_FORM_MODE = '{{ form_mode_key }}'; // 'create' | 'edit'
+    const NOTICE_ID = {{ notice_id|default:'null' }};
+</script>
+<script src="{% static 'js/admin/notices/notice_form.js' %}"></script>
+{% endblock %}
