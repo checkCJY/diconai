@@ -109,7 +109,16 @@ class PowerDataBulkIngestSerializer(serializers.Serializer):
             for ch in validated_data["channels"]
         ]
         PowerData.objects.bulk_create(objs, ignore_conflicts=True)
-        trigger_power_alarms(
-            objs, device
-        )  # watt 채널에 대해 위험도 판정 후 알람 라우팅
-        return objs
+        # ignore_conflicts=True 시 conflict 행은 저장 skip되지만 objs 리스트엔 그대로 남는다.
+        # 미저장 행에 알람을 발화하지 않도록 unique 조건으로 실제 저장된 행만 재조회.
+        # (power_device, channel, data_type, measured_at) 복합 UNIQUE 보장 — Phase 1 C3.
+        saved = list(
+            PowerData.objects.filter(
+                power_device=device,
+                measured_at=validated_data["measured_at"],
+                data_type=validated_data["data_type"],
+                channel__in=[o.channel for o in objs],
+            )
+        )
+        trigger_power_alarms(saved, device)
+        return saved
