@@ -60,12 +60,15 @@ services:
     env_file: ./.env.docker
     environment:
       DRF_BASE_URL: http://drf:8000
+      REDIS_URL: redis://redis:6379/0
     volumes:
       # 소스 핫리로드 — celery-worker/drf와 동일하게 호스트 코드를 마운트해
       # 라우터/서비스 코드 변경이 `restart` 한 번으로 반영된다.
       - ./fastapi-server:/app
     depends_on:
       drf:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     ports:
       - "8001:8001"

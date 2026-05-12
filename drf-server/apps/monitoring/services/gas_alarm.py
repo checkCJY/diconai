@@ -16,6 +16,11 @@
 
 from django.core.cache import cache
 
+from apps.alerts.services.alarm_dedupe import (
+    clear_state,
+    get_state,
+    try_transition,
+)
 from apps.alerts.tasks import (
     WARNING_DURATION_SEC,
     fire_clear_notification_task,
@@ -40,6 +45,7 @@ def _task_key(sensor_id: int, gas: str) -> str:
 def _revoke(task_id: str) -> None:
     """진행 중인 Celery 태스크를 취소한다."""
     from config.celery import app as celery_app
+
     celery_app.control.revoke(task_id, terminate=True)
 
 
@@ -50,20 +56,19 @@ def trigger_gas_alarms(gas_data) -> list[dict]:
     GasDataCreateSerializer.create()에서 호출되며,
     반환값은 빈 리스트 — WS 알람은 Celery 태스크가 FastAPI에 직접 푸시한다.
     """
-    sensor       = gas_data.gas_sensor
-    sensor_id    = sensor.id
-    facility_id  = sensor.facility_id
+    sensor = gas_data.gas_sensor
+    sensor_id = sensor.id
+    facility_id = sensor.facility_id
     source_label = sensor.device_name
 
     for gas in GAS_FIELDS:
-        risk  = getattr(gas_data, f"{gas}_risk", None)
+        risk = getattr(gas_data, f"{gas}_risk", None)
         value = getattr(gas_data, gas, None)
         if value is None:
             continue
 
-        state_key  = _state_key(sensor_id, gas)
-        task_key   = _task_key(sensor_id, gas)
-        prev_state = cache.get(state_key, "normal")
+        state_key = _state_key(sensor_id, gas)
+        task_key = _task_key(sensor_id, gas)
 
         if risk == "danger":
             # 진행 중인 WARNING 타이머가 있으면 취소
@@ -72,22 +77,25 @@ def trigger_gas_alarms(gas_data) -> list[dict]:
                 _revoke(pending_task_id)
                 cache.delete(task_key)
 
-            # 이미 DANGER 상태면 중복 발송 방지
-            if prev_state != "danger":
+            # 원자 천이 — 직전 상태가 danger 아닐 때만 1회 fire (race-safe)
+            if try_transition(state_key, "danger", _CACHE_TTL):
                 fire_danger_alarm_task.delay(
                     sensor_id, gas, value, facility_id, source_label
                 )
-                cache.set(state_key, "danger", _CACHE_TTL)
 
         elif risk == "warning":
-            # WARNING/DANGER 타이머가 이미 있으면 중복 시작 방지
-            if prev_state not in ("warning", "danger") and not cache.get(task_key):
-                task = fire_warning_alarm_task.apply_async(
-                    args=[sensor_id, gas, value, facility_id, source_label],
-                    countdown=WARNING_DURATION_SEC,
-                )
-                cache.set(task_key, task.id, _CACHE_TTL)
-                cache.set(state_key, "warning", _CACHE_TTL)
+            prev_state = get_state(state_key)
+            if prev_state in ("warning", "danger"):
+                continue
+            # SETNX(cache.add)로 첫 도착자만 타이머 시작 — race 차단
+            if not cache.add(task_key, "_pending_", _CACHE_TTL):
+                continue
+            task = fire_warning_alarm_task.apply_async(
+                args=[sensor_id, gas, value, facility_id, source_label],
+                countdown=WARNING_DURATION_SEC,
+            )
+            cache.set(task_key, task.id, _CACHE_TTL)
+            try_transition(state_key, "warning", _CACHE_TTL)
 
         else:  # normal
             # 타이머가 있으면 취소
@@ -97,9 +105,9 @@ def trigger_gas_alarms(gas_data) -> list[dict]:
                 cache.delete(task_key)
 
             # 이전에 경보 상태였으면 정상화 알림 발송
-            if prev_state in ("warning", "danger"):
+            if get_state(state_key) in ("warning", "danger"):
                 fire_clear_notification_task.delay(sensor_id, source_label, gas)
-                cache.set(state_key, "normal", _CACHE_TTL)
+                clear_state(state_key)
 
     # WS 알람은 Celery 태스크가 직접 FastAPI에 푸시하므로 빈 리스트 반환
     return []

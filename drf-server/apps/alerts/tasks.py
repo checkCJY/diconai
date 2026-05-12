@@ -18,7 +18,9 @@ logger = logging.getLogger(__name__)
 
 # WARNING 타이머 — gas_alarm.py / power_alarm.py가 import해서 사용하므로
 # 이 값만 바꾸면 두 도메인의 countdown이 함께 변경된다.
-WARNING_DURATION_SEC = 10
+# 10초였으나 더미 시나리오에서 WARNING 구간이 빠르게 DANGER로 점프해
+# 거의 발화되지 않아 3초로 완화 (Phase 2 P2 운영 피드백).
+WARNING_DURATION_SEC = 3
 
 # FastAPI 내부 알람 푸시 엔드포인트.
 # 호스트는 settings.FASTAPI_INTERNAL_URL (env 주입) — 도커에선 `http://fastapi:8001`,
@@ -40,15 +42,18 @@ _GAS_NAME = {
 }
 
 
-def _push_to_ws(alarm_data: dict) -> None:
+def _push_to_ws(alarm_data: dict, *, raise_on_failure: bool = True) -> None:
     """FastAPI WebSocket 브로드캐스트 큐에 알람을 추가한다.
 
-    실패해도 태스크 자체는 성공으로 처리 — DB 기록이 우선이고
-    WS 알림 누락은 다음 틱에서 Event 목록으로 확인 가능.
+    Phase 1 C5 — 일시 장애 시 silent fail로 알람이 영구 누락되던 결함 보강.
+    timeout 3.0→10.0초로 도커 네트워크 마진 확보, 5xx 및 네트워크 오류는
+    raise해서 호출자(fire_*_task)의 self.retry(exc=exc)에 흡수되도록 한다.
 
-    [IntegrationLog 비동기 기록 — PR-D 변경]
+    raise_on_failure=False는 fire_clear_*_task에서만 사용 — 정상화 알림은
+    critical하지 않아 retry로 인한 중복 발송보다 손실 허용이 합리적.
+
+    [IntegrationLog 비동기 기록 — PR-D]
     호출 결과(성공/실패)를 Celery task delay()로 비동기 INSERT.
-    이전: ORM 직접 create (web pod 부담). 이후: Celery worker 분리 → web latency 0.
     broker 다운 시 silent fail — 본 흐름 비차단.
 
     [created_at 주입 — JS 03 R3]
@@ -68,11 +73,21 @@ def _push_to_ws(alarm_data: dict) -> None:
     url = base.rstrip("/") + _ALARM_PUSH_PATH
 
     result = "success"
+    pushed = True
     try:
-        httpx.post(url, json=alarm_data, headers=headers, timeout=3.0)
-    except Exception as e:
-        logger.warning("FastAPI WS 알람 푸시 실패 (WS 알림 누락): %s", e)
+        resp = httpx.post(url, json=alarm_data, headers=headers, timeout=10.0)
+        # 5xx는 재시도 가치가 있는 일시 장애로 간주 (FastAPI 503=Redis 일시 장애 포함)
+        # 4xx는 페이로드 검증 실패라 retry해도 의미 없음 → raise 안 함
+        if resp.status_code >= 500:
+            raise httpx.HTTPStatusError(
+                f"upstream {resp.status_code}",
+                request=resp.request,
+                response=resp,
+            )
+    except (httpx.RequestError, httpx.HTTPStatusError) as e:
+        logger.warning("FastAPI WS 알람 푸시 실패: %s", e)
         result = "failure"
+        pushed = False
 
     try:
         from apps.operations.tasks.integration_log_task import (
@@ -87,6 +102,10 @@ def _push_to_ws(alarm_data: dict) -> None:
         )
     except Exception:
         pass  # broker 다운 silent fail — 본 흐름 비차단
+
+    if not pushed and raise_on_failure:
+        # 호출자(fire_*_task)의 except에서 self.retry(exc=exc)로 흡수
+        raise RuntimeError("FastAPI WS push failed")
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=5)
@@ -288,6 +307,7 @@ def fire_clear_notification_task(
             " 관리자 확인 후 작업을 재개하세요."
         )
 
+        # 정상화 알림은 critical 아님 — push 실패해도 retry 안 함 (중복 발송 회피)
         _push_to_ws(
             {
                 "alarm_type": "gas_clear",
@@ -296,7 +316,8 @@ def fire_clear_notification_task(
                 "source_label": source_label,
                 "summary": summary,
                 "is_new_event": False,
-            }
+            },
+            raise_on_failure=False,
         )
         logger.info("정상화 알림 발송 | sensor=%s gas=%s", sensor_id, gas_type)
 
@@ -436,6 +457,7 @@ def fire_power_clear_task(
             f"[안전] {source_label} — 전력이 정상 범위로 복귀했습니다."
             " 관리자 확인 후 작업을 재개하세요."
         )
+        # 정상화 알림은 critical 아님 — push 실패해도 retry 안 함 (중복 발송 회피)
         _push_to_ws(
             {
                 "alarm_type": "power_clear",
@@ -444,7 +466,8 @@ def fire_power_clear_task(
                 "source_label": source_label,
                 "summary": summary,
                 "is_new_event": False,
-            }
+            },
+            raise_on_failure=False,
         )
         logger.info("전력 정상화 알림 | device=%s ch=%s", device_id, channel)
     except Exception as exc:

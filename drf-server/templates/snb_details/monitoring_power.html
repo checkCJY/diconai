@@ -19,6 +19,9 @@
 <div class="body-wrap page-wrap">
 
   <H1> 실시간/AI 예측 스마트 전력 현황 </H1><br>
+
+  {% include 'components/ws_conn_banner.html' %}
+
   <div class="power-wrap">
 
     <!-- ❶ 좌측: 스마트 전력 위험 현황 -->
@@ -124,6 +127,7 @@
 <script src="{% static 'js/shared/config.js' %}"></script>
 <script src="{% static 'js/shared/auth.js' %}"></script>
 <script src="{% static 'js/shared/ws-client.js' %}"></script>
+<script src="{% static 'js/shared/ws-conn-banner.js' %}"></script>
 <script src="{% static 'js/shared/layout.js' %}"></script>
 <script src="{% static 'js/shared/app-sub.js' %}"></script>
 <script src="{% static 'js/detail/ui-exception.js' %}"></script>

@@ -19,12 +19,14 @@ const EventPanel = {
     if (emptyEl) emptyEl.remove();
 
     const isDanger   = data.alarm_level === 'danger';
-    const colorClass = isDanger ? 'danger-text' : 'caution-text';
-    const dotClass   = isDanger ? 'danger'       : 'caution';
+    const colorClass = LevelMapper.toTextClass(data.alarm_level);
+    const dotClass   = LevelMapper.toCssClass(data.alarm_level);
     const label      = data.sensor_name || data.worker_name || '알 수 없음';
     const time       = data.created_at
-      ? new Date(data.created_at).toLocaleTimeString()
-      : (data.timestamp ? new Date(data.timestamp).toLocaleTimeString() : '');
+      ? (typeof TimeFormat !== 'undefined' ? TimeFormat.short(data.created_at) : new Date(data.created_at).toLocaleTimeString())
+      : (data.timestamp
+          ? (typeof TimeFormat !== 'undefined' ? TimeFormat.short(data.timestamp) : new Date(data.timestamp).toLocaleTimeString())
+          : '');
     const isResolved = data.status === 'resolved';
 
     const item = document.createElement('div');

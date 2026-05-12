@@ -75,12 +75,12 @@ function _renderAIGasNav() {
 
   if (nameEl) {
     nameEl.textContent = gas.name;
-    nameEl.className   = risk === 'danger' ? 'danger-text fw' : risk === 'warning' ? 'caution-text fw' : 'fw';
+    nameEl.className   = `fw ${LevelMapper.toTextClass(risk)}`.trim();
   }
   if (countEl)   countEl.textContent   = `${_aiGasIdx + 1} / ${_GAS_META.length}`;
   if (currentEl) {
     currentEl.textContent = val != null ? `${val} ${gas.unit}` : '--';
-    currentEl.className   = `big ${risk === 'danger' ? 'danger-text' : risk === 'warning' ? 'caution-text' : ''}`;
+    currentEl.className   = `big ${LevelMapper.toTextClass(risk)}`.trim();
   }
   if (maxEl) maxEl.textContent = val != null ? `${(val * 1.3).toFixed(2)} ${gas.unit}` : '--';
 
@@ -126,9 +126,7 @@ function _renderAIPowerNav() {
 
   if (nameEl) {
     nameEl.textContent = pred.name;
-    const riskCls = pred.risk_level === 'danger'  ? 'danger-text'
-                  : pred.risk_level === 'warning' ? 'caution-text' : '';
-    nameEl.className = `fw ai-equip-name ${riskCls}`.trim();
+    nameEl.className = `fw ai-equip-name ${LevelMapper.toTextClass(pred.risk_level)}`.trim();
   }
   if (etaEl) etaEl.textContent = pred.eta_min != null ? `${pred.eta_min} 분 뒤` : '-';
   if (loadEl) {
@@ -329,7 +327,8 @@ function initWebSocket() {
         const pct  = data.power_change_pct;
         const sign = pct >= 0 ? '▲ +' : '▼ ';
         powerChangePct.textContent = `기준 대비 ${sign}${pct}%`;
-        powerChangePct.className   = pct >= 15 ? 'danger-text' : 'caution-text';
+        // 증감률 임계 — 15%+ 위험, 미만은 주의로 매핑
+        powerChangePct.className   = LevelMapper.toTextClass(pct >= 15 ? 'danger' : 'warning');
       }
 
       if (powerTableBody) {

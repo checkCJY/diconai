@@ -25,7 +25,7 @@ async function loadEvents(statusFilter) {
 
     tbody.innerHTML = list.map((ev, idx) => {
       const time = ev.first_detected_at
-        ? new Date(ev.first_detected_at).toLocaleString('ko-KR')
+        ? (typeof TimeFormat !== 'undefined' ? TimeFormat.abs(ev.first_detected_at) : new Date(ev.first_detected_at).toLocaleString('ko-KR'))
         : '-';
       const rClass  = RISK_CLASS[ev.risk_level]  ?? 'normal';
       const sClass  = STATUS_CLASS[ev.status]    ?? 'gray';
