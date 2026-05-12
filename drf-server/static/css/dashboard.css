@@ -609,6 +609,31 @@ a.more {
   cursor: pointer; font-size: 14px; padding: 0; flex-shrink: 0;
 }
 
+/* ── WebSocket 연결 상태 배너 (P3 공용) ─────────────────── */
+/* monitoring_power/workers/realtime에서 include 후 사용. gas 페이지의
+   기존 #gas-conn-banner와는 별개 (마이그레이션 별도 sprint). */
+.ws-conn-banner {
+  margin-bottom: 10px;
+}
+.ws-conn-msg {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(56, 139, 253, 0.08);
+  border: 1px solid rgba(56, 139, 253, 0.3);
+  border-radius: 6px;
+  padding: 9px 14px;
+  font-size: 12px; color: var(--text2);
+}
+/* .conn-spinner는 gas_monitoring.css에서 정의됨 — 공유 사용.
+   gas 페이지 미로드 시(예: power 페이지) 정의 누락 방지를 위해 fallback 추가. */
+.ws-conn-banner .conn-spinner {
+  width: 14px; height: 14px;
+  border: 2px solid rgba(56, 139, 253, 0.25);
+  border-top-color: #58a6ff;
+  border-radius: 50%; flex-shrink: 0;
+  animation: conn-spin 0.8s linear infinite;
+}
+@keyframes conn-spin { to { transform: rotate(360deg); } }
+
 /* ── 서브 페이지 공통 ────────────────────────────────────── */
 .page-wrap        { padding: 16px; }
 .page-header      { margin-bottom: 12px; }

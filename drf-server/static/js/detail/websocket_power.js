@@ -119,6 +119,7 @@ function initPowerWebSocket() {
     showSkeleton(grid, 8);
 
     const ws = WSClient.connect('/ws/sensors/', { attachToken: true });
+    if (typeof WsConnBanner !== 'undefined') WsConnBanner.attach(ws);  // P3 공용 배너
 
     ws.onMessage((data) => {
       const equipment = data.equipment ?? [];

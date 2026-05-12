@@ -330,6 +330,7 @@ function _processPositions(workerPositions) {
 ══════════════════════════════════════════════════════════ */
 function _connectWebSocket() {
   const ws = WSClient.connect('/ws/sensors/', { attachToken: true });
+  if (typeof WsConnBanner !== 'undefined') WsConnBanner.attach(ws);  // P3 공용 배너
   ws.onOpen(() => console.log('[작업자 현황] WebSocket 연결됨'));
   ws.onClose(() => console.warn('[작업자 현황] 연결 끊김, WSClient 자동 재연결'));
   ws.onMessage((data) => {
