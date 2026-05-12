@@ -51,6 +51,7 @@
 .ic-done { color: var(--safe); }
 .ic-undone { color: var(--danger); }
 .ic-na { color: var(--text2); opacity: .5; }
+.cal-absent { font-size: 11px; color: var(--text2); opacity: .7; margin-top: 2px; }
 
 /* ── 범례 ── */
 .cal-legend { display: flex; justify-content: flex-end; align-items: center; gap: 16px; padding: 10px 14px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text2); }
@@ -153,6 +154,7 @@
   .ic-done   { color: #2a9d2a !important; }
   .ic-undone { color: #cc0000 !important; }
   .ic-na     { color: #999 !important; }
+  .cal-absent { color: #999 !important; }
   .cal-cell.today .cal-day-num { background: #1a6fc4 !important; color: #fff !important; }
   .cal-legend { border-top: 1px solid #ccc !important; }
   .legend-icon-done   { color: #2a9d2a !important; }

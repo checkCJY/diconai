@@ -11,6 +11,11 @@
  *   PATCH  /api/admin/accounts/<id>/      정보 수정
  *   DELETE /api/admin/accounts/<id>/      비활성화
  *   POST   /api/admin/accounts/<id>/lock/ 잠금 / 잠금 해제
+ *
+ * facility 처리 비대칭 (의도된 동작):
+ *   - 등록 모달: 빈 값이면 키 자체를 생략 → serializer의 allow_null로 NULL 처리
+ *   - 수정 모달: 빈 값을 null로 명시 전송 → PATCH partial에서 기존 facility 비우기
+ *   각 _submit*Form 내부 주석 참조.
  */
 'use strict';
 
@@ -151,7 +156,7 @@ const AccountsAdmin = {
     } catch (e) {
       console.error('[AccountsAdmin] 목록 로드 실패:', e);
       document.getElementById('accountsTableBody').innerHTML =
-        `<tr><td colspan="11" class="empty-state">데이터를 불러오지 못했습니다.</td></tr>`;
+        `<tr><td colspan="12" class="empty-state">데이터를 불러오지 못했습니다.</td></tr>`;
     }
   },
 
@@ -170,7 +175,7 @@ const AccountsAdmin = {
   _renderTable(items) {
     const tbody = document.getElementById('accountsTableBody');
     if (!items.length) {
-      tbody.innerHTML = `<tr><td colspan="11" class="empty-state">검색 결과가 없습니다.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="12" class="empty-state">검색 결과가 없습니다.</td></tr>`;
       return;
     }
 
@@ -179,6 +184,7 @@ const AccountsAdmin = {
         <td><input type="checkbox" class="row-check" data-id="${u.id}" ${this.selected.has(u.id) ? 'checked' : ''}></td>
         <td>${u.name || '-'}</td>
         <td>${u.department || '-'}</td>
+        <td>${u.facility_name || '-'}</td>
         <td>${u.position || '-'}</td>
         <td>${u.username}</td>
         <td><span class="badge ${this.USER_TYPE_BADGE[u.user_type] || 'badge-gray'}">${this.USER_TYPE_LABEL[u.user_type] || u.user_type}</span></td>
@@ -302,7 +308,7 @@ const AccountsAdmin = {
     ['createName', 'createUsername', 'createPassword', 'createPasswordConfirm', 'createEmail', 'createPhone'].forEach(id => {
       document.getElementById(id).value = '';
     });
-    ['createDepartment', 'createUserType', 'createPosition', 'createStatus'].forEach(id => {
+    ['createDepartment', 'createFacility', 'createUserType', 'createPosition', 'createStatus'].forEach(id => {
       document.getElementById(id).value = '';
     });
     document.querySelectorAll('#createUserModal .field-error').forEach(el => {
@@ -465,6 +471,10 @@ const AccountsAdmin = {
       status: document.getElementById('createStatus').value,
     };
 
+    // facility는 선택 항목. 등록 시 빈 값이면 키 자체를 생략해 serializer의 allow_null=True가 NULL로 처리.
+    const facility = document.getElementById('createFacility').value;
+    if (facility) payload.facility_id = parseInt(facility);
+
     const position = document.getElementById('createPosition').value;
     if (position) payload.position = parseInt(position);
 
@@ -537,6 +547,7 @@ const AccountsAdmin = {
       document.getElementById('editEmail').value = user.email || '';
       document.getElementById('editPhone').value = user.phone ? this._formatPhone(user.phone) : '';
       document.getElementById('editDepartment').value = user.department_id || '';
+      document.getElementById('editFacility').value = user.facility_id || '';
       document.getElementById('editPosition').value = user.position_id || '';
       document.getElementById('editStatus').value = user.status || '';
       document.getElementById('btnEditSubmit').disabled = false;
@@ -562,7 +573,7 @@ const AccountsAdmin = {
     ['editName', 'editUsername', 'editEmail', 'editPhone'].forEach(id => {
       document.getElementById(id).value = '';
     });
-    ['editDepartment', 'editPosition', 'editStatus'].forEach(id => {
+    ['editDepartment', 'editFacility', 'editPosition', 'editStatus'].forEach(id => {
       document.getElementById(id).value = '';
     });
     document.getElementById('editUserId').value = '';
@@ -669,6 +680,11 @@ const AccountsAdmin = {
       department_id: parseInt(document.getElementById('editDepartment').value),
       status: document.getElementById('editStatus').value,
     };
+
+    // 수정 시에는 빈 값을 명시적 null로 보내야 기존 facility를 비울 수 있다 (PATCH partial 특성).
+    // 등록 폼의 "키 생략" 처리와 비대칭한 이유 — 기존 값 제거 의도를 살리기 위함.
+    const facility = document.getElementById('editFacility').value;
+    payload.facility_id = facility ? parseInt(facility) : null;
 
     const position = document.getElementById('editPosition').value;
     if (position) payload.position = parseInt(position);

@@ -1,3 +1,5 @@
+from django.conf import settings
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import include, path
@@ -29,6 +31,9 @@ urlpatterns = [
     path("api/", include("apps.geofence.urls")),
     path("api/admin/", include("apps.accounts.admin_urls")),
     path("api/admin/", include("apps.monitoring.admin_urls")),
+    path("api/admin/safety/", include("apps.safety.admin_urls")),
+    path("api/admin/training/", include("apps.training.admin_urls")),
+    path("api/safety/", include("apps.safety.urls")),
     path("api/admin/", include("apps.notices.urls")),
     path("api/admin/", include("apps.core.admin_urls")),
     path("api/positioning/", include("apps.positioning.urls")),
@@ -49,3 +54,7 @@ urlpatterns = [
         name="api-redoc",
     ),
 ]
+
+if settings.DEBUG:
+    # 개발 환경 한정 MEDIA 서빙. 운영은 nginx/CDN에서 처리.
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

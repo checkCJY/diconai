@@ -1,0 +1,54 @@
+<!-- VR 교육 수정 모달 — JS(safety/vr_training.js _openEdit / _onSubmitEdit)가 채움.
+     파일 선택 여부에 따라 multipart POST /replace/ 와 JSON PATCH /<pk>/ 가 분기된다. -->
+<div class="modal-overlay" id="vrEditModal" hidden>
+    <div class="modal-dialog" role="dialog" aria-labelledby="vrEditTitle">
+        <header class="modal-header">
+            <h3 id="vrEditTitle">VR 교육 수정</h3>
+            <button class="modal-close" id="vrEditClose" aria-label="닫기">닫기</button>
+        </header>
+        <p class="modal-desc">단일 VR 교육 콘텐츠를 교체하거나 정보를 수정합니다.</p>
+
+        <form id="vrEditForm" enctype="multipart/form-data" novalidate>
+            <div class="edit-body">
+                <div class="media-pane">
+                    <div class="thumb-preview" id="thumbPreview">
+                        <span class="placeholder">미리보기</span>
+                    </div>
+                    <div class="media-actions">
+                        <button type="button" class="btn-outline btn-sm" id="btnPickVideo">영상 선택</button>
+                        <input id="videoInput" type="file" name="file" accept="video/mp4,video/webm,video/quicktime" hidden>
+                    </div>
+                    <div class="picked-name muted" id="pickedName">선택된 파일 없음</div>
+                    <div class="info-note">
+                        <strong>교체 안내</strong>
+                        <p>저장 시 기존 VR 교육 콘텐츠를 새 영상으로 교체합니다. 이전 영상 파일은 서버에서 삭제됩니다.</p>
+                    </div>
+                </div>
+
+                <div class="form-pane">
+                    <div class="input-group">
+                        <label for="editName">교육명</label>
+                        <input type="text" id="editName" name="name" maxlength="200">
+                    </div>
+                    <div class="input-group">
+                        <label for="editDuration">재생 시간</label>
+                        <input type="text" id="editDuration" value="업로드 후 자동 계산" readonly>
+                    </div>
+                    <div class="input-group">
+                        <label for="editDescription">교육 설명</label>
+                        <textarea id="editDescription" name="description" rows="4" maxlength="2000"></textarea>
+                    </div>
+                    <div class="input-group">
+                        <label for="editOperationNote">운영 메모</label>
+                        <textarea id="editOperationNote" name="operation_note" rows="3" maxlength="2000"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" class="btn-outline" id="vrEditCancel">취소</button>
+                <button type="submit" class="btn-primary" id="vrEditSubmit">저장</button>
+            </div>
+        </form>
+    </div>
+</div>

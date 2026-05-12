@@ -37,6 +37,12 @@ class SafetyCheckSession(BaseModel):
         default=False, verbose_name="완료 여부 (모든 필수 항목 체크)"
     )
     completed_at = models.DateTimeField(null=True, blank=True)
+    vr_completed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="VR 교육 완료 시각",
+        help_text="작업자가 VR 영상 끝까지 시청해 완료 처리한 시각. NULL=미완료.",
+    )
 
     def __str__(self):
         worker_name = self.worker.username if self.worker else "(탈퇴)"

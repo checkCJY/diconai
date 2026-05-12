@@ -50,11 +50,11 @@ class AlarmPayload(BaseModel):
     },
 )
 async def push_alarm(request: Request, alarm: AlarmPayload):
-    client_host = request.client.host if request.client else ""
-    if client_host not in ("127.0.0.1", "::1", "localhost"):
-        raise HTTPException(status_code=403, detail="내부 전용 엔드포인트입니다.")
-
-    # Phase 5: 서비스 토큰 검증 (옵트인 — 미설정 시 기존 동작 유지)
+    # 인증 정책:
+    #   - INTERNAL_SERVICE_TOKEN 설정 시 → Bearer 토큰으로만 검증 (IP 체크 생략).
+    #     도커 네트워크에선 celery-worker가 컨테이너 IP(예: 172.x.x.x)로 접속하므로
+    #     localhost-only 화이트리스트와 호환되지 않는다.
+    #   - 미설정(레거시) 시 → localhost-only로 폴백.
     expected_token = settings.INTERNAL_SERVICE_TOKEN
     if expected_token:
         auth_header = request.headers.get("Authorization", "")
@@ -64,6 +64,10 @@ async def push_alarm(request: Request, alarm: AlarmPayload):
             raise HTTPException(
                 status_code=403, detail="유효하지 않은 서비스 토큰입니다."
             )
+    else:
+        client_host = request.client.host if request.client else ""
+        if client_host not in ("127.0.0.1", "::1", "localhost"):
+            raise HTTPException(status_code=403, detail="내부 전용 엔드포인트입니다.")
 
     payload = alarm.model_dump(exclude_none=True)
     active_alarms.append(payload)

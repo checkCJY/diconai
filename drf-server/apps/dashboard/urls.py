@@ -11,6 +11,11 @@ urlpatterns = [
     path("safety/vr/", views.safety_vr_page, name="safety-vr"),
     path("api/vr-progress/", views.VRProgressView.as_view(), name="vr-progress"),
     path(
+        "api/vr-content/active/",
+        views.WorkerVRContentView.as_view(),
+        name="vr-content-active",
+    ),
+    path(
         "monitoring/realtime/",
         views.monitoring_realtime_page,
         name="monitoring-realtime",

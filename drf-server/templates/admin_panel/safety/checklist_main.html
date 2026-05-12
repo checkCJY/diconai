@@ -1,0 +1,108 @@
+{% extends 'admin_panel/base.html' %}
+{% load static %}
+{% comment %}
+페이지: /admin-panel/safety/checklist/
+View: config/admin_panel_urls.py SafetyChecklistAdminPageView
+JS:   static/js/admin/safety/checklist.js  — 섹션/문항 CRUD + 반영 저장/이력
+CSS:  static/css/admin/safety_checklist.css
+페이지 셸만 제공하고 실제 데이터는 JS가 /api/admin/safety/ 엔드포인트로 fetch.
+{% endcomment %}
+
+{% block title %}작업 전 안전 점검 체크리스트 관리{% endblock %}
+
+{% block content %}
+<!-- 페이지 헤더 -->
+<section class="page-header">
+    <div class="header-titles">
+        <div class="breadcrumb">안전 확인 관리 &gt; 작업 전 안전 점검 체크리스트 관리</div>
+        <h2 class="page-title">작업 전 안전 점검 체크리스트 관리</h2>
+        <p class="page-desc">체크리스트 항목과 서약 문구를 수정합니다.</p>
+    </div>
+    <div class="header-actions">
+        <div class="header-meta">
+            <label class="meta-label">최근 반영일</label>
+            <div class="meta-value" id="lastPublishedAt">-</div>
+        </div>
+        <button class="btn-outline" id="btnOpenHistory">반영 이력</button>
+        <button class="btn-primary" id="btnPublish">반영 저장</button>
+    </div>
+</section>
+
+<!-- 본문: 좌측 섹션 + 우측 편집 -->
+<section class="checklist-layout">
+    <!-- 좌측: 섹션 리스트 -->
+    <aside class="section-pane">
+        <header class="pane-header">
+            <h3>체크리스트 섹션</h3>
+            <button class="btn-outline btn-sm" id="btnAddSection">추가</button>
+        </header>
+        <p class="pane-desc">좌측에서 섹션을 선택해 편집 위치를 빠르게 이동합니다.</p>
+        <div class="section-total">총 <strong id="sectionTotal">0</strong>개 섹션</div>
+        <ul class="section-list" id="sectionList">
+            <li class="empty-state">데이터를 불러오는 중...</li>
+        </ul>
+        <div class="section-status" id="sectionStatus" hidden>
+            <div class="status-label">최근 채널과 동기화된 섹션</div>
+            <div class="status-current" id="statusCurrentName">-</div>
+            <span class="badge badge-edit" id="badgeEditing" hidden>편집 중</span>
+        </div>
+    </aside>
+
+    <!-- 우측: 선택된 섹션 편집 -->
+    <main class="editor-pane" id="editorPane" hidden>
+        <header class="editor-header">
+            <div class="editor-title">
+                <h3 id="editorSectionName">-</h3>
+                <span class="badge badge-selected">선택 섹션</span>
+            </div>
+            <p class="editor-desc">질문, 답변 방식, 문항 순서와 서약 문구를 한 화면에서 수정합니다.</p>
+        </header>
+
+        <div class="editor-meta-row">
+            <div class="input-group">
+                <label>섹션명</label>
+                <input type="text" id="editSectionName" maxlength="100">
+            </div>
+            <div class="input-group editor-meta-desc">
+                <label>섹션 설명</label>
+                <input type="text" id="editSectionDescription" maxlength="1000">
+            </div>
+            <div class="input-group">
+                <label>답변 방식</label>
+                <input type="text" value="체크 박스" disabled readonly>
+            </div>
+            <div class="input-group editor-meta-counter">
+                <label>&nbsp;</label>
+                <div class="counter-row">
+                    <span id="sectionIndex">1/1</span>
+                    <span class="counter-divider">·</span>
+                    <span>문항 <strong id="itemCount">0</strong>개</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="editor-body">
+            <header class="editor-body-header">
+                <div>
+                    <h4>문항 전체 수정</h4>
+                    <p class="muted">행 단위로 순서를 조정하고 복제 또는 삭제할 수 있습니다.</p>
+                </div>
+                <button class="btn-outline btn-sm" id="btnAddItem">문항 추가</button>
+            </header>
+            <ul class="item-list" id="itemList">
+                <li class="empty-state">문항이 없습니다.</li>
+            </ul>
+        </div>
+    </main>
+</section>
+
+{% include 'admin_panel/safety/_modal_history.html' %}
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/admin/safety_checklist.css' %}">
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/admin/safety/checklist.js' %}"></script>
+{% endblock %}

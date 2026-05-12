@@ -40,6 +40,18 @@
                     </select>
                     <span class="field-error" id="errDepartment"></span>
                 </div>
+                {# 소속 공장: 선택 항목 — 비워두면 serializer가 facility=NULL 처리.
+                   facility=NULL 사용자도 단일 공장 환경에서는 페이지 동작 가능 (서버 폴백). #}
+                <div class="form-field">
+                    <label>소속 공장</label>
+                    <select id="createFacility">
+                        <option value="">공장을 선택하세요 (선택)</option>
+                        {% for f in facilities %}
+                        <option value="{{ f.id }}">{{ f.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <span class="field-error" id="errFacility"></span>
+                </div>
                 <div class="form-field">
                     <label>권한 <span class="required">*</span></label>
                     <select id="createUserType">
