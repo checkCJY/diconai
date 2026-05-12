@@ -50,42 +50,16 @@ def safety_vr_page(request):
     """작업자 VR 교육 페이지 (HTML 셸).
 
     [동적 영상 연동]
-    작업자 본인 facility의 활성 `VRTrainingContent`를 어드민이 등록해 둔
-    경우 그 콘텐츠 URL을 `<video>` src로 주입한다. 미등록 시에는 기존
-    `static/video/safety_vr.mp4`로 폴백되어 화면이 깨지지 않는다.
+    템플릿은 빈 셸만 렌더하고, 실제 콘텐츠 URL은 JS가 페이지 로드 후
+    `GET /dashboard/api/vr-content/active/`로 fetch해 video src를 주입한다.
 
-    [context 키]
-    - `vr_content_id`: 클라이언트의 진행도 가드(다른 콘텐츠 position 적용
-      방지)에 사용. data-content-id 속성으로 전달.
-    - `vr_content_url`: <source src>에 직접 렌더.
-    - `vr_content_name`: 현재 미사용이지만 향후 페이지 타이틀에 노출 여지.
-
-    [facility 해석]
-    `user.facility_id`가 NULL이면 `get_default_facility_id()` 폴백. 단일
-    공장 단계에서는 정상 동작하지만 다중 공장 전환 시 작업자(worker)에게는
-    폴백을 끊는 것이 안전 — 후속 정리 과제.
+    [SSR을 안 쓰는 이유 — JWT-only 환경 대응]
+    본 시스템은 `JWTAuthentication`만 사용하므로 Django 페이지 뷰에서는
+    `request.user`가 항상 AnonymousUser가 된다. context로 콘텐츠를 직접
+    주입하면 모든 사용자에게 빈 화면이 노출되는 버그가 발생했다. 다른
+    페이지(체크리스트/이력 등)와 동일하게 클라이언트 fetch 패턴으로 통일.
     """
-    content_id = None
-    content_url = None
-    content_name = None
-    user = request.user
-    if user.is_authenticated:
-        facility_id = getattr(user, "facility_id", None) or get_default_facility_id()
-        if facility_id is not None:
-            content = get_vr_content_for_facility(facility_id)
-            if content is not None:
-                content_id = content.id
-                content_url = content.content_url
-                content_name = content.name
-    return render(
-        request,
-        "snb_details/safety_vr.html",
-        {
-            "vr_content_id": content_id,
-            "vr_content_url": content_url,
-            "vr_content_name": content_name,
-        },
-    )
+    return render(request, "snb_details/safety_vr.html")
 
 
 def monitoring_realtime_page(request):
@@ -233,6 +207,63 @@ class VRProgressView(APIView):
 # ──────────────────────────────────────────────────────────
 # GET/POST /api/safety-status/ — 나의 안전확인 완료 상태 (세션 기반)
 # ──────────────────────────────────────────────────────────
+class WorkerVRContentView(APIView):
+    """작업자 페이지용 VR 콘텐츠 조회 — 인증 사용자 누구나.
+
+    [JWT 인증 + 작업자 공용]
+    `safety_vr_page`(SSR)가 JWT-only 환경에서 `request.user`가 비어 발생한
+    버그를 회피하기 위해, 페이지 렌더는 빈 셸만 보내고 클라이언트가 본 API로
+    실제 URL을 가져간다. 어드민 API(`/api/admin/training/...`)와 달리
+    `IsAuthenticated`만 요구하므로 worker도 호출 가능.
+
+    [facility 해석]
+    `user.facility_id || default` 폴백. 다중 공장 전환 시 worker 폴백은
+    제거해야 함 (후속 과제 — 본 PR에서는 단일 공장 단계에 맞춤).
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=["Dashboard"],
+        summary="작업자 페이지용 VR 콘텐츠 1건 조회",
+        responses={
+            200: inline_serializer(
+                name="WorkerVRContent",
+                fields={
+                    "id": serializers.IntegerField(allow_null=True),
+                    "name": serializers.CharField(allow_null=True),
+                    "content_url": serializers.URLField(allow_null=True),
+                    "duration_seconds": serializers.IntegerField(allow_null=True),
+                },
+            )
+        },
+    )
+    def get(self, request):
+        facility_id = (
+            getattr(request.user, "facility_id", None) or get_default_facility_id()
+        )
+        content = None
+        if facility_id is not None:
+            content = get_vr_content_for_facility(facility_id)
+        if content is None:
+            return Response(
+                {
+                    "id": None,
+                    "name": None,
+                    "content_url": None,
+                    "duration_seconds": None,
+                }
+            )
+        return Response(
+            {
+                "id": content.id,
+                "name": content.name,
+                "content_url": content.content_url,
+                "duration_seconds": content.duration_seconds,
+            }
+        )
+
+
 class MySafetyStatusView(APIView):
     """오늘의 안전 확인 완료 상태 — 메인 대시보드 카드용 API.
 
