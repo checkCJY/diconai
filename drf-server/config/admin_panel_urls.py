@@ -87,6 +87,21 @@ class GasDataAdminPageView(TemplateView):
         return ctx
 
 
+class SafetyChecklistAdminPageView(TemplateView):
+    """
+    작업 전 안전 점검 체크리스트 관리 페이지.
+    좌측 섹션 리스트, 우측 선택 섹션 편집, 상단 [반영 이력]/[반영 저장]을 노출한다.
+    실제 데이터는 JS가 /api/admin/safety/ 엔드포인트를 fetch해 렌더링한다.
+    """
+
+    template_name = "admin_panel/safety/checklist_main.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["active_nav"] = "policy"
+        return ctx
+
+
 urlpatterns = [
     path(
         "accounts-management/",
@@ -126,5 +141,10 @@ urlpatterns = [
         "data/power/",
         PowerDataAdminPageView.as_view(),
         name="admin-power-data",
+    ),
+    path(
+        "safety/checklist/",
+        SafetyChecklistAdminPageView.as_view(),
+        name="admin-safety-checklist-page",
     ),
 ]
