@@ -1,19 +1,22 @@
 # monitoring/services/power_alarm.py — 전력 알람 라우팅 서비스
 #
-# PowerData(watt) 수신 시 채널별 위험도로 Celery 태스크를 분기한다.
-# gas_alarm.py와 동일한 패턴 — 위험도·타이머 상태는 Redis 캐시에 보관.
+# PowerData(watt/current/voltage) 수신 시 채널별 3축(W·A·V) 위험도를 통합한 종합
+# 위험도(max-of-3)로 Celery 태스크를 분기한다. 한 채널 = 한 알람 유지.
 #
 # ┌──────────────────────────────────────────────────────────────┐
-# │  위험도     │  동작                                           │
+# │  종합 위험도 │  동작                                            │
 # ├──────────────────────────────────────────────────────────────┤
-# │  DANGER    │  즉각 알람 (fire_power_danger_task.delay)        │
-# │  WARNING   │  30초 타이머 (apply_async countdown=30)          │
-# │  NORMAL    │  타이머 취소 + 정상화 알림 (이전 경보 시)          │
+# │  DANGER     │  즉각 알람 (fire_power_danger_task.delay)         │
+# │  WARNING    │  3초 타이머 (apply_async countdown=3)             │
+# │  NORMAL     │  타이머 취소 + 정상화 알림 (이전 경보 시)           │
 # └──────────────────────────────────────────────────────────────┘
 #
 # 캐시 키:
-#   alarm:power:state:{device_id}:{channel}  → "normal" | "warning" | "danger"
-#   alarm:power:task:{device_id}:{channel}   → Celery task ID (revoke용)
+#   alarm:power:state:{device_id}:{channel}           → 종합 위험도 (Phase 1 계약, 변경 금지)
+#   alarm:power:task:{device_id}:{channel}            → Celery task ID (revoke용)
+#   alarm:power:risk:{device_id}:{channel}:{axis}     → 축별 마지막 위험도 (5분 TTL)
+#
+# 채널 라벨: PowerDevice.channel_meta[str(ch)]["name"] 우선, 미지정 시 "CH{n}".
 
 from django.core.cache import cache
 
@@ -28,31 +31,43 @@ from apps.alerts.tasks import (
     fire_power_danger_task,
     fire_power_warning_task,
 )
-from apps.facilities.services.threshold_service import evaluate_power_risk
-
-# 채널 번호 → 설비명 (power_service.py의 CHANNEL_TO_DEVICE와 동기화)
-_CHANNEL_NAME: dict[int, str] = {
-    1: "압연기",
-    2: "송풍기",
-    3: "집진기",
-    4: "전자기 교반기",
-    5: "냉각펌프",
-    6: "유압장치",
-    7: "컨베이어",
-    8: "분쇄기",
-}
+from apps.core.constants import RiskLevel
+from apps.facilities.services.threshold_service import (
+    evaluate_current_risk,
+    evaluate_power_risk,
+    evaluate_voltage_risk,
+)
 
 _CACHE_TTL = 3600
+_AXIS_TTL = 300  # 축별 위험도 캐시 (송신 주기 1초 대비 충분)
+
+# data_type → (평가 함수, 축 이름)
+_EVALUATORS = {
+    "watt": (evaluate_power_risk, "watt"),
+    "current": (evaluate_current_risk, "current"),
+    "voltage": (evaluate_voltage_risk, "voltage"),
+}
+
+_RISK_ORDER = {
+    RiskLevel.NORMAL: 0,
+    RiskLevel.WARNING: 1,
+    RiskLevel.DANGER: 2,
+}
 
 
 def _state_key(device_id: int, channel: int) -> str:
-    """채널별 현재 알람 상태를 저장하는 Redis 캐시 키를 반환한다."""
+    """Phase 1 계약 — 변경 금지. 종합 위험도 dedupe 단일 경계."""
     return f"alarm:power:state:{device_id}:{channel}"
 
 
 def _task_key(device_id: int, channel: int) -> str:
-    """WARNING 타이머 Celery task ID를 저장하는 Redis 캐시 키를 반환한다."""
+    """WARNING 타이머 Celery task ID 저장 키."""
     return f"alarm:power:task:{device_id}:{channel}"
+
+
+def _axis_risk_key(device_id: int, channel: int, axis: str) -> str:
+    """축(W/A/V)별 마지막 위험도 캐시 키. _state_key와 sibling 네임스페이스."""
+    return f"alarm:power:risk:{device_id}:{channel}:{axis}"
 
 
 def _revoke(task_id: str) -> None:
@@ -62,71 +77,86 @@ def _revoke(task_id: str) -> None:
     celery_app.control.revoke(task_id, terminate=True)
 
 
-def _channel_label(channel: int) -> str:
-    """채널 번호를 설비명 문자열로 변환한다. 미등록 채널은 'CH{n}' 형식으로 반환한다."""
-    return _CHANNEL_NAME.get(channel, f"CH{channel}")
+def _channel_label(device, channel: int) -> str:
+    """PowerDevice.channel_meta[str(ch)]["name"] → 미지정 시 "CH{n}"."""
+    meta = (device.channel_meta or {}).get(str(channel)) or {}
+    return meta.get("name") or f"CH{channel}"
 
 
-def _evaluate(watt: float) -> str:
-    """watt 값을 Threshold DB(power_default 그룹) 기준으로 위험도 문자열로 변환.
+def _max_risk(levels: list[str]) -> str:
+    """[normal, warning, danger] 중 가장 높은 위험도를 반환."""
+    return max(levels, key=lambda lv: _RISK_ORDER.get(lv, 0))
 
-    Phase 4-b: 이전 POWER_THRESHOLDS 상수 → DB Threshold + Redis 캐시.
-    threshold_service.evaluate_power_risk()에 위임.
-    """
-    return evaluate_power_risk(watt)
+
+def _aggregate_risk(device_id: int, channel: int, axis: str, this_risk: str) -> str:
+    """이번 축 위험도를 캐시에 기록하고, 3축 최댓값을 반환."""
+    cache.set(_axis_risk_key(device_id, channel, axis), this_risk, _AXIS_TTL)
+    keys_by_axis = {
+        ax: _axis_risk_key(device_id, channel, ax)
+        for ax in ("watt", "current", "voltage")
+    }
+    cached = cache.get_many(list(keys_by_axis.values()))
+    levels = [cached.get(keys_by_axis[ax], RiskLevel.NORMAL) for ax in keys_by_axis]
+    return _max_risk(levels)
 
 
 def trigger_power_alarms(objs: list, device) -> None:
     """
-    PowerData 일괄 저장 후 watt 채널에 대해 채널별 위험도로 알람 라우팅한다.
+    PowerData 일괄 저장 후 채널별 종합 위험도(W·A·V max)로 알람 라우팅한다.
 
     PowerDataBulkIngestSerializer.create()에서 호출된다.
-    watt 데이터 타입이 아닌 경우(current/voltage) 즉시 반환한다.
+    objs[0].data_type에 따라 해당 축만 평가하고, 다른 두 축의 마지막 위험도와 max 산출.
     """
-    if not objs or objs[0].data_type != "watt":
+    if not objs:
         return
+    axis = objs[0].data_type
+    if axis not in _EVALUATORS:
+        return  # onoff 등 알람 대상이 아닌 타입
 
+    eval_fn, axis_name = _EVALUATORS[axis]
     device_id = device.id
     facility_id = device.facility_id
 
     for obj in objs:
         channel = obj.channel
-        watt = obj.value
+        value = obj.value
 
-        # 통신 불능 채널은 알람 판정 제외
-        if watt is None:
+        # 통신 불능 채널은 알람 판정 제외 (해당 축은 캐시 미갱신 → 다른 축에 영향 없음)
+        if value is None:
             continue
 
-        risk = _evaluate(watt)
+        this_risk = eval_fn(value, channel=channel, device_id=device_id)
+        aggregate = _aggregate_risk(device_id, channel, axis_name, this_risk)
+
         state_key = _state_key(device_id, channel)
         task_key = _task_key(device_id, channel)
-        label = _channel_label(channel)
+        label = _channel_label(device, channel)
 
-        if risk == "danger":
+        if aggregate == RiskLevel.DANGER:
             # 진행 중인 WARNING 타이머가 있으면 취소
             pending = cache.get(task_key)
             if pending:
                 _revoke(pending)
                 cache.delete(task_key)
             # 원자 천이 — 직전 상태가 danger 아닐 때만 1회 fire (race-safe)
-            if try_transition(state_key, "danger", _CACHE_TTL):
+            if try_transition(state_key, RiskLevel.DANGER, _CACHE_TTL):
                 fire_power_danger_task.delay(
-                    device_id, channel, watt, facility_id, label
+                    device_id, channel, value, facility_id, label
                 )
 
-        elif risk == "warning":
+        elif aggregate == RiskLevel.WARNING:
             prev_state = get_state(state_key)
-            if prev_state in ("warning", "danger"):
+            if prev_state in (RiskLevel.WARNING, RiskLevel.DANGER):
                 continue
             # SETNX(cache.add)로 첫 도착자만 타이머 시작 — race 차단
             if not cache.add(task_key, "_pending_", _CACHE_TTL):
                 continue
             task = fire_power_warning_task.apply_async(
-                args=[device_id, channel, watt, facility_id, label],
+                args=[device_id, channel, value, facility_id, label],
                 countdown=WARNING_DURATION_SEC,
             )
             cache.set(task_key, task.id, _CACHE_TTL)
-            try_transition(state_key, "warning", _CACHE_TTL)
+            try_transition(state_key, RiskLevel.WARNING, _CACHE_TTL)
 
         else:  # normal
             # WARNING 타이머가 있으면 취소하고 이전 경보 시 정상화 알림 발송
@@ -134,6 +164,6 @@ def trigger_power_alarms(objs: list, device) -> None:
             if pending:
                 _revoke(pending)
                 cache.delete(task_key)
-            if get_state(state_key) in ("warning", "danger"):
+            if get_state(state_key) in (RiskLevel.WARNING, RiskLevel.DANGER):
                 fire_power_clear_task.delay(device_id, channel, label)
                 clear_state(state_key)
