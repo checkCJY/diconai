@@ -14,10 +14,9 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from core.config import settings
 from services.drf_client import post_to_drf
 from websocket.auth import verify_jwt_from_ws_query
+from websocket.services.alarm_queue import pop_alarm_blocking
 from websocket.services.broadcast import build_broadcast_payload
 from websocket.state import (
-    active_alarms,
-    alarm_signal,
     sensor_clients,
     worker_clients,
     worker_positions,
@@ -45,19 +44,25 @@ async def _send_to_all(payload: dict) -> None:
 
 
 async def alarm_flush_loop():
-    """새 알람이 active_alarms에 추가되는 즉시 브로드캐스트한다.
+    """Redis 큐(diconai:ws:alarms)에서 알람을 즉시 소비해 브로드캐스트한다.
 
-    폴링 대신 asyncio.Event로 신호를 받아 대기 없이 즉각 전달한다.
-    alarm_router의 push_alarm이 alarm_signal.set()을 호출하면 이 루프가 깨어난다.
+    Phase 1 C4 — 기존 asyncio.Event 신호는 set/clear race로 알람 손실 가능했고,
+    is_new_event 필터로 정상화 알림이 silent drop되었다. BRPOP은 큐에 원소가
+    들어오는 순간 깨어나며 pop과 소비가 한 연산이라 race가 구조적으로 제거된다.
+    페이로드 형식은 호환 모드 — `{"alarms": [payload], ...}` shape 유지로 프론트 무수정.
     """
     while True:
-        await alarm_signal.wait()
-        alarm_signal.clear()
+        payload = await pop_alarm_blocking(timeout=0)
+        if payload is None:
+            # Redis 일시 장애 — 짧게 대기 후 재시도 (busy-loop 방지)
+            await asyncio.sleep(1)
+            continue
         if not sensor_clients:
+            # 큐에서 pop했으나 연결된 클라 없음 → drop (의도, 큐에 다시 넣지 않음)
             continue
-        if not any(a.get("is_new_event") for a in active_alarms):
-            continue
-        await _send_to_all(build_broadcast_payload())
+        base = build_broadcast_payload(include_alarms=False)
+        base["alarms"] = [payload]
+        await _send_to_all(base)
 
 
 async def broadcast_loop():

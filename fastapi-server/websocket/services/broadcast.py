@@ -5,7 +5,7 @@
 # 하나의 dict로 합친다.
 #   - 전력: build_equipment()로 16채널 설비 현황 + 총 전력(kW) + 증감률
 #   - 가스: latest_gas_snapshot (가스 측정값 + 가스별 위험도)
-#   - 알람: active_alarms (송출 후 즉시 비워 중복 전달 방지)
+#   - 알람: alarm_flush_loop이 단독 담당 — 주기 broadcast는 빈 alarms[]만 송신
 #   - 위치: worker_positions (IoT 장비로부터 갱신된 작업자 좌표)
 #
 # 파트별 함수로 분리되어 있으므로 단위 테스트 시 개별 호출 가능.
@@ -15,7 +15,6 @@ from datetime import datetime, timezone
 from core.config import settings
 from power.services.power_service import build_equipment
 from websocket.state import (
-    active_alarms,
     gas_latest,
     latest_gas_snapshot,
     power_latest,
@@ -66,7 +65,8 @@ def build_broadcast_payload(include_alarms: bool = True) -> dict:
 
     전력/가스 데이터가 stale이면 equipment를 빈 리스트로 처리하고
     *_loading 플래그를 True로 두어 브라우저가 로딩 스켈레톤을 유지하도록 한다.
-    active_alarms는 송출 직후 clear해 다음 틱에 중복 전달되지 않도록 한다.
+    알람은 alarm_flush_loop이 Redis 큐에서 별도 즉시 전달 — 주기 broadcast는
+    빈 alarms[]만 송신 (호환 모드 — 프론트가 alarms 키 존재를 가정).
     """
     global _prev_total_kw
 
@@ -110,9 +110,7 @@ def build_broadcast_payload(include_alarms: bool = True) -> dict:
         "gas_loading": gas_stale,
         **ai_fields,
         "worker_positions": dict(worker_positions),
-        "alarms": list(active_alarms)[:5] if include_alarms else [],
+        "alarms": [],
         **(latest_gas_snapshot if not gas_stale else {}),
     }
-    if include_alarms:
-        del active_alarms[:5]
     return payload

@@ -21,6 +21,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from core.config import settings
 from core.logging import setup_logging
+from core.redis_client import close_redis
 from gas.routers.gas_router import router as gas_router
 from internal.routers.alarm_router import router as internal_alarm_router
 from internal.routers.scenario_router import router as internal_scenario_router
@@ -52,6 +53,7 @@ async def lifespan(app: FastAPI):
     finally:
         task1.cancel()
         task2.cancel()
+        await close_redis()  # Phase 1 C4 — Redis 연결 풀 정리
         logger.info("[app] action=shutdown")
 
 

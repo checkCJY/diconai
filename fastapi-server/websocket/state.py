@@ -1,7 +1,10 @@
 # websocket/state.py — 프로세스 공유 상태
 # 모든 라우터가 이 모듈을 import해 직접 읽고 씀.
 # HTTP /internal/* 엔드포인트 없이 상태를 공유한다.
-import asyncio
+#
+# Phase 1 C4 — `active_alarms`(메모리 list) + `alarm_signal`(asyncio.Event) 조합은
+# 재시작 휘발·set/clear race·5개 cap 문제로 Redis LIST(`diconai:ws:alarms`)로 이관됨.
+# 알람 큐 관련 코드는 websocket/services/alarm_queue.py 참조.
 
 from fastapi import WebSocket
 
@@ -13,12 +16,6 @@ worker_clients: dict[int, WebSocket] = {}
 
 # 작업자 최신 위치 { worker_id: { x, y, facility_id, updated_at } }
 worker_positions: dict[int, dict] = {}
-
-# 가스 알람 이벤트 큐 — gas_service가 push, broadcast가 소비 후 비움
-active_alarms: list[dict] = []
-
-# 새 알람 도착 신호 — alarm_router가 set(), alarm_flush_loop가 wait() 후 clear()
-alarm_signal: asyncio.Event = asyncio.Event()
 
 # 최신 가스 측정 스냅샷 — gas_service가 갱신, broadcast가 페이로드에 spread
 latest_gas_snapshot: dict = {}
