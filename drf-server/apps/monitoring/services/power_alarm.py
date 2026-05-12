@@ -17,6 +17,11 @@
 
 from django.core.cache import cache
 
+from apps.alerts.services.alarm_dedupe import (
+    clear_state,
+    get_state,
+    try_transition,
+)
 from apps.alerts.tasks import (
     WARNING_DURATION_SEC,
     fire_power_clear_task,
@@ -95,30 +100,33 @@ def trigger_power_alarms(objs: list, device) -> None:
         risk = _evaluate(watt)
         state_key = _state_key(device_id, channel)
         task_key = _task_key(device_id, channel)
-        prev_state = cache.get(state_key, "normal")
         label = _channel_label(channel)
 
         if risk == "danger":
-            # 진행 중인 WARNING 타이머가 있으면 취소하고 즉각 DANGER 알람 발화
+            # 진행 중인 WARNING 타이머가 있으면 취소
             pending = cache.get(task_key)
             if pending:
                 _revoke(pending)
                 cache.delete(task_key)
-            if prev_state != "danger":
+            # 원자 천이 — 직전 상태가 danger 아닐 때만 1회 fire (race-safe)
+            if try_transition(state_key, "danger", _CACHE_TTL):
                 fire_power_danger_task.delay(
                     device_id, channel, watt, facility_id, label
                 )
-                cache.set(state_key, "danger", _CACHE_TTL)
 
         elif risk == "warning":
-            # 이미 타이머가 걸려 있으면 중복 시작 방지
-            if prev_state not in ("warning", "danger") and not cache.get(task_key):
-                task = fire_power_warning_task.apply_async(
-                    args=[device_id, channel, watt, facility_id, label],
-                    countdown=WARNING_DURATION_SEC,
-                )
-                cache.set(task_key, task.id, _CACHE_TTL)
-                cache.set(state_key, "warning", _CACHE_TTL)
+            prev_state = get_state(state_key)
+            if prev_state in ("warning", "danger"):
+                continue
+            # SETNX(cache.add)로 첫 도착자만 타이머 시작 — race 차단
+            if not cache.add(task_key, "_pending_", _CACHE_TTL):
+                continue
+            task = fire_power_warning_task.apply_async(
+                args=[device_id, channel, watt, facility_id, label],
+                countdown=WARNING_DURATION_SEC,
+            )
+            cache.set(task_key, task.id, _CACHE_TTL)
+            try_transition(state_key, "warning", _CACHE_TTL)
 
         else:  # normal
             # WARNING 타이머가 있으면 취소하고 이전 경보 시 정상화 알림 발송
@@ -126,6 +134,6 @@ def trigger_power_alarms(objs: list, device) -> None:
             if pending:
                 _revoke(pending)
                 cache.delete(task_key)
-            if prev_state in ("warning", "danger"):
+            if get_state(state_key) in ("warning", "danger"):
                 fire_power_clear_task.delay(device_id, channel, label)
-                cache.set(state_key, "normal", _CACHE_TTL)
+                clear_state(state_key)
