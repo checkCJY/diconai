@@ -21,7 +21,7 @@ const _POPUP_CFG = {
     iconClass:   'caution',
     typeLabel:   '주의 알림',
     actionText:  '주의하세요!',
-    actionClass: 'alarm-popup-action caution-text',
+    actionClass: 'alarm-popup-action',  // 색상은 사용 시점에 LevelMapper.toTextClass(level)로 결합
     badgeClass:  'brisk caution',
     badgeText:   '주의',
   },
@@ -96,7 +96,7 @@ const AlarmPopup = {
     const actionEl = document.getElementById('alarm-popup-action');
     if (actionEl) {
       actionEl.textContent = cfg.actionText;
-      actionEl.className   = cfg.actionClass;
+      actionEl.className   = `${cfg.actionClass} ${LevelMapper.toTextClass(level)}`.trim();
     }
 
     const levelEl = document.getElementById('alarm-popup-level');
