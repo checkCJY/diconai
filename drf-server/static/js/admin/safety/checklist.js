@@ -5,6 +5,24 @@
  * - [반영 저장] → SafetyChecklistRevision 스냅샷 생성
  * - [반영 이력] 모달 → 시점 선택 후 읽기 전용 스냅샷 표시
  *
+ * 핵심 상태 (state machine):
+ *   facilityId           — _qs()로 매 요청에 facility_id 쿼리 자동 부착
+ *   currentSectionId     — 우측 편집기에 노출 중인 섹션 (좌측 클릭으로 전환)
+ *   isDirty              — 마지막 publish 이후 클라이언트가 수정한 적 있는지 (UI 즉시 신호)
+ *   hasUnpublishedChanges — 서버 측 timestamp 비교 결과 (state API에서 받음)
+ *   "편집 중" 배지 = isDirty || hasUnpublishedChanges
+ *
+ * 주요 흐름:
+ *   init → _loadAll(state + sections 병렬 fetch) → _render
+ *      ├ 좌측: _renderSectionList (× 삭제 버튼은 hover/active 시 노출)
+ *      └ 우측: _renderEditor (input change → _onSectionFieldChange/_onItemTitleChange)
+ *   CRUD 요청 → _markDirty() → _loadAll 재호출
+ *   [반영 저장] → POST publish/ → 200=다이얼로그 + state 리셋 / 400 no_changes=보류 안내
+ *
+ * 공용 컴포넌트:
+ *   Dialog.prompt/confirm/alert  — 네이티브 window.* 대체. Promise 반환, ESC=취소, Enter=확인.
+ *     · variant: 'danger'로 빨간 확정 버튼 (삭제 액션 전용)
+ *
  * API 엔드포인트 (모두 /api/admin/safety/):
  *   GET    /checklist/state/                헤더 메타
  *   GET    /sections/                       섹션 + 문항 트리

@@ -1,10 +1,21 @@
 """
 config/admin_panel_urls.py
 
-어드민 패널 HTML 페이지 URL 설정.
-config/urls.py에서 "admin-panel/" 프리픽스로 포함된다.
+어드민 패널 HTML 페이지 URL 설정. `config/urls.py`에서 `admin-panel/` 프리픽스로
+include 된다.
 
-필터 드롭다운에 필요한 초기 데이터(부서·직급 목록 등)를 context로 전달한다.
+[공통 패턴]
+모든 페이지 View는 `TemplateView`를 상속해 다음 3가지만 책임진다:
+1) `template_name` — `templates/admin_panel/.../*.html`
+2) `active_nav` — 사이드바 활성 표시 토큰 (예: "account", "policy")
+3) (선택) 필터 드롭다운 초기 데이터 context — 부서/직급/공장 같은 비변동 메타
+
+실제 테이블/트리/CRUD 데이터는 JS가 페이지 로드 후 `/api/admin/...`을 fetch해서
+렌더링한다 — 본 모듈은 페이지 셸만 제공.
+
+[권한]
+TemplateView 자체에는 권한 가드를 두지 않음 (기존 어드민 페이지 패턴 유지).
+실제 권한 강제는 JS가 호출하는 API 단(`IsSuperAdminOrFacilityAdmin` 등)에서 수행.
 """
 
 from django.urls import path

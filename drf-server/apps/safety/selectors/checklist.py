@@ -1,7 +1,18 @@
 # safety/selectors/checklist.py
 """
-어드민 — 작업 전 안전 점검 체크리스트 관리 페이지용 읽기 쿼리.
-페이지: /admin-panel/safety/checklist/
+체크리스트 어드민·운영자 페이지용 읽기 쿼리 모음.
+
+CLAUDE.md 컨벤션상 selector는 단순 조회·집계만 담당(쓰기 없음). 어드민 페이지의
+좌측/우측 패널 데이터, 반영 이력 모달, "편집 중" 배지 신호가 모두 여기에서 나온다.
+
+[변경 요약 계산기]
+`compute_change_summary`는 현 revision의 `revision_data`와 직전 버전을 비교해
+섹션/문항의 추가·수정·삭제 개수를 산출 — 반영 이력 모달 상단의 요약 카드 데이터.
+
+[has_unpublished_changes의 휴리스틱 한계]
+section/item의 `updated_at` 최댓값이 active.published_at보다 늦으면 True를 반환.
+값을 원상복귀(예: 이름 A→B→A)하면 내용 동일이지만 timestamp 기준으로 True로 잡힘.
+서버 측 noop 발행 차단(`active.revision_data == snapshot`)이 진짜 안전망 역할.
 """
 
 from django.db.models import Max
@@ -23,12 +34,14 @@ def get_sections_with_items(facility_id: int):
 
 
 def get_active_items_qs(section_id: int):
+    """특정 섹션의 활성 문항 QuerySet (order 정렬)."""
     return SafetyCheckItem.objects.filter(
         section_id=section_id, is_active=True
     ).order_by("order", "id")
 
 
 def get_active_revision(facility_id: int) -> SafetyChecklistRevision | None:
+    """facility별 현재 활성 Revision (partial UniqueConstraint로 최대 1건 보장)."""
     return SafetyChecklistRevision.objects.filter(
         facility_id=facility_id, is_active=True
     ).first()
@@ -42,6 +55,7 @@ def list_revisions(facility_id: int):
 
 
 def get_revision(revision_id: int, facility_id: int) -> SafetyChecklistRevision | None:
+    """facility 격리를 위해 facility_id를 함께 조건에 포함 (cross-facility 접근 차단)."""
     return SafetyChecklistRevision.objects.filter(
         pk=revision_id, facility_id=facility_id
     ).first()
@@ -73,9 +87,11 @@ def compute_change_summary(revision: SafetyChecklistRevision) -> dict:
     prev_data = prev.revision_data or {}
 
     def index_sections(data):
+        # id 기준 dict로 펼쳐 두 버전을 set 차집합/교집합으로 비교 가능하게 함.
         return {s["id"]: s for s in data.get("sections", []) if "id" in s}
 
     def index_items(data):
+        # 문항은 섹션을 가로질러 평면화 (같은 문항이 다른 섹션으로 이동해도 id로 추적).
         out = {}
         for section in data.get("sections", []):
             for item in section.get("items", []):

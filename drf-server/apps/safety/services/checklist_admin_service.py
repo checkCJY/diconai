@@ -1,12 +1,24 @@
 # safety/services/checklist_admin_service.py
 """
-어드민 — 작업 전 안전 점검 체크리스트 관리 비즈니스 로직.
-페이지: /admin-panel/safety/checklist/
+체크리스트 어드민 비즈니스 로직 — view에서 호출하는 서비스 함수 모음.
 
 [발행 정책]
-관리자가 [반영 저장]을 누르면 publish_revision()이 트랜잭션으로 스냅샷을 생성하고
+관리자가 [반영 저장]을 누르면 `publish_revision()`이 트랜잭션으로 스냅샷을 생성하고
 기존 active Revision을 False로 전환한다. 현장 운영자 페이지는 active Revision의
-revision_data를 읽어 렌더 (결정문 §3c-4 패턴).
+`revision_data`를 읽어 렌더 (결정문 §3c-4 패턴).
+
+[soft-delete + cascade]
+섹션 삭제 시 하위 문항도 같은 timestamp로 함께 비활성화한다. 동일 timestamp는
+"어느 시점에 묶여서 비활성화됐는지" 감사 추적성을 보장하기 위함 (이전 버그 fix).
+
+[order 운영 규칙]
+order 필드에 UniqueConstraint를 두지 않음. 드래그앤드롭 재정렬 시 일괄 UPDATE로
+처리하므로 중간 충돌이 없고, 빈 자리(holes)가 생겨도 ordering 정렬에 무해.
+
+[트랜잭션 일관성]
+모든 mutating 함수에 `@transaction.atomic`. 특히 `publish_revision`은 partial
+UniqueConstraint(facility, is_active=True) 위반 방지를 위해 기존 active를 먼저
+False로 전환한 뒤 새 row를 INSERT하는 순서를 단일 트랜잭션 안에서 보장.
 """
 
 from django.db import transaction
@@ -22,7 +34,11 @@ from apps.safety.models import (
 
 
 class NoChangesToPublishError(Exception):
-    """반영 저장 시점에 active revision과 내용이 동일한 경우."""
+    """반영 저장 시점에 active revision과 내용이 동일해 새 버전 생성을 차단.
+
+    view에서 잡아 400 + `code:"no_changes"`로 응답. 클라이언트는 "반영 보류"
+    안내 다이얼로그를 표시하고 isDirty 플래그를 false로 리셋한다.
+    """
 
 
 # ──────────────────────────────────────────────────────────
@@ -35,6 +51,7 @@ def create_section(
     description: str = "",
     updated_by=None,
 ) -> SafetyCheckSection:
+    """섹션 신규 생성. 활성 섹션 중 최대 order의 다음 값을 부여."""
     next_order = (
         SafetyCheckSection.objects.filter(
             facility_id=facility_id, is_active=True
@@ -58,6 +75,7 @@ def update_section(
     description: str | None = None,
     updated_by=None,
 ) -> SafetyCheckSection:
+    """섹션 부분 수정. None 인자는 "변경 없음" 의미 (description 비우기는 빈 문자열로)."""
     fields = ["updated_at"]
     if name is not None:
         section.name = name
@@ -98,7 +116,7 @@ def soft_delete_section(section: SafetyCheckSection, updated_by=None) -> None:
 
 @transaction.atomic
 def reorder_sections(facility_id: int, ordered_ids: list[int]) -> None:
-    """드래그앤드롭 후 일괄 order 갱신."""
+    """드래그앤드롭 후 일괄 order 갱신. 잘못된 id는 silent skip (입력 검증은 view 책임)."""
     for new_order, section_id in enumerate(ordered_ids, start=1):
         SafetyCheckSection.objects.filter(
             pk=section_id, facility_id=facility_id
@@ -116,6 +134,7 @@ def create_item(
     is_required: bool = True,
     updated_by=None,
 ) -> SafetyCheckItem:
+    """문항 신규 추가. 섹션 내 활성 문항 중 최대 order의 다음 값을 부여."""
     next_order = (
         SafetyCheckItem.objects.filter(section=section, is_active=True).aggregate(
             m=Max("order")
@@ -142,6 +161,7 @@ def update_item(
     is_required: bool | None = None,
     updated_by=None,
 ) -> SafetyCheckItem:
+    """문항 부분 수정. None 인자는 "변경 없음" 의미."""
     fields = ["updated_at"]
     if title is not None:
         item.title = title
@@ -179,11 +199,13 @@ def duplicate_item(item: SafetyCheckItem, updated_by=None) -> SafetyCheckItem:
 
 @transaction.atomic
 def soft_delete_item(item: SafetyCheckItem, updated_by=None) -> None:
+    """문항 단건 비활성화. 모델의 `deactivate()`가 deactivated_at=now 자동 세팅."""
     item.deactivate(updated_by=updated_by)
 
 
 @transaction.atomic
 def reorder_items(section_id: int, ordered_ids: list[int]) -> None:
+    """섹션 내 문항 일괄 order 갱신. section_id에 속하지 않는 id는 silent skip."""
     for new_order, item_id in enumerate(ordered_ids, start=1):
         SafetyCheckItem.objects.filter(pk=item_id, section_id=section_id).update(
             order=new_order
@@ -194,7 +216,14 @@ def reorder_items(section_id: int, ordered_ids: list[int]) -> None:
 # Revision publish — [반영 저장]
 # ──────────────────────────────────────────────────────────
 def _build_revision_snapshot(facility_id: int) -> dict:
-    """현재 활성 Section/Item을 JSON 스냅샷으로 직렬화."""
+    """현재 활성 Section/Item을 JSON 스냅샷으로 직렬화.
+
+    구조: `{"sections": [{"id","name","description","order","items":[
+              {"id","title","description","is_required","order"}, ...
+          ]}]}`
+    이 dict가 그대로 `SafetyChecklistRevision.revision_data` JSONField에 저장되며,
+    이후 동등성 비교(noop 발행 차단)와 운영자 페이지/이력 모달 렌더에 재사용된다.
+    """
     sections = (
         SafetyCheckSection.objects.filter(facility_id=facility_id, is_active=True)
         .prefetch_related("items")

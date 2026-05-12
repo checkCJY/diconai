@@ -1,5 +1,12 @@
 {% extends 'admin_panel/base.html' %}
 {% load static %}
+{% comment %}
+페이지: /admin-panel/safety/checklist/
+View: config/admin_panel_urls.py SafetyChecklistAdminPageView
+JS:   static/js/admin/safety/checklist.js  — 섹션/문항 CRUD + 반영 저장/이력
+CSS:  static/css/admin/safety_checklist.css
+페이지 셸만 제공하고 실제 데이터는 JS가 /api/admin/safety/ 엔드포인트로 fetch.
+{% endcomment %}
 
 {% block title %}작업 전 안전 점검 체크리스트 관리{% endblock %}
 

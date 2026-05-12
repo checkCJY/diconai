@@ -11,6 +11,11 @@
  *   PATCH  /api/admin/accounts/<id>/      정보 수정
  *   DELETE /api/admin/accounts/<id>/      비활성화
  *   POST   /api/admin/accounts/<id>/lock/ 잠금 / 잠금 해제
+ *
+ * facility 처리 비대칭 (의도된 동작):
+ *   - 등록 모달: 빈 값이면 키 자체를 생략 → serializer의 allow_null로 NULL 처리
+ *   - 수정 모달: 빈 값을 null로 명시 전송 → PATCH partial에서 기존 facility 비우기
+ *   각 _submit*Form 내부 주석 참조.
  */
 'use strict';
 

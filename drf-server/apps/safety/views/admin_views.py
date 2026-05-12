@@ -1,10 +1,22 @@
 # safety/views/admin_views.py
 """
-어드민 — 작업 전 안전 점검 체크리스트 관리 API.
-URL 프리픽스: /api/admin/safety/
+안전 점검 체크리스트 API — 어드민 11종 + 운영자 공용 1종.
 
-운영자(현장 작업자/관리자/슈퍼관리자 모두) 페이지에서 활성 체크리스트를 조회하는
-`ActiveChecklistView`도 함께 정의한다. 권한: 인증된 사용자 누구나.
+[책임 분리]
+- 어드민 (`/api/admin/safety/...`): 슈퍼관리자·시설관리자 한정. 섹션/문항 CRUD,
+  순서 변경, 발행, 이력 조회.
+- 운영자 공용 (`/api/safety/checklist/active/`): 인증된 사용자 누구나. 활성
+  Revision의 스냅샷만 read-only로 반환 (작업자 페이지 렌더링용).
+
+[facility 해석 정책 — `_resolve_facility_id`]
+1) SUPER_ADMIN: `?facility_id=` 쿼리/바디 > 본인 facility_id > 기본(첫 활성) facility
+2) FACILITY_ADMIN: 본인 facility_id > 기본 facility (단일 공장 가정용 폴백)
+단일 공장 환경의 UX 안전망으로 폴백을 둠. 다중 공장 전환 시 FACILITY_ADMIN
+폴백은 데이터 노출 위험이 있어 제거 후 명시 지정 필요 (후속 과제).
+
+[CLAUDE.md 컨벤션 준수]
+view는 권한 체크 → serializer 검증 → services 호출만 담당. 비즈니스 로직은
+`services/checklist_admin_service.py`로 분리.
 """
 
 from drf_spectacular.utils import OpenApiResponse, extend_schema
@@ -115,6 +127,8 @@ class ActiveChecklistView(APIView):
 # GET /checklist/state/
 # ──────────────────────────────────────────────────────────
 class ChecklistStateView(APIView):
+    """어드민 페이지 헤더용 메타 — 최근 반영일/발행자/편집 중 배지 활성화 신호."""
+
     permission_classes = _BASE_PERMS
 
     @extend_schema(
@@ -146,6 +160,8 @@ class ChecklistStateView(APIView):
 # GET/POST /sections/
 # ──────────────────────────────────────────────────────────
 class ChecklistSectionListView(APIView):
+    """GET: 좌측 패널 + 우측 편집기에 동시 사용되는 섹션·문항 트리. POST: 섹션 신규."""
+
     permission_classes = _BASE_PERMS
 
     @extend_schema(
@@ -187,6 +203,8 @@ class ChecklistSectionListView(APIView):
 # PATCH/DELETE /sections/<id>/
 # ──────────────────────────────────────────────────────────
 class ChecklistSectionDetailView(APIView):
+    """섹션 단건 수정/삭제. 삭제는 soft-delete + 하위 문항 cascade."""
+
     permission_classes = _BASE_PERMS
 
     def _get_section(self, request, pk):
@@ -246,6 +264,8 @@ class ChecklistSectionDetailView(APIView):
 # POST /sections/reorder/
 # ──────────────────────────────────────────────────────────
 class ChecklistSectionReorderView(APIView):
+    """드래그앤드롭 후 호출. `ordered_ids` 인덱스 기준으로 일괄 order 갱신."""
+
     permission_classes = _BASE_PERMS
 
     @extend_schema(
@@ -268,6 +288,8 @@ class ChecklistSectionReorderView(APIView):
 # POST /sections/<id>/items/
 # ──────────────────────────────────────────────────────────
 class ChecklistItemCreateView(APIView):
+    """선택 섹션에 문항 추가. 응답은 해당 섹션 전체 트리(클라이언트 재렌더용)."""
+
     permission_classes = _BASE_PERMS
 
     @extend_schema(
@@ -307,6 +329,8 @@ class ChecklistItemCreateView(APIView):
 # PATCH/DELETE /items/<id>/
 # ──────────────────────────────────────────────────────────
 class ChecklistItemDetailView(APIView):
+    """문항 단건 수정/삭제. 삭제는 soft-delete (이력 보존)."""
+
     permission_classes = _BASE_PERMS
 
     def _get_item(self, request, pk):
@@ -367,6 +391,8 @@ class ChecklistItemDetailView(APIView):
 # POST /items/<id>/duplicate/
 # ──────────────────────────────────────────────────────────
 class ChecklistItemDuplicateView(APIView):
+    """원본 바로 다음 순번에 동일 문항 사본 생성. 이후 항목은 order 한 칸씩 밀림."""
+
     permission_classes = _BASE_PERMS
 
     @extend_schema(
@@ -398,6 +424,8 @@ class ChecklistItemDuplicateView(APIView):
 # POST /items/reorder/
 # ──────────────────────────────────────────────────────────
 class ChecklistItemReorderView(APIView):
+    """드래그앤드롭 결과 반영. section_id 검증 후 ordered_ids 인덱스로 order 갱신."""
+
     permission_classes = _BASE_PERMS
 
     @extend_schema(
@@ -427,6 +455,13 @@ class ChecklistItemReorderView(APIView):
 # POST /checklist/publish/
 # ──────────────────────────────────────────────────────────
 class ChecklistPublishView(APIView):
+    """[반영 저장]: 현재 section/item 상태를 active SafetyChecklistRevision 스냅샷으로 발행.
+
+    노-옵 발행을 방지하기 위해 서비스 레이어가 직전 active와 비교해 동일하면
+    `NoChangesToPublishError`를 발생시키며, 본 view는 이를 400 + `code:no_changes`로
+    응답해 클라이언트가 "반영 보류" 안내를 표시할 수 있게 한다.
+    """
+
     permission_classes = _BASE_PERMS
 
     @extend_schema(
@@ -458,6 +493,8 @@ class ChecklistPublishView(APIView):
 # GET /checklist/revisions/
 # ──────────────────────────────────────────────────────────
 class ChecklistRevisionListView(APIView):
+    """반영 이력 모달 좌측의 일시 리스트(신규순). detail은 별도 view 호출."""
+
     permission_classes = _BASE_PERMS
 
     @extend_schema(
@@ -477,6 +514,8 @@ class ChecklistRevisionListView(APIView):
 # GET /checklist/revisions/<id>/
 # ──────────────────────────────────────────────────────────
 class ChecklistRevisionDetailView(APIView):
+    """반영 이력 모달 우측의 스냅샷 읽기. 직전 버전 대비 변경 요약(`change_summary`) 동봉."""
+
     permission_classes = _BASE_PERMS
 
     @extend_schema(

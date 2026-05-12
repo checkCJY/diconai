@@ -1,3 +1,25 @@
+"""
+사용자 관리 어드민 시리얼라이저 — 등록/수정/상세/목록 4종.
+
+[department vs facility 처리 비대칭]
+- `department_id`: UserDepartment 중간 테이블에 (user, department, is_primary=True)
+  row를 별도로 생성/갱신해야 하므로 명시 pop + 분기 처리.
+- `facility_id`: CustomUser.facility 직접 FK라 `source="facility"`로 매핑하면
+  DRF가 validated_data에 Facility 객체를 넣어줌. 그래도 가독성을 위해 명시 pop +
+  setattr (department 패턴과 시각적 일관성).
+
+[partial PATCH의 "키 누락 vs null"]
+Update에서 `"facility" in validated_data` 플래그로 두 케이스를 구분:
+- 키 누락 → 변경 없음 (기존 facility 유지)
+- 키 명시(None 포함) → setattr로 적용 (None이면 비우기)
+이 의미를 살리지 않으면 PATCH로 facility를 비울 방법이 사라진다.
+
+[Detail의 SerializerMethodField 일관성]
+`facility_id`도 SerializerMethodField로 통일 — department_id/position_id와 동일
+패턴 유지를 위해. 단순 `IntegerField(read_only=True)`로도 동작하지만 다음 개발자가
+혼란스럽지 않도록.
+"""
+
 import re
 
 from django.contrib.auth import get_user_model

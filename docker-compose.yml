@@ -13,6 +13,13 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # drf: Django REST API + 어드민/대시보드 HTML 렌더링 서버 (포트 8000).
+  # 현재 compose는 개발용으로 구성됨 — 핫리로드 3단 결합:
+  #   1) 소스 볼륨 마운트(./drf-server:/app)로 호스트 변경이 즉시 컨테이너에 노출
+  #   2) gunicorn --reload + --workers=1로 .py 변경 시 워커 자동 재시작 (~1-2초)
+  #   3) DJANGO_DEBUG=True + settings.py 분기로 WhiteNoise StaticFilesStorage +
+  #      WHITENOISE_USE_FINDERS/AUTOREFRESH 활성 → .css/.js/템플릿 변경이 다음 요청에 반영
+  # 운영용 compose 분리 시 위 3가지를 모두 끄고 collectstatic + multi-worker로 전환.
   drf:
     build:
       context: ./drf-server
@@ -22,13 +29,17 @@ services:
       DATABASE_URL: sqlite:////app/db.sqlite3
       REDIS_URL: redis://redis:6379/0
       FASTAPI_INTERNAL_URL: http://fastapi:8001
-      DJANGO_DEBUG: "True"      # 개발: 템플릿/정적 핫리로드 활성
+      DJANGO_DEBUG: "True"      # 개발: 템플릿/정적 핫리로드 활성 (운영에선 False)
       COLLECT_STATIC: "0"       # WHITENOISE_USE_FINDERS=True → collectstatic 불필요
     volumes:
-      - ./drf-server:/app                            # 소스 핫리로드 (코드/템플릿/정적 즉시 반영)
-      - ./drf-server/db.sqlite3:/app/db.sqlite3      # 영속 데이터 명시적 마운트
+      # 소스 핫리로드용 — 코드/템플릿/정적 변경이 별도 빌드 없이 즉시 컨테이너에 노출.
+      # 하위 db.sqlite3/media는 명시적 mount로 source 경계를 분명히 함 (영속 데이터 표시).
+      - ./drf-server:/app
+      - ./drf-server/db.sqlite3:/app/db.sqlite3
       - ./drf-server/media:/app/media
     command:
+      # workers=1 + --reload 조합 — multi-worker에선 inotify가 워커별 분산되며 reload가 불안정.
+      # 운영 배포 시 workers=(2*CPU)+1 권장, --reload 제거.
       - gunicorn
       - config.wsgi:application
       - --bind=0.0.0.0:8000

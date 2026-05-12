@@ -1,8 +1,18 @@
 """
-apps/safety/admin_urls.py
+apps/safety/admin_urls.py — 어드민 전용 라우터 (슈퍼관리자·시설관리자 한정).
 
-어드민 패널 — 작업 전 안전 점검 체크리스트 관리 API URL 설정.
-config/urls.py에서 "api/admin/safety/" 프리픽스로 포함된다.
+URL 프리픽스: `/api/admin/safety/` (config/urls.py에서 include).
+운영자 공용 라우터(`apps/safety/urls.py`, 프리픽스 `/api/safety/`)와 의도적으로 분리.
+
+[라우트 그룹]
+- checklist/state/        — 페이지 헤더 메타 (최근 반영일, 편집 중 여부)
+- sections/...            — 섹션 CRUD + reorder + 섹션별 문항 생성
+- items/...               — 문항 CRUD + duplicate + reorder
+- checklist/publish/      — 반영 저장 (SafetyChecklistRevision 스냅샷 발행)
+- checklist/revisions/... — 반영 이력 리스트 + 단건 스냅샷 조회
+
+[순서 규칙]
+구체 path를 우선 등록 (예: `sections/reorder/` → `sections/<int:pk>/`).
 """
 
 from django.urls import path

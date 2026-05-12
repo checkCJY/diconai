@@ -7,6 +7,13 @@
  * API:
  *   GET  /api/safety/checklist/active/        (인증 사용자 공용)
  *   POST /dashboard/api/safety-status/        (세션 기반 완료 표시)
+ *
+ * 렌더링 정책:
+ *   - 동적 섹션: 활성 Revision JSON의 sections를 그대로 1, 2, 3, ... 번호 부여
+ *   - 마지막에 항상 "최종 확인 및 서약" 섹션 추가 (PLEDGE_TEXT 상수, 어드민에서
+ *     편집 불가 — 코드 내 고정 문구로 유지하기로 결정).
+ *   - 활성 Revision이 없으면 안내 메시지 + [다음] 비활성. 어드민이 [반영 저장]을
+ *     누르기 전까지는 작업자 페이지가 빈 상태로 보임이 정상 동작.
  */
 (function () {
   const PLEDGE_TEXT =

@@ -43,6 +43,9 @@ def list_admin_users(
     Returns:
         QuerySet[User] — view에서 그대로 페이지네이터에 넘긴다.
     """
+    # `select_related("position", "facility")` 은 시리얼라이저가 직렬화 시
+    # source="position.name" / source="facility.name" 으로 접근하면서 발생할 N+1 방지용.
+    # prefetch_related는 다대다(부서 멤버십) 전용.
     qs = (
         User.objects.prefetch_related("dept_memberships__department")
         .select_related("position", "facility")

@@ -1,7 +1,20 @@
 # safety/serializers/checklist_admin.py
 """
-어드민 — 작업 전 안전 점검 체크리스트 관리 직렬화.
-페이지: /admin-panel/safety/checklist/
+체크리스트 어드민 직렬화 — 입력 검증·출력 형태 정의.
+
+[사용 매핑]
+- `ChecklistSectionSerializer` / `ChecklistItemSerializer`
+  : 좌측 패널·우측 편집기 트리 출력 (`ChecklistSectionListView.get` 등)
+- `Checklist*CreateSerializer` / `Checklist*UpdateSerializer`
+  : POST/PATCH 입력 검증 (`name`, `title`, `description`, `is_required` 화이트리스트)
+- `ChecklistReorderSerializer` / `ChecklistItemReorderSerializer`
+  : 드래그앤드롭 결과 `ordered_ids` 검증
+- `ChecklistStateSerializer`
+  : 페이지 헤더의 "최근 반영일/편집 중" 메타 (`ChecklistStateView.get`)
+- `RevisionListItemSerializer` / `RevisionDetailSerializer`
+  : 반영 이력 모달의 일시 리스트·스냅샷 detail (`change_summary` 포함)
+
+본 모듈에는 비즈니스 로직 없음. 변환 + 검증만 (CLAUDE.md 컨벤션).
 """
 
 from rest_framework import serializers
