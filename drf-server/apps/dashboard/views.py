@@ -242,6 +242,7 @@ class SafetyHistoryAPIView(APIView):
                             name="SafetyHistoryRecord",
                             fields={
                                 "date": serializers.CharField(),
+                                "attended": serializers.BooleanField(),
                                 "checklist_done": serializers.BooleanField(),
                                 "vr_done": serializers.BooleanField(),
                             },
@@ -272,6 +273,7 @@ class SafetyHistoryAPIView(APIView):
         else:
             target = request.user
 
+        from apps.accounts.models import LoginLog
         from apps.safety.models.safety import SafetyStatus
 
         checked_dates = set(
@@ -283,6 +285,17 @@ class SafetyHistoryAPIView(APIView):
             ).values_list("checked_at__date", flat=True)
         )
 
+        attended_dates = set(
+            LoginLog.objects.filter(
+                user=target,
+                login_result=LoginLog.LoginResult.SUCCESS,
+                timestamp__year=year,
+                timestamp__month=month,
+            )
+            .values_list("timestamp__date", flat=True)
+            .distinct()
+        )
+
         _, days_in_month = calendar.monthrange(year, month)
         records = []
         for day in range(1, days_in_month + 1):
@@ -290,6 +303,7 @@ class SafetyHistoryAPIView(APIView):
             records.append(
                 {
                     "date": d.isoformat(),
+                    "attended": d in attended_dates,
                     "checklist_done": d in checked_dates,
                     "vr_done": False,  # 4차 연동 예정
                 }
@@ -315,8 +329,8 @@ class WorkerListAPIView(APIView):
         tags=["Dashboard"],
         summary="작업자 목록 + 부서 드롭다운 (관리자 전용)",
         description=(
-            "facility_admin은 자기 공장 작업자만, super_admin은 전체. "
-            "오늘 위치 데이터 유무로 `is_present` 자동 계산."
+            "facility_admin은 자기 공장 사용자만, super_admin은 전체 활성 사용자. "
+            "오늘 LoginLog 성공 기록 유무로 `is_present` 자동 계산."
         ),
         parameters=[
             OpenApiParameter(name="department_id", type=int, required=False),
@@ -361,13 +375,11 @@ class WorkerListAPIView(APIView):
         if request.user.user_type not in ADMIN_TYPES:
             return Response({"error": "권한이 없습니다."}, status=403)
 
-        from apps.accounts.models import CustomUser, Department
-        from apps.positioning.models.worker_position import WorkerPosition
+        from django.utils import timezone
 
-        workers = CustomUser.objects.filter(
-            user_type="worker",
-            deactivated_at__isnull=True,
-        )
+        from apps.accounts.models import CustomUser, Department, LoginLog
+
+        workers = CustomUser.objects.filter(deactivated_at__isnull=True)
 
         if request.user.user_type == "facility_admin":
             workers = workers.filter(facility=request.user.facility)
@@ -383,13 +395,14 @@ class WorkerListAPIView(APIView):
         if name_q:
             workers = workers.filter(name__icontains=name_q)
 
-        today = date.today()
-        today_positions = WorkerPosition.objects.filter(
-            worker=OuterRef("pk"),
-            measured_at__date=today,
+        today = timezone.localdate()
+        today_logins = LoginLog.objects.filter(
+            user=OuterRef("pk"),
+            login_result=LoginLog.LoginResult.SUCCESS,
+            timestamp__date=today,
         )
         workers = (
-            workers.annotate(is_present=Exists(today_positions))
+            workers.annotate(is_present=Exists(today_logins))
             .prefetch_related("dept_memberships__department")
             .order_by("name")
         )
@@ -410,7 +423,7 @@ class WorkerListAPIView(APIView):
             depts = (
                 Department.objects.filter(
                     memberships__user__facility=request.user.facility,
-                    memberships__user__user_type="worker",
+                    memberships__user__deactivated_at__isnull=True,
                     is_active=True,
                 )
                 .distinct()

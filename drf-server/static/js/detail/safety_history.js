@@ -304,7 +304,7 @@
 
     const inRange = !isOther && dateStr <= todayStr && (!joinedDate || dateStr >= joinedDate);
     if (inRange) {
-      const rec = records[dateStr] || { checklist_done: false, vr_done: false };
+      const rec = records[dateStr] || { attended: false, checklist_done: false, vr_done: false };
       cell.appendChild(makeIndicators(rec));
     }
 
@@ -314,6 +314,13 @@
   function makeIndicators(rec) {
     const wrap = document.createElement('div');
     wrap.className = 'cal-indicators';
+    if (!rec.attended) {
+      const absent = document.createElement('div');
+      absent.className = 'cal-absent';
+      absent.textContent = '미출근';
+      wrap.appendChild(absent);
+      return wrap;
+    }
     wrap.appendChild(makeIndicatorRow(rec.checklist_done, '안전 체크리스트', false));
     wrap.appendChild(makeIndicatorRow(rec.vr_done,        'VR 교육',         true));
     return wrap;
