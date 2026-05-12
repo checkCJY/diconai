@@ -15,6 +15,7 @@ from rest_framework.views import APIView
 
 from apps.core.constants import UserType
 from apps.core.permissions import IsSuperAdminOrFacilityAdmin
+from apps.facilities.selectors.facility import get_default_facility_id
 from apps.safety.models import SafetyCheckItem, SafetyCheckSection
 from apps.safety.selectors.checklist import (
     get_active_revision,
@@ -40,8 +41,11 @@ from apps.safety.services import checklist_admin_service as svc
 
 def _resolve_facility_id(request) -> int | None:
     """
-    슈퍼관리자: ?facility_id= 쿼리 우선, 없으면 본인 facility_id 기본값
-    시설관리자: 본인 facility_id 강제
+    슈퍼관리자: ?facility_id= 쿼리 우선 → 본인 facility_id → 기본(첫 활성) facility
+    시설관리자: 본인 facility_id → 기본(첫 활성) facility
+
+    단일 공장 운영 단계에서 user.facility_id가 NULL이어도 페이지가 즉시 동작하도록
+    `get_default_facility_id()`로 마지막 폴백을 수행한다.
     """
     user = request.user
     if user.user_type == UserType.SUPER_ADMIN:
@@ -51,8 +55,8 @@ def _resolve_facility_id(request) -> int | None:
                 return int(raw)
             except (TypeError, ValueError):
                 return None
-        return user.facility_id
-    return user.facility_id
+        return user.facility_id or get_default_facility_id()
+    return user.facility_id or get_default_facility_id()
 
 
 _BASE_PERMS = [IsAuthenticated, IsSuperAdminOrFacilityAdmin]
