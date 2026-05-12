@@ -182,8 +182,28 @@ const AlarmPopup = {
     if (msgEl) {
       const sensor = data.sensor_name || data.source_label || '';
       const msg    = data.message     || data.summary      || '';
-      // 그룹 카운트는 더 이상 메시지 suffix가 아닌 우상단 뱃지로 표시 (P2-1)
-      msgEl.textContent = sensor ? `${sensor} — ${msg}` : msg;
+      // 센서 이름은 굵은 한 줄로 분리, 메시지 본문은 별도 행 — 가독성 향상.
+      // innerHTML 대신 안전한 DOM API로 XSS 회피.
+      msgEl.replaceChildren();
+      if (sensor) {
+        const senEl = document.createElement('strong');
+        senEl.className = 'sensor-name';
+        senEl.textContent = sensor;
+        msgEl.appendChild(senEl);
+      }
+      if (msg) {
+        const bodyEl = document.createElement('span');
+        bodyEl.className = 'msg-body';
+        bodyEl.textContent = msg;
+        msgEl.appendChild(bodyEl);
+      }
+      // 임계값 컨텍스트 — 운영자가 정상/위험 기준을 즉시 비교 가능 (P2 추가, 피드백 #3)
+      if (data.measured_value != null && data.threshold_value != null) {
+        const thrEl = document.createElement('span');
+        thrEl.className = 'msg-threshold';
+        thrEl.textContent = `위험 기준 ${data.threshold_value} 초과 (측정 ${data.measured_value})`;
+        msgEl.appendChild(thrEl);
+      }
     }
 
     // 그룹 카운트 뱃지 + 큐 풀 누락 배지 갱신
