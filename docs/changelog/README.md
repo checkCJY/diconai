@@ -38,7 +38,8 @@ docs/changelog/
 │  └─ power_phase3.md                   (Phase 3 — IF 학습 데이터 인프라)
 │
 └─ ml/                                  (2026-05-13 ML 이상탐지 트랙 — 전력·가스 공유)
-   └─ ml_step1_infra.md                 (STEP 1 — IF 학습·추론 인프라)
+   ├─ ml_step1_infra.md                 (STEP 1 — IF 학습·추론 인프라)
+   └─ gas_phase3.md                     (가스 라벨 인프라 + ml 앱 가스 분기 활성화)
 ```
 
 ---
@@ -52,7 +53,7 @@ docs/changelog/
 | 단일 기능 | 2026-05-07 | 대시보드 어드민 UI · 실시간 지도 지오펜스 | [`single_features/`](single_features/) |
 | 알람 신뢰성 | 2026-05-12 | dedupe 원자화·SQLite WAL·Redis 큐 + 알람 UI/UX | [`alarm_reliability/`](alarm_reliability/) |
 | 전력 임계치 | 2026-05-13 | W·A·V 3축 정격 % 평가 + channel_meta DB 이관 + Phase 3 IF 학습 데이터 인프라 | [`power_phase1_2/`](power_phase1_2/) |
-| ML 이상탐지 | 2026-05-13 | apps/ml/ + sklearn IsolationForest 학습·추론 인프라 (전력·가스 공유) | [`ml/`](ml/) |
+| ML 이상탐지 | 2026-05-13 | apps/ml/ + sklearn IsolationForest 학습·추론 인프라 + 가스 분기 활성화 (전력·가스 모두 사용 가능) | [`ml/`](ml/) |
 
 ---
 

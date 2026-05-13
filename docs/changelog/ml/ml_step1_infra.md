@@ -1,5 +1,7 @@
 # ML 트랙 STEP 1 — IF 이상탐지 인프라 (학습·추론 동작)
 
+> **2026-05-13 업데이트**: 가스 도메인 분기는 [`gas_phase3.md`](gas_phase3.md) (G7/G8) 에서 활성화 — 본 STEP 1 인프라가 이제 전력/가스 두 도메인 모두 사용 가능.
+
 > **요약 한 줄**: `apps/ml/` Django 앱과 `fastapi-server/ai/` 라우터를 신설해 sklearn IsolationForest 학습 → .pkl 저장 → MLModel 메타 → FastAPI 실시간 추론까지 end-to-end 동작하는 인프라를 구축한다. sensor_type 분리로 전력/가스 양 도메인이 같은 ml 앱을 공유한다.
 
 **브랜치**: `feature/power_refactory` (Phase 3 후속) · **상세 plan**: [skill/plan/if-integration-guide.md](../../../skill/plan/if-integration-guide.md) §1단계 · **선행**: 전력 Phase 3 (라벨 데이터 인프라, [`power_phase3.md`](../power_phase1_2/power_phase3.md))
