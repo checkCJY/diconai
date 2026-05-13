@@ -34,7 +34,8 @@ docs/changelog/
 │
 └─ power_phase1_2/                      (2026-05-13 전력 임계치 트랙)
    ├─ power_phase1_2.md
-   └─ power_phase1_2_verification.md
+   ├─ power_phase1_2_verification.md
+   └─ power_phase3.md                   (Phase 3 — IF 학습 데이터 인프라)
 ```
 
 ---
@@ -47,7 +48,7 @@ docs/changelog/
 | 백엔드 Phase 1-5 | 2026-05-07 | 설정 중앙화·인증·HTTP/WS 통합·예외·FastAPI 정리 | [`phase1-5_refactoring/`](phase1-5_refactoring/) |
 | 단일 기능 | 2026-05-07 | 대시보드 어드민 UI · 실시간 지도 지오펜스 | [`single_features/`](single_features/) |
 | 알람 신뢰성 | 2026-05-12 | dedupe 원자화·SQLite WAL·Redis 큐 + 알람 UI/UX | [`alarm_reliability/`](alarm_reliability/) |
-| 전력 임계치 | 2026-05-13 | W·A·V 3축 정격 % 평가 + channel_meta DB 이관 | [`power_phase1_2/`](power_phase1_2/) |
+| 전력 임계치 | 2026-05-13 | W·A·V 3축 정격 % 평가 + channel_meta DB 이관 + Phase 3 IF 학습 데이터 인프라 | [`power_phase1_2/`](power_phase1_2/) |
 
 ---
 
