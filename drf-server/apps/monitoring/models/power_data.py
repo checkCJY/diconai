@@ -22,6 +22,13 @@ class PowerData(models.Model):
         VOLTAGE = "voltage", "전압 (V)"
         WATT = "watt", "전력 (W)"
 
+    class AnomalyType(models.TextChoices):
+        OVERLOAD = "overload", "과부하"
+        VOLTAGE_DROP = "voltage_drop", "저전압"
+        SPIKE = "spike", "스파이크"
+        PHASE_LOSS = "phase_loss", "결상"
+        DEGRADATION = "degradation", "열화"
+
     power_device = models.ForeignKey(
         "facilities.PowerDevice", on_delete=models.PROTECT, related_name="power_data"
     )
@@ -38,6 +45,19 @@ class PowerData(models.Model):
     )
     risk_level = models.CharField(
         max_length=10, choices=RiskLevel.choices, default=RiskLevel.NORMAL
+    )
+    is_anomaly = models.BooleanField(
+        default=False,
+        verbose_name="이상 라벨",
+        help_text="더미 시뮬레이터/운영자 라벨링용",
+    )
+    anomaly_type = models.CharField(
+        max_length=20,
+        choices=AnomalyType.choices,
+        null=True,
+        blank=True,
+        verbose_name="이상 시나리오",
+        help_text="더미 시뮬레이터 시나리오 라벨 — IF 학습 평가용",
     )
     measured_at = models.DateTimeField()
     received_at = models.DateTimeField(auto_now_add=True)
@@ -72,5 +92,8 @@ class PowerData(models.Model):
             models.Index(fields=["-measured_at"], name="idx_pwr_time"),
             models.Index(
                 fields=["risk_level", "-measured_at"], name="idx_pwr_risk_time"
+            ),
+            models.Index(
+                fields=["is_anomaly", "-measured_at"], name="idx_pwr_anomaly_time"
             ),
         ]

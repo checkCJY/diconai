@@ -70,6 +70,13 @@ class _ChannelEntrySerializer(serializers.Serializer):
         choices=RiskLevel.choices,
         default=RiskLevel.NORMAL,
     )
+    is_anomaly = serializers.BooleanField(required=False, default=False)
+    anomaly_type = serializers.ChoiceField(
+        choices=PowerData.AnomalyType.choices,
+        required=False,
+        allow_null=True,
+        default=None,
+    )
 
 
 class PowerDataBulkIngestSerializer(serializers.Serializer):
@@ -80,13 +87,16 @@ class PowerDataBulkIngestSerializer(serializers.Serializer):
       device_id   : PowerDevice.device_id
       measured_at : 장치 측정 시각 — FastAPI가 UTC ISO 문자열로 주입
       data_type   : "current" | "voltage" | "watt"
-      channels    : [{channel: int, value: float, risk_level: str}, ...]
+      channels    : [{channel: int, value: float, risk_level: str,
+                       is_anomaly: bool?, anomaly_type: str?}, ...]
                     — PowerMeasurementPayload.to_channel_values() 변환 후 전달
 
     처리:
       - device_id → PowerDevice FK 조회
       - 16채널 PowerData 일괄 생성 (bulk_create, uq 충돌 시 무시)
       - 통신 불능 채널: value=None, sensor_status='comm_failure'로 저장
+      - is_anomaly/anomaly_type 은 더미 시뮬레이터 라벨 (IF 학습 평가용).
+        운영 장비 페이로드는 비워서 기본값(False/None) 저장.
     """
 
     device_id = serializers.CharField(max_length=50)
@@ -104,12 +114,23 @@ class PowerDataBulkIngestSerializer(serializers.Serializer):
                 value=ch["value"],
                 sensor_status=ch["sensor_status"],
                 risk_level=ch["risk_level"],
+                is_anomaly=ch.get("is_anomaly", False),
+                anomaly_type=ch.get("anomaly_type"),
                 measured_at=validated_data["measured_at"],
             )
             for ch in validated_data["channels"]
         ]
         PowerData.objects.bulk_create(objs, ignore_conflicts=True)
-        trigger_power_alarms(
-            objs, device
-        )  # watt 채널에 대해 위험도 판정 후 알람 라우팅
-        return objs
+        # ignore_conflicts=True 시 conflict 행은 저장 skip되지만 objs 리스트엔 그대로 남는다.
+        # 미저장 행에 알람을 발화하지 않도록 unique 조건으로 실제 저장된 행만 재조회.
+        # (power_device, channel, data_type, measured_at) 복합 UNIQUE 보장 — Phase 1 C3.
+        saved = list(
+            PowerData.objects.filter(
+                power_device=device,
+                measured_at=validated_data["measured_at"],
+                data_type=validated_data["data_type"],
+                channel__in=[o.channel for o in objs],
+            )
+        )
+        trigger_power_alarms(saved, device)
+        return saved

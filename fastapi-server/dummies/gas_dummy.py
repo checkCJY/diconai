@@ -1,18 +1,23 @@
-# dummies/gas_dummy.py — 가스 센서 더미 데이터 전송 스크립트
+# dummies/gas_dummy.py — 가스 센서 더미 데이터 전송 스크립트 (v3, IF 학습 데이터용)
 #
-# 실제 에어위드 가스 센서 장비 대신 FastAPI 엔드포인트에 더미 데이터를 1초 주기로 전송한다.
+# 실제 에어위드 가스 센서 장비 대신 FastAPI 엔드포인트에 더미 데이터를 주기적으로 전송한다.
 # 기동 시 /api/sensors/info 에 장비 식별 정보를 1회 전송하고,
 # 이후 /api/sensors/gas 에 가스 측정값을 반복 전송한다.
 #
-# [시나리오 기반 이상 생성 — v2]
-# 기존: 가스별 독립 확률 샘플링 → 이상 레코드에서 가스 1~2개만 위험, 나머지 정상
-#       → Isolation Forest가 "거의 정상"으로 오판 (멀티변수 패턴 미형성)
-# 변경: 실제 사고 유형을 시나리오로 모델링 → 관련 가스들이 함께 이상 범위로 이동
-#       → IF가 멀티변수 상관 패턴을 학습해 정확도 90%+ 기대
+# [v3 변경 — IF 학습 데이터 품질 확보 (전력 Phase 3 패턴 적용)]
+# v2: 시나리오 4종 진입은 했으나 (1) 시계열 자기상관 없음 (2) DB에 라벨 안 남음
+# v3: 상태머신(RAMP_UP/HOLD/RAMP_DOWN) + 가중치 random.choices + anomaly_type 페이로드 동봉
+#     → IF 가 "정상 → 사고 진입 → 회복" 의 연속적 변화를 학습 가능
+#     → DB 의 GasData.is_anomaly/anomaly_type 으로 학습/평가 데이터 추출 가능
 #
-# mixed 모드: DANGER_EVENT_PROB 확률로 4종 시나리오 중 1개를 무작위 선택
-#             나머지 확률은 전 가스 정상 레코드
-# fixed 모드(normal/warning/danger): 기존 동작 유지 (전 가스 동일 레벨)
+# 가스 vs 전력 차이:
+# - 전력: 16채널 각자 독립 상태머신 (채널별 시나리오 다를 수 있음)
+# - 가스: 9가스가 같은 상태머신 1개 공유 (시나리오 1개가 row 전체 = 9가스 동시 영향)
+#
+# 모드:
+#   mixed       — 정상 90% + 가중치 시나리오 10% (IF 학습 데이터셋 생성)
+#   normal/warning/danger — 전 가스 동일 레벨 강제 (UI/알람 테스트)
+#   co_leak/h2s_leak/fire/chemical_spill — 단일 시나리오 강제 (격리 테스트)
 #
 # 실행: python -m dummies.gas_dummy
 
@@ -26,6 +31,13 @@ import requests
 from core.config import settings
 from core.gas_thresholds import calculate_gas_status
 from dummies._scenario import get_scenario_mode
+from dummies._state_machine import (
+    ChannelState,
+    enter_scenario,
+    maybe_trigger,
+    mix,
+    step,
+)
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
@@ -136,26 +148,32 @@ SCENARIOS: dict[str, dict[str, str]] = {
 
 _SCENARIO_NAMES = list(SCENARIOS.keys())
 
+# ---------------------------------------------------------------------------
+# v3 — 상태머신 파라미터 (가스 4종 시나리오)
+# ramp_up : 정상→사고 점진 진입 틱 수
+# hold    : 사고 상태 유지 틱 수
+# ramp_down : 사고→정상 점진 회복 틱 수
+# 1틱 = DUMMY_SEND_INTERVAL_SEC 초 (기본 1초)
+# ---------------------------------------------------------------------------
+SCENARIO_PATTERNS: dict[str, dict[str, int]] = {
+    "co_leak": {"ramp_up": 5, "hold": 30, "ramp_down": 5},
+    "h2s_leak": {"ramp_up": 5, "hold": 30, "ramp_down": 5},
+    "fire": {"ramp_up": 3, "hold": 20, "ramp_down": 5},  # 화재는 더 빠른 진입
+    "chemical_spill": {"ramp_up": 5, "hold": 30, "ramp_down": 5},
+}
 
-def _build_scenario_levels(mode: str) -> dict[str, str]:
-    """모드에 따라 가스별 위험도 레벨 매핑을 반환한다.
+# 가중치 — 발생 빈도(가스 사고 통계 기반 초기값, 운영 데이터 축적 후 보정)
+# 4종 모두 유사 빈도 (전력 overload 처럼 dominant 시나리오 없음)
+SCENARIO_WEIGHTS = [6, 4, 4, 4]  # co_leak / h2s_leak / fire / chemical_spill
+HOLD_TICKS_BY_SCENARIO = {k: v["hold"] for k, v in SCENARIO_PATTERNS.items()}
 
-    fixed 모드(normal/warning/danger): 전 가스를 동일 레벨로 설정.
-    mixed 모드: DANGER_EVENT_PROB 확률로 시나리오 1개를 무작위 선택해 적용.
-               시나리오에 포함되지 않은 가스는 normal 유지.
-               나머지 확률은 전 가스 normal.
-    """
-    all_gases = list(GAS_NORMAL_RANGE.keys())
+# mixed 모드에서 매 틱마다 NORMAL 상태일 때 시나리오 진입할 확률.
+# 평균 1 / MIXED_TRIGGER_PROBABILITY 틱마다 1건 시나리오 발생.
+# DANGER_EVENT_PROB(.env)을 그대로 재사용 — 운영자가 환경변수로 조정 가능.
+MIXED_TRIGGER_PROBABILITY = DANGER_EVENT_PROB
 
-    if mode in ("normal", "warning", "danger"):
-        return {gas: mode for gas in all_gases}
-
-    # mixed 모드 — 시나리오 기반
-    if random.random() < DANGER_EVENT_PROB:
-        scenario = SCENARIOS[random.choice(_SCENARIO_NAMES)]
-        return {gas: scenario.get(gas, "normal") for gas in all_gases}
-
-    return {gas: "normal" for gas in all_gases}
+# 가스는 row=시점 단위 시나리오라 9가스가 같은 상태머신 1개 공유.
+_gas_state = ChannelState()
 
 
 def _pick_value(gas: str, level: str) -> float | int:
@@ -164,6 +182,75 @@ def _pick_value(gas: str, level: str) -> float | int:
     if isinstance(low, float) or isinstance(high, float):
         return round(random.uniform(low, high), 2)
     return random.randint(int(low), int(high))
+
+
+# FIXED 모드 (전 가스 동일 레벨 강제) 식별용
+FIXED_LEVELS = {"normal", "warning", "danger"}
+
+
+def _apply_mode(mode: str) -> None:
+    """매 틱 시작 시 호출. 상태머신 트리거 또는 강제 진입."""
+    if mode == "mixed":
+        maybe_trigger(
+            _gas_state,
+            probability=MIXED_TRIGGER_PROBABILITY,
+            scenarios=_SCENARIO_NAMES,
+            weights=SCENARIO_WEIGHTS,
+            hold_ticks_by_scenario=HOLD_TICKS_BY_SCENARIO,
+            ramp_up_ticks=5,
+            ramp_down_ticks=5,
+        )
+        return
+    if mode in SCENARIO_PATTERNS:
+        pattern = SCENARIO_PATTERNS[mode]
+        enter_scenario(
+            _gas_state,
+            scenario=mode,
+            ramp_up_ticks=pattern["ramp_up"],
+            hold_ticks=pattern["hold"],
+            ramp_down_ticks=pattern["ramp_down"],
+        )
+        return
+    # FIXED_LEVELS 또는 알 수 없는 모드 — 상태머신 미사용, _build_gas_values 에서 fallback 처리.
+
+
+def _build_gas_values(mode: str) -> tuple[dict[str, float | int], str | None]:
+    """상태머신 진행 후 가스값 9종과 anomaly_type(시나리오명 or None)을 반환한다.
+
+    상태머신 weight 에 따라 normal_pick 과 scenario_pick 을 선형 보간 (mix).
+    weight=0 → 완전 정상, weight=1 → 완전 사고 (HOLD 구간).
+    """
+    _apply_mode(mode)
+
+    # FIXED 모드 — 전 가스 동일 레벨, 라벨 없음
+    if mode in FIXED_LEVELS:
+        return (
+            {gas: _pick_value(gas, mode) for gas in GAS_NORMAL_RANGE},
+            None,
+        )
+
+    # 상태머신 진행
+    out = step(_gas_state)
+
+    if not out.is_anomaly:
+        return (
+            {gas: _pick_value(gas, "normal") for gas in GAS_NORMAL_RANGE},
+            None,
+        )
+
+    # 시나리오 진행 중 — normal_pick 과 scenario_pick 을 weight 로 가중평균
+    scenario = out.anomaly_type or "co_leak"
+    scenario_levels = SCENARIOS[scenario]
+    weight = out.scenario_weight
+    gas_values: dict[str, float | int] = {}
+    for gas in GAS_NORMAL_RANGE:
+        normal_pick = _pick_value(gas, "normal")
+        scenario_level = scenario_levels.get(gas, "normal")
+        scenario_pick = _pick_value(gas, scenario_level)
+        v = mix(float(normal_pick), float(scenario_pick), weight)
+        # 정수 가스(co/h2s/co2/lel/nh3 등 일부) 도 float 로 저장 가능 (GasData.FloatField)
+        gas_values[gas] = round(v, 2)
+    return gas_values, scenario
 
 
 def generate_device_info() -> dict:
@@ -179,15 +266,14 @@ def generate_device_info() -> dict:
 def generate_gas_data() -> dict:
     """FastAPI /api/sensors/gas 에 전송할 가스 측정값 페이로드를 생성한다.
 
-    시나리오 모드(mixed/normal/warning/danger)에 따라 범위가 결정된다.
-    mixed 모드: DANGER_EVENT_PROB 확률로 사고 시나리오 1종을 선택해
-               관련 가스들이 함께 위험 범위로 이동 (상관 패턴 형성).
-    fixed 모드(normal/warning/danger): 전 가스가 동일 위험도 범위에서 랜덤 샘플링.
+    v3: 상태머신 기반 시계열 자기상관 + anomaly_type 페이로드 동봉.
+        - mixed: 가중치 random.choices 로 시나리오 진입 (정상/사고 자연스러운 전이)
+        - 단일 시나리오 (co_leak/h2s_leak/fire/chemical_spill): 강제 진입
+        - fixed (normal/warning/danger): 상태머신 미사용, 전 가스 동일 레벨
     """
     mode = get_scenario_mode()
-    levels = _build_scenario_levels(mode)
-    gas_values = {gas: _pick_value(gas, levels[gas]) for gas in GAS_NORMAL_RANGE}
-    return {
+    gas_values, anomaly_type = _build_gas_values(mode)
+    payload: dict = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "device_id": DEVICE_ID,
         "device_name": DEVICE_NAME,
@@ -195,6 +281,9 @@ def generate_gas_data() -> dict:
         **gas_values,
         "status": calculate_gas_status(gas_values),
     }
+    if anomaly_type is not None:
+        payload["anomaly_type"] = anomaly_type
+    return payload
 
 
 def send_data(url: str, payload: dict, label: str) -> None:
@@ -220,18 +309,23 @@ def send_data(url: str, payload: dict, label: str) -> None:
 def run() -> None:
     """더미 전송 루프를 시작한다.
 
-    장비 정보를 1회 전송한 뒤 1초마다 가스 데이터를 반복 전송한다.
-    DANGER_EVENT_PROB 확률로 위험 데이터를 섞어 알람 시나리오를 테스트할 수 있다.
+    장비 정보를 1회 전송한 뒤 DUMMY_SEND_INTERVAL_SEC 주기로 가스 데이터를 반복 전송한다.
+    v3: 상태머신 + 가중치 + anomaly_type 동봉 (IF 학습용).
     """
     logger.info(
-        "=== 가스 더미 전송 시작 (시나리오 모드 v2 | 위험 확률: %d%% | 시나리오: %s) ===",
-        int(DANGER_EVENT_PROB * 100),
+        "=== 가스 더미 v3 시작 (주기: %ds | 트리거 확률: %d%% | 시나리오: %s | 가중치: %s) ===",
+        settings.DUMMY_SEND_INTERVAL_SEC,
+        int(MIXED_TRIGGER_PROBABILITY * 100),
         ", ".join(_SCENARIO_NAMES),
+        SCENARIO_WEIGHTS,
     )
     send_data(FASTAPI_DEVICE_INFO_URL, generate_device_info(), "DEVICE_INFO")
     logger.info("가스 데이터 전송 시작 → %s", FASTAPI_GAS_URL)
     while True:
-        send_data(FASTAPI_GAS_URL, generate_gas_data(), "GAS")
+        payload = generate_gas_data()
+        send_data(FASTAPI_GAS_URL, payload, "GAS")
+        if payload.get("anomaly_type"):
+            logger.info("[TICK] scenario=%s", payload["anomaly_type"])
         time.sleep(settings.DUMMY_SEND_INTERVAL_SEC)
 
 

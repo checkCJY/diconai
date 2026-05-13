@@ -24,6 +24,10 @@ services:
     build:
       context: ./drf-server
     image: diconai/drf:dev
+    # host 유저 UID/GID 로 실행 — 컨테이너 안에서 생성된 파일(마이그/모델 .pkl/db.sqlite3)
+    # 이 host 에 root 소유로 노출되어 pre-commit/git 작업이 막히는 문제 회피.
+    # WSL2 Ubuntu 기본 uid=1000. 다른 환경은 `UID=$(id -u) GID=$(id -g) docker compose up`.
+    user: "${UID:-1000}:${GID:-1000}"
     env_file: ./.env.docker
     environment:
       DATABASE_URL: sqlite:////app/db.sqlite3
@@ -57,15 +61,22 @@ services:
     build:
       context: ./fastapi-server
     image: diconai/fastapi:dev
+    user: "${UID:-1000}:${GID:-1000}"  # host UID 매핑 — drf 와 동일 이유
     env_file: ./.env.docker
     environment:
       DRF_BASE_URL: http://drf:8000
+      REDIS_URL: redis://redis:6379/0
     volumes:
       # 소스 핫리로드 — celery-worker/drf와 동일하게 호스트 코드를 마운트해
       # 라우터/서비스 코드 변경이 `restart` 한 번으로 반영된다.
       - ./fastapi-server:/app
+      # IF 모델 .pkl 공유 (read-only) — drf 가 학습 → fastapi 가 추론.
+      # host: ./drf-server/ml_models/  →  fastapi: /app/ml_models/ (Settings.ML_MODELS_DIR)
+      - ./drf-server/ml_models:/app/ml_models:ro
     depends_on:
       drf:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     ports:
       - "8001:8001"
@@ -73,6 +84,7 @@ services:
 
   celery-worker:
     image: diconai/drf:dev
+    user: "${UID:-1000}:${GID:-1000}"  # host UID 매핑 — drf 와 동일 이유
     command: ["celery", "-A", "config", "worker", "-l", "info", "--concurrency=2"]
     env_file: ./.env.docker
     environment:
@@ -96,6 +108,7 @@ services:
 
   celery-beat:
     image: diconai/drf:dev
+    user: "${UID:-1000}:${GID:-1000}"  # host UID 매핑 — drf 와 동일 이유
     command: ["celery", "-A", "config", "beat", "-l", "info"]
     env_file: ./.env.docker
     environment:

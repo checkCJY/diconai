@@ -4,10 +4,12 @@
 #   - DRF 비동기 전송 (BackgroundTask용 fire-and-forget 패턴)
 #   - power_latest 공유 상태 갱신
 #   - 채널 데이터를 equipment[] 형태로 조립해 WebSocket 브로드캐스트에 제공
+#   - 채널 라벨·정격은 channel_meta_cache(DRF PowerDevice.channel_meta)에서 조회
 import logging
 from datetime import datetime, timezone
 
 from core.power_thresholds import POWER_THRESHOLDS
+from power.services.channel_meta_cache import get_channel_entry
 from services.drf_client import post_to_drf
 from websocket.state import power_latest
 
@@ -16,26 +18,21 @@ logger = logging.getLogger(__name__)
 DRF_POWER_EVENT_PATH = "/api/monitoring/power/event/"
 DRF_POWER_DATA_PATH = "/api/monitoring/power/data/"
 
-# 채널 번호 → 설비명 매핑
-# 운영 환경에서는 DRF PowerDevice.channel_meta 조회로 교체 예정
-CHANNEL_TO_DEVICE: dict[int, str] = {
-    1: "압연기",
-    2: "송풍기",
-    3: "집진기",
-    4: "전자기 교반기",
-    5: "냉각펌프",
-    6: "유압장치",
-    7: "컨베이어",
-    8: "분쇄기",
-    9: "CH9",
-    10: "CH10",
-    11: "CH11",
-    12: "CH12",
-    13: "CH13",
-    14: "CH14",
-    15: "CH15",
-    16: "CH16",
+# 페이로드 표시용 정격 % 임계치 (DRF facilities.Threshold "power_facility_default"와 동일)
+# 실제 알람 트리거는 DRF가 단일 진실 공급원. 본 모듈은 대시보드 색상 표시만 담당.
+_PCT_THRESHOLDS = {
+    "watt": {"warning": 80, "danger": 100, "bidirectional": False},
+    "current": {"warning": 80, "danger": 100, "bidirectional": False},
+    "voltage": {
+        "warning_low": 95,
+        "warning_high": 105,
+        "danger_low": 90,
+        "danger_high": 110,
+        "bidirectional": True,
+    },
 }
+
+_AXIS_BY_KEY = {"watt": "rated_w", "current": "rated_a", "voltage": "rated_v"}
 
 
 def now_utc_iso() -> str:
@@ -52,17 +49,25 @@ async def post_power_to_drf(path: str, payload: dict) -> None:
     await post_to_drf(path, payload, raise_on_error=False, log_category="power_service")
 
 
-def to_channel_list(channel_values: dict) -> list[dict]:
+def to_channel_list(
+    channel_values: dict, anomaly_map: dict | None = None
+) -> list[dict]:
     """
     채널별 측정값 딕셔너리를 DRF PowerData 저장 형식(리스트)으로 변환한다.
     값이 None인 채널은 통신 불능(comm_failure) 상태로 표시한다.
+
+    anomaly_map : {channel:int → anomaly_type:str} — 더미 시뮬레이터에서만 채워짐.
+                  해당 채널은 is_anomaly=True 로 저장된다.
     """
+    anomaly_map = anomaly_map or {}
     return [
         {
             "channel": ch,
             "value": val,
             "sensor_status": "comm_failure" if val is None else "active",
             "risk_level": "normal",
+            "is_anomaly": ch in anomaly_map,
+            "anomaly_type": anomaly_map.get(ch),
         }
         for ch, val in channel_values.items()
     ]
@@ -77,20 +82,59 @@ def update_power_state(data_type: str, values: dict, measured_at: str) -> None:
     power_latest["updated_at"] = measured_at
 
 
+def _eval_axis_pct(value: float | None, rated, axis: str) -> str:
+    """정격 % 환산 후 임계치 비교. 표시용 — DRF threshold_service와 동일 시맨틱(>=)."""
+    if value is None or rated is None:
+        return "normal"
+    try:
+        rated_f = float(rated)
+    except (TypeError, ValueError):
+        return "normal"
+    if rated_f == 0:
+        return "normal"
+    pct = value / rated_f * 100
+    cfg = _PCT_THRESHOLDS[axis]
+    if cfg["bidirectional"]:
+        if pct <= cfg["danger_low"] or pct >= cfg["danger_high"]:
+            return "danger"
+        if pct <= cfg["warning_low"] or pct >= cfg["warning_high"]:
+            return "warning"
+        return "normal"
+    if pct >= cfg["danger"]:
+        return "danger"
+    if pct >= cfg["warning"]:
+        return "warning"
+    return "normal"
+
+
+def _max_risk(levels: list[str]) -> str:
+    order = {"normal": 0, "warning": 1, "danger": 2}
+    return max(levels, key=lambda lv: order.get(lv, 0))
+
+
+def _legacy_watt_risk(watt: float | None) -> str:
+    """channel_meta 미수신 시 watt 절대값 fallback (POWER_THRESHOLDS)."""
+    if watt is None:
+        return "normal"
+    if watt > POWER_THRESHOLDS["danger"]:
+        return "danger"
+    if watt > POWER_THRESHOLDS["caution"]:
+        return "warning"
+    return "normal"
+
+
 def build_equipment() -> tuple[list[dict], float]:
     """
     power_latest 공유 상태를 읽어 equipment 목록과 총 전력(kW)을 조립한다.
 
-    WebSocket 브로드캐스트 페이로드의 equipment[] 필드를 생성하는 데 사용된다.
-    watt/current/voltage가 모두 비어있으면 데이터 미수신 상태로 간주해 빈 리스트를 반환한다.
+    [축별 risk 표시]
+    채널 정격(channel_meta[ch][rated_*])을 사용해 W·A·V 각 축의 % 위험도를 산출.
+    정격 미입력 시 power_risk만 POWER_THRESHOLDS 절대값으로 fallback.
+    종합 risk_level = max(power_risk, current_risk, voltage_risk).
 
-    [risk_level 표시용 fallback — Phase 4 회귀 점검 fix]
-    채널별 위험도: watt > POWER_THRESHOLDS["danger"] → danger, > POWER_THRESHOLDS["caution"]
-    → warning, 그 외 → normal.
-
-    본 risk_level은 표시용이며 실제 알람 판정 + DB 저장은 DRF의
-    `apps.alerts.tasks.fire_power_*_task`가 담당 (Phase 4-b에서 DB Threshold 전환 완료).
-    DRF GasData.save() 패턴과 일관: fastapi 측 risk는 페이로드 표시용, DRF가 단일 진실 공급원.
+    [단일 진실 공급원]
+    본 함수의 risk 산출은 대시보드 색상 표시용. 실제 알람 트리거는 DRF의
+    apps.monitoring.services.power_alarm.trigger_power_alarms()가 담당.
     """
     if not any(
         [power_latest["watt"], power_latest["current"], power_latest["voltage"]]
@@ -109,27 +153,35 @@ def build_equipment() -> tuple[list[dict], float]:
         is_comm = watt is None and voltage is None and current is None
         sensor_status = "comm_failure" if is_comm else "active"
 
-        if not is_comm and watt is not None:
-            risk_level = (
-                "danger"
-                if watt > POWER_THRESHOLDS["danger"]
-                else "warning"
-                if watt > POWER_THRESHOLDS["caution"]
-                else "normal"
-            )
-            total_w += watt
+        entry = get_channel_entry(None, ch)
+        label = entry.get("name") or f"CH{ch}"
+
+        if is_comm:
+            power_risk = current_risk = voltage_risk = risk_level = "normal"
         else:
-            risk_level = "normal"
+            rated_w = entry.get("rated_w")
+            if rated_w is not None:
+                power_risk = _eval_axis_pct(watt, rated_w, "watt")
+            else:
+                power_risk = _legacy_watt_risk(watt)
+            current_risk = _eval_axis_pct(current, entry.get("rated_a"), "current")
+            voltage_risk = _eval_axis_pct(voltage, entry.get("rated_v"), "voltage")
+            risk_level = _max_risk([power_risk, current_risk, voltage_risk])
+            if watt is not None:
+                total_w += watt
 
         equipment.append(
             {
-                "name": CHANNEL_TO_DEVICE.get(ch, f"CH{ch}"),
+                "name": label,
                 "watt": watt,
                 "voltage": voltage,
                 "current": current,
                 "onoff": onoff,
                 "sensor_status": sensor_status,
                 "risk_level": risk_level,
+                "power_risk": power_risk,
+                "current_risk": current_risk,
+                "voltage_risk": voltage_risk,
             }
         )
 

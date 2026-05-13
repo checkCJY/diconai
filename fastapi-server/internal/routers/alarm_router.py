@@ -1,16 +1,21 @@
 # internal/routers/alarm_router.py — Celery → FastAPI WebSocket 브리지
 #
 # Celery 태스크(DRF 컨텍스트)가 알람을 생성한 뒤 이 엔드포인트를 호출해
-# FastAPI의 active_alarms 큐에 추가한다.
-# 다음 WebSocket 브로드캐스트 틱(1초)에 브라우저로 전달된다.
+# Redis 알람 큐(`diconai:ws:alarms`)에 LPUSH한다 (Phase 1 C4).
+# alarm_flush_loop이 BRPOP으로 즉시 소비해 브라우저로 전달.
 #
-# 보안: 127.0.0.1 (localhost)에서만 호출 가능.
+# 보안: 127.0.0.1 (localhost)에서만 호출 가능 — 또는 INTERNAL_SERVICE_TOKEN 검증.
+
+import logging
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from core.config import settings
-from websocket.state import active_alarms, alarm_signal, worker_clients
+from websocket.services.alarm_queue import push_alarm
+from websocket.state import worker_clients
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/internal", tags=["internal"])
 
@@ -49,7 +54,7 @@ class AlarmPayload(BaseModel):
         422: {"description": "AlarmPayload 검증 실패"},
     },
 )
-async def push_alarm(request: Request, alarm: AlarmPayload):
+async def push_alarm_handler(request: Request, alarm: AlarmPayload):
     # 인증 정책:
     #   - INTERNAL_SERVICE_TOKEN 설정 시 → Bearer 토큰으로만 검증 (IP 체크 생략).
     #     도커 네트워크에선 celery-worker가 컨테이너 IP(예: 172.x.x.x)로 접속하므로
@@ -70,8 +75,13 @@ async def push_alarm(request: Request, alarm: AlarmPayload):
             raise HTTPException(status_code=403, detail="내부 전용 엔드포인트입니다.")
 
     payload = alarm.model_dump(exclude_none=True)
-    active_alarms.append(payload)
-    alarm_signal.set()
+
+    # Phase 1 C4 — Redis LIST에 LPUSH. 장애 시 503으로 Celery retry 유도.
+    try:
+        await push_alarm(payload)
+    except Exception as exc:
+        logger.warning(f"[alarm_router] action=redis_push_failed error={exc!r}")
+        raise HTTPException(status_code=503, detail="알람 큐 일시 장애. 재시도 필요.")
 
     # 지오펜스 진입 알람은 해당 작업자에게도 개인 전송
     if alarm.alarm_type == "geofence_intrusion" and alarm.worker_id is not None:

@@ -83,6 +83,12 @@ class GasDataPayload(BaseModel):
     # 센서 전송값을 초기값으로 받지만 model_validator에서 서버 재계산으로 덮어씀
     status: Literal["normal", "warning", "danger"] = "normal"
 
+    # IF 학습 라벨 — 더미 시뮬레이터에서만 채워서 전송. 운영 센서는 미전송.
+    # 값: GasData.AnomalyType code (gas_dummy SCENARIOS 와 1:1).
+    # 이 필드가 채워져 있으면 GasData.is_anomaly=True 로 저장된다.
+    # Literal 화이트리스트 — 임의 문자열 차단 (DRF 단계 422 회피, fastapi 단에서 cut).
+    anomaly_type: Literal["co_leak", "h2s_leak", "fire", "chemical_spill"] | None = None
+
     @field_validator("timestamp")
     @classmethod
     def ensure_timezone_aware(cls, v: datetime) -> datetime:

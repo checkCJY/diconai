@@ -5,6 +5,19 @@ from apps.monitoring.models.gas_data import GasData
 
 
 class GasDataCreateSerializer(serializers.ModelSerializer):
+    """
+    FastAPI → DRF: GasData 수신 시리얼라이저.
+
+    필드:
+      device_id              : GasSensor.device_id → FK 매핑
+      measured_at            : 장치 측정 시각 (UTC ISO 문자열)
+      9종 가스 측정값         : co/h2s/co2/o2/no2/so2/o3/nh3/voc
+      9종 위험도              : *_risk (FastAPI 가 임계치 기준으로 계산)
+      raw_payload            : 원본(lel 포함)
+      is_anomaly/anomaly_type: 더미 시뮬레이터 시나리오 라벨 (IF 학습 평가용).
+                               운영 센서 페이로드는 비워서 기본값(False/None) 저장.
+    """
+
     device_id = serializers.CharField(write_only=True)
 
     class Meta:
@@ -13,12 +26,30 @@ class GasDataCreateSerializer(serializers.ModelSerializer):
             "device_id",
             "measured_at",
             # 가스 측정값 9종 (lel 제외 — 모델 컬럼 없음, raw_payload에 보관)
-            "co", "h2s", "co2", "o2", "no2", "so2", "o3", "nh3", "voc",
+            "co",
+            "h2s",
+            "co2",
+            "o2",
+            "no2",
+            "so2",
+            "o3",
+            "nh3",
+            "voc",
             # 가스별 위험도 9종
-            "co_risk", "h2s_risk", "co2_risk", "o2_risk", "no2_risk",
-            "so2_risk", "o3_risk", "nh3_risk", "voc_risk",
+            "co_risk",
+            "h2s_risk",
+            "co2_risk",
+            "o2_risk",
+            "no2_risk",
+            "so2_risk",
+            "o3_risk",
+            "nh3_risk",
+            "voc_risk",
             # 원본 페이로드 (lel 포함 전체)
             "raw_payload",
+            # IF 학습 라벨 (시뮬레이터 전용, 운영은 빈 값)
+            "is_anomaly",
+            "anomaly_type",
         ]
 
     def validate(self, attrs):
@@ -39,7 +70,7 @@ class GasDataCreateSerializer(serializers.ModelSerializer):
         gas_data.gas_sensor.save(update_fields=["last_reading", "updated_at"])
 
         from apps.monitoring.services.gas_alarm import trigger_gas_alarms
+
         gas_data._alarms = trigger_gas_alarms(gas_data)
 
         return gas_data
-    

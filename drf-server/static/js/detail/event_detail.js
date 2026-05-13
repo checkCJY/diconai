@@ -29,7 +29,8 @@ function renderDetail(ev) {
   document.getElementById('summary-status').className   = `status-badge ${sClass}`;
   document.getElementById('summary-source').textContent = ev.source_label ?? '-';
   document.getElementById('summary-time').textContent   = ev.first_detected_at
-    ? new Date(ev.first_detected_at).toLocaleString('ko-KR') : '-';
+    ? (typeof TimeFormat !== 'undefined' ? TimeFormat.abs(ev.first_detected_at) : new Date(ev.first_detected_at).toLocaleString('ko-KR'))
+    : '-';
   document.getElementById('summary-worker').textContent = ev.worker_name ?? '-';
 
   // 상세 내용

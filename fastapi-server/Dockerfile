@@ -7,8 +7,9 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
 RUN pip install uv==0.5.7
 
 WORKDIR /app
-COPY requirements.txt .
-RUN uv pip install --system -r requirements.txt
+COPY requirements.txt requirements-dev.txt ./
+# dev 의존성(pytest, pytest-asyncio) 도 image 빌드 시 함께 install (drf Dockerfile 과 동일 이유).
+RUN uv pip install --system -r requirements.txt -r requirements-dev.txt
 
 
 FROM python:3.12-slim

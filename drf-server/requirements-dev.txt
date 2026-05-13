@@ -1,2 +1,10 @@
 pytest==9.0.3
 pytest-django==4.12.0
+
+# ML EDA / 학습 노트북용 — STEP B 진입 후 추가.
+# production 이미지에는 포함되지 않음. 학습 컨테이너에서:
+#   docker exec diconai-drf-1 pip install -r requirements-dev.txt
+#   docker exec -p 8888:8888 diconai-drf-1 jupyter lab --ip=0.0.0.0 --no-browser --allow-root
+jupyterlab==4.4.10
+matplotlib==3.10.5
+pandas==2.3.4

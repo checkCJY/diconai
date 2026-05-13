@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     DRF_SERVICE_TOKEN: str = ""  # 빈 문자열이면 Authorization 헤더 미포함
     DRF_REQUEST_TIMEOUT_SEC: float = 5.0
 
+    # ── Redis (Phase 1 C4) ─────────────────────────────────────
+    # 알람 큐(diconai:ws:alarms) + 향후 IF rate limit/메트릭 공유 저장소.
+    # 로컬: redis://localhost:6379/0, 도커 컴포즈: redis://redis:6379/0 (compose가 주입).
+    REDIS_URL: str = "redis://localhost:6379/0"
+
     # ── 서비스 간 인증 토큰 (Phase 5) ──────────────────────────
     # /internal/alarms/push/ (Celery → FastAPI) 검증용. 빈 문자열이면 비활성.
     # 운영에서는 drf의 INTERNAL_SERVICE_TOKEN과 동일 값으로 설정.
@@ -53,6 +58,13 @@ class Settings(BaseSettings):
     # 시연 시나리오 모드. mixed=확률 기반, normal/warning/danger=고정.
     # 더미는 부팅 시 이 값을 초기 상태로 사용하고, 이후 FastAPI에 polling.
     DUMMY_SCENARIO_MODE: str = "mixed"
+
+    # ── ML 모델 (STEP B) ───────────────────────────────────────
+    # IF 모델 .pkl 디렉토리. drf-server 와 같은 volume 마운트 (다음 sprint).
+    # 로컬: /home/.../diconai/drf-server/ml_models, 컨테이너: /app/ml_models.
+    ML_MODELS_DIR: str = "/app/ml_models"
+    # 모델 캐시 TTL (초). 0 이하면 영구 캐시.
+    ML_MODEL_CACHE_TTL_SEC: int = 3600
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

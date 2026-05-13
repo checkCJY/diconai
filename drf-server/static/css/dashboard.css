@@ -436,10 +436,31 @@ a.more {
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
   z-index: 1100;
-  width: 340px; border-radius: 10px; padding: 18px 16px 14px;
-  box-shadow: 0 6px 24px rgba(0,0,0,.5);
-  background: #1e1e2e; border-left: 4px solid var(--danger);
-  transition: border-left-color .2s;
+  width: 440px; border-radius: 12px;
+  padding: 20px;  /* 4면 균등 */
+  background: #1e1e2e;
+  /* 4면 균일 2px — 좌측 강조는 글로우 펄스(level-danger/warning)가 담당 */
+  border: 2px solid var(--danger);
+  box-shadow: 0 6px 24px rgba(0,0,0,.5), 0 0 20px rgba(248,81,73,.35);
+  transition: border-color .2s, box-shadow .2s;
+}
+/* danger 레벨 — 빨간 글로우 펄스로 운영자 시선 강제 (P2 추가) */
+#alarm-popup.level-danger {
+  animation: alarm-popup-glow-danger 1.4s ease-in-out infinite;
+}
+@keyframes alarm-popup-glow-danger {
+  0%, 100% { box-shadow: 0 6px 24px rgba(0,0,0,.5), 0 0 16px rgba(248,81,73,.4); }
+  50%      { box-shadow: 0 6px 24px rgba(0,0,0,.5), 0 0 36px rgba(248,81,73,.85); }
+}
+/* warning 레벨 — 노란 테두리 + 약한 펄스 */
+#alarm-popup.level-warning {
+  border-color: var(--caution);
+  box-shadow: 0 6px 24px rgba(0,0,0,.5), 0 0 18px rgba(227,179,65,.35);
+  animation: alarm-popup-glow-warning 1.8s ease-in-out infinite;
+}
+@keyframes alarm-popup-glow-warning {
+  0%, 100% { box-shadow: 0 6px 24px rgba(0,0,0,.5), 0 0 14px rgba(227,179,65,.35); }
+  50%      { box-shadow: 0 6px 24px rgba(0,0,0,.5), 0 0 28px rgba(227,179,65,.65); }
 }
 /* 상단 행: 발생 시간 + 닫기 */
 .alarm-popup-top {
@@ -459,6 +480,33 @@ a.more {
   background: none; border: none; color: var(--text2);
   cursor: pointer; font-size: 16px; padding: 0; line-height: 1;
 }
+/* 그룹 카운트 — 우상단 원형 뱃지 (동일 센서·레벨 연속 알람) */
+.alarm-popup-count {
+  position: absolute; top: -10px; right: -10px;
+  min-width: 26px; height: 26px; padding: 0 7px;
+  border-radius: 13px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--danger); color: #fff;
+  font-size: 12px; font-weight: 700;
+  box-shadow: 0 2px 6px rgba(0,0,0,.4);
+  border: 2px solid #1e1e2e;
+}
+.alarm-popup-count.pulse {
+  animation: alarm-count-pulse 1.2s ease-in-out infinite;
+}
+@keyframes alarm-count-pulse {
+  0%, 100% { transform: scale(1);   box-shadow: 0 2px 6px rgba(0,0,0,.4); }
+  50%      { transform: scale(1.15); box-shadow: 0 0 0 6px rgba(248,81,73,.25); }
+}
+/* 큐 풀 누락 배지 — 헤더 가운데 (확인 가능 영역으로 클릭 유도) */
+.alarm-popup-drop-badge {
+  background: rgba(248,81,73,.18); border: 1px solid var(--danger);
+  color: var(--danger); border-radius: 12px;
+  padding: 2px 9px; font-size: 10.5px; font-weight: 600;
+  cursor: pointer; line-height: 1.4;
+  margin: 0 6px;
+}
+.alarm-popup-drop-badge:hover { background: rgba(248,81,73,.3); }
 /* 중앙: 아이콘 + 알림 유형 */
 .alarm-popup-icon-wrap {
   display: flex; flex-direction: column; align-items: center;
@@ -484,10 +532,38 @@ a.more {
 .alarm-popup-action.safe-text    { color: var(--safe); }
 /* 배지 + 상세 내용 행 */
 .alarm-popup-desc-row {
-  display: flex; align-items: flex-start; gap: 8px;
+  display: flex; align-items: flex-start; gap: 10px;
   margin-bottom: 14px; font-size: 12px; color: var(--text);
 }
-.alarm-popup-desc { line-height: 1.5; flex: 1; }
+/* "위험"/"주의" 배지 — 폭/폰트 키워 가독성 강화 */
+.alarm-popup-desc-row .brisk {
+  font-size: 13px; font-weight: 700;
+  padding: 4px 10px; border-radius: 4px;
+  flex-shrink: 0; line-height: 1.2;
+  letter-spacing: 0.5px;
+}
+.alarm-popup-desc { line-height: 1.65; flex: 1; font-size: 13px; word-break: keep-all; }
+/* 센서 이름 — 메시지와 분리해 한 줄로 강조 */
+.alarm-popup-desc .sensor-name {
+  display: block;
+  font-size: 14px; font-weight: 700; color: var(--text);
+  margin-bottom: 4px;
+}
+/* 메시지 본문 — 운영자가 가장 빨리 읽어야 하므로 밝은 색상 */
+.alarm-popup-desc .msg-body {
+  display: block;
+  color: var(--text);
+}
+/* 임계값 컨텍스트 — 메시지 아래 한 줄로 "기준 X 초과 (측정 Y)" 표시 */
+.alarm-popup-desc .msg-threshold {
+  display: block;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255,255,255,.1);
+  font-size: 12px; font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.2px;
+}
 /* 하단 버튼 행 */
 .alarm-popup-btn-row {
   display: flex; gap: 8px;
@@ -532,6 +608,31 @@ a.more {
   background: none; border: none; color: var(--text2);
   cursor: pointer; font-size: 14px; padding: 0; flex-shrink: 0;
 }
+
+/* ── WebSocket 연결 상태 배너 (P3 공용) ─────────────────── */
+/* monitoring_power/workers/realtime에서 include 후 사용. gas 페이지의
+   기존 #gas-conn-banner와는 별개 (마이그레이션 별도 sprint). */
+.ws-conn-banner {
+  margin-bottom: 10px;
+}
+.ws-conn-msg {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(56, 139, 253, 0.08);
+  border: 1px solid rgba(56, 139, 253, 0.3);
+  border-radius: 6px;
+  padding: 9px 14px;
+  font-size: 12px; color: var(--text2);
+}
+/* .conn-spinner는 gas_monitoring.css에서 정의됨 — 공유 사용.
+   gas 페이지 미로드 시(예: power 페이지) 정의 누락 방지를 위해 fallback 추가. */
+.ws-conn-banner .conn-spinner {
+  width: 14px; height: 14px;
+  border: 2px solid rgba(56, 139, 253, 0.25);
+  border-top-color: #58a6ff;
+  border-radius: 50%; flex-shrink: 0;
+  animation: conn-spin 0.8s linear infinite;
+}
+@keyframes conn-spin { to { transform: rotate(360deg); } }
 
 /* ── 서브 페이지 공통 ────────────────────────────────────── */
 .page-wrap        { padding: 16px; }

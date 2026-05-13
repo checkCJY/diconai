@@ -14,13 +14,17 @@
 const AlarmMapper = (function () {
   function _common(src) {
     return {
-      alarm_level:  src.risk_level,
-      is_new_event: src.is_new_event,
-      message:      src.summary,
-      sensor_name:  src.source_label,
+      alarm_level:    src.risk_level,
+      is_new_event:   src.is_new_event,
+      message:        src.summary,
+      sensor_name:    src.source_label,
       // 서버 발신 시각 우선(03 R3) — 누락 시 도착 시각으로 fallback
-      timestamp:    src.created_at || new Date().toISOString(),
-      event_id:     src.event_id,
+      timestamp:      src.created_at || new Date().toISOString(),
+      event_id:       src.event_id,
+      // 임계값 컨텍스트 (P2 추가) — 메시지 아래 줄에 "기준 X 초과 (측정 Y)" 표시
+      measured_value: src.measured_value,
+      threshold_value: src.threshold_value,
+      alarm_type:     src.alarm_type,
     };
   }
 

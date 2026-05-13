@@ -38,6 +38,7 @@ urlpatterns = [
     path("api/admin/", include("apps.core.admin_urls")),
     path("api/positioning/", include("apps.positioning.urls")),
     path("api/monitoring/", include("apps.monitoring.urls")),
+    path("api/ml/", include("apps.ml.urls")),
     path("admin-panel/", include("config.admin_panel_urls")),
     path("api/", include("apps.facilities.urls")),
     path("api/", include("apps.operations.urls")),
