@@ -8,13 +8,16 @@
         --since 2026-05-12 --until 2026-05-13 \\
         --contamination 0.01 --n-estimators 100 --window 30
 
+가스 사용 예:
+    python manage.py train_anomaly_model \\
+        --sensor-type gas --sensor-id 1 --gas-name co \\
+        --since 2026-05-12 --until 2026-05-13 \\
+        --contamination 0.01 --activate
+
 학습 결과:
 - .pkl 파일: settings.ML_MODELS_DIR / "{sensor_type}_if_v{version}.pkl"
 - MLModel row 1건 (sensor_type, version, file_path 등 메타)
 - 옵션 `--activate` 지정 시 is_active=True 로 표시 (기존 활성 모델은 자동 비활성화)
-
-가스 도메인:
-- dataset_service 에 `extract_normal_gas_series()` 추가된 후 본 커맨드의 sensor_type='gas' 분기 활성화.
 """
 
 from __future__ import annotations
@@ -33,6 +36,7 @@ from sklearn.ensemble import IsolationForest
 from apps.ml.models import MLModel
 from apps.ml.services.dataset_service import (
     TimeSeries,
+    extract_normal_gas_series,
     extract_normal_power_series,
 )
 from apps.ml.services.feature_service import DEFAULT_WINDOW, build_features
@@ -50,7 +54,7 @@ def _parse_dt(s: str) -> datetime:
 
 
 def _fetch_series(sensor_type: str, opts: dict) -> TimeSeries:
-    """sensor_type 별 dataset 추출 — 가스는 후속 추가."""
+    """sensor_type 별 dataset 추출 — 전력/가스 둘 다 지원."""
     if sensor_type == "power":
         return extract_normal_power_series(
             device_id=opts["device_id"],
@@ -60,9 +64,11 @@ def _fetch_series(sensor_type: str, opts: dict) -> TimeSeries:
             until=opts["until"],
         )
     if sensor_type == "gas":
-        raise CommandError(
-            "gas 학습은 GasData 에 is_anomaly 필드 추가 + "
-            "extract_normal_gas_series() 작성 후 활성화하세요."
+        return extract_normal_gas_series(
+            sensor_id=opts["sensor_id"],
+            gas_name=opts["gas_name"],
+            since=opts["since"],
+            until=opts["until"],
         )
     raise CommandError(f"알 수 없는 sensor_type: {sensor_type}")
 
@@ -93,6 +99,12 @@ class Command(BaseCommand):
             choices=("current", "voltage", "watt"),
             help="(power) 측정 종류",
         )
+        parser.add_argument("--sensor-id", type=int, help="(gas) GasSensor.id")
+        parser.add_argument(
+            "--gas-name",
+            choices=("co", "h2s", "co2", "o2", "no2", "so2", "o3", "nh3", "voc"),
+            help="(gas) 학습할 가스 종류",
+        )
         parser.add_argument("--since", required=True, help="ISO 또는 YYYY-MM-DD")
         parser.add_argument("--until", required=True, help="ISO 또는 YYYY-MM-DD")
         parser.add_argument("--window", type=int, default=DEFAULT_WINDOW)
@@ -113,6 +125,8 @@ class Command(BaseCommand):
             "device_id": options.get("device_id"),
             "channel": options.get("channel"),
             "data_type": options.get("data_type"),
+            "sensor_id": options.get("sensor_id"),
+            "gas_name": options.get("gas_name"),
             "since": since,
             "until": until,
         }
@@ -123,6 +137,8 @@ class Command(BaseCommand):
             raise CommandError(
                 "sensor-type=power 는 --device-id / --channel / --data-type 필수."
             )
+        if sensor_type == "gas" and not all((opts["sensor_id"], opts["gas_name"])):
+            raise CommandError("sensor-type=gas 는 --sensor-id / --gas-name 필수.")
 
         self.stdout.write(f"[1/5] dataset 추출 — sensor_type={sensor_type}")
         series = _fetch_series(sensor_type, opts)
@@ -172,9 +188,13 @@ class Command(BaseCommand):
             "n_estimators": options["n_estimators"],
             "random_state": options["random_state"],
             "window": options["window"],
+            # power 학습 시 채워짐
             "device_id": opts["device_id"],
             "channel": opts["channel"],
             "data_type": opts["data_type"],
+            # gas 학습 시 채워짐
+            "sensor_id": opts["sensor_id"],
+            "gas_name": opts["gas_name"],
         }
 
         self.stdout.write(f"[5/5] MLModel row 생성 — version v{version}")
