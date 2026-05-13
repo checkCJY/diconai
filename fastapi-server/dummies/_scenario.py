@@ -30,6 +30,11 @@ ALLOWED_MODES = {
     "spike",
     "phase_loss",
     "degradation",
+    # gas_dummy 단일 시나리오 모드 — 전력/위치 더미는 fallback("mixed") 처리.
+    "co_leak",
+    "h2s_leak",
+    "fire",
+    "chemical_spill",
 }
 
 
