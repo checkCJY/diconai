@@ -149,6 +149,11 @@ class _PowerMeasurementBase(BaseModel):
     slave71: float = Field(ge=-1)
     slave72: float = Field(ge=-1)
 
+    # IF 학습 라벨링 — 더미 시뮬레이터에서만 채워서 전송. 운영 장비는 미전송.
+    # 키: 채널 번호(1~16) 문자열, 값: AnomalyType code (overload/voltage_drop/...)
+    # 채널 키가 anomaly_labels 에 있으면 PowerData.is_anomaly=True 로 저장된다.
+    anomaly_labels: dict[str, str] | None = None
+
     def to_channel_values(self) -> dict[int, float | None]:
         """채널 번호(1~16) → 측정값 매핑으로 변환. 통신 불능(-1)은 None으로 변환."""
         return {
@@ -157,6 +162,12 @@ class _PowerMeasurementBase(BaseModel):
             else getattr(self, key)
             for key in SLAVE_KEYS
         }
+
+    def to_anomaly_map(self) -> dict[int, str]:
+        """anomaly_labels 를 채널 번호 키로 변환."""
+        if not self.anomaly_labels:
+            return {}
+        return {int(k): v for k, v in self.anomaly_labels.items()}
 
 
 # ============================================================

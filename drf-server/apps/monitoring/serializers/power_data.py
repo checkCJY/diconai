@@ -70,6 +70,13 @@ class _ChannelEntrySerializer(serializers.Serializer):
         choices=RiskLevel.choices,
         default=RiskLevel.NORMAL,
     )
+    is_anomaly = serializers.BooleanField(required=False, default=False)
+    anomaly_type = serializers.ChoiceField(
+        choices=PowerData.AnomalyType.choices,
+        required=False,
+        allow_null=True,
+        default=None,
+    )
 
 
 class PowerDataBulkIngestSerializer(serializers.Serializer):
@@ -80,13 +87,16 @@ class PowerDataBulkIngestSerializer(serializers.Serializer):
       device_id   : PowerDevice.device_id
       measured_at : 장치 측정 시각 — FastAPI가 UTC ISO 문자열로 주입
       data_type   : "current" | "voltage" | "watt"
-      channels    : [{channel: int, value: float, risk_level: str}, ...]
+      channels    : [{channel: int, value: float, risk_level: str,
+                       is_anomaly: bool?, anomaly_type: str?}, ...]
                     — PowerMeasurementPayload.to_channel_values() 변환 후 전달
 
     처리:
       - device_id → PowerDevice FK 조회
       - 16채널 PowerData 일괄 생성 (bulk_create, uq 충돌 시 무시)
       - 통신 불능 채널: value=None, sensor_status='comm_failure'로 저장
+      - is_anomaly/anomaly_type 은 더미 시뮬레이터 라벨 (IF 학습 평가용).
+        운영 장비 페이로드는 비워서 기본값(False/None) 저장.
     """
 
     device_id = serializers.CharField(max_length=50)
@@ -104,6 +114,8 @@ class PowerDataBulkIngestSerializer(serializers.Serializer):
                 value=ch["value"],
                 sensor_status=ch["sensor_status"],
                 risk_level=ch["risk_level"],
+                is_anomaly=ch.get("is_anomaly", False),
+                anomaly_type=ch.get("anomaly_type"),
                 measured_at=validated_data["measured_at"],
             )
             for ch in validated_data["channels"]

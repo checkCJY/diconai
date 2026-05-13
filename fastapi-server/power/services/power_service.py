@@ -49,17 +49,25 @@ async def post_power_to_drf(path: str, payload: dict) -> None:
     await post_to_drf(path, payload, raise_on_error=False, log_category="power_service")
 
 
-def to_channel_list(channel_values: dict) -> list[dict]:
+def to_channel_list(
+    channel_values: dict, anomaly_map: dict | None = None
+) -> list[dict]:
     """
     채널별 측정값 딕셔너리를 DRF PowerData 저장 형식(리스트)으로 변환한다.
     값이 None인 채널은 통신 불능(comm_failure) 상태로 표시한다.
+
+    anomaly_map : {channel:int → anomaly_type:str} — 더미 시뮬레이터에서만 채워짐.
+                  해당 채널은 is_anomaly=True 로 저장된다.
     """
+    anomaly_map = anomaly_map or {}
     return [
         {
             "channel": ch,
             "value": val,
             "sensor_status": "comm_failure" if val is None else "active",
             "risk_level": "normal",
+            "is_anomaly": ch in anomaly_map,
+            "anomaly_type": anomaly_map.get(ch),
         }
         for ch, val in channel_values.items()
     ]

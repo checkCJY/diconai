@@ -19,7 +19,18 @@ _cache: dict = {"mode": settings.DUMMY_SCENARIO_MODE, "fetched_at": 0.0}
 _FASTAPI_BASE_URL = f"http://{settings.DUMMY_TARGET_HOST}:{settings.DUMMY_TARGET_PORT}"
 _MODE_URL = f"{_FASTAPI_BASE_URL}/internal/scenario/mode"
 
-ALLOWED_MODES = {"mixed", "normal", "warning", "danger"}
+ALLOWED_MODES = {
+    "mixed",
+    "normal",
+    "warning",
+    "danger",
+    # power_dummy 단일 시나리오 모드 — 가스/위치 더미는 fallback("mixed") 처리.
+    "overload",
+    "voltage_drop",
+    "spike",
+    "phase_loss",
+    "degradation",
+}
 
 
 def get_scenario_mode() -> str:
