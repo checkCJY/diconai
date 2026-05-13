@@ -133,8 +133,10 @@ async def recv_watt(payload: PowerWattPayload, bg: BackgroundTasks):
     channel_values = payload.to_channel_values()
     measured_at = now_utc_iso()
     update_power_state("watt", channel_values, measured_at)
-    # 트랙 1 v2 — IF 추론 + push_alarm (ch1·watt 만 활성화)
-    await process_anomaly_inference(payload.device_id, channel_values, "watt")
+    # 트랙 1 v2 — IF 추론 + push_alarm + DRF MLAnomalyResult forward (ch1·watt)
+    await process_anomaly_inference(
+        payload.device_id, channel_values, "watt", measured_at
+    )
     bg.add_task(
         post_power_to_drf,
         DRF_POWER_DATA_PATH,

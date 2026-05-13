@@ -77,16 +77,21 @@ async def post_power_to_drf(path: str, payload: dict) -> None:
     await post_to_drf(path, payload, raise_on_error=False, log_category="power_service")
 
 
+DRF_ML_ANOMALY_RESULT_PATH = "/api/ml/anomaly-results/"
+
+
 async def process_anomaly_inference(
     device_id: str | None,
     channel_values: dict,
     data_type: str,
+    measured_at: str,
 ) -> None:
-    """[트랙 1 v2] IF 추론 + combine_risk + push_alarm.
+    """[트랙 1 v2] IF 추론 + combine_risk + push_alarm + DRF MLAnomalyResult forward.
 
     ch1·watt 등 _INFERENCE_ENABLED_CHANNELS 에 포함된 (channel, data_type) 만 추론.
-    윈도우 누적 < _INFERENCE_WINDOW 면 skip. push_alarm/추론 실패 시 silent fail —
-    DRF 저장 흐름에 영향 없음.
+    윈도우 누적 < _INFERENCE_WINDOW 면 skip. push_alarm 은 발화 levels 일 때만,
+    MLAnomalyResult forward 는 추론 매번 (운영 추적용). 모든 외부 호출 silent fail —
+    DRF 저장 흐름과 fastapi 응답 시간에 영향 없음.
     """
     for channel, value in channel_values.items():
         if (channel, data_type) not in _INFERENCE_ENABLED_CHANNELS:
@@ -107,6 +112,32 @@ async def process_anomaly_inference(
 
             threshold_risk = calculate_power_risk(value, data_type, device_id, channel)
             combined = combine_risk(threshold_risk, prediction)
+            features = {
+                "value": float(row[0, 0]),
+                "roll_mean": float(row[0, 1]),
+                "roll_std": float(row[0, 2]),
+                "diff": float(row[0, 3]),
+            }
+            sensor_identifier = f"power:device_{device_id}:ch{channel}:{data_type}"
+
+            # MLAnomalyResult 운영 추적용 forward — 발화 여부 무관, 추론 매번 저장.
+            # silent fail (raise_on_error=False) — DRF 다운 시 알람 push 흐름 영향 X.
+            await post_to_drf(
+                DRF_ML_ANOMALY_RESULT_PATH,
+                {
+                    "ml_model": None,  # SET_NULL 허용. version 추적은 snapshot 으로
+                    "model_version_snapshot": entry.version,
+                    "sensor_type": "power",
+                    "sensor_identifier": sensor_identifier,
+                    "measured_at": measured_at,
+                    "anomaly_score": score,
+                    "prediction": prediction,
+                    "risk_classified": combined,
+                    "feature_snapshot_json": features,
+                },
+                raise_on_error=False,
+                log_category="power_anomaly_forward",
+            )
 
             if combined not in _FIRE_LEVELS:
                 continue
