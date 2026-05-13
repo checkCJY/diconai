@@ -5,15 +5,43 @@
 #   - power_latest 공유 상태 갱신
 #   - 채널 데이터를 equipment[] 형태로 조립해 WebSocket 브로드캐스트에 제공
 #   - 채널 라벨·정격은 channel_meta_cache(DRF PowerDevice.channel_meta)에서 조회
+#   - [트랙 1 v2] IF 추론 + combine_risk + push_alarm (process_anomaly_inference)
 import logging
+from collections import defaultdict, deque
 from datetime import datetime, timezone
 
+from ai.risk_combine import combine_risk
+from ai.router import _build_feature_row, _get_or_load
 from core.power_thresholds import POWER_THRESHOLDS
 from power.services.channel_meta_cache import get_channel_entry
+from power.services.threshold_eval import calculate_power_risk
 from services.drf_client import post_to_drf
+from websocket.services.alarm_queue import push_alarm
 from websocket.state import power_latest
 
 logger = logging.getLogger(__name__)
+
+# IF 추론용 in-memory 윈도우 — (channel, data_type) 별 deque(maxlen=window).
+# 가스 _co_window 패턴을 power 다채널·다측정으로 확장. fastapi 재시작 시 초기화 (무상태).
+_INFERENCE_WINDOW = 30
+_power_windows: dict[tuple[int, str], deque] = defaultdict(
+    lambda: deque(maxlen=_INFERENCE_WINDOW)
+)
+
+# combined_risk → AlarmPayload.risk_level (RiskLevel) 매핑.
+# CAUTION/PREDICT_WARN 둘 다 RiskLevel.WARNING 으로 (RiskLevel 3단계라 합칠 수밖에).
+# UI 에서 더 풍부한 구분은 C8 에서 AlarmPayload 에 combined_risk 필드 추가 후 가능.
+_COMBINED_TO_RISK_LEVEL = {
+    "normal": "normal",
+    "caution": "warning",
+    "predict_warn": "warning",
+    "danger": "danger",
+}
+_FIRE_LEVELS = {"caution", "predict_warn", "danger"}
+
+# 본 sprint active 모델은 (device_1, ch1, watt) 한 채널만 학습됨.
+# 다른 채널은 학습 분포 안 맞아 false positive ↑ → §3 multi-channel sprint 까지 비활성.
+_INFERENCE_ENABLED_CHANNELS: set[tuple[int, str]] = {(1, "watt")}
 
 DRF_POWER_EVENT_PATH = "/api/monitoring/power/event/"
 DRF_POWER_DATA_PATH = "/api/monitoring/power/data/"
@@ -47,6 +75,78 @@ async def post_power_to_drf(path: str, payload: dict) -> None:
     실패는 services.drf_client가 logger.warning/error로 기록한다.
     """
     await post_to_drf(path, payload, raise_on_error=False, log_category="power_service")
+
+
+async def process_anomaly_inference(
+    device_id: str | None,
+    channel_values: dict,
+    data_type: str,
+) -> None:
+    """[트랙 1 v2] IF 추론 + combine_risk + push_alarm.
+
+    ch1·watt 등 _INFERENCE_ENABLED_CHANNELS 에 포함된 (channel, data_type) 만 추론.
+    윈도우 누적 < _INFERENCE_WINDOW 면 skip. push_alarm/추론 실패 시 silent fail —
+    DRF 저장 흐름에 영향 없음.
+    """
+    for channel, value in channel_values.items():
+        if (channel, data_type) not in _INFERENCE_ENABLED_CHANNELS:
+            continue
+        if value is None:
+            continue
+        win = _power_windows[(channel, data_type)]
+        win.append(float(value))
+        if len(win) < _INFERENCE_WINDOW:
+            continue
+
+        try:
+            entry = await _get_or_load("power")
+            row = _build_feature_row(list(win), entry.window)
+            score = float(entry.model.decision_function(row)[0])
+            pred_int = int(entry.model.predict(row)[0])
+            prediction = "anomaly" if pred_int == -1 else "normal"
+
+            threshold_risk = calculate_power_risk(value, data_type, device_id, channel)
+            combined = combine_risk(threshold_risk, prediction)
+
+            if combined not in _FIRE_LEVELS:
+                continue
+
+            entry_meta = get_channel_entry(device_id, channel)
+            label = entry_meta.get("name") or f"CH{channel}"
+            summary = (
+                f"[AI 이상 패턴] {label} {data_type}={value} "
+                f"(IF score {score:.4f}, combined={combined})"
+            )
+            await push_alarm(
+                {
+                    "alarm_type": "anomaly",
+                    "risk_level": _COMBINED_TO_RISK_LEVEL[combined],
+                    "source_label": label,
+                    "summary": summary,
+                    "is_new_event": True,
+                    "measured_value": value,
+                }
+            )
+            logger.info(
+                "[anomaly_inference] device=%s ch=%s %s value=%s "
+                "threshold=%s pred=%s combined=%s score=%.4f",
+                device_id,
+                channel,
+                data_type,
+                value,
+                threshold_risk,
+                prediction,
+                combined,
+                score,
+            )
+        except Exception as exc:
+            logger.warning(
+                "[anomaly_inference] failed device=%s ch=%s %s: %s",
+                device_id,
+                channel,
+                data_type,
+                exc,
+            )
 
 
 def to_channel_list(
