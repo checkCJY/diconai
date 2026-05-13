@@ -65,6 +65,44 @@ class PowerThresholdView(APIView):
         )
 
 
+class PowerChannelMetaView(APIView):
+    """
+    GET /api/monitoring/power/channel-meta/
+
+    활성 PowerDevice 16채널 라벨·정격을 반환. fastapi-server가 broadcast 페이로드
+    조립 시 채널명·정격 % 환산에 사용. 공개 데이터 (Threshold와 동일 정책).
+
+    [응답 형식]
+        {
+            "<device_id>": {
+                "<channel_number>": {"name": str, "rated_w": int, "rated_a": int, "rated_v": int},
+                ...
+            },
+            ...
+        }
+
+    [단일 진실 공급원]
+    PowerDevice.channel_meta JSON. 어드민 변경 시 다음 fetch 주기에 반영
+    (fastapi 5분 캐시).
+    """
+
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=["Monitoring (Public)"],
+        summary="전력 채널 메타 조회 (라벨 + 정격)",
+        description="활성 PowerDevice의 channel_meta JSON을 device_id 단위로 묶어 반환.",
+        responses={200: OpenApiResponse(description="device_id → channel_meta 매핑")},
+    )
+    def get(self, request):
+        from apps.facilities.models import PowerDevice
+
+        payload = {}
+        for device in PowerDevice.objects.filter(is_active=True):
+            payload[device.device_id] = device.channel_meta or {}
+        return Response(payload)
+
+
 class PowerEventIngestView(APIView):
     """
     POST /monitoring/api/power/event/

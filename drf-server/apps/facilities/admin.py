@@ -69,3 +69,25 @@ class PowerDeviceAdmin(admin.ModelAdmin):
     list_filter = ("status", "is_active", "facility")
     search_fields = ("device_name", "device_id")
     readonly_fields = ("created_at", "updated_at")
+    fields = (
+        "facility",
+        "device_id",
+        "device_name",
+        "device_code",
+        "x",
+        "y",
+        "channel_count",
+        "channel_meta",
+        "department",
+        "manager",
+        "ip_address",
+        "port",
+        "status",
+        "is_active",
+        "last_reading",
+        "connection_checked_at",
+        "connection_ok",
+        "notes",
+        "created_at",
+        "updated_at",
+    )

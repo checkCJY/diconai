@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     "apps.reference",
     "apps.notices",
     "apps.training",
+    "apps.ml",
 ]
 
 MIDDLEWARE = [
@@ -214,6 +215,10 @@ FRONTEND_WS_BASE_URL = env("FRONTEND_WS_BASE_URL", default="ws://127.0.0.1:8001"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+# ML 모델 (.pkl) 저장 경로 — MEDIA_ROOT 밖, 웹 서버가 서빙하지 못하도록.
+# Docker 환경: drf-server 와 fastapi-server 가 같은 named volume 마운트 (다음 sprint).
+ML_MODELS_DIR = env("ML_MODELS_DIR", default=str(BASE_DIR / "ml_models"))
 
 
 # Static files (CSS, JavaScript, Images)

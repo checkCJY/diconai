@@ -7,8 +7,12 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
 RUN pip install uv==0.5.7
 
 WORKDIR /app
-COPY requirements.txt .
-RUN uv pip install --system -r requirements.txt
+COPY requirements.txt requirements-dev.txt ./
+# dev 의존성(pytest, pytest-django, jupyterlab, matplotlib, pandas)을 image 빌드 시 함께 install.
+# 이유: UID 매핑 환경에서 컨테이너 안 pip install 은 site-packages 쓰기 권한 없어 실패 →
+#       dev tool 은 이미지에 미리 포함시켜 컨테이너 실행 후 추가 install 불필요.
+# 현재 이미지 태그 diconai/drf:dev — dev 전용. 운영 배포 시 별도 빌드 권장.
+RUN uv pip install --system -r requirements.txt -r requirements-dev.txt
 
 
 FROM python:3.12-slim

@@ -22,11 +22,13 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from core.config import settings
 from core.logging import setup_logging
 from core.redis_client import close_redis
+from ai.router import router as ai_router
 from gas.routers.gas_router import router as gas_router
 from internal.routers.alarm_router import router as internal_alarm_router
 from internal.routers.scenario_router import router as internal_scenario_router
 from positioning.routers.position_router import router as positioning_router
 from power.routers.power_router import router as power_router
+from power.services.channel_meta_cache import channel_meta_refresh_loop
 from websocket.routers.ws_router import (
     alarm_flush_loop,
     broadcast_loop,
@@ -48,11 +50,15 @@ async def lifespan(app: FastAPI):
         broadcast_loop()
     )  # 센서 통합 페이로드 주기 브로드캐스트
     task2 = asyncio.create_task(alarm_flush_loop())  # 신규 알람 즉시 플러시
+    task3 = asyncio.create_task(
+        channel_meta_refresh_loop()
+    )  # PowerDevice.channel_meta 5분 주기 동기화
     try:
         yield
     finally:
         task1.cancel()
         task2.cancel()
+        task3.cancel()
         await close_redis()  # Phase 1 C4 — Redis 연결 풀 정리
         logger.info("[app] action=shutdown")
 
@@ -81,6 +87,7 @@ app = FastAPI(
             "description": "서비스 간 통신 (Celery → FastAPI 브리지). localhost 전용",
         },
         {"name": "health", "description": "헬스체크"},
+        {"name": "ai", "description": "IF 이상탐지 추론 (STEP B)"},
     ],
     lifespan=lifespan,
 )
@@ -99,6 +106,7 @@ app.include_router(positioning_router)
 app.include_router(ws_router)
 app.include_router(internal_alarm_router)  # Celery → WS 브리지 (localhost 전용)
 app.include_router(internal_scenario_router)  # 시연 시나리오 모드 컨트롤
+app.include_router(ai_router)  # IF 이상탐지 추론 (STEP B)
 
 
 # ── Prometheus 메트릭 (직접 노출, 외부 instrumentator 패키지 미사용) ──

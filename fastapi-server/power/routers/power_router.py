@@ -86,7 +86,7 @@ async def recv_current(payload: PowerCurrentPayload, bg: BackgroundTasks):
             "device_id": payload.device_id,
             "measured_at": measured_at,
             "data_type": "current",
-            "channels": to_channel_list(channel_values),
+            "channels": to_channel_list(channel_values, payload.to_anomaly_map()),
         },
     )
     return {"status": "ok", "updated": "current"}
@@ -111,7 +111,7 @@ async def recv_voltage(payload: PowerVoltagePayload, bg: BackgroundTasks):
             "device_id": payload.device_id,
             "measured_at": measured_at,
             "data_type": "voltage",
-            "channels": to_channel_list(channel_values),
+            "channels": to_channel_list(channel_values, payload.to_anomaly_map()),
         },
     )
     return {"status": "ok", "updated": "voltage"}
@@ -139,7 +139,7 @@ async def recv_watt(payload: PowerWattPayload, bg: BackgroundTasks):
             "device_id": payload.device_id,
             "measured_at": measured_at,
             "data_type": "watt",
-            "channels": to_channel_list(channel_values),
+            "channels": to_channel_list(channel_values, payload.to_anomaly_map()),
         },
     )
     return {"status": "ok", "updated": "watt"}

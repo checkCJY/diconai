@@ -59,6 +59,13 @@ class Settings(BaseSettings):
     # 더미는 부팅 시 이 값을 초기 상태로 사용하고, 이후 FastAPI에 polling.
     DUMMY_SCENARIO_MODE: str = "mixed"
 
+    # ── ML 모델 (STEP B) ───────────────────────────────────────
+    # IF 모델 .pkl 디렉토리. drf-server 와 같은 volume 마운트 (다음 sprint).
+    # 로컬: /home/.../diconai/drf-server/ml_models, 컨테이너: /app/ml_models.
+    ML_MODELS_DIR: str = "/app/ml_models"
+    # 모델 캐시 TTL (초). 0 이하면 영구 캐시.
+    ML_MODEL_CACHE_TTL_SEC: int = 3600
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 
