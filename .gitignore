@@ -40,5 +40,8 @@ Thumbs.db
 # Logs
 *.log
 
+# Prometheus multiprocess metric files (런타임 생성 파일, 커밋 불필요)
+drf-server/prometheus_multiproc/
+
 .claude
 skill
