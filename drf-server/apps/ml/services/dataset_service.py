@@ -1,9 +1,9 @@
 # apps/ml/services/dataset_service.py
 """
-ML 학습/평가 데이터셋 추출.
+ML 학습/평가 데이터셋 추출 — 전력/가스 두 도메인 시계열을 numpy array 로.
 
-PowerData (3축 long-format) 에서 (device, channel, data_type) 단위 시계열을 뽑아
-학습/평가용 numpy array 로 변환한다. 가스 데이터는 동일 패턴으로 후속 확장.
+- 전력 (long-format): `extract_*_power_series(device_id, channel, data_type, ...)`
+- 가스 (wide-format):  `extract_*_gas_series(sensor_id, gas_name, ...)`
 
 설계 선택:
 - pandas 의존성을 피하기 위해 numpy + dataclass 만 사용 (feature_service 의 계산도 numpy)
@@ -30,6 +30,8 @@ import numpy as np
 from apps.monitoring.models import GasData, PowerData
 
 # 가스 9종 화이트리스트 — GasData 컬럼명과 1:1.
+# lel 은 GasData 모델 컬럼 없음(원본은 raw_payload JSONField 에만 보관) → 학습 대상 외.
+# fire 시나리오는 lel↑ 가 핵심이지만 co/co2/o2/voc 동반 영향으로 우회 학습 가능.
 _GAS_NAMES = ("co", "h2s", "co2", "o2", "no2", "so2", "o3", "nh3", "voc")
 
 
@@ -162,7 +164,11 @@ def extract_normal_gas_series(
     since: datetime,
     until: datetime,
 ) -> TimeSeries:
-    """is_anomaly=False · 가스값 not None 인 GasData 시계열을 반환한다 (학습용)."""
+    """is_anomaly=False · 가스값 not None 인 GasData 시계열을 반환한다 (학습용).
+
+    주의: `is_anomaly=False` 필터는 운영 정상 row 와 시뮬레이터 정상 row 를 구분 못한다.
+    학습 기간에 시뮬레이터만 동작했음을 가정 — 운영 진입 시 별도 출처 식별 필드 도입 검토.
+    """
     if gas_name not in _GAS_NAMES:
         raise ValueError(f"unknown gas_name: {gas_name} (allowed: {_GAS_NAMES})")
     qs = GasData.objects.filter(

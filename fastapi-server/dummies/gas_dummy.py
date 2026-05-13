@@ -211,7 +211,7 @@ def _apply_mode(mode: str) -> None:
             ramp_down_ticks=pattern["ramp_down"],
         )
         return
-    # FIXED_LEVELS 는 상태머신 미사용 — generate_gas_data 에서 직접 처리
+    # FIXED_LEVELS 또는 알 수 없는 모드 — 상태머신 미사용, _build_gas_values 에서 fallback 처리.
 
 
 def _build_gas_values(mode: str) -> tuple[dict[str, float | int], str | None]:

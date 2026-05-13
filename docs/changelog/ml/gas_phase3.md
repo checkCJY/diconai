@@ -232,14 +232,27 @@ print(p.anomaly_type)  # None
 
 ## 알려진 제약 / 다음 단계
 
+### 도메인 본질 제약 (가스 인원이 알아야 할 사항)
+
 | # | 항목 | 본 PR 처리 | 후속 |
 |---|---|---|---|
 | 1 | 학습 데이터 충분량 | 8488 정상 (window\*10=300 임계 통과) | 본격 학습은 24시간+ 데이터 축적 후 v2 학습 권장 |
 | 2 | 추론 정확도 | 단일 spike CO 200ppm 미감지 (학습 분포 좁음) | 데이터 축적 + window 조정 + contamination 튜닝 (STEP 3) |
 | 3 | 가스 9종 중 1종만 학습 | co 모델 1개 | 가스별 9개 모델 또는 멀티변수 IF (별도 PR) |
-| 4 | `DUMMY_RISK_PROBABILITY=0.1` 환경변수 | 시나리오 진입 비율이 높음 (mixed 30틱 중 29건 anomaly) | 운영자가 `.env.docker` 조정 — 코드 변경 불필요 |
+| 4 | `DUMMY_RISK_PROBABILITY=0.1` 환경변수 | 시나리오 진입 비율이 높음 (mixed 30틱 중 29건 anomaly) | 운영자가 `.env.docker` 조정 — 코드 변경 불필요. **가스/전력 공유 변수라 가스(상태머신 1개)는 전력(16채널)보다 16배 희소** |
 | 5 | 알람 연동 | 추론만 — 알람 발화 없음 | **STEP D (가스 §4-2 또는 통합) — 결합 매트릭스 4단계 분류** |
 | 6 | scenario_router 인증 | 내부망 가정 | 운영 진입 시 `INTERNAL_SERVICE_TOKEN` 권장 |
+
+### 독립 코드 리뷰에서 식별된 추가 제약
+
+| # | 항목 | 영향 | 권장 대응 |
+|---|---|---|---|
+| 7 | **`lel` 가스가 GasData 모델 컬럼 부재** — `raw_payload` JSONField 에만 보관 | `fire` 시나리오의 핵심 신호(lel↑) 시계열을 학습 입력으로 못 씀. co/co2/o2/voc 동반 영향으로 우회 학습. `extract_*_gas_series(gas_name="lel")` 호출 시 `_GAS_NAMES` ValueError | 운영 진입 시 GasData 에 lel 컬럼 추가 + 마이그 (별도 PR) |
+| 8 | **`_gas_state` 단일 인스턴스** — 9가스가 한 상태머신 공유 | 시연 중 `co_leak` → `fire` 모드 전환 시 진행 중 시나리오 완료(최대 40초) 후 다음 진입. 전력(16채널)은 일부 채널 NORMAL 가능성 높지만 가스는 stuck 가능성 ↑ | changelog 명시 + 시연 시 모드 변경 전 `co_leak` 종료 대기. 강제 리셋 옵션은 별도 PR |
+| 9 | **`extract_normal_gas_series` 가 운영/시뮬 정상 row 미구분** | 학습 데이터에 운영 노이즈 + 시뮬레이터 정상이 섞이면 분포 편향 가능 | 학습 기간 = 시뮬레이터만 동작 가정. 운영 진입 시 `data_source` 출처 필드 도입 검토 |
+| 10 | **운영 센서 통신 불능 sentinel 미정의** | 가스는 `value=-1` 같은 sentinel 가드 없음 (전력은 `.exclude(value=-1)`). dummy 는 양수만 보냄 | 운영 진입 시 에어위드 spec 확인 후 가드 추가 |
+| 11 | **학습 후 fastapi 캐시 자동 reload 없음** | 가스 학습 완료 후 운영자가 수동 `curl -X POST /ai/reload?sensor_type=gas` 필요. TTL(1시간) 만료까지 대기 | train_anomaly_model 마지막에 reload 호출 또는 stdout 안내 추가 (별도 PR) |
+| 12 | **`_state_machine.py` 가 전력/가스 공유** | 한 도메인이 FSM 시그니처 변경 시 다른 도메인 영향 가능 | 현재 도메인 비종속 설계라 안전. 추후 도메인별 분기 필요 시 별도 모듈 분리 |
 
 ---
 
