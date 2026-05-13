@@ -21,6 +21,14 @@ class GasData(models.Model):
     센서별 데이터 구조 및 임계치 정의서 (디코나이 260401)
     """
 
+    class AnomalyType(models.TextChoices):
+        """IF 학습 라벨 — gas_dummy SCENARIOS 4종과 1:1 매핑."""
+
+        CO_LEAK = "co_leak", "일산화탄소 누출"
+        H2S_LEAK = "h2s_leak", "황화수소 누출"
+        FIRE = "fire", "화재/폭발 전조"
+        CHEMICAL_SPILL = "chemical_spill", "유해화학물 다중 누출"
+
     gas_sensor = models.ForeignKey(
         "facilities.GasSensor",
         on_delete=models.PROTECT,  # 센서 삭제 차단 (측정 이력 보존)
@@ -87,6 +95,25 @@ class GasData(models.Model):
         null=True,
         blank=True,
         verbose_name="원본 수신 페이로드",
+    )
+
+    # =====================================================================
+    # IF 학습 라벨 — 더미 시뮬레이터에서만 채워서 전송. 운영 센서는 미전송.
+    # is_anomaly=False AND anomaly_type=None  ← IF 학습용 정상 데이터 추출 필터
+    # is_anomaly=True  AND anomaly_type=...   ← 평가용 (시나리오별 detection rate 측정)
+    # =====================================================================
+    is_anomaly = models.BooleanField(
+        default=False,
+        verbose_name="이상 라벨",
+        help_text="더미 시뮬레이터/운영자 라벨링용",
+    )
+    anomaly_type = models.CharField(
+        max_length=20,
+        choices=AnomalyType.choices,
+        null=True,
+        blank=True,
+        verbose_name="이상 시나리오",
+        help_text="더미 시뮬레이터 시나리오 라벨 — IF 학습 평가용",
     )
 
     measured_at = models.DateTimeField(verbose_name="측정 시각")
@@ -178,6 +205,10 @@ class GasData(models.Model):
             models.Index(
                 fields=["max_risk_level", "-measured_at"],
                 name="idx_gas_data_risk_time",
+            ),
+            models.Index(
+                fields=["is_anomaly", "-measured_at"],
+                name="idx_gas_anomaly_time",
             ),
         ]
 
