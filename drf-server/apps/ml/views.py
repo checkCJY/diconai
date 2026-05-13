@@ -40,7 +40,11 @@ class ActiveMLModelView(RetrieveAPIView):
     """
 
     serializer_class = _ActiveMLModelSerializer
-    permission_classes: list = []  # 내부 API. fastapi 만 접근. 추후 INTERNAL_SERVICE_TOKEN 권장.
+    # 내부 API. fastapi 만 접근. 추후 INTERNAL_SERVICE_TOKEN 권장.
+    # authentication_classes=[] — drf_client 가 부착하는 invalid Bearer 토큰을
+    # JWTAuthentication 이 401 처리하지 않도록 인증 자체 skip.
+    authentication_classes: list = []
+    permission_classes: list = []
 
     def get_object(self):
         sensor_type = self.request.query_params.get("sensor_type")
@@ -89,4 +93,8 @@ class MLAnomalyResultCreateView(CreateAPIView):
 
     queryset = MLAnomalyResult.objects.all()
     serializer_class = _MLAnomalyResultCreateSerializer
-    permission_classes: list = []  # 내부 API. fastapi 만 접근. 추후 INTERNAL_SERVICE_TOKEN 권장.
+    # 내부 API. fastapi 만 접근. 추후 INTERNAL_SERVICE_TOKEN 권장.
+    # authentication_classes=[] — drf_client 가 부착하는 invalid Bearer 토큰을
+    # JWTAuthentication 이 401 처리하지 않도록 인증 자체 skip.
+    authentication_classes: list = []
+    permission_classes: list = []
