@@ -125,6 +125,14 @@ async def process_anomaly_inference(
                     "summary": summary,
                     "is_new_event": True,
                     "measured_value": value,
+                    # AnomalyMeta nested — UI 가 PREDICT_WARN/CAUTION 차별화 표시 가능
+                    "anomaly_meta": {
+                        "combined_risk": combined,
+                        "anomaly_score": score,
+                        "device_id": device_id,
+                        "channel": channel,
+                        "data_type": data_type,
+                    },
                 }
             )
             logger.info(
