@@ -58,6 +58,11 @@ class AlarmType(models.TextChoices):
     BATCH_FAILED = "batch_failed", "배치 실패"
     STORAGE_OVERDUE = "storage_overdue", "보관 주기 실패"
 
+    # T1 IF §2 — IsolationForest 추론 결과 기반 알람.
+    # threshold 룰과 결합한 combined_risk 매트릭스로 발화 (PREDICT_WARN/WARNING/DANGER).
+    # source FK는 GAS_THRESHOLD/POWER_OVERLOAD 와 동일하게 sensor 모델 사용.
+    ANOMALY = "anomaly", "이상 패턴 감지"
+
 
 # 정책 화면 노출 9종 (SENSOR_FAULT 제외) — AlertPolicy.event_type 선택지
 USER_FACING_ALARM_TYPES = [
@@ -70,6 +75,7 @@ USER_FACING_ALARM_TYPES = [
     AlarmType.INSPECTION_SCHEDULED,
     AlarmType.BATCH_FAILED,
     AlarmType.STORAGE_OVERDUE,
+    AlarmType.ANOMALY,
 ]
 
 
