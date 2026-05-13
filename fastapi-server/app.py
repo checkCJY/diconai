@@ -22,6 +22,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from core.config import settings
 from core.logging import setup_logging
 from core.redis_client import close_redis
+from ai.router import router as ai_router
 from gas.routers.gas_router import router as gas_router
 from internal.routers.alarm_router import router as internal_alarm_router
 from internal.routers.scenario_router import router as internal_scenario_router
@@ -86,6 +87,7 @@ app = FastAPI(
             "description": "서비스 간 통신 (Celery → FastAPI 브리지). localhost 전용",
         },
         {"name": "health", "description": "헬스체크"},
+        {"name": "ai", "description": "IF 이상탐지 추론 (STEP B)"},
     ],
     lifespan=lifespan,
 )
@@ -104,6 +106,7 @@ app.include_router(positioning_router)
 app.include_router(ws_router)
 app.include_router(internal_alarm_router)  # Celery → WS 브리지 (localhost 전용)
 app.include_router(internal_scenario_router)  # 시연 시나리오 모드 컨트롤
+app.include_router(ai_router)  # IF 이상탐지 추론 (STEP B)
 
 
 # ── Prometheus 메트릭 (직접 노출, 외부 instrumentator 패키지 미사용) ──
