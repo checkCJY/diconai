@@ -59,6 +59,10 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
         "voc": payload.voc,
         **individual_risks,
         "raw_payload": payload.model_dump(mode="json"),
+        # IF 학습 라벨 — 시뮬레이터에서만 채워짐. 운영 페이로드는 None.
+        # serializer 가 anomaly_type 값이 있으면 is_anomaly=True 와 함께 저장 (G2).
+        "is_anomaly": payload.anomaly_type is not None,
+        "anomaly_type": payload.anomaly_type,
     }
 
     try:
