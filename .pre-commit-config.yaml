@@ -6,8 +6,11 @@ repos:
         args: [--fix]
         # backend와 ai-server 폴더 내의 모든 .py 파일을 검사
         files: ^(drf-server|fastapi-server)/.*\.py$
+        # Django 자동 생성 마이그는 사람이 안 만지는 파일 — 포맷·lint 부담 제거
+        exclude: ^.*/migrations/.*\.py$
       - id: ruff-format
         files: ^(drf-server|fastapi-server)/.*\.py$
+        exclude: ^.*/migrations/.*\.py$
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
@@ -16,6 +19,8 @@ repos:
         # 모든 파일에 대해 공백 검사 (필요시 특정 폴더 제외 가능)
         exclude: ^(.*/migrations/|static/)
       - id: end-of-file-fixer
+        # 마이그·정적 자산은 자동 수정 대상에서 제외 (Django 생성물 + 바이너리)
+        exclude: ^(.*/migrations/|static/|.*\.pkl$)
       - id: check-yaml
         files: \.(yml|yaml)$
       - id: check-added-large-files

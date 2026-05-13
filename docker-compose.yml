@@ -24,6 +24,10 @@ services:
     build:
       context: ./drf-server
     image: diconai/drf:dev
+    # host 유저 UID/GID 로 실행 — 컨테이너 안에서 생성된 파일(마이그/모델 .pkl/db.sqlite3)
+    # 이 host 에 root 소유로 노출되어 pre-commit/git 작업이 막히는 문제 회피.
+    # WSL2 Ubuntu 기본 uid=1000. 다른 환경은 `UID=$(id -u) GID=$(id -g) docker compose up`.
+    user: "${UID:-1000}:${GID:-1000}"
     env_file: ./.env.docker
     environment:
       DATABASE_URL: sqlite:////app/db.sqlite3
@@ -57,6 +61,7 @@ services:
     build:
       context: ./fastapi-server
     image: diconai/fastapi:dev
+    user: "${UID:-1000}:${GID:-1000}"  # host UID 매핑 — drf 와 동일 이유
     env_file: ./.env.docker
     environment:
       DRF_BASE_URL: http://drf:8000
@@ -79,6 +84,7 @@ services:
 
   celery-worker:
     image: diconai/drf:dev
+    user: "${UID:-1000}:${GID:-1000}"  # host UID 매핑 — drf 와 동일 이유
     command: ["celery", "-A", "config", "worker", "-l", "info", "--concurrency=2"]
     env_file: ./.env.docker
     environment:
@@ -102,6 +108,7 @@ services:
 
   celery-beat:
     image: diconai/drf:dev
+    user: "${UID:-1000}:${GID:-1000}"  # host UID 매핑 — drf 와 동일 이유
     command: ["celery", "-A", "config", "beat", "-l", "info"]
     env_file: ./.env.docker
     environment:

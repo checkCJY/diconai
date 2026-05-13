@@ -170,7 +170,10 @@ class Command(BaseCommand):
 
         version = _next_version(sensor_type)
         models_dir = Path(settings.ML_MODELS_DIR)
-        models_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+        # 0o755 — 컨테이너 user UID 매핑(docker-compose user) 환경에서도 fastapi 가
+        # 같은 uid 로 read 가능하도록 완화. ml_models 는 .gitignore + 웹 서버 미서빙이라
+        # dev 단계 보안 영향 미미. 운영 진입 시 별도 secure path 권장.
+        models_dir.mkdir(parents=True, exist_ok=True, mode=0o755)
         file_name = f"{sensor_type}_if_v{version}.pkl"
         file_path = models_dir / file_name
         self.stdout.write(f"[4/5] joblib.dump → {file_path}")
