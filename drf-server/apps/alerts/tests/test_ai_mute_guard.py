@@ -87,18 +87,23 @@ def test_default_ttl_matches_module_constant():
 
 @pytest.mark.django_db
 def test_power_alarm_rule_fire_skipped_when_ai_mute_active(power_device):
-    """power_alarm.trigger_power_alarms — AI mute 활성 시 룰 DANGER fire skip + counter."""
+    """power_alarm.trigger_power_alarms — AI mute 활성 시 룰 DANGER fire skip + counter.
+
+    [식별자 일치 규약] fastapi 가 IoT raw id (PowerDevice.device_id) 로 마킹하므로
+    DRF 가드도 같은 식별자로 read. PK 사용 시 키 mismatch 로 가드 부재.
+    """
     from apps.monitoring.models import PowerData
     from apps.monitoring.services.power_alarm import trigger_power_alarms
 
-    device_id = power_device.id
     channel = 1
-    # AI 가 danger 마크 한 상태로 가정 (실제 운영에선 fastapi 가 마킹)
-    mark_ai_recent(device_id=device_id, channel=channel, rule_level="danger")
+    # AI 가 danger 마크 한 상태로 가정 (실제 운영에선 fastapi 가 device_id raw 로 마킹)
+    mark_ai_recent(
+        device_id=power_device.device_id, channel=channel, rule_level="danger"
+    )
 
-    # 룰 fire 가 skip 되었는지 카운터로 검증 — label 조합 매칭
+    # 룰 fire 가 skip 되었는지 카운터로 검증 — label 도 raw IoT id 와 일치
     counter_metric = RULE_FIRE_SUPPRESSED_BY_AI_TOTAL.labels(
-        device_id=str(device_id),
+        device_id=str(power_device.device_id),
         channel=str(channel),
         level=RiskLevel.DANGER.value,
     )
@@ -174,8 +179,10 @@ def test_power_alarm_revokes_pending_warning_before_ai_mute_skip(power_device):
     task_key = _task_key(device_id, channel)
     cache.set(task_key, "fake-pending-task-id-xyz", 30)
 
-    # AI 가 같은 채널에 DANGER 발화 → mute 활성
-    mark_ai_recent(device_id=device_id, channel=channel, rule_level="danger")
+    # AI 가 같은 채널에 DANGER 발화 → mute 활성 (식별자는 raw IoT id, 운영 일관)
+    mark_ai_recent(
+        device_id=power_device.device_id, channel=channel, rule_level="danger"
+    )
 
     obj = PowerData(
         power_device=power_device,

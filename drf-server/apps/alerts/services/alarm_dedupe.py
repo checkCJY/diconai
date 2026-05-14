@@ -80,7 +80,7 @@ AI_MUTE_TTL_SEC = 60
 
 
 def mark_ai_recent(
-    device_id: int,
+    device_id: int | str,
     channel: int,
     rule_level: str,
     ttl_sec: int = AI_MUTE_TTL_SEC,
@@ -95,7 +95,10 @@ def mark_ai_recent(
     raw redis 사용 — try_transition 패턴과 일치. cache.set 의 pickle 직렬화 회피.
 
     Args:
-        device_id: PowerDevice.id (DRF 측 PK). 가스 도메인 확장 시 sensor_id 도 가능.
+        device_id: 식별자. **fastapi 가 set 하는 것과 일치해야 한다** — 운영에선 IoT
+            raw id (PowerDevice.device_id, 예: mac 주소) 를 쓴다. PK (PowerDevice.id)
+            로 마킹/조회 시 fastapi 키와 mismatch → 가드 부재. 가스 도메인 확장 시
+            sensor 의 raw device_id 도 동일 원칙.
         channel: PowerData.channel (1~16) 또는 가스 0 등.
         rule_level: AI 발화 레벨을 AI_TO_RULE_LEVEL 로 환산한 결과 ('warning'|'danger').
             'normal' 도 가능하나 그 경우 어차피 룰도 fire 안 함이라 의미 없음.
@@ -109,7 +112,7 @@ def mark_ai_recent(
         redis.set(key, "1", ex=ttl_sec)
 
 
-def is_ai_mute_active(device_id: int, channel: int, rule_level: str) -> bool:
+def is_ai_mute_active(device_id: int | str, channel: int, rule_level: str) -> bool:
     """룰이 rule_level 로 발화하려 할 때 mute 상태인지 확인.
 
     raw redis EXISTS — rule_level 키만 본다. 격상 케이스 (룰 danger, AI 가 warning
