@@ -42,6 +42,22 @@ const EventPanel = {
   // event_id 있으면 그 값을, 없는 정상화/지오펜스류는 (alarm_type, source, 분단위) 합성 키.
   _seenKeys: new Set(),
 
+  // burst 그룹화 대상 — 정상화는 디바이스별로 N건 도착해도 패널에 1줄.
+  // 백엔드 fingerprint dedup 은 source_label 단위라 가스 9 종은 이미 1건이지만
+  // 전력 디바이스 N개의 동시 정상화는 N건 도착 → 본 그룹화가 같은 분(minute) 안
+  // 같은 alarm_type 을 1줄로 묶고 "외 N건" 배지로 표시.
+  CLEAR_TYPES: new Set(['gas_clear', 'power_clear']),
+
+  // 정상화 burst 그룹 — key=`clear:{alarm_type}:{minute_bucket}`,
+  // value={ itemEl, sources[], moreEl, moreCountEl, sourcesEl }.
+  _clearGroups: new Map(),
+
+  _clearGroupKey(data) {
+    const ts = data.created_at || data.timestamp;
+    const minuteBucket = ts ? Math.floor(new Date(ts).getTime() / 60_000) : 0;
+    return `clear:${data.alarm_type}:${minuteBucket}`;
+  },
+
   // [Step 2-3] data 에서 dedup 키 1개 생성. event_id 가 진리값이라 우선.
   // event_id 없는 알람 (gas_clear/power_clear/지오펜스 일부) 은 같은 발생원의 분 단위
   // 버스트 (가스 9 종 동시 정상화) 를 1줄로 합치기 위해 minute_bucket 사용.
@@ -59,6 +75,14 @@ const EventPanel = {
     const listEl  = document.getElementById('event-list');
     const emptyEl = document.getElementById('event-empty');
     if (!listEl) return;
+
+    // 정상화 알람은 같은 분·같은 type 끼리 1줄 + "외 N건" 으로 묶기.
+    // 일반 알람 흐름과 dedup/클릭/flash 의미가 달라 별도 경로.
+    if (this.CLEAR_TYPES.has(data.alarm_type)) {
+      this._addToClearGroup(data, listEl, emptyEl);
+      this._trimList(listEl);
+      return;
+    }
 
     const dedupKey = this._dedupKey(data);
     // dedup — 이미 같은 키가 표시 중이면 시각 갱신 없이 skip.
@@ -118,11 +142,104 @@ const EventPanel = {
       setTimeout(() => item.classList.remove('event-item--new'), 3000);
     }
 
-    // 최대 20개 유지 — 초과 시 오래된 항목 제거 + dedup set 도 정리.
+    this._trimList(listEl);
+  },
+
+  // ── 정상화 burst 그룹 추가/갱신 ──────────────────────────
+  // 같은 분 안 같은 alarm_type 의 정상화 push 가 들어오면 첫 항목은 일반 알람처럼
+  // 추가하고, 같은 분의 다음 정상화는 첫 항목에 "외 N건" 카운터 + sources 누적.
+  _addToClearGroup(data, listEl, emptyEl) {
+    const groupKey = this._clearGroupKey(data);
+    const source =
+      data.source_label ||
+      data.sensor_name ||
+      data.power_device_name ||
+      '알 수 없음';
+
+    const existing = this._clearGroups.get(groupKey);
+    if (existing) {
+      // 같은 그룹 내 새 source — 중복 source 는 카운트 안 늘림 (백엔드 dedup 보정).
+      if (!existing.sources.includes(source)) {
+        existing.sources.push(source);
+        this._refreshClearGroup(existing);
+      }
+      return;
+    }
+
+    if (emptyEl) emptyEl.remove();
+
+    const time = data.created_at
+      ? (typeof TimeFormat !== 'undefined' ? TimeFormat.short(data.created_at) : new Date(data.created_at).toLocaleTimeString())
+      : '';
+    const colorClass = LevelMapper.toTextClass(data.alarm_level);
+    const icon       = this.ICON_BY_TYPE[data.alarm_type] || '🔔';
+    const message    = data.message || '정상 복귀';
+
+    const item = document.createElement('div');
+    item.className       = 'event-item event-item--clear-group';
+    item.dataset.dedupKey = groupKey;
+    item.innerHTML = `
+      <div class="event-head">
+        <span><span class="event-icon">${icon}</span><span class="event-clear-label">${source}</span></span>
+        <span class="sub">${time}</span>
+      </div>
+      <div class="${colorClass} event-desc">
+        <span>${message}</span>
+        <span class="event-clear-more" hidden>외 <span class="event-clear-more-count">0</span>건</span>
+      </div>
+      <ul class="event-clear-sources" hidden></ul>
+    `;
+    listEl.insertBefore(item, listEl.firstChild);
+
+    const moreEl = item.querySelector('.event-clear-more');
+    const moreCountEl = item.querySelector('.event-clear-more-count');
+    const sourcesEl = item.querySelector('.event-clear-sources');
+    // "외 N건" 클릭 → 디바이스 source_label 목록 펼침/접힘.
+    if (moreEl && sourcesEl) {
+      moreEl.style.cursor = 'pointer';
+      moreEl.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        sourcesEl.hidden = !sourcesEl.hidden;
+      });
+    }
+
+    this._clearGroups.set(groupKey, {
+      itemEl: item,
+      sources: [source],
+      moreEl,
+      moreCountEl,
+      sourcesEl,
+    });
+
+    item.classList.add('event-item--new');
+    setTimeout(() => item.classList.remove('event-item--new'), 3000);
+  },
+
+  _refreshClearGroup(group) {
+    const extra = group.sources.length - 1;
+    if (extra > 0) {
+      group.moreEl.hidden = false;
+      group.moreCountEl.textContent = String(extra);
+    }
+    // sources 목록 갱신 — textContent 로 escape (source_label 은 시스템 입력이지만
+    // XSS 방어 차원).
+    group.sourcesEl.innerHTML = '';
+    for (const s of group.sources) {
+      const li = document.createElement('li');
+      li.textContent = s;
+      group.sourcesEl.appendChild(li);
+    }
+  },
+
+  // ── LRU 정리 — 최대 20개 유지, 제거 시 dedup set/그룹 정리 ──
+  _trimList(listEl) {
     while (listEl.children.length > 20) {
       const removed = listEl.lastChild;
       const removedKey = removed?.dataset?.dedupKey;
-      if (removedKey) this._seenKeys.delete(removedKey);
+      if (removedKey) {
+        this._seenKeys.delete(removedKey);
+        this._clearGroups.delete(removedKey);
+      }
       listEl.removeChild(removed);
     }
   },

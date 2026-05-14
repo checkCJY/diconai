@@ -148,6 +148,32 @@ body {
   animation: event-item-flash 3s ease-out;
 }
 
+/* 정상화 burst 그룹 — "외 N건" 배지 + 펼침 디바이스 목록 */
+.event-clear-more {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text2);
+  background: var(--bg3);
+  padding: 1px 6px;
+  border-radius: 8px;
+  user-select: none;
+}
+.event-clear-more:hover {
+  color: var(--text);
+  background: var(--bg2, #21262d);
+}
+.event-clear-sources {
+  margin: 6px 0 0 22px;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+  color: var(--text2);
+}
+.event-clear-sources li {
+  padding: 2px 0;
+}
+
 /* ── 공통 테이블 ────────────────────────────────────────── */
 .tbl          { width: 100%; border-collapse: collapse; font-size: 11px; }
 .tbl th       { color: var(--text2); font-weight: 500; padding: 2px 3px; text-align: left; border-bottom: 1px solid var(--border); }
