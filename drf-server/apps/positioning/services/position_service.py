@@ -1,9 +1,13 @@
 # positioning/services/position_service.py
 import math
+import time
+
 from django.db import transaction
-from apps.positioning.models import WorkerPosition
 from django.utils import timezone
 from datetime import timedelta
+
+from apps.core.metrics import GEOFENCE_CHECK_DURATION
+from apps.positioning.models import WorkerPosition
 
 _RISK_ORDER = {"warning": 1, "danger": 2}
 
@@ -180,7 +184,17 @@ def handle_position_receive(
     pos.save(update_fields=["current_geofence"])
 
     geofence = pos.current_geofence
-    danger_info = _get_dangerous_sensors_in_geofence(geofence) if geofence else None
+
+    # GEOFENCE_CHECK_DURATION: 위험 센서 판정에 걸린 시간을 히스토그램으로 기록한다.
+    # geofence가 있을 때만 DB 쿼리가 실행되므로 geofence가 None인 케이스는 측정에서 제외.
+    # p99 ≥ 100ms이면 DB 인덱스 점검 또는 worker 스케일 아웃 검토.
+    if geofence:
+        _t = time.perf_counter()
+        danger_info = _get_dangerous_sensors_in_geofence(geofence)
+        GEOFENCE_CHECK_DURATION.observe(time.perf_counter() - _t)
+    else:
+        danger_info = None
+
     risk_level = danger_info["risk_level"] if danger_info else "normal"
 
     if danger_info:
