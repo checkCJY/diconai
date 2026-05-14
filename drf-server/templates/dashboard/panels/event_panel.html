@@ -1,16 +1,34 @@
-<!-- 우측: 이벤트 현황 -->
+<!--
+  우측: 이벤트 현황 패널
+  [원안 디자인 충실 구현 — 2026-05-15]
+  - 미확인 카운트 박스 (상단, 0건 이면 숨김)
+  - 이벤트 목록 (스크롤 가능, 아이콘 + 라벨 + 시간 + 색상 메시지)
+  - 24h 합계 (하단, 원안 mockup 위치)
+-->
 <div class="col-right">
-  <div class="panel" style="flex:1;overflow:hidden;">
+  <div class="panel" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
     <div class="panel-title">이벤트 현황 <a href="/dashboard/monitoring/events/" class="more">+ 상세 보기</a></div>
-    <div class="event-summary">
-      최근 24시간 동안 발생한 이벤트 현황<br>
-      <span class="danger-text">위험 <span id="summary-danger">0</span>건</span>
-      / <span class="caution-text">주의 <span id="summary-warning">0</span>건</span>
+
+    <!-- 미확인 카운트 강조 박스 — 0건 이면 JS 가 display:none 처리 -->
+    <div id="summary-unack-box" class="event-unack" style="display:none;">
+      <span class="event-unack-label">미확인</span>
+      <span class="event-unack-count danger-text"><span id="summary-unack">0</span>건</span>
+      <span class="event-unack-hint">— 운영자 확인 필요</span>
     </div>
-    <div id="event-list" style="overflow-y:auto;max-height:260px;">
+
+    <!-- 이벤트 목록 — 스크롤 가능, 신규 항목은 위로 prepend -->
+    <div id="event-list" style="overflow-y:auto;flex:1;min-height:120px;">
       <div id="event-empty" class="sub" style="text-align:center;padding:20px;">
         현재 발생한 이벤트가 없습니다
       </div>
+    </div>
+
+    <!-- 24h 합계 — 원안 디자인 따라 하단 배치 -->
+    <div class="event-summary">
+      <span class="event-summary-icon">ⓘ</span>
+      최근 24시간 동안 발생한 이벤트 현황<br>
+      <span class="danger-text">위험 <span id="summary-danger">0</span>건</span>
+      / <span class="caution-text">주의 <span id="summary-warning">0</span>건</span>
     </div>
   </div>
 </div>

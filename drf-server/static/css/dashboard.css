@@ -113,10 +113,40 @@ body {
 .ws-status.error     { background: #3d1a1a; color: #f85149; }
 
 /* ── 패널 10: 이벤트 현황 ───────────────────────────────── */
-.event-item    { padding: 7px 0; border-bottom: 1px solid var(--border); }
+.event-item    { padding: 7px 0; border-bottom: 1px solid var(--border); transition: background-color .3s ease, border-color .3s ease; }
+.event-item:hover { background: rgba(255, 255, 255, .03); }
 .event-head    { display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 12px; margin-bottom: 3px; }
-.event-desc    { font-size: 11px; padding-left: 13px; }
+.event-head > span:first-child { display: flex; align-items: center; gap: 6px; }
+.event-desc    { font-size: 11px; padding-left: 22px; }
+.event-icon    { font-size: 14px; line-height: 1; display: inline-block; width: 18px; text-align: center; }
 .event-summary { margin-top: 8px; padding: 7px; background: var(--bg3); border-radius: 5px; font-size: 11px; color: var(--text2); line-height: 1.8; }
+.event-summary-icon { color: var(--accent); margin-right: 4px; }
+
+/* 미확인 카운트 강조 박스 (원안 미확인 N건 표시) */
+.event-unack {
+  margin: 8px 0;
+  padding: 8px 10px;
+  background: rgba(248, 81, 73, .12);
+  border: 1px solid rgba(248, 81, 73, .4);
+  border-radius: 5px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.event-unack-label { font-weight: 700; color: var(--text); }
+.event-unack-count { font-weight: 800; font-size: 14px; }
+.event-unack-hint  { color: var(--text2); font-size: 11px; }
+
+/* 새 항목 강조 — fadeIn + border 깜빡 (3초) */
+@keyframes event-item-flash {
+  0%   { background: rgba(248, 81, 73, .25); border-color: var(--danger); }
+  60%  { background: rgba(248, 81, 73, .10); border-color: rgba(248, 81, 73, .5); }
+  100% { background: transparent; border-color: var(--border); }
+}
+.event-item--new {
+  animation: event-item-flash 3s ease-out;
+}
 
 /* ── 공통 테이블 ────────────────────────────────────────── */
 .tbl          { width: 100%; border-collapse: collapse; font-size: 11px; }
