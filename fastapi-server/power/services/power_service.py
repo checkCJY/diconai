@@ -17,8 +17,8 @@ from ai.router import _build_feature_row, _get_or_load
 from core.power_thresholds import POWER_THRESHOLDS
 from power.services.channel_meta_cache import get_channel_entry
 from power.services.threshold_eval import calculate_power_risk
+from services.anomaly_alarm import forward_inference_e2e
 from services.drf_client import post_to_drf
-from websocket.services.alarm_queue import push_alarm
 from websocket.state import power_latest
 
 logger = logging.getLogger(__name__)
@@ -86,22 +86,6 @@ async def post_power_to_drf(path: str, payload: dict) -> None:
     await post_to_drf(path, payload, raise_on_error=False, log_category="power_service")
 
 
-DRF_ML_ANOMALY_RESULT_PATH = "/api/ml/anomaly-results/"
-
-
-async def _safe_push_alarm(payload: dict) -> None:
-    """fire-and-forget 알람 push — 실패는 silent (logger.warning).
-
-    asyncio.create_task 로 wrap 시 task 안 exception 이 외부로 안 나가므로,
-    별도 try/except 로 logger.warning 보존. Redis 일시 hang/장애 시 fastapi 워커
-    안 묶음.
-    """
-    try:
-        await push_alarm(payload)
-    except Exception as exc:
-        logger.warning("[anomaly_inference] push_alarm failed: %s", exc)
-
-
 async def process_anomaly_inference(
     device_id: str | None,
     channel_values: dict,
@@ -142,28 +126,6 @@ async def process_anomaly_inference(
             }
             sensor_identifier = f"power:device_{device_id}:ch{channel}:{data_type}"
 
-            # MLAnomalyResult 운영 추적용 forward — 발화 여부 무관, 추론 매번 저장.
-            # fire-and-forget (asyncio.create_task) — DRF SQLite lock 발생해도 fastapi
-            # 단일 워커 안 묶임. 가스 endpoint 보호. silent fail (raise_on_error=False).
-            asyncio.create_task(
-                post_to_drf(
-                    DRF_ML_ANOMALY_RESULT_PATH,
-                    {
-                        "ml_model": None,
-                        "model_version_snapshot": entry.version,
-                        "sensor_type": "power",
-                        "sensor_identifier": sensor_identifier,
-                        "measured_at": measured_at,
-                        "anomaly_score": score,
-                        "prediction": prediction,
-                        "risk_classified": combined,
-                        "feature_snapshot_json": features,
-                    },
-                    raise_on_error=False,
-                    log_category="power_anomaly_forward",
-                )
-            )
-
             logger.info(
                 "[anomaly_inference] device=%s ch=%s %s value=%s "
                 "threshold=%s pred=%s combined=%s score=%.4f",
@@ -177,22 +139,23 @@ async def process_anomaly_inference(
                 score,
             )
 
-            if combined not in _FIRE_LEVELS:
-                continue
-
-            # rate limit — push_alarm 만 60초당 1회. forward 는 위에서 이미 매번 호출됨.
-            now_ts = time.time()
-            last_ts = _last_fired_at.get(sensor_identifier, 0.0)
-            if now_ts - last_ts < RATE_LIMIT_SEC:
-                logger.info(
-                    "[anomaly_inference] rate limited — sensor=%s combined=%s "
-                    "(last %.1fs ago)",
-                    sensor_identifier,
-                    combined,
-                    now_ts - last_ts,
-                )
-                continue
-            _last_fired_at[sensor_identifier] = now_ts
+            # should_fire = (발화 레벨) AND (rate limit 통과). False 면 helper 가
+            # push/alarm forward skip, ML forward 만 진행 (운영 추적 유지).
+            should_fire = combined in _FIRE_LEVELS
+            if should_fire:
+                now_ts = time.time()
+                last_ts = _last_fired_at.get(sensor_identifier, 0.0)
+                if now_ts - last_ts < RATE_LIMIT_SEC:
+                    logger.info(
+                        "[anomaly_inference] rate limited — sensor=%s combined=%s "
+                        "(last %.1fs ago)",
+                        sensor_identifier,
+                        combined,
+                        now_ts - last_ts,
+                    )
+                    should_fire = False
+                else:
+                    _last_fired_at[sensor_identifier] = now_ts
 
             entry_meta = get_channel_entry(device_id, channel)
             label = entry_meta.get("name") or f"CH{channel}"
@@ -200,17 +163,40 @@ async def process_anomaly_inference(
                 f"[AI 이상 패턴] {label} {data_type}={value} "
                 f"(IF score {score:.4f}, combined={combined})"
             )
-            # fire-and-forget — Redis hang 시 fastapi 워커 안 묶음. silent fail (wrapper).
+            risk_level = _COMBINED_TO_RISK_LEVEL[combined]
+
+            # ML forward + push + AlarmRecord forward 를 helper 단일 호출로 캡슐화.
+            # helper 안에서 push 는 독립 task (C12 효과 보존), ML→alarm 은 sequential.
+            # 모든 외부 호출 silent fail + Prometheus counter (anomaly_alarm.py).
             asyncio.create_task(
-                _safe_push_alarm(
-                    {
+                forward_inference_e2e(
+                    ml_payload={
+                        "ml_model": None,
+                        "model_version_snapshot": entry.version,
+                        "sensor_type": "power",
+                        "sensor_identifier": sensor_identifier,
+                        "measured_at": measured_at,
+                        "anomaly_score": score,
+                        "prediction": prediction,
+                        "risk_classified": combined,
+                        "feature_snapshot_json": features,
+                    },
+                    alarm_payload={
                         "alarm_type": "power_anomaly_ai",
-                        "risk_level": _COMBINED_TO_RISK_LEVEL[combined],
+                        "risk_level": risk_level,
+                        "source_device_id": str(device_id),
+                        "measured_value": value,
+                        "summary": summary,
+                        "detected_at": measured_at,
+                        "source_label": label,
+                    },
+                    push_payload={
+                        "alarm_type": "power_anomaly_ai",
+                        "risk_level": risk_level,
                         "source_label": label,
                         "summary": summary,
                         "is_new_event": True,
                         "measured_value": value,
-                        # AnomalyMeta nested — UI 가 PREDICT_WARN/CAUTION 차별화 표시 가능
                         "anomaly_meta": {
                             "combined_risk": combined,
                             "anomaly_score": score,
@@ -218,7 +204,8 @@ async def process_anomaly_inference(
                             "channel": channel,
                             "data_type": data_type,
                         },
-                    }
+                    },
+                    should_fire=should_fire,
                 )
             )
         except Exception as exc:
