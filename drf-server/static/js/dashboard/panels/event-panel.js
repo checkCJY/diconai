@@ -36,10 +36,23 @@ const EventPanel = {
     storage_overdue:      '📦',
   },
 
-  // 같은 패널 안에 같은 event_id 항목이 중복 추가되지 않도록 추적.
-  // WS dispatch (실시간) 와 loadEventList (페이지 로드) 가 같은 항목을 받아도
-  // 시각적으로 1번만 표시되어야 한다. event_id 기준 dedup.
-  _seenEventIds: new Set(),
+  // 같은 패널 안에 동일 항목이 중복 추가되지 않도록 추적.
+  // WS dispatch (실시간) 와 loadEventList (페이지 로드), 그리고 백엔드 dedup TTL
+  // 만료 후 재푸시가 같은 항목을 다시 보내도 시각적으로 1번만 노출.
+  // event_id 있으면 그 값을, 없는 정상화/지오펜스류는 (alarm_type, source, 분단위) 합성 키.
+  _seenKeys: new Set(),
+
+  // [Step 2-3] data 에서 dedup 키 1개 생성. event_id 가 진리값이라 우선.
+  // event_id 없는 알람 (gas_clear/power_clear/지오펜스 일부) 은 같은 발생원의 분 단위
+  // 버스트 (가스 9 종 동시 정상화) 를 1줄로 합치기 위해 minute_bucket 사용.
+  _dedupKey(data) {
+    const eventId = data.event ?? data.event_id ?? null;
+    if (eventId !== null && eventId !== undefined) return `event:${eventId}`;
+    const ts = data.created_at || data.timestamp;
+    const minuteBucket = ts ? Math.floor(new Date(ts).getTime() / 60_000) : 0;
+    const source = data.source_label || data.sensor_name || data.power_device_name || '';
+    return `${data.alarm_type || 'unknown'}:${source}:${minuteBucket}`;
+  },
 
   // ── 이벤트 항목 1개 추가 ────────────────────────────────
   addItem(data) {
@@ -47,11 +60,12 @@ const EventPanel = {
     const emptyEl = document.getElementById('event-empty');
     if (!listEl) return;
 
+    const dedupKey = this._dedupKey(data);
+    // dedup — 이미 같은 키가 표시 중이면 시각 갱신 없이 skip.
+    if (this._seenKeys.has(dedupKey)) return;
+    this._seenKeys.add(dedupKey);
+
     const eventId = data.event ?? data.event_id ?? null;
-    // dedup — 이미 같은 event_id 가 표시 중이면 시각 갱신 없이 skip.
-    // (1분 cadence 재푸시 시 같은 Event 의 다른 AlarmRecord 가 들어와도 패널 1줄 유지)
-    if (eventId !== null && this._seenEventIds.has(eventId)) return;
-    if (eventId !== null) this._seenEventIds.add(eventId);
 
     if (emptyEl) emptyEl.remove();
 
@@ -76,8 +90,10 @@ const EventPanel = {
     const icon       = this.ICON_BY_TYPE[data.alarm_type] || '🔔';
 
     const item = document.createElement('div');
-    item.className     = 'event-item';
-    item.style.opacity = isResolved ? '0.5' : '1';
+    item.className       = 'event-item';
+    item.style.opacity   = isResolved ? '0.5' : '1';
+    // dedup key 를 dataset 에 보관 — LRU 제거 시 _seenKeys 에서 같이 정리.
+    item.dataset.dedupKey = dedupKey;
     if (eventId !== null) {
       // [P2-2] 클릭 시 이벤트 상세 페이지로 이동.
       item.style.cursor    = 'pointer';
@@ -105,8 +121,8 @@ const EventPanel = {
     // 최대 20개 유지 — 초과 시 오래된 항목 제거 + dedup set 도 정리.
     while (listEl.children.length > 20) {
       const removed = listEl.lastChild;
-      const removedId = removed?.dataset?.eventId;
-      if (removedId) this._seenEventIds.delete(Number(removedId));
+      const removedKey = removed?.dataset?.dedupKey;
+      if (removedKey) this._seenKeys.delete(removedKey);
       listEl.removeChild(removed);
     }
   },
