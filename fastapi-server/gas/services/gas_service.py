@@ -21,15 +21,17 @@ from collections import (
 )  # co 값을 최근 30개만 유지하는 버퍼 , 30개 이상 시 오래 된 순으로 자동으로 버림
 from ai.router import (
     _get_or_load,
-    _build_feature_row,
+    _build_multi_feature_row,
 )  # 학습된 ai모델을 가져옴 , co 값 30개를 ai읽을 수 있는 형태로 변환
 
 
 logger = logging.getLogger(__name__)
 
 # 이성현 작업
-# co 값을 담아두는 버퍼 , 최대 30개 , 슬라이딩 윈도우 구현에 맞음
+# co, h2s, co2값을 담아두는 버퍼 , 최대 30개 , 슬라이딩 윈도우 구현에 맞음
 _co_window: deque = deque(maxlen=30)
+_h2s_window: deque = deque(maxlen=30)
+_co2_window: deque = deque(maxlen=30)
 
 DRF_GAS_PATH = "/api/monitoring/gas/"
 
@@ -58,34 +60,37 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
     }
     individual_risks = calculate_individual_risks(gas_values)
 
-    # 이성현 작업 — co 슬라이딩 윈도우 추론
-    # _co_window.append(payload.co) — 들어온 co 값을 버퍼에 추가
-    # if len(_co_window) >= 30 — 30개 쌓여야 추론 시작 (그 전엔 데이터 부족)
-    # entry.model.predict(row)[0] — AI가 판단. -1이면 이상, 1이면 정상
-    # logger.warning — 이상 감지 시 로그 출력 (알람 연동은 다음 단계)
-    # except — 추론 실패해도 가스 데이터 저장은 계속 진행
+    # 이성현 수정 — co 단변량 → co + h2s + co2 다변량 슬라이딩 윈도우 추론
     _co_window.append(payload.co)
+    _h2s_window.append(payload.h2s)
+    _co2_window.append(payload.co2)
     if len(_co_window) >= 30:
         try:
             entry = await _get_or_load("gas")
-            row = _build_feature_row(list(_co_window), entry.window)
+            row = _build_multi_feature_row(
+                {
+                    "co": list(_co_window),
+                    "h2s": list(_h2s_window),
+                    "co2": list(_co2_window),
+                },
+                entry.window,
+            )
             pred = int(entry.model.predict(row)[0])
             if pred == -1:
                 logger.warning(
-                    f"[AI 이상탐지] co 이상 감지 | device={payload.device_id} | co={payload.co}"
+                    f"[AI 이상탐지] co+h2s+co2 이상 감지 | device={payload.device_id} | co={payload.co} h2s={payload.h2s} co2={payload.co2}"
                 )
                 await push_alarm(
                     {
-                        "alarm_type": "gas_anomaly_ai",  # 알람 종류 식별자. AI 알람임을 구분
-                        "risk_level": "danger",  # 위험도
-                        "source_label": "가스센서 AI 이상탐지",  # 브라우저에 표시될 출처
-                        "summary": f"CO 이상 감지 (AI) | 측정값: {payload.co}",  #  알람 내용
+                        "alarm_type": "gas_anomaly_ai",
+                        "risk_level": "danger",
+                        "source_label": "가스센서 AI 이상탐지",
+                        "summary": f"가스 이상 감지 (AI) | CO:{payload.co} H2S:{payload.h2s} CO2:{payload.co2}",
                         "is_new_event": True,
                         "gas_type": "co",
-                        "measured_value": payload.co,  # 실제 측정된 co 값
+                        "measured_value": payload.co,
                     }
                 )
-
         except Exception as e:
             logger.error(f"[AI 추론 실패] {e}")
 
