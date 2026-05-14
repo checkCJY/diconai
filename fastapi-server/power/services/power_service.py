@@ -150,7 +150,7 @@ async def process_anomaly_inference(
             )
             await push_alarm(
                 {
-                    "alarm_type": "anomaly",
+                    "alarm_type": "power_anomaly_ai",
                     "risk_level": _COMBINED_TO_RISK_LEVEL[combined],
                     "source_label": label,
                     "summary": summary,

@@ -8,7 +8,7 @@ from internal.routers.alarm_router import AlarmPayload, AnomalyMeta
 
 def _base_payload():
     return {
-        "alarm_type": "anomaly",
+        "alarm_type": "power_anomaly_ai",
         "risk_level": "warning",
         "source_label": "ch1",
         "summary": "test",
