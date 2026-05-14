@@ -23,6 +23,7 @@ from django.core.cache import cache
 from apps.alerts.services.alarm_dedupe import (
     clear_state,
     get_state,
+    is_ai_mute_active,
     try_transition,
 )
 from apps.alerts.tasks import (
@@ -32,14 +33,23 @@ from apps.alerts.tasks import (
     fire_power_warning_task,
 )
 from apps.core.constants import RiskLevel
+from apps.core.metrics import RULE_FIRE_SUPPRESSED_BY_AI_TOTAL
 from apps.facilities.services.threshold_service import (
     evaluate_current_risk,
     evaluate_power_risk,
     evaluate_voltage_risk,
 )
 
-_CACHE_TTL = 3600
+# state_key 캐시 유지 시간. [Step 4 — 1시간 → 5분 단축]
+# RENOTIFY_COOLDOWN_MINUTES=5 와 일치시켜 try_transition / Event cooldown 두 dedup
+# 계층 시간 정렬. 가스 측 동일 변경과 짝.
+_CACHE_TTL = 300
 _AXIS_TTL = 300  # 축별 위험도 캐시 (송신 주기 1초 대비 충분)
+
+# task_key (`alarm:power:task:{device_id}:{channel}`) — WARNING 타이머 진행 신호.
+# [Step 5 — TTL 분리] WARNING_DURATION_SEC + 5s 마진. 정상 종료 시 tasks.py 가
+# cache.delete 로 즉시 정리. retry/실패는 자연 만료.
+_TASK_KEY_TTL = WARNING_DURATION_SEC + 5
 
 # data_type → (평가 함수, 축 이름)
 _EVALUATORS = {
@@ -133,11 +143,24 @@ def trigger_power_alarms(objs: list, device) -> None:
         label = _channel_label(device, channel)
 
         if aggregate == RiskLevel.DANGER:
-            # 진행 중인 WARNING 타이머가 있으면 취소
+            # 진행 중인 WARNING 타이머가 있으면 먼저 취소 — AI mute 가드 이전에 수행.
+            # 그렇지 않으면 AI mute 가 활성일 때 룰 fire 만 suppress 되고 stale WARNING
+            # 타이머가 카운트다운 끝나면 발화해 화면에 룰 알람이 등장 (AI 1순위 위반).
             pending = cache.get(task_key)
             if pending:
                 _revoke(pending)
                 cache.delete(task_key)
+
+            # [Step 3] AI 가 같은 채널에 최근 발화한 경우 룰 fire 를 60s suppress.
+            # 격상 (AI=warning, 룰=danger) 은 danger 키 부재로 자연 통과.
+            if is_ai_mute_active(device_id, channel, RiskLevel.DANGER):
+                RULE_FIRE_SUPPRESSED_BY_AI_TOTAL.labels(
+                    device_id=str(device_id),
+                    channel=str(channel),
+                    level=RiskLevel.DANGER.value,
+                ).inc()
+                continue
+
             # 원자 천이 — 직전 상태가 danger 아닐 때만 1회 fire (race-safe)
             if try_transition(state_key, RiskLevel.DANGER, _CACHE_TTL):
                 fire_power_danger_task.delay(
@@ -148,14 +171,26 @@ def trigger_power_alarms(objs: list, device) -> None:
             prev_state = get_state(state_key)
             if prev_state in (RiskLevel.WARNING, RiskLevel.DANGER):
                 continue
-            # SETNX(cache.add)로 첫 도착자만 타이머 시작 — race 차단
-            if not cache.add(task_key, "_pending_", _CACHE_TTL):
+            # [Step 3] AI mute 가드. WARNING 의 경우 AI 가 같은 또는 더 높은 레벨로
+            # 발화했으면 룰 fire suppress (단계 일치 또는 격상 케이스). 격상은 AI 가
+            # 더 높은 키 set → 모두 부재 → 통과 (방향 반대라 fire 진행 정상).
+            if is_ai_mute_active(device_id, channel, RiskLevel.WARNING):
+                RULE_FIRE_SUPPRESSED_BY_AI_TOTAL.labels(
+                    device_id=str(device_id),
+                    channel=str(channel),
+                    level=RiskLevel.WARNING.value,
+                ).inc()
+                continue
+            # SETNX(cache.add)로 첫 도착자만 타이머 시작 — race 차단.
+            # TTL 은 _TASK_KEY_TTL (카운트다운 + 5s) — 정상 종료 시 tasks.py 가
+            # cache.delete 로 즉시 정리하고, retry/실패는 자연 만료로 정리된다.
+            if not cache.add(task_key, "_pending_", _TASK_KEY_TTL):
                 continue
             task = fire_power_warning_task.apply_async(
                 args=[device_id, channel, value, facility_id, label],
                 countdown=WARNING_DURATION_SEC,
             )
-            cache.set(task_key, task.id, _CACHE_TTL)
+            cache.set(task_key, task.id, _TASK_KEY_TTL)
             try_transition(state_key, RiskLevel.WARNING, _CACHE_TTL)
 
         else:  # normal

@@ -30,8 +30,23 @@ from apps.alerts.tasks import (
 
 GAS_FIELDS = ["co", "h2s", "co2", "o2", "no2", "so2", "o3", "nh3", "voc"]
 
-# 알람 상태/task ID 캐시 유지 시간 (1시간)
-_CACHE_TTL = 3600
+# state_key (`alarm:state:{sensor_id}:{gas}`) 캐시 유지 시간.
+#
+# [Step 4 — 1시간 → 5분 단축]
+# 기존 3600s 는 한 번 danger 천이 후 1시간 동안 같은 (sensor, gas) 의 동일 상태
+# 천이를 모두 skip → 운영에서 "한 번 뜨고 그 뒤 1시간 안 뜸" 누락의 직접 원인.
+# RENOTIFY_COOLDOWN_MINUTES=5 (event_service) 와 일치시켜 두 dedup 계층 (try_
+# transition / Event 쿨다운) 시간이 합치되도록 정렬.
+_CACHE_TTL = 300
+
+# task_key (`alarm:task:{sensor_id}:{gas}`) — WARNING 타이머 진행 신호 키.
+#
+# [Step 5 — TTL 분리·축소]
+# 기존엔 state_key 와 동일한 _CACHE_TTL (1시간) 을 썼다. task 실행 끝나도 키가
+# 잔류해 다음 WARNING 의 cache.add(SETNX) 가 False → 새 타이머 시작 안 됨 → 누락.
+# 카운트다운보다 5초 큰 값으로 두면 race 마진 확보, 정상 종료 시는 tasks.py 가
+# 직접 cache.delete 한다.
+_TASK_KEY_TTL = WARNING_DURATION_SEC + 5
 
 
 def _state_key(sensor_id: int, gas: str) -> str:
@@ -87,14 +102,16 @@ def trigger_gas_alarms(gas_data) -> list[dict]:
             prev_state = get_state(state_key)
             if prev_state in ("warning", "danger"):
                 continue
-            # SETNX(cache.add)로 첫 도착자만 타이머 시작 — race 차단
-            if not cache.add(task_key, "_pending_", _CACHE_TTL):
+            # SETNX(cache.add)로 첫 도착자만 타이머 시작 — race 차단.
+            # TTL 은 _TASK_KEY_TTL (카운트다운 + 5s) — 정상 종료 시 tasks.py 가
+            # cache.delete 로 즉시 정리하고, retry/실패는 자연 만료로 정리된다.
+            if not cache.add(task_key, "_pending_", _TASK_KEY_TTL):
                 continue
             task = fire_warning_alarm_task.apply_async(
                 args=[sensor_id, gas, value, facility_id, source_label],
                 countdown=WARNING_DURATION_SEC,
             )
-            cache.set(task_key, task.id, _CACHE_TTL)
+            cache.set(task_key, task.id, _TASK_KEY_TTL)
             try_transition(state_key, "warning", _CACHE_TTL)
 
         else:  # normal

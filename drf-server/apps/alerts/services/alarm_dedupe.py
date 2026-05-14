@@ -1,4 +1,4 @@
-# apps/alerts/services/alarm_dedupe.py — 알람 상태 천이 원자화
+# apps/alerts/services/alarm_dedupe.py — 알람 상태 천이 원자화 + AI 우선순위 mute
 #
 # Phase 1 C2 — Redis Lua로 GET→CMP→SET을 단일 명령으로 실행해
 # gas_alarm/power_alarm의 cache.get → fire_task.delay → cache.set 비원자
@@ -8,8 +8,11 @@
 # SET한 값을 cache.get/cache.add 등 기존 코드 경로에서도 그대로 읽을 수
 # 있도록 보장한다.
 #
-# 향후 IF §2-3-a에서 state_key에 `:threshold`/`:anomaly` 접미사를 도입할 때도
-# 본 모듈의 시그니처는 변경 없이 그대로 재사용된다.
+# [Step 3 — AI 우선순위 mute]
+# AI 추론 알람이 발화하면 같은 (device, channel) 의 룰 알람을 60s 동안 mute 한다.
+# AI 가 fastapi 측에서 Redis 에 직접 마킹한 키를 본 모듈의 헬퍼가 읽어 가드.
+# 격상 (warning AI → danger 룰) 케이스는 mute 키 자체가 level 별로 분리되어
+# 있어 자연 bypass — 별도 분기 로직 불요.
 
 import pickle
 
@@ -52,3 +55,74 @@ def get_state(state_key: str, default: str = "normal") -> str:
 def clear_state(state_key: str) -> None:
     """알람 상태 키를 삭제(정상 복귀). 다음 try_transition에서 어떤 상태든 천이 가능."""
     cache.delete(state_key)
+
+
+# ── Step 3 — AI 발화 시 룰 mute 가드 ─────────────────────────────────────────
+
+# 룰 위험도의 순서 — 격상 bypass 키 설계용.
+# AI 가 warning 발화 시 normal·warning 키만 set → 룰 danger 들어오면 danger 키 부재
+# → mute 해제 → fire. 격상은 "더 높은 level 키가 없으면 통과" 로 자연 표현된다.
+_LEVELS_AT_OR_BELOW: dict[str, list[str]] = {
+    "normal": ["normal"],
+    "warning": ["normal", "warning"],
+    "danger": ["normal", "warning", "danger"],
+}
+
+# Redis 키 prefix — fastapi `services/ai_mute.py` 와 동일 포맷. 양쪽이 raw redis
+# 클라이언트 (`_redis()`) 로 키를 set/exists 하므로 Django RedisCache 의 pickle
+# 직렬화·prefix 영향을 받지 않고 동일 raw 키 공간을 공유한다. 키 형식 변경 시
+# 양쪽 동시 갱신 필수.
+_AI_FIRED_KEY_TEMPLATE = "ai_fired:{device_id}:{channel}:{rule_level}"
+
+# 기본 mute TTL — power_service.RATE_LIMIT_SEC 와 일치. AI 가 같은 채널을 60s 에
+# 최대 1번 발화하므로 mute 도 그 주기에 맞춰 회수된다.
+AI_MUTE_TTL_SEC = 60
+
+
+def mark_ai_recent(
+    device_id: int,
+    channel: int,
+    rule_level: str,
+    ttl_sec: int = AI_MUTE_TTL_SEC,
+) -> None:
+    """AI 발화를 Redis 에 마킹 — 같은 채널의 룰 알람을 ttl_sec 동안 mute 한다.
+
+    발화 level '이하' 키를 모두 set 함으로써 격상 bypass 를 보장한다 (예: warning
+    발화면 normal/warning 키만 set, danger 키 부재 → 룰 danger 자유 통과). DRF
+    측 호출은 통합 테스트·가스 AI 후속 sprint 의 가스 룰 가드용. 운영에선 fastapi
+    `services.ai_mute.mark_ai_recent` 가 같은 키 공간에 마킹한다.
+
+    raw redis 사용 — try_transition 패턴과 일치. cache.set 의 pickle 직렬화 회피.
+
+    Args:
+        device_id: PowerDevice.id (DRF 측 PK). 가스 도메인 확장 시 sensor_id 도 가능.
+        channel: PowerData.channel (1~16) 또는 가스 0 등.
+        rule_level: AI 발화 레벨을 AI_TO_RULE_LEVEL 로 환산한 결과 ('warning'|'danger').
+            'normal' 도 가능하나 그 경우 어차피 룰도 fire 안 함이라 의미 없음.
+        ttl_sec: mute 유지 시간. 테스트에서 짧게 인자화 가능 (0.1s 등).
+    """
+    redis = _redis()
+    for lv in _LEVELS_AT_OR_BELOW.get(rule_level, [rule_level]):
+        key = _AI_FIRED_KEY_TEMPLATE.format(
+            device_id=device_id, channel=channel, rule_level=lv
+        )
+        redis.set(key, "1", ex=ttl_sec)
+
+
+def is_ai_mute_active(device_id: int, channel: int, rule_level: str) -> bool:
+    """룰이 rule_level 로 발화하려 할 때 mute 상태인지 확인.
+
+    raw redis EXISTS — rule_level 키만 본다. 격상 케이스 (룰 danger, AI 가 warning
+    만 set) 는 danger 키 부재 → False → mute 해제 → 룰 fire 진행. 같거나 낮은
+    level 의 룰 발화만 suppress 된다 (운영 의도와 일치).
+
+    Redis 장애 시 False 반환 (fail-open) — mute 가드 실패가 알람 발화 흐름을
+    막으면 안 됨. 인프라 장애는 별도 모니터링.
+    """
+    key = _AI_FIRED_KEY_TEMPLATE.format(
+        device_id=device_id, channel=channel, rule_level=rule_level
+    )
+    try:
+        return bool(_redis().exists(key))
+    except Exception:
+        return False
