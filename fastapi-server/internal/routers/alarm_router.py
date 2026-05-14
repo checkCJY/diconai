@@ -20,6 +20,22 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/internal", tags=["internal"])
 
 
+class AnomalyMeta(BaseModel):
+    """ANOMALY 알람 전용 ML 메타 — AlarmPayload.anomaly_meta 에 nested.
+
+    [확장 정책]
+    §3 multi-variate IF / CPD / spike detection 추가 시 본 모델에만 필드 추가
+    (combined_risk/anomaly_score 외에 cpd_change_score, ar_residual 등). 외부
+    AlarmPayload 는 그대로 유지 → 다른 alarm_type · 브라우저 처리 영향 0.
+    """
+
+    combined_risk: str  # normal | caution | predict_warn | danger
+    anomaly_score: float  # IF decision_function 결과 (음수=이상)
+    device_id: str | None = None  # PowerDevice 식별
+    channel: int | None = None  # 1~16
+    data_type: str | None = None  # watt | current | voltage
+
+
 class AlarmPayload(BaseModel):
     # 미정의 필드는 통과시키지 않음 — DRF Celery 측이 명시 필드만 보내야 함
     model_config = {"extra": "ignore"}
@@ -37,6 +53,8 @@ class AlarmPayload(BaseModel):
     # 서버(DRF Celery) 발신 시각 — 클라이언트가 우선 사용 (JS 03 R3).
     # 누락 시 클라이언트는 도착 시각(new Date())으로 fallback.
     created_at: str | None = None
+    # ANOMALY 알람 전용 nested 메타 (다른 alarm_type 에선 None)
+    anomaly_meta: AnomalyMeta | None = None
 
 
 @router.post(
