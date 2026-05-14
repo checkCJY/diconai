@@ -45,13 +45,19 @@ services:
       - ./drf-server:/app
       - ./drf-server/db.sqlite3:/app/db.sqlite3
       - ./drf-server/media:/app/media
+      # 학습 자산(parquet 스냅샷 등) — 운영 DB와 분리해 별도 보관.
+      # ARIMA/IF 학습 셋 export, 모델 재현용 데이터셋 스냅샷이 여기에 적재됨.
+      - ./drf-server/ml_datasets:/app/ml_datasets
     command:
       # workers=1 + --reload 조합 — multi-worker에선 inotify가 워커별 분산되며 reload가 불안정.
+      # threads=4 — 더미 폭주 시 단일 워커가 직렬화돼 fastapi→drf 타임아웃 폭주 + 대시보드 멈춤
+      # 발생했음(2026-05-14). 스레드로 동시성 확보 (gunicorn gthread 자동 선택).
       # 운영 배포 시 workers=(2*CPU)+1 권장, --reload 제거.
       - gunicorn
       - config.wsgi:application
       - --bind=0.0.0.0:8000
       - --workers=1
+      - --threads=4
       - --reload
       - --access-logfile=-
     depends_on:

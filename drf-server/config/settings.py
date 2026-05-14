@@ -113,6 +113,20 @@ DATABASES = {
     )
 }
 
+# SQLite 락 완화 (2026-05-14) — 더미 3종 동시 송출 + Celery worker 다중 writer 환경 대응.
+#   - timeout=30: Django 연결 timeout (기본 5초 → 30초)
+#   - transaction_mode='IMMEDIATE': 트랜잭션 시작 시 write lock 선점.
+#     기본 DEFERRED는 SELECT→INSERT 업그레이드 중 다른 writer가 끼면 SQLITE_BUSY_SNAPSHOT을
+#     던지는데, 이건 busy_timeout으로 재시도되지 않고 즉시 실패함 → Celery 알람 태스크가
+#     마이크로초 단위로 retry 폭주하던 원인. IMMEDIATE는 writer를 큐잉시켜 busy_timeout으로
+#     30초까지 기다리게 만든다. WAL 모드에선 reader는 영향 없음.
+#   - busy_timeout PRAGMA 자체는 apps/core/sqlite_pragmas.py가 single source of truth.
+# Postgres로 전환 시 이 블록은 무시되므로 ENGINE 분기로 보호.
+if DATABASES["default"]["ENGINE"] == "django.db.backends.sqlite3":
+    DATABASES["default"].setdefault("OPTIONS", {})
+    DATABASES["default"]["OPTIONS"].setdefault("timeout", 30)
+    DATABASES["default"]["OPTIONS"].setdefault("transaction_mode", "IMMEDIATE")
+
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
@@ -323,7 +337,9 @@ from celery.schedules import crontab  # noqa: E402
 CELERY_BEAT_SCHEDULE = {
     "data_retention_daily": {
         "task": "apps.operations.tasks.data_retention_task.run_data_retention",
-        "schedule": crontab(hour=3, minute=0),
+        # 09:30 KST — 개발자가 작업 시작할 시점. 03시는 호스트 PC 꺼져 있어
+        # WSL2/Docker가 같이 멈춰 cron이 미발사되던 문제(2026-05-14 진단).
+        "schedule": crontab(hour=9, minute=30),
         "args": (False,),  # dry_run=False (실제 삭제)
     },
     # Celery 큐 길이를 30초마다 읽어 Prometheus Gauge에 기록한다.
