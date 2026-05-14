@@ -79,6 +79,7 @@ async def post_to_drf(
     *,
     raise_on_error: bool = False,
     log_category: str = "drf_client",
+    timeout: float | None = None,
 ) -> httpx.Response | None:
     """DRF에 비동기 POST. 절대 URL 또는 상대 path를 받는다.
 
@@ -87,16 +88,20 @@ async def post_to_drf(
         json: 직렬화 대상
         raise_on_error: 통신/4xx/5xx 시 DrfClientError 발생 여부
         log_category: 로깅 카테고리 (호출자가 도메인 식별 가능하도록)
+        timeout: 호출별 timeout 초. None 이면 settings.DRF_REQUEST_TIMEOUT_SEC
+            (기본 5초). anomaly forward 처럼 fire-and-forget 호출은 2초로 단축해
+            빠른 실패 후 다음 inference 처리.
 
     Returns:
         성공 시 httpx.Response. raise_on_error=False에서 실패 시 None.
     """
     url = path if path.startswith("http") else f"{settings.DRF_BASE_URL}{path}"
+    effective_timeout = (
+        timeout if timeout is not None else settings.DRF_REQUEST_TIMEOUT_SEC
+    )
 
     try:
-        async with httpx.AsyncClient(
-            timeout=settings.DRF_REQUEST_TIMEOUT_SEC
-        ) as client:
+        async with httpx.AsyncClient(timeout=effective_timeout) as client:
             res = await client.post(url, json=json, headers=_auth_headers())
     except httpx.ConnectError as exc:
         logger.error(f"[{log_category}] action=connect_failed url={url} error={exc}")
