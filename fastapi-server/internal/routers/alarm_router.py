@@ -53,6 +53,10 @@ class AlarmPayload(BaseModel):
     # 서버(DRF Celery) 발신 시각 — 클라이언트가 우선 사용 (JS 03 R3).
     # 누락 시 클라이언트는 도착 시각(new Date())으로 fallback.
     created_at: str | None = None
+    # AlarmRecord.get_short_message() 결과 — 패널·Toast 의 한 줄 표시용.
+    # summary(긴 운영자 안내문) 와 구분되는 도메인 사실. DRF API 응답의 message
+    # 필드와 동일 텍스트 (single source of truth). 누락 시 프론트는 summary fallback.
+    message: str | None = None
     # ANOMALY 알람 전용 nested 메타 (다른 alarm_type 에선 None)
     anomaly_meta: AnomalyMeta | None = None
 
