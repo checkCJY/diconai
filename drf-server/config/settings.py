@@ -326,6 +326,13 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": crontab(hour=3, minute=0),
         "args": (False,),  # dry_run=False (실제 삭제)
     },
+    # Celery 큐 길이를 30초마다 읽어 Prometheus Gauge에 기록한다.
+    # 큐 길이 추이를 보고 worker 증설 또는 전용 큐 분리 시점을 결정.
+    # timedelta 사용: crontab은 최소 1분 단위라 30초 주기는 timedelta로 설정.
+    "celery_queue_length_metrics": {
+        "task": "apps.operations.tasks.queue_metrics_task.record_celery_queue_length",
+        "schedule": timedelta(seconds=30),
+    },
 }
 
 # ── Cache (Redis) ─────────────────────────────────────────────

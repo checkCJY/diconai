@@ -13,28 +13,11 @@ import httpx
 from celery import shared_task
 from django.conf import settings
 from django.utils import timezone
-from prometheus_client import Counter
 
 # ── Prometheus 메트릭 ─────────────────────────────────────────────────────
-# Celery worker는 gunicorn과 별도 프로세스라 HTTP 미들웨어가 못 잡는다.
-# PROMETHEUS_MULTIPROC_DIR 설정 시 파일 기반으로 gunicorn과 메트릭을 공유하고,
-# DRF /metrics 엔드포인트에서 MultiProcessCollector가 합산해 노출한다.
-
-# 알람 태스크 실제 발송 횟수 — event is not None 조건 통과한 것만 카운팅.
-# (dedupe/쿨다운으로 걸러진 AlarmRecord 생성만 된 케이스는 제외)
-_ALARM_FIRED_TOTAL = Counter(
-    "alarm_fired_total",
-    "Total alarm notifications pushed to WebSocket (deduped, passed cooldown)",
-    ["alarm_type", "risk_level"],
-)
-
-# WS 푸시 실패 횟수 — FastAPI /internal/alarms/push/ 호출 실패.
-# 이 값이 올라가면 알람이 브라우저에 전달되지 않은 것 — FastAPI 상태 함께 확인.
-_ALARM_WS_PUSH_FAILED_TOTAL = Counter(
-    "alarm_ws_push_failed_total",
-    "Total WebSocket alarm push failures (network error or 5xx from FastAPI)",
-    ["alarm_type"],
-)
+# 메트릭 선언은 apps/core/metrics.py 에 중앙화되어 있다.
+# Celery worker 프로세스에서도 multiprocess 파일 기반으로 gunicorn과 공유된다.
+from apps.core.metrics import ALARM_FIRED_TOTAL, ALARM_WS_PUSH_FAILED_TOTAL
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +93,7 @@ def _push_to_ws(alarm_data: dict, *, raise_on_failure: bool = True) -> None:
         logger.warning("FastAPI WS 알람 푸시 실패: %s", e)
         result = "failure"
         pushed = False
-        _ALARM_WS_PUSH_FAILED_TOTAL.labels(
+        ALARM_WS_PUSH_FAILED_TOTAL.labels(
             alarm_type=alarm_data.get("alarm_type", "unknown")
         ).inc()
 
@@ -170,7 +153,7 @@ def fire_danger_alarm_task(
         )
 
         if event is not None:
-            _ALARM_FIRED_TOTAL.labels(alarm_type="gas_threshold", risk_level="danger").inc()
+            ALARM_FIRED_TOTAL.labels(alarm_type="gas_threshold", risk_level="danger").inc()
             _push_to_ws(
                 {
                     "event_id": event.id,
@@ -238,7 +221,7 @@ def fire_warning_alarm_task(
         )
 
         if event is not None:
-            _ALARM_FIRED_TOTAL.labels(alarm_type="gas_threshold", risk_level="warning").inc()
+            ALARM_FIRED_TOTAL.labels(alarm_type="gas_threshold", risk_level="warning").inc()
             _push_to_ws(
                 {
                     "event_id": event.id,
@@ -297,7 +280,7 @@ def fire_geofence_alarm_task(
             detected_at=timezone.now(),
         )
         if event is not None:
-            _ALARM_FIRED_TOTAL.labels(alarm_type="geofence_intrusion", risk_level=risk_level).inc()
+            ALARM_FIRED_TOTAL.labels(alarm_type="geofence_intrusion", risk_level=risk_level).inc()
             _push_to_ws(
                 {
                     "event_id": event.id,
@@ -388,7 +371,7 @@ def fire_power_danger_task(
             detected_at=timezone.now(),
         )
         if event is not None:
-            _ALARM_FIRED_TOTAL.labels(alarm_type="power_overload", risk_level="danger").inc()
+            ALARM_FIRED_TOTAL.labels(alarm_type="power_overload", risk_level="danger").inc()
             _push_to_ws(
                 {
                     "event_id": event.id,
@@ -448,7 +431,7 @@ def fire_power_warning_task(
             detected_at=timezone.now(),
         )
         if event is not None:
-            _ALARM_FIRED_TOTAL.labels(alarm_type="power_overload", risk_level="warning").inc()
+            ALARM_FIRED_TOTAL.labels(alarm_type="power_overload", risk_level="warning").inc()
             _push_to_ws(
                 {
                     "event_id": event.id,

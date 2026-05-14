@@ -135,6 +135,33 @@ def _build_feature_row(window_values: list[float], window: int) -> np.ndarray:
     diff = float(arr[-1] - arr[-2])
     return np.array([[value, roll_mean, roll_std, diff]], dtype=np.float64)
 
+    # 이성현 추가 — 다변량 추론용 피처 빌더 (co + h2s + co2 동시)
+
+
+def _build_multi_feature_row(
+    windows: dict[str, list[float]], window: int
+) -> np.ndarray:
+    """다변량 추론 1회용 — 가스별 슬라이딩 윈도우를 수평 스택해 1행 피처 반환.
+
+    예: {"co": [...30개], "h2s": [...30개], "co2": [...30개]} → shape (1, 12)
+    가스 1개당 4피처(value, roll_mean, roll_std, diff) x 3가스 = 12피처
+    """
+    if not windows:
+        raise HTTPException(status_code=400, detail="windows 가 비어 있습니다.")
+    parts: list[float] = []
+    for gas_name, values in windows.items():
+        if len(values) < window:
+            raise HTTPException(
+                status_code=400,
+                detail=f"{gas_name} window_values 길이 부족: {len(values)} < {window}",
+            )
+        arr = np.asarray(values[-window:], dtype=np.float64)
+        roll_mean = float(arr.mean())
+        roll_std = float(arr.std(ddof=0))
+        diff = float(arr[-1] - arr[-2])
+        parts.extend([float(arr[-1]), roll_mean, roll_std, diff])
+    return np.array([parts], dtype=np.float64)
+
 
 # ---------------------------------------------------------------------------
 # 스키마

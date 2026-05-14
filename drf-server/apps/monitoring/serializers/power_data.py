@@ -1,7 +1,10 @@
 # monitoring/serializers/power_data.py
+from django.db import IntegrityError, OperationalError
+
 from rest_framework import serializers
 
 from apps.core.constants import RiskLevel, SensorStatus
+from apps.core.metrics import DB_SAVE_TOTAL
 from apps.facilities.models.devices import PowerDevice
 from apps.monitoring.models import PowerData, PowerEvent
 from apps.monitoring.services.power_alarm import trigger_power_alarms
@@ -120,7 +123,24 @@ class PowerDataBulkIngestSerializer(serializers.Serializer):
             )
             for ch in validated_data["channels"]
         ]
-        PowerData.objects.bulk_create(objs, ignore_conflicts=True)
+        # DB_SAVE_TOTAL: bulk_create 호출 성공/실패를 추적한다.
+        # ignore_conflicts=True이므로 중복 행은 조용히 skip — IntegrityError는 실질적으로 발생 안 함.
+        # 그러나 SQLite "database is locked"은 발생 가능하므로 OperationalError를 캡처한다.
+        try:
+            PowerData.objects.bulk_create(objs, ignore_conflicts=True)
+        except OperationalError as e:
+            error_type = "db_locked" if "database is locked" in str(e).lower() else "other"
+            DB_SAVE_TOTAL.labels(model="power", result="error", error_type=error_type).inc()
+            raise
+        except IntegrityError:
+            DB_SAVE_TOTAL.labels(model="power", result="error", error_type="integrity").inc()
+            raise
+        except Exception:
+            DB_SAVE_TOTAL.labels(model="power", result="error", error_type="other").inc()
+            raise
+
+        DB_SAVE_TOTAL.labels(model="power", result="ok", error_type="").inc()
+
         # ignore_conflicts=True 시 conflict 행은 저장 skip되지만 objs 리스트엔 그대로 남는다.
         # 미저장 행에 알람을 발화하지 않도록 unique 조건으로 실제 저장된 행만 재조회.
         # (power_device, channel, data_type, measured_at) 복합 UNIQUE 보장 — Phase 1 C3.
