@@ -42,24 +42,10 @@ class AlarmRecordSerializer(serializers.ModelSerializer):
         return obj.geofence.name if obj.geofence else None
 
     def get_message(self, obj):
-        """이벤트 현황 패널 등에 표시할 한국어 요약 메시지.
+        """이벤트 현황 패널 등에 표시할 한 줄 메시지.
 
-        원안 디자인 — "산소 농도 정상 범위 이하로 저하" 처럼 도메인 의미가 한눈에
-        드러나야 한다. alarm_type 별 분기로 발생원·측정값·임계 단서를 조합.
+        실제 분기는 AlarmRecord.get_short_message() 가 single source of truth.
+        WS push payload (apps.alerts.tasks._push_to_ws) 도 같은 메서드를 호출하므로
+        API 응답과 실시간 push 가 같은 텍스트를 노출 (drift 방지).
         """
-        if obj.gas_type and obj.measured_value is not None:
-            return f"{obj.gas_type.upper()} 임계치 초과 ({obj.measured_value} ppm)"
-        if obj.power_device_id and obj.measured_value is not None:
-            if obj.alarm_type == "power_anomaly_ai":
-                return f"AI 이상 패턴 감지 ({obj.measured_value} W)"
-            return f"전력 임계치 초과 ({obj.measured_value} W)"
-        if obj.geofence_id:
-            return "위험구역 진입"
-        if obj.alarm_type == "sensor_fault":
-            return "센서 통신 이상"
-        # 화면 정책 알람 (PPE, VR 교육 등) — alarm_type 라벨이 이미 한글이라 그대로.
-        return (
-            obj.get_alarm_type_display()
-            if hasattr(obj, "get_alarm_type_display")
-            else obj.alarm_type
-        )
+        return obj.get_short_message()
