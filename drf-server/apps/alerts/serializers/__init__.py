@@ -1,4 +1,5 @@
 from .alarm_record import AlarmRecordSerializer
+from .anomaly_alarm_record import AnomalyAlarmRecordPayloadSerializer
 from .event import EventListSerializer, EventDetailSerializer
 from .responses import (
     MyStatusDataSerializer,
@@ -9,6 +10,7 @@ from .responses import (
 
 __all__ = [
     "AlarmRecordSerializer",
+    "AnomalyAlarmRecordPayloadSerializer",
     "EventListSerializer",
     "EventDetailSerializer",
     "MyStatusDataSerializer",

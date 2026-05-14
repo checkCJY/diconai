@@ -74,6 +74,17 @@ class AlarmRecord(BaseModel):
         related_name="alarm_records_as_worker",
     )
 
+    # ML 추론 메타 (POWER_ANOMALY_AI 등 AI 알람 시 MLAnomalyResult 와 PK join 용)
+    # nullable: 임계치 알람·기존 데이터는 None 유지
+    ml_anomaly_result = models.ForeignKey(
+        "ml.MLAnomalyResult",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="alarm_records",
+        db_index=True,
+    )
+
     # 판정 내용
     alarm_type = models.CharField(
         max_length=30, choices=AlarmType.choices, verbose_name="알람 유형"
@@ -97,13 +108,13 @@ class AlarmRecord(BaseModel):
     def save(self, *args, **kwargs):
         """생성만 허용 — 수정 차단"""
         if self.pk is not None:
-            # event FK 업데이트만 예외 허용 (Event 병합 시 필요)
+            # event FK (병합 시) + ml_anomaly_result FK (AI 알람 ML 메타 연결 시) 만 예외 허용
             update_fields = kwargs.get("update_fields")
-            allowed = {"event"}
+            allowed = {"event", "ml_anomaly_result"}
             if update_fields is None or not set(update_fields).issubset(allowed):
                 raise ValueError(
                     "AlarmRecord는 수정할 수 없습니다. "
-                    "event 필드만 병합 시 업데이트 가능합니다."
+                    "event / ml_anomaly_result 필드만 사후 연결 시 업데이트 가능합니다."
                 )
         super().save(*args, **kwargs)
 
