@@ -8,7 +8,16 @@ from django.utils import timezone
 from datetime import timedelta
 
 RISK_LEVELS = ["normal", "warning", "danger"]
-RENOTIFY_COOLDOWN_MINUTES = 5
+
+# 같은 활성 Event 안에서 새 AlarmRecord 가 들어왔을 때 재푸시 (last_notified_at
+# 갱신 + WS broadcast) 사이의 최소 간격.
+#
+# [5번 문서 §9 정렬] "동일 작업자+센서+구역+위험단계 1분 내 1회" 패턴.
+# 산업 안전 도메인에서 위험 지속은 미대응 신호 — 1분 cadence 가 운영자 escalation
+# 트리거. monitoring._CACHE_TTL (가스/전력 try_transition) 과 동기. 추후 위험
+# 단계별 차등 (Critical 1m / Warning 3m 등) 필요 시 dict/함수로 리팩토링 가능,
+# 단 운영 데이터 누적 전까진 YAGNI.
+RENOTIFY_COOLDOWN_MINUTES = 1
 
 
 # 알람발생 시, Event 생성/병합 플로우

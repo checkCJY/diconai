@@ -32,12 +32,14 @@ GAS_FIELDS = ["co", "h2s", "co2", "o2", "no2", "so2", "o3", "nh3", "voc"]
 
 # state_key (`alarm:state:{sensor_id}:{gas}`) 캐시 유지 시간.
 #
-# [Step 4 — 1시간 → 5분 단축]
+# [Step 4 — 1시간 → 1분 단축, 5번 문서 §9 정렬]
 # 기존 3600s 는 한 번 danger 천이 후 1시간 동안 같은 (sensor, gas) 의 동일 상태
 # 천이를 모두 skip → 운영에서 "한 번 뜨고 그 뒤 1시간 안 뜸" 누락의 직접 원인.
-# RENOTIFY_COOLDOWN_MINUTES=5 (event_service) 와 일치시켜 두 dedup 계층 (try_
-# transition / Event 쿨다운) 시간이 합치되도록 정렬.
-_CACHE_TTL = 300
+# RENOTIFY_COOLDOWN_MINUTES=1 (event_service) 와 일치시켜 두 dedup 계층 (try_
+# transition / Event 쿨다운) 시간이 합치되도록 정렬. 산업 안전 도메인에서 위험
+# 지속 시 1분 cadence 는 escalation 트리거 역할도 함 (5번 문서 §9 의 "동일 작업자
+# +센서+구역+위험단계 1분 내 1회"). 추후 1~2주 운영 데이터 보고 재평가.
+_CACHE_TTL = 60
 
 # task_key (`alarm:task:{sensor_id}:{gas}`) — WARNING 타이머 진행 신호 키.
 #

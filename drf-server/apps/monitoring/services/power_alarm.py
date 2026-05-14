@@ -40,10 +40,12 @@ from apps.facilities.services.threshold_service import (
     evaluate_voltage_risk,
 )
 
-# state_key 캐시 유지 시간. [Step 4 — 1시간 → 5분 단축]
-# RENOTIFY_COOLDOWN_MINUTES=5 와 일치시켜 try_transition / Event cooldown 두 dedup
-# 계층 시간 정렬. 가스 측 동일 변경과 짝.
-_CACHE_TTL = 300
+# state_key 캐시 유지 시간. [Step 4 — 1시간 → 1분 단축, 5번 문서 §9 정렬]
+# RENOTIFY_COOLDOWN_MINUTES=1 와 일치시켜 try_transition / Event cooldown 두 dedup
+# 계층 시간 정렬. 가스 측 동일 변경과 짝. 위험 지속 시 1분 cadence 는 escalation
+# 트리거 역할 — 운영자가 1분째 대응 안 하면 같은 알람 재푸시로 인지 유도.
+# 추후 1~2주 운영 데이터 후 재평가.
+_CACHE_TTL = 60
 _AXIS_TTL = 300  # 축별 위험도 캐시 (송신 주기 1초 대비 충분)
 
 # task_key (`alarm:power:task:{device_id}:{channel}`) — WARNING 타이머 진행 신호.

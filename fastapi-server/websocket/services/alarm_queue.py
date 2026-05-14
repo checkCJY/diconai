@@ -28,9 +28,14 @@ MAX_QUEUE_LEN = 10_000  # 폭주 시 가장 오래된 알람부터 drop (LTRIM)
 # fingerprint 키 prefix — `redis-cli KEYS "alarm:push:dedup:*"` 로 모니터링 가능.
 DEDUP_KEY_PREFIX = "alarm:push:dedup:"
 # 기본 dedup TTL — Celery retry 간격 5s × max_retries 3 = 15s 보다 충분히 길고,
-# 정상 5 분 cooldown (event_service.RENOTIFY_COOLDOWN_MINUTES) 보다 짧아야 5 분 후
-# 같은 fingerprint 의 정상 재발화를 막지 않는다.
-PUSH_DEDUP_TTL_SEC = 60
+# RENOTIFY_COOLDOWN_MINUTES=1 (event_service) 보다 명확히 짧아야 1분 후 같은
+# fingerprint 의 정상 재발화를 막지 않는다.
+#
+# [hard requirement 아님, 가독성·예측가능성 마진]
+# race 발생해도 결과는 "한 cycle 누락" 이지 "잘못된 알림 발사" 아님 — 최대 1분
+# 지연 수준. 그러나 cooldown(60s) 과 동일 TTL 두면 만료 타이밍 race 가독성 저하
+# 라 30s 로 마진. 운영 데이터 후 재평가.
+PUSH_DEDUP_TTL_SEC = 30
 
 logger = logging.getLogger(__name__)
 
