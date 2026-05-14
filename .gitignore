@@ -19,6 +19,13 @@ drf-server/staticfiles/
 drf-server/ml_models/
 fastapi-server/ml_models/
 
+# DB 수동 백업 — backfill 같은 대량 작업 전 보존용. 수백 MB 단위라 git 부적합.
+drf-server/db.sqlite3.backup_*
+
+# 평가/EDA ad-hoc 스크립트 — sprint 단위 1회용. changelog 의 명령어로 재현 가능.
+# 보존하지만 git 추적 X (다음 sprint 시 새로 작성하거나 재사용).
+drf-server/_eval_*.py
+
 # Environment
 .env
 *.env
@@ -39,6 +46,9 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Prometheus multiprocess metric files (런타임 생성 파일, 커밋 불필요)
+drf-server/prometheus_multiproc/
 
 .claude
 skill

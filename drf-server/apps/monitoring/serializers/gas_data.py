@@ -1,5 +1,8 @@
+from django.db import IntegrityError, OperationalError
+
 from rest_framework import serializers
 
+from apps.core.metrics import DB_SAVE_TOTAL
 from apps.facilities.models import GasSensor
 from apps.monitoring.models.gas_data import GasData
 
@@ -65,7 +68,24 @@ class GasDataCreateSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
-        gas_data = GasData.objects.create(**validated_data)
+        # DB_SAVE_TOTAL: GasData 저장 성공/실패를 추적한다.
+        # SQLite 운영 중 동시 쓰기 증가 시 "database is locked" OperationalError가 발생.
+        # 이 에러 빈도를 모니터링해 PostgreSQL 마이그레이션 타이밍을 결정하는 데 사용한다.
+        try:
+            gas_data = GasData.objects.create(**validated_data)
+        except OperationalError as e:
+            error_type = "db_locked" if "database is locked" in str(e).lower() else "other"
+            DB_SAVE_TOTAL.labels(model="gas", result="error", error_type=error_type).inc()
+            raise
+        except IntegrityError:
+            DB_SAVE_TOTAL.labels(model="gas", result="error", error_type="integrity").inc()
+            raise
+        except Exception:
+            DB_SAVE_TOTAL.labels(model="gas", result="error", error_type="other").inc()
+            raise
+
+        DB_SAVE_TOTAL.labels(model="gas", result="ok", error_type="").inc()
+
         gas_data.gas_sensor.last_reading = gas_data.measured_at
         gas_data.gas_sensor.save(update_fields=["last_reading", "updated_at"])
 

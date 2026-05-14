@@ -14,6 +14,11 @@ from celery import shared_task
 from django.conf import settings
 from django.utils import timezone
 
+# ── Prometheus 메트릭 ─────────────────────────────────────────────────────
+# 메트릭 선언은 apps/core/metrics.py 에 중앙화되어 있다.
+# Celery worker 프로세스에서도 multiprocess 파일 기반으로 gunicorn과 공유된다.
+from apps.core.metrics import ALARM_FIRED_TOTAL, ALARM_WS_PUSH_FAILED_TOTAL
+
 logger = logging.getLogger(__name__)
 
 # WARNING 타이머 — gas_alarm.py / power_alarm.py가 import해서 사용하므로
@@ -88,6 +93,9 @@ def _push_to_ws(alarm_data: dict, *, raise_on_failure: bool = True) -> None:
         logger.warning("FastAPI WS 알람 푸시 실패: %s", e)
         result = "failure"
         pushed = False
+        ALARM_WS_PUSH_FAILED_TOTAL.labels(
+            alarm_type=alarm_data.get("alarm_type", "unknown")
+        ).inc()
 
     try:
         from apps.operations.tasks.integration_log_task import (
@@ -145,6 +153,7 @@ def fire_danger_alarm_task(
         )
 
         if event is not None:
+            ALARM_FIRED_TOTAL.labels(alarm_type="gas_threshold", risk_level="danger").inc()
             _push_to_ws(
                 {
                     "event_id": event.id,
@@ -212,6 +221,7 @@ def fire_warning_alarm_task(
         )
 
         if event is not None:
+            ALARM_FIRED_TOTAL.labels(alarm_type="gas_threshold", risk_level="warning").inc()
             _push_to_ws(
                 {
                     "event_id": event.id,
@@ -270,6 +280,7 @@ def fire_geofence_alarm_task(
             detected_at=timezone.now(),
         )
         if event is not None:
+            ALARM_FIRED_TOTAL.labels(alarm_type="geofence_intrusion", risk_level=risk_level).inc()
             _push_to_ws(
                 {
                     "event_id": event.id,
@@ -360,6 +371,7 @@ def fire_power_danger_task(
             detected_at=timezone.now(),
         )
         if event is not None:
+            ALARM_FIRED_TOTAL.labels(alarm_type="power_overload", risk_level="danger").inc()
             _push_to_ws(
                 {
                     "event_id": event.id,
@@ -419,6 +431,7 @@ def fire_power_warning_task(
             detected_at=timezone.now(),
         )
         if event is not None:
+            ALARM_FIRED_TOTAL.labels(alarm_type="power_overload", risk_level="warning").inc()
             _push_to_ws(
                 {
                     "event_id": event.id,

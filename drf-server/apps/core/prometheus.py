@@ -3,8 +3,15 @@
 django-prometheus가 django<6 요구라 직접 작성. fastapi-server/app.py의
 prometheus 미들웨어와 메트릭 이름·label 동일하게 맞춤(서버 구분은 prometheus
 scrape job label로).
+
+multiprocess 모드:
+  PROMETHEUS_MULTIPROC_DIR 환경변수가 설정되면 prometheus_client가 각 프로세스
+  (gunicorn 워커, celery-worker)의 메트릭을 해당 디렉토리에 파일로 저장한다.
+  /metrics 엔드포인트에서 MultiProcessCollector로 전체 파일을 합산해 노출하므로
+  Celery 태스크에서 inc()한 Counter도 Prometheus가 수집할 수 있다.
 """
 
+import os
 import time
 
 from django.http import HttpResponse
@@ -52,4 +59,12 @@ class PrometheusMiddleware:
 
 
 def metrics_view(_request):
+    # PROMETHEUS_MULTIPROC_DIR 설정 시 모든 프로세스의 메트릭을 합산해 반환.
+    # 미설정(로컬 단독 실행) 시 기존 단일 프로세스 방식으로 동작.
+    if os.environ.get("PROMETHEUS_MULTIPROC_DIR"):
+        from prometheus_client import CollectorRegistry
+        from prometheus_client.multiprocess import MultiProcessCollector
+        registry = CollectorRegistry()
+        MultiProcessCollector(registry)
+        return HttpResponse(generate_latest(registry), content_type=CONTENT_TYPE_LATEST)
     return HttpResponse(generate_latest(), content_type=CONTENT_TYPE_LATEST)
