@@ -405,7 +405,9 @@ function initWebSocket() {
         data.alarms.forEach(alarm => {
           const alarmData = AlarmMapper.fromSensorsAlarm(alarm);
           // 새 이벤트(danger/warning)만 중앙 팝업 — 조치완료 전 동일 이벤트 재발화는 팝업 없음
-          if (alarm.is_new_event) AlarmPopup.show(alarmData);
+          // 2026-05-15 알람 재설계: event_resolved_at 박힌 RESOLVED 신호도 show 로 흘려
+          // _handleResolved 분기가 같은 event_id 떠있는 팝업 close + 토스트 처리.
+          if (alarm.is_new_event || alarm.event_resolved_at) AlarmPopup.show(alarmData);
           // 정상화는 우하단 토스트
           if (alarm.risk_level === 'normal' && typeof AlarmToast !== 'undefined') {
             AlarmToast.show(alarmData);
