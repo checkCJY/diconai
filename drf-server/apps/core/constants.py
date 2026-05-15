@@ -67,6 +67,19 @@ class AlarmType(models.TextChoices):
     GAS_ANOMALY_AI = "gas_anomaly_ai", "가스 AI 이상 감지"
 
 
+# AI 추론 위험도 → 룰 측 RiskLevel 매핑.
+# AI 모델은 4단계(normal/caution/predict_warn/danger), 룰은 3단계(normal/warning/danger).
+# Step 3 AI mute 가드에서 "AI 발화 레벨 이상의 룰 fire 를 60s suppress" 로직의 단일
+# 진실 공급원. 곳곳에 암묵 매핑이 박히면 회귀 — predict_warn 이 warning 인지 danger
+# 인지 의견 갈리는 순간 dedup 키 충돌·격상 bypass 깨짐.
+AI_TO_RULE_LEVEL: dict[str, str] = {
+    "normal": RiskLevel.NORMAL.value,
+    "caution": RiskLevel.WARNING.value,
+    "predict_warn": RiskLevel.WARNING.value,
+    "danger": RiskLevel.DANGER.value,
+}
+
+
 # 정책 화면 노출 9종 (SENSOR_FAULT 제외) — AlertPolicy.event_type 선택지
 USER_FACING_ALARM_TYPES = [
     AlarmType.GAS_THRESHOLD,

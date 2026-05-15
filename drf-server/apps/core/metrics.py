@@ -115,3 +115,19 @@ GEOFENCE_CHECK_DURATION = Histogram(
     "Time to check for dangerous sensors inside geofence (includes DB queries)",
     buckets=[0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0],
 )
+
+
+# ── AI 우선순위 mute 메트릭 ───────────────────────────────────────────────────
+# Step 3 — AI 발화 시 같은 채널의 룰 알람을 60s 동안 mute 한다. 룰 fire 가 가드로
+# skip 되는 횟수를 추적해 운영 중 "왜 룰이 안 떴나?" 디버깅 자료로 쓰고, AI 의 오탐
+# 가능성을 시계열로 점검 (mute 빈도가 비정상적으로 높으면 AI 임계치 재학습 신호).
+#
+# 레이블:
+#   device_id : PowerDevice.id (string). cardinality 우려 적음 (현재 64개 미만).
+#   channel   : "1"~"16" — _INFERENCE_ENABLED_CHANNELS 확장 시 사용 채널만 증가.
+#   level     : "warning" | "danger" — skip 된 룰 fire 의 위험 단계.
+RULE_FIRE_SUPPRESSED_BY_AI_TOTAL = Counter(
+    "rule_fire_suppressed_by_ai_total",
+    "Rule alarm fire skipped because an AI alarm fired on the same channel recently",
+    ["device_id", "channel", "level"],
+)

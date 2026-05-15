@@ -12,6 +12,7 @@ import logging
 import httpx
 from celery import shared_task
 from django.conf import settings
+from django.core.cache import cache
 from django.utils import timezone
 
 # ── Prometheus 메트릭 ─────────────────────────────────────────────────────
@@ -153,7 +154,9 @@ def fire_danger_alarm_task(
         )
 
         if event is not None:
-            ALARM_FIRED_TOTAL.labels(alarm_type="gas_threshold", risk_level="danger").inc()
+            ALARM_FIRED_TOTAL.labels(
+                alarm_type="gas_threshold", risk_level="danger"
+            ).inc()
             _push_to_ws(
                 {
                     "event_id": event.id,
@@ -221,7 +224,9 @@ def fire_warning_alarm_task(
         )
 
         if event is not None:
-            ALARM_FIRED_TOTAL.labels(alarm_type="gas_threshold", risk_level="warning").inc()
+            ALARM_FIRED_TOTAL.labels(
+                alarm_type="gas_threshold", risk_level="warning"
+            ).inc()
             _push_to_ws(
                 {
                     "event_id": event.id,
@@ -242,6 +247,13 @@ def fire_warning_alarm_task(
                 value,
                 alarm is not None,
             )
+
+        # [Step 5] 정상 종료 시 task_key 즉시 정리.
+        # normal 처리 (gas_alarm.py) 의 cache.delete 에 의존하지 않고 task 가 직접
+        # 책임 — normal 천이가 안 들어와도 잔류 키로 다음 WARNING 이 막히지 않게.
+        # retry 경로는 아래 except 에서 raise 후 finally 없이 종료 → 잔류 허용
+        # (_TASK_KEY_TTL=35s 로 자연 정리).
+        cache.delete(f"alarm:task:{sensor_id}:{gas_type}")
 
     except Exception as exc:
         logger.error("WARNING 알람 생성 실패: %s", exc)
@@ -280,7 +292,9 @@ def fire_geofence_alarm_task(
             detected_at=timezone.now(),
         )
         if event is not None:
-            ALARM_FIRED_TOTAL.labels(alarm_type="geofence_intrusion", risk_level=risk_level).inc()
+            ALARM_FIRED_TOTAL.labels(
+                alarm_type="geofence_intrusion", risk_level=risk_level
+            ).inc()
             _push_to_ws(
                 {
                     "event_id": event.id,
@@ -371,7 +385,9 @@ def fire_power_danger_task(
             detected_at=timezone.now(),
         )
         if event is not None:
-            ALARM_FIRED_TOTAL.labels(alarm_type="power_overload", risk_level="danger").inc()
+            ALARM_FIRED_TOTAL.labels(
+                alarm_type="power_overload", risk_level="danger"
+            ).inc()
             _push_to_ws(
                 {
                     "event_id": event.id,
@@ -431,7 +447,9 @@ def fire_power_warning_task(
             detected_at=timezone.now(),
         )
         if event is not None:
-            ALARM_FIRED_TOTAL.labels(alarm_type="power_overload", risk_level="warning").inc()
+            ALARM_FIRED_TOTAL.labels(
+                alarm_type="power_overload", risk_level="warning"
+            ).inc()
             _push_to_ws(
                 {
                     "event_id": event.id,
@@ -452,6 +470,10 @@ def fire_power_warning_task(
                 value,
                 alarm is not None,
             )
+
+        # [Step 5] 정상 종료 시 task_key 즉시 정리 (가스 task 와 동일 패턴).
+        cache.delete(f"alarm:power:task:{device_id}:{channel}")
+
     except Exception as exc:
         logger.error("전력 WARNING 알람 생성 실패: %s", exc)
         raise self.retry(exc=exc)
