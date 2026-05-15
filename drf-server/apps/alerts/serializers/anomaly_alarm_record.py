@@ -15,7 +15,8 @@ from apps.core.constants import AlarmType, GasTypeChoices, RiskLevel
 
 class AnomalyAlarmRecordPayloadSerializer(serializers.Serializer):
     alarm_type = serializers.ChoiceField(
-        choices=[AlarmType.POWER_ANOMALY_AI],
+        # 이성현 추가. GAS_ANOMALY_AI 추가
+        choices=[AlarmType.POWER_ANOMALY_AI, AlarmType.GAS_ANOMALY_AI]
     )
     risk_level = serializers.ChoiceField(choices=RiskLevel.choices)
     source_device_id = serializers.CharField(required=False, allow_null=True)
