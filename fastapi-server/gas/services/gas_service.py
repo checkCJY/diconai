@@ -6,8 +6,10 @@
 #
 # 알람은 Celery 태스크가 /internal/alarms/push/ 를 통해 직접 active_alarms에 추가한다.
 # HTTP Push(/internal/*) 없이 websocket/state.py를 직접 갱신하는 방식을 사용한다.
+import time
 import logging
-from websocket.services.alarm_queue import push_alarm
+import asyncio
+from services.anomaly_alarm import forward_inference_e2e
 from datetime import datetime, timezone
 
 from fastapi import HTTPException
@@ -32,6 +34,10 @@ logger = logging.getLogger(__name__)
 _co_window: deque = deque(maxlen=30)
 _h2s_window: deque = deque(maxlen=30)
 _co2_window: deque = deque(maxlen=30)
+
+# 이성현 추가 — 같은 센서 60초당 1회만 알람 발화 (전력 서비스와 동일 rate limit 패턴)
+_gas_last_fired_at: dict[str, float] = {}
+GAS_RATE_LIMIT_SEC = 30
 
 DRF_GAS_PATH = "/api/monitoring/gas/"
 
@@ -76,20 +82,63 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
                 entry.window,
             )
             pred = int(entry.model.predict(row)[0])
-            if pred == -1:
-                logger.warning(
-                    f"[AI 이상탐지] co+h2s+co2 이상 감지 | device={payload.device_id} | co={payload.co} h2s={payload.h2s} co2={payload.co2}"
-                )
-                await push_alarm(
-                    {
-                        "alarm_type": "gas_anomaly_ai",
-                        "risk_level": "danger",
-                        "source_label": "가스센서 AI 이상탐지",
-                        "summary": f"가스 이상 감지 (AI) | CO:{payload.co} H2S:{payload.h2s} CO2:{payload.co2}",
-                        "is_new_event": True,
-                        "gas_type": "co",
-                        "measured_value": payload.co,
-                    }
+            score = float(entry.model.decision_function(row)[0])
+
+            if pred == -1:  # AI가 이상 패턴으로 판단했을 때만 실행 (-1=이상, 1=정상)
+                # 이성현 수정 — should_fire=True 하드코딩 제거, 60초 rate limit 적용
+                sensor_identifier = f"gas:{payload.device_id}:co_h2s_co2"  # 이 센서만의 고유 이름 (장치ID + 가스 종류 조합)
+                now_ts = time.time()  # 지금 이 순간의 시각 (초 단위 숫자)
+                last_ts = _gas_last_fired_at.get(
+                    sensor_identifier, 0.0
+                )  # 이 센서가 마지막으로 알람을 쐈던 시각 (처음이면 0.0)
+                should_fire = (
+                    (now_ts - last_ts) >= GAS_RATE_LIMIT_SEC
+                )  # 마지막 알람 후 60초 이상 지났으면 True, 아니면 False
+                if should_fire:  # 60초가 지났을 때만 실행
+                    _gas_last_fired_at[sensor_identifier] = (
+                        now_ts  # 방금 쏜 시각 기록 (다음 번 비교에 사용)
+                    )
+                    logger.warning(  # 서버 로그에 이상 감지 출력 (60초 지났을 때만)
+                        f"[AI 이상탐지] co+h2s+co2 이상 감지 | device={payload.device_id} | co={payload.co} h2s={payload.h2s} co2={payload.co2}"
+                    )
+                asyncio.create_task(  # 백그라운드 실행 (가스 데이터 저장 흐름을 막지 않기 위해)
+                    forward_inference_e2e(  # 팀장 공용 함수: ML결과 저장 + 알람 저장 + 브라우저 전송을 한 번에 처리
+                        ml_payload={  # AI 추론 결과 DB 저장용 데이터 (should_fire 무관하게 매번 저장됨)
+                            "ml_model": None,  # 모델 FK — 현재 미사용
+                            "model_version_snapshot": entry.version,  # 사용된 AI 모델 버전
+                            "sensor_type": "gas",  # 센서 종류
+                            "sensor_identifier": sensor_identifier,  # 위에서 만든 센서 고유 이름
+                            "measured_at": payload.timestamp.isoformat(),  # 측정 시각
+                            "anomaly_score": score,  # AI 이상 점수 (음수일수록 더 이상함)
+                            "prediction": "anomaly",  # 예측 결과
+                            "risk_classified": "danger",  # 위험도 분류
+                            "feature_snapshot_json": {  # AI 판단에 사용한 실제 측정값
+                                "co": payload.co,
+                                "h2s": payload.h2s,
+                                "co2": payload.co2,
+                            },
+                        },
+                        alarm_payload={  # 알람 기록 DB 저장용 데이터 (should_fire=True일 때만 저장됨)
+                            "alarm_type": "gas_anomaly_ai",  # 알람 종류 — 가스 AI 이상탐지
+                            "risk_level": "danger",  # 위험도
+                            "source_sensor_id": payload.device_id,  # 어떤 센서에서 발생했는지
+                            "gas_type": "co",  # 대표 가스 종류
+                            "measured_value": payload.co,  # 대표 측정값
+                            "summary": f"가스 이상 감지 (AI) | CO:{payload.co} H2S:{payload.h2s} CO2:{payload.co2}",  # 알람 요약 문자열
+                            "detected_at": payload.timestamp.isoformat(),  # 감지 시각
+                            "source_label": "가스센서 AI 이상탐지",  # 화면에 표시될 출처 이름
+                        },
+                        push_payload={  # 브라우저 알람 팝업용 데이터 (should_fire=True일 때만 전송됨)
+                            "alarm_type": "gas_anomaly_ai",  # 알람 종류
+                            "risk_level": "danger",  # 위험도
+                            "source_label": "가스센서 AI 이상탐지",  # 화면 표시용 출처 이름
+                            "summary": f"가스 이상 감지 (AI) | CO:{payload.co} H2S:{payload.h2s} CO2:{payload.co2}",  # 팝업에 보여줄 요약
+                            "is_new_event": True,  # 새 이벤트 여부
+                            "gas_type": "co",  # 대표 가스 종류
+                            "measured_value": payload.co,  # 대표 측정값
+                        },
+                        should_fire=should_fire,  # True면 알람+브라우저 전송, False면 ML결과 DB 기록만
+                    )
                 )
         except Exception as e:
             logger.error(f"[AI 추론 실패] {e}")

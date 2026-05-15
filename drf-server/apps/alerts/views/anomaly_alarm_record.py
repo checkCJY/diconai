@@ -22,7 +22,7 @@ from apps.alerts.serializers.anomaly_alarm_record import (
 )
 from apps.alerts.services.event_service import create_alarm_and_event
 from apps.core.constants import AlarmType
-from apps.facilities.models import PowerDevice
+from apps.facilities.models import GasSensor, PowerDevice  # 가스 센서 추가
 
 logger = logging.getLogger(__name__)
 
@@ -92,5 +92,19 @@ class AnomalyAlarmRecordCreateView(APIView):
                 return None
             return device.facility_id, {"power_device_id": device.id}
 
-        # 가스 (gas_anomaly_ai) 분기는 가스 트랙 후속 sprint 에서 활성화.
+        # 이성현 추가 — 가스 AI 알람 분기 활성화
+        elif alarm_type == AlarmType.GAS_ANOMALY_AI:
+            sensor_id_str = data.get("source_sensor_id")
+            if not sensor_id_str:
+                return None
+            try:
+                sensor = GasSensor.objects.get(device_id=sensor_id_str)
+            except GasSensor.DoesNotExist:
+                logger.warning(
+                    "[anomaly_alarm_forward] GasSensor not found device_id=%s",
+                    sensor_id_str,
+                )
+                return None
+            return sensor.facility_id, {"sensor_id": sensor.id}
+
         return None
