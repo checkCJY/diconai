@@ -28,9 +28,12 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 
 COPY . .
 
+RUN chmod +x /app/entrypoint.sh
+
 EXPOSE 8001
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD curl -fsS http://localhost:8001/health/ || exit 1
 
+ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "1"]
