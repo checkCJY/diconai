@@ -125,3 +125,34 @@ def build_features(
         measured_at=measured_at,
         is_anomaly=is_anomaly,
     )
+
+
+# 이성현 추가 — 다변량 피처 행렬 빌더 (여러 가스 TimeSeries 수평 스택)
+def build_multi_features(
+    series_list: list[TimeSeries],
+    gas_names: list[str],
+    window: int = DEFAULT_WINDOW,
+    drop_warmup: bool = True,
+) -> FeatureMatrix:
+    """여러 가스 TimeSeries → 다변량 피처 행렬.
+
+    각 가스 4피처(value, roll_mean_N, roll_std_N, diff)에 가스명 접두어를 붙여 수평 스택.
+    gas_names=["co","h2s","co2"] → 12피처 — ai/router.py _build_multi_feature_row 와 동일 순서.
+    """
+    fms = [
+        build_features(s, window=window, drop_warmup=drop_warmup) for s in series_list
+    ]
+    min_len = min(len(fm) for fm in fms)
+
+    columns: list[str] = []
+    feature_parts: list[np.ndarray] = []
+    for gas_name, fm in zip(gas_names, fms):
+        columns.extend(f"{gas_name}_{col}" for col in fm.columns)
+        feature_parts.append(fm.features[-min_len:])
+
+    return FeatureMatrix(
+        columns=columns,
+        features=np.column_stack(feature_parts),
+        measured_at=fms[0].measured_at[-min_len:],
+        is_anomaly=fms[0].is_anomaly[-min_len:],
+    )
