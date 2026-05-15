@@ -102,15 +102,17 @@ async def test_ai_alarm_fingerprint_includes_device_channel():
 
 @pytest.mark.asyncio
 async def test_unrecognized_payload_skips_dedup():
-    """fingerprint 형식 모르는 payload (event_id/anomaly_meta 둘 다 없음) 는 dedup 미적용.
-
-    clear notification 등 — 매번 LPUSH (set 호출 자체 안 함).
+    """fingerprint 형식 모르는 payload (event_id/anomaly_meta/source_label 모두 없음)
+    는 dedup 미적용 — 매번 LPUSH (set 호출 자체 안 함).
     """
     redis = _make_redis_mock(set_returns=[True, True])
+    # geofence_intrusion 은 event_id 없는 경로로 들어오는 케이스 가정.
+    # gas_clear/power_clear 은 별도 source_label 기반 dedup 분기 (아래 테스트) 라
+    # 본 케이스는 "어느 분기에도 안 맞는 payload" 로 따로 검증.
     payload = {
-        "alarm_type": "gas_clear",
-        "risk_level": "normal",
-        "summary": "정상화",
+        "alarm_type": "geofence_intrusion",
+        "risk_level": "warning",
+        "summary": "fallback",
     }
 
     with patch("websocket.services.alarm_queue.get_redis", return_value=redis):
@@ -119,6 +121,54 @@ async def test_unrecognized_payload_skips_dedup():
 
     assert redis.set.await_count == 0  # dedup 검사 자체 skip
     assert redis.lpush.await_count == 2  # 둘 다 LPUSH
+
+
+@pytest.mark.asyncio
+async def test_push_alarm_dedupes_gas_clear_by_source_label():
+    """gas 9 종 (co/h2s/co2/...) 이 같은 source_label 로 9 push → 첫 도착만 LPUSH.
+
+    실제 운영 시나리오: `fire_clear_notification_task` 가 가스 9 종 각각 호출되어
+    같은 센서의 정상화 push 가 짧은 시간 안에 9 건 들어옴. source_label 단위
+    fingerprint 로 dedup 해서 패널 9줄 도배 방지.
+    """
+    redis = _make_redis_mock(set_returns=[True, False])
+    payload = {
+        "alarm_type": "gas_clear",
+        "risk_level": "normal",
+        "source_label": "공장동-가스센서-01",
+    }
+
+    with patch("websocket.services.alarm_queue.get_redis", return_value=redis):
+        await alarm_queue.push_alarm(payload)
+        await alarm_queue.push_alarm(payload)
+
+    assert redis.lpush.await_count == 1
+    assert redis.set.await_count == 2
+    # fingerprint 키에 source_label 과 alarm_type 포함
+    set_call_key = redis.set.call_args_list[0].args[0]
+    assert "clear:gas_clear:공장동-가스센서-01" in set_call_key
+
+
+@pytest.mark.asyncio
+async def test_push_alarm_does_not_dedupe_gas_clear_across_sources():
+    """다른 source_label 의 정상화는 별개 알람 → 둘 다 LPUSH."""
+    redis = _make_redis_mock(set_returns=[True, True])
+    payload_a = {
+        "alarm_type": "gas_clear",
+        "risk_level": "normal",
+        "source_label": "공장동-가스센서-01",
+    }
+    payload_b = {
+        "alarm_type": "gas_clear",
+        "risk_level": "normal",
+        "source_label": "사무동-가스센서-02",
+    }
+
+    with patch("websocket.services.alarm_queue.get_redis", return_value=redis):
+        await alarm_queue.push_alarm(payload_a)
+        await alarm_queue.push_alarm(payload_b)
+
+    assert redis.lpush.await_count == 2
 
 
 @pytest.mark.asyncio
@@ -171,7 +221,29 @@ def test_payload_fingerprint_ai_alarm():
 
 def test_payload_fingerprint_unknown_returns_none():
     """fingerprint 형식 모름 — None (dedup skip)."""
+    # source_label 없는 정상화 — 분기 매칭은 되지만 키 생성 불가 → None
     assert alarm_queue._payload_fingerprint({"alarm_type": "gas_clear"}) is None
     assert alarm_queue._payload_fingerprint({}) is None
     # AI alarm_type 인데 meta 미포함 — None
     assert alarm_queue._payload_fingerprint({"alarm_type": "power_anomaly_ai"}) is None
+
+
+def test_payload_fingerprint_clear_alarm():
+    """정상화 알람 fingerprint — clear:{alarm_type}:{source_label}."""
+    fp = alarm_queue._payload_fingerprint(
+        {
+            "alarm_type": "gas_clear",
+            "risk_level": "normal",
+            "source_label": "공장동-가스센서-01",
+        }
+    )
+    assert fp == "clear:gas_clear:공장동-가스센서-01"
+
+    fp_power = alarm_queue._payload_fingerprint(
+        {
+            "alarm_type": "power_clear",
+            "risk_level": "normal",
+            "source_label": "송풍기-A",
+        }
+    )
+    assert fp_power == "clear:power_clear:송풍기-A"

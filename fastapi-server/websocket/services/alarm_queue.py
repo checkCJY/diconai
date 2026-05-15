@@ -75,6 +75,16 @@ def _payload_fingerprint(payload: dict) -> str | None:
             return None
         return f"ai:{alarm_type}:{device_id}:{channel}:{risk_level}"
 
+    # 정상화 알람 — gas 센서는 9 종 (co/h2s/co2/o2/no2/so2/o3/nh3/voc) 각각이
+    # 별도 fire_clear_notification_task 를 발화 → 같은 source_label 9 push 가
+    # 30s 안에 동시 도착. source_label 단위로 dedup 해서 패널 1줄만 노출.
+    # source_label 누락 시 (이론상 없음) None 반환 → 백워드 호환.
+    if alarm_type in ("gas_clear", "power_clear"):
+        source_label = payload.get("source_label", "")
+        if not source_label:
+            return None
+        return f"clear:{alarm_type}:{source_label}"
+
     return None
 
 

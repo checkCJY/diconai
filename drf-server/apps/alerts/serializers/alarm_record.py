@@ -42,6 +42,10 @@ class AlarmRecordSerializer(serializers.ModelSerializer):
         return obj.geofence.name if obj.geofence else None
 
     def get_message(self, obj):
-        if obj.gas_type and obj.measured_value is not None:
-            return f"{obj.gas_type.upper()} 임계치 초과 ({obj.measured_value} ppm)"
-        return obj.alarm_type
+        """이벤트 현황 패널 등에 표시할 한 줄 메시지.
+
+        실제 분기는 AlarmRecord.get_short_message() 가 single source of truth.
+        WS push payload (apps.alerts.tasks._push_to_ws) 도 같은 메서드를 호출하므로
+        API 응답과 실시간 push 가 같은 텍스트를 노출 (drift 방지).
+        """
+        return obj.get_short_message()

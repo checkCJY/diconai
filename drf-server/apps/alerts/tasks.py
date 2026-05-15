@@ -167,6 +167,7 @@ def fire_danger_alarm_task(
                     "threshold_value": threshold,
                     "source_label": source_label,
                     "summary": summary,
+                    "message": alarm.get_short_message(),
                     "is_new_event": alarm is not None,
                 }
             )
@@ -237,6 +238,7 @@ def fire_warning_alarm_task(
                     "threshold_value": threshold,
                     "source_label": source_label,
                     "summary": summary,
+                    "message": alarm.get_short_message(),
                     "is_new_event": alarm is not None,
                 }
             )
@@ -302,6 +304,7 @@ def fire_geofence_alarm_task(
                     "risk_level": risk_level,
                     "source_label": geofence_name,
                     "summary": summary,
+                    "message": alarm.get_short_message(),
                     "is_new_event": alarm is not None,
                 }
             )
@@ -325,12 +328,17 @@ def fire_clear_notification_task(
     gas_type: str,
 ):
     """정상화 알림 — 가스 농도 복귀 시 WS 알림만 발송. 이벤트 상태는 운영자가 직접 변경."""
+    from apps.alerts.models import AlarmRecord
+
     try:
         gas_name = _GAS_NAME.get(gas_type, gas_type.upper())
         summary = (
             f"[안전] {source_label} — {gas_name} 농도가 정상 범위로 복귀했습니다."
             " 관리자 확인 후 작업을 재개하세요."
         )
+        # AlarmRecord 객체는 생성 안 함 (정상화는 record 안 남김). 모델 메서드를
+        # ephemeral 인스턴스로 호출 — short message single source of truth 유지.
+        short_message = AlarmRecord(alarm_type="gas_clear").get_short_message()
 
         # 정상화 알림은 critical 아님 — push 실패해도 retry 안 함 (중복 발송 회피)
         _push_to_ws(
@@ -340,6 +348,7 @@ def fire_clear_notification_task(
                 "risk_level": "normal",
                 "source_label": source_label,
                 "summary": summary,
+                "message": short_message,
                 "is_new_event": False,
             },
             raise_on_failure=False,
@@ -398,6 +407,7 @@ def fire_power_danger_task(
                     "threshold_value": threshold,
                     "source_label": source_label,
                     "summary": summary,
+                    "message": alarm.get_short_message(),
                     "is_new_event": alarm is not None,
                 }
             )
@@ -460,6 +470,7 @@ def fire_power_warning_task(
                     "threshold_value": threshold,
                     "source_label": source_label,
                     "summary": summary,
+                    "message": alarm.get_short_message(),
                     "is_new_event": alarm is not None,
                 }
             )
@@ -487,11 +498,14 @@ def fire_power_clear_task(
     source_label: str,
 ):
     """전력 정상화 알림 — WS 알림만 발송. 이벤트 상태는 운영자가 직접 변경."""
+    from apps.alerts.models import AlarmRecord
+
     try:
         summary = (
             f"[안전] {source_label} — 전력이 정상 범위로 복귀했습니다."
             " 관리자 확인 후 작업을 재개하세요."
         )
+        short_message = AlarmRecord(alarm_type="power_clear").get_short_message()
         # 정상화 알림은 critical 아님 — push 실패해도 retry 안 함 (중복 발송 회피)
         _push_to_ws(
             {
@@ -500,6 +514,7 @@ def fire_power_clear_task(
                 "risk_level": "normal",
                 "source_label": source_label,
                 "summary": summary,
+                "message": short_message,
                 "is_new_event": False,
             },
             raise_on_failure=False,

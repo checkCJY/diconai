@@ -11,7 +11,10 @@
 gas_anomaly_ai enum 미정의 — 가스 트랙 후속 sprint 에서 별도 테스트 추가.
 """
 
+from datetime import timedelta
+
 import pytest
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.alerts.models import AlarmRecord, AlertPolicy, Event
@@ -42,13 +45,15 @@ def ml_anomaly_row(db):
 
 
 def _payload(power_device, ml_row=None):
+    # detected_at 은 now-1분 으로 동적 생성. 하드코드 ISO 문자열을 쓰면
+    # Event.is_mergeable_time_window (12h) 윈도우를 며칠 뒤에 벗어나 flaky 해짐.
     return {
         "alarm_type": "power_anomaly_ai",
         "risk_level": "warning",
         "source_device_id": power_device.device_id,
         "measured_value": 8200.0,
         "summary": "[AI 이상 패턴] CH1 watt=8200 (IF score -0.07)",
-        "detected_at": "2026-05-14T10:00:00Z",
+        "detected_at": (timezone.now() - timedelta(minutes=1)).isoformat(),
         "source_label": "CH1",
         "ml_anomaly_result_id": ml_row.id if ml_row else None,
     }
@@ -113,11 +118,16 @@ def test_create_anomaly_alarm_device_not_found(api_client, facility):
 
 @pytest.mark.django_db
 def test_create_anomaly_alarm_invalid_alarm_type(api_client, power_device):
-    """잘못된 alarm_type → 400."""
+    """가스 AI 분기 활성 후 source_sensor_id 누락 시 → 404 (발생원 미발견).
+
+    GAS_ANOMALY_AI 가 serializer choices 에 추가되면서 더 이상 validation 단계에서
+    reject 안 됨. _payload(power_device) 는 source_device_id 만 가지므로
+    _resolve_source 가 None 을 반환 → 404. (이전엔 400 expected — stale)
+    """
     payload = _payload(power_device)
-    payload["alarm_type"] = "gas_anomaly_ai"  # 현재 sprint serializer 미허용
+    payload["alarm_type"] = "gas_anomaly_ai"  # serializer choices 에 활성
     response = api_client.post(URL, payload, format="json")
-    assert response.status_code == 400
+    assert response.status_code == 404
 
 
 @pytest.mark.django_db
