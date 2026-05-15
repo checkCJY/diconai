@@ -199,3 +199,80 @@
   background: none; border: none; color: var(--text2);
   cursor: pointer; font-size: 14px; padding: 0; flex-shrink: 0;
 }
+
+/* ==========================================================
+   2026-05-15 Phase 2 A-mini — admin-panel UX 차별화: 토스트 stack
+   ==========================================================
+   admin-panel/* 페이지에서 차단형 모달 대신 우상단에 누적되는 비차단 토스트.
+   DANGER 토스트는 10초 무응답 시 모달로 격상 (alarm-popup.js 가 처리).
+   pointer-events:none 으로 컨테이너 클릭은 페이지로 통과, item 만 받음.
+   ========================================================== */
+#alarm-toast-stack {
+  position: fixed;
+  top: 60px;       /* 상단바 아래 (admin-panel topbar 높이) */
+  right: 20px;
+  z-index: 1090;   /* alarm-popup (1100) 보다 낮게 — 격상 시 모달이 토스트 위 */
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 340px;
+  pointer-events: none;
+}
+
+.alarm-toast-stack-item {
+  pointer-events: auto;
+  background: var(--bg2, #161b22);
+  border: 1px solid var(--border, #30363d);
+  border-left: 4px solid var(--danger, #f85149);
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: var(--text, #e6edf3);
+  font-size: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  cursor: pointer;
+  animation: alarmToastStackSlideIn 0.3s ease;
+}
+.alarm-toast-stack-item.warning {
+  border-left-color: var(--caution, #e3b341);
+}
+.alarm-toast-stack-item:hover {
+  background: var(--bg3, #1c2128);
+}
+.alarm-toast-stack-item.dismissing {
+  animation: alarmToastStackSlideOut 0.3s ease forwards;
+}
+
+@keyframes alarmToastStackSlideIn {
+  from { transform: translateX(110%); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+@keyframes alarmToastStackSlideOut {
+  from { transform: translateX(0); opacity: 1; }
+  to   { transform: translateX(110%); opacity: 0; }
+}
+
+.alarm-toast-stack-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 6px;
+}
+.alarm-toast-stack-badge {
+  background: var(--danger, #f85149); color: #fff;
+  padding: 2px 8px; border-radius: 4px;
+  font-size: 11px; font-weight: 600;
+}
+.alarm-toast-stack-item.warning .alarm-toast-stack-badge {
+  background: var(--caution, #e3b341); color: #000;
+}
+.alarm-toast-stack-close {
+  background: none; border: none; color: var(--text2, #8b949e);
+  cursor: pointer; font-size: 14px; padding: 0;
+}
+.alarm-toast-stack-close:hover {
+  color: var(--text, #e6edf3);
+}
+.alarm-toast-stack-sensor {
+  font-weight: 600; margin-bottom: 4px; word-break: keep-all;
+}
+.alarm-toast-stack-msg {
+  color: var(--text2, #8b949e); line-height: 1.4; word-break: keep-all;
+}

@@ -70,6 +70,114 @@ const _LastSeen = {
   },
 };
 
+// ── 2026-05-15 Phase 2 A-mini: admin-panel UX 차별화 ────────
+// admin-panel/* 페이지에선 차단형 모달이 운영 워크플로우 (폼 작성·지도 편집 등) 를
+// 차단하던 문제 해결. 우상단 토스트 stack 으로 비차단 표시 + DANGER 무응답 시 격상.
+// 모니터링 페이지 (dashboard / snb_details / event_detail 등) 는 기존 모달 유지.
+const _ADMIN_PATH_PREFIX = '/admin-panel/';
+const _TOAST_ESCALATE_MS = 10000;   // DANGER 무응답 → 모달 격상까지
+const _TOAST_TTL_MS      = { danger: 15000, warning: 10000 };
+
+function _resolveDisplayMode() {
+  return window.location.pathname.startsWith(_ADMIN_PATH_PREFIX) ? 'toast' : 'modal';
+}
+
+const AlarmToastStack = {
+  _items: new Map(),   // event_id → element (같은 event 중복 push 차단)
+
+  push(data) {
+    const eventId = data.event_id || data.id;
+    if (eventId != null && this._items.has(eventId)) return;
+    const level = data.alarm_level;
+    if (level !== 'danger' && level !== 'warning') return;
+
+    const container = this._ensureContainer();
+    const item = this._createItem(data, level);
+    container.appendChild(item);
+    if (eventId != null) this._items.set(eventId, item);
+
+    // 자동 사라짐 — DANGER 15s / WARNING 10s
+    const ttl = _TOAST_TTL_MS[level] || 10000;
+    item._timers = {
+      dismiss: setTimeout(() => this._dismiss(eventId, item), ttl),
+    };
+
+    // DANGER 격상 — 10s 무응답 시 같은 데이터로 모달 재진입
+    if (level === 'danger') {
+      item._timers.escalate = setTimeout(() => {
+        clearTimeout(item._timers.dismiss);
+        this._dismiss(eventId, item);
+        AlarmPopup.show(Object.assign({}, data, { __forceModal: true }));
+      }, _TOAST_ESCALATE_MS);
+    }
+  },
+
+  _ensureContainer() {
+    let el = document.getElementById('alarm-toast-stack');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'alarm-toast-stack';
+      document.body.appendChild(el);
+    }
+    return el;
+  },
+
+  _createItem(data, level) {
+    const item = document.createElement('div');
+    item.className = `alarm-toast-stack-item ${level}`;
+    const sensor = data.sensor_name || data.source_label || '';
+    const msg    = data.message     || data.summary      || '';
+    const badge  = (level === 'danger') ? '⚠ 위험' : '⚠ 주의';
+
+    // 안전한 DOM API — innerHTML 회피 (XSS 방지, alarm-popup.js 의 _process 와 동일 패턴)
+    const header = document.createElement('div');
+    header.className = 'alarm-toast-stack-header';
+    const badgeEl = document.createElement('span');
+    badgeEl.className = 'alarm-toast-stack-badge';
+    badgeEl.textContent = badge;
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'alarm-toast-stack-close';
+    closeBtn.type = 'button';
+    closeBtn.textContent = '✕';
+    closeBtn.addEventListener('click', () => {
+      this._dismiss(data.event_id || data.id, item);
+    });
+    header.append(badgeEl, closeBtn);
+
+    const sensorEl = document.createElement('div');
+    sensorEl.className = 'alarm-toast-stack-sensor';
+    sensorEl.textContent = sensor;
+
+    const msgEl = document.createElement('div');
+    msgEl.className = 'alarm-toast-stack-msg';
+    msgEl.textContent = msg;
+
+    item.append(header, sensorEl, msgEl);
+    // 토스트 클릭 — 격상 즉시 트리거 (사용자가 본 것으로 인지)
+    item.addEventListener('click', (ev) => {
+      if (ev.target === closeBtn) return;
+      if (item._timers) {
+        clearTimeout(item._timers.dismiss);
+        clearTimeout(item._timers.escalate);
+      }
+      this._dismiss(data.event_id || data.id, item);
+      AlarmPopup.show(Object.assign({}, data, { __forceModal: true }));
+    });
+    return item;
+  },
+
+  _dismiss(eventId, item) {
+    if (eventId != null) this._items.delete(eventId);
+    if (item._timers) {
+      clearTimeout(item._timers.dismiss);
+      clearTimeout(item._timers.escalate);
+      item._timers = null;
+    }
+    item.classList.add('dismissing');
+    setTimeout(() => item.remove(), 300);
+  },
+};
+
 // ── 위험/주의 레벨별 중앙 팝업 설정 ────────────────────────
 const _POPUP_CFG = {
   danger: {
@@ -167,6 +275,15 @@ const AlarmPopup = {
     // 이벤트 패널 표시 (newAlarmEvent) 는 alarm-ws.js 가 별도로 발행하므로 영향 없음.
     const eventId = data.event_id || data.id;
     if (_AckStore.has(eventId)) return;
+
+    // 2026-05-15 Phase 2 A-mini: admin-panel/* 페이지는 차단형 모달이 폼 입력 손실 +
+    // 운영자 무지성 닫기 학습을 유발 — 우상단 토스트 stack 으로 비차단 표시.
+    // DANGER 토스트는 10초 무응답 시 모달 격상 (__forceModal 플래그로 재진입).
+    // __forceModal 박힌 호출은 격상 경로라 분기 skip.
+    if (!data.__forceModal && _resolveDisplayMode() === 'toast') {
+      AlarmToastStack.push(data);
+      return;
+    }
 
     // 같은 센서·동일 레벨 group window — 위험은 1초로 짧게 (재팝업 빠른 반응),
     // 그 외(주의)는 기존 5초 유지 (전기 노이즈 등 burst 보호).
