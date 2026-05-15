@@ -360,3 +360,16 @@ CACHES = {
         "LOCATION": REDIS_URL,
     }
 }
+
+# ── Alarm 재팝업 쿨다운 ────────────────────────────────────────
+# 같은 활성 Event 에 새 AlarmRecord 가 들어왔을 때 broadcast 재발송 최소 간격.
+# event_service.create_alarm_and_event 에서 last_notified_at 비교에 사용.
+#
+# [의미]
+# 산업 안전 도메인 — 위험 지속은 미대응 신호. 이 cadence 가 운영자 escalation 트리거.
+# user-scoped ack (EventAcknowledgement) 와는 별개의 글로벌 결정. drf 측은 이 값만 비교,
+# user 단위 분기는 fastapi broadcast 시점에 EventAcknowledgement 조회로 처리.
+#
+# [환경별 권장]
+# 운영: 60s (기본). 시연: 15s (D-30 시연에서 재팝업 동작을 짧은 시간 안에 보여주기 위함).
+ALARM_REPOPUP_COOLDOWN_SEC = env.int("ALARM_REPOPUP_COOLDOWN_SEC", default=60)
