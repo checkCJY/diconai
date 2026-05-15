@@ -48,8 +48,8 @@
 
 {% include 'components/app_config.html' %}
 <script src="{% static 'js/shared/config.js' %}"></script>
-<script src="{% static 'js/shared/auth.js' %}"></script>
-<script src="{% static 'js/shared/ws-client.js' %}"></script>
+{# Phase 2 알람 인프라 — admin/main.js 가 Auth/WSClient 의존이라 partial 이 먼저 #}
+{% include 'components/alarm_stack.html' %}
 <script src="{% static 'js/admin/main.js' %}"></script>
 {% block extra_js %}{% endblock %}
 </body>
