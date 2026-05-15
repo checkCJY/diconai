@@ -63,6 +63,8 @@ class AlarmType(models.TextChoices):
     # source FK 는 POWER_OVERLOAD 와 동일하게 PowerDevice 사용.
     # 도메인별 분리: gas_anomaly_ai 는 가스 트랙에서 별도 enum 추가 예정 (현재 미정의 anti-pattern).
     POWER_ANOMALY_AI = "power_anomaly_ai", "전력 AI 이상 감지"
+    # 이성현 추가 — 가스 AI 이상탐지 알람 타입
+    GAS_ANOMALY_AI = "gas_anomaly_ai", "가스 AI 이상 감지"
 
 
 # AI 추론 위험도 → 룰 측 RiskLevel 매핑.
@@ -87,6 +89,7 @@ USER_FACING_ALARM_TYPES = [
     AlarmType.VR_TRAINING_NOT_DONE,
     AlarmType.SAFETY_CHECK_PENDING,
     AlarmType.INSPECTION_SCHEDULED,
+    AlarmType.GAS_ANOMALY_AI,  # 이성현 추가
     AlarmType.BATCH_FAILED,
     AlarmType.STORAGE_OVERDUE,
     AlarmType.POWER_ANOMALY_AI,

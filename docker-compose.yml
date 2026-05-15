@@ -60,6 +60,7 @@ services:
       - --threads=4
       - --reload
       - --access-logfile=-
+      - --config=/app/gunicorn.conf.py
     depends_on:
       redis:
         condition: service_healthy
