@@ -143,7 +143,9 @@ async def worker_stream(websocket: WebSocket, user_id: int):
 
     # 옵트인 활성 시 (payload truthy) path user_id 일치 확인.
     # 비활성 시 payload는 빈 dict라 user_id 검증 skip (기존 동작).
-    if payload and payload.get("user_id") != user_id:
+    # JWT payload 의 user_id 는 string ("13"), path user_id 는 FastAPI 가 int 변환 (13).
+    # type mismatch 로 항상 forbidden 되던 사전 버그 fix (2026-05-15) — str 양쪽 비교.
+    if payload and str(payload.get("user_id")) != str(user_id):
         logger.warning(
             f"[ws/worker] action=forbidden token_user={payload.get('user_id')} "
             f"path_user={user_id}"

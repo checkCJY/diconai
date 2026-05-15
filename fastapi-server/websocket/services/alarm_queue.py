@@ -64,6 +64,11 @@ def _payload_fingerprint(payload: dict) -> str | None:
 
     event_id = payload.get("event_id")
     if event_id is not None:
+        # 2026-05-15 알람 재설계: RESOLVED 신호는 원래 알람과 같은 (event_id, risk_level)
+        # 조합이라 기본 fingerprint 로는 dedup 차단됨 (운영 버그). 별도 suffix 로 분리해
+        # RESOLVED 신호 자체의 retry 중복은 막되 원래 알람과는 독립 trackin.
+        if payload.get("event_resolved_at"):
+            return f"event:{event_id}:resolved"
         return f"event:{event_id}:{risk_level}"
 
     alarm_type = payload.get("alarm_type", "")
