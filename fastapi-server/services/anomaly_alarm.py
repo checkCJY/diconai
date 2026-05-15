@@ -26,6 +26,8 @@ import os
 
 from prometheus_client import Counter
 
+from core.constants import AI_TO_RULE_LEVEL
+from services.ai_mute import mark_ai_recent
 from services.drf_client import post_to_drf
 from websocket.services.alarm_queue import push_alarm
 
@@ -98,6 +100,15 @@ async def forward_inference_e2e(
     # push 는 ML 의존성 없음 → 독립 task 즉시 발사. C12 효과(ML latency 에 push 가
     # 묶이지 않음) 보존. push 실패는 _safe_push 안에서 silent + counter.
     if should_fire:
+        # [Step 3] AI 발화 마킹 — DRF power_alarm 의 룰 fire 를 60s suppress.
+        # push 와 같은 시점에 fire-and-forget. 마킹 실패는 silent (mark_ai_recent
+        # 내부) — 마킹 실패 시 룰 가드 작동 안 해 중복 1건 노출되는 정도.
+        meta = push_payload.get("anomaly_meta") or {}
+        combined_risk = meta.get("combined_risk", "normal")
+        rule_level = AI_TO_RULE_LEVEL.get(combined_risk, combined_risk)
+        asyncio.create_task(
+            mark_ai_recent(meta.get("device_id"), meta.get("channel"), rule_level)
+        )
         asyncio.create_task(_safe_push(push_payload))
 
     # ML forward → ml_id 추출. silent fail (response None / status != 201).

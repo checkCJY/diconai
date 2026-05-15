@@ -23,7 +23,11 @@ RESET  := \033[0m
 
 .PHONY: help up down start stop restart ps build rebuild logs sh exec \
         test test-drf test-fastapi migrate super seed showmigrations shell-drf \
-        health metrics targets clean prune
+        health metrics targets clean prune \
+        logs-drf logs-fastapi logs-celery logs-beat logs-all \
+        logs-locks logs-timeouts logs-errors logs-ai logs-retention \
+        dummies-start dummies-stop dummies-list dummies-restart \
+        db-size db-pragma db-counts
 
 help:  ## 전체 명령어 + 자주 쓰는 시나리오 보기
 	@printf "\n  $(BOLD)📦 diconai Docker 단축 명령어$(RESET)\n"
@@ -89,10 +93,43 @@ rebuild:      ## 캐시 무시 재빌드 (의존성 충돌·이미지 깨짐 의
 	docker compose build --no-cache $(s)
 
 
-##@ 📋 로그
+##@ 📋 서비스별 로그 (개발 일상)
 
-logs:         ## 로그 실시간 (Ctrl+C로 빠짐). s=서비스명 미지정이면 전체
+logs:         ## 로그 실시간 (Ctrl+C). s=서비스명 미지정이면 전체 7개 서비스
 	docker compose logs -f --tail=100 $(s)
+
+logs-drf:     ## drf 단독 (gunicorn access + Django request/ERROR)
+	docker compose logs -f --tail=100 drf
+
+logs-fastapi: ## fastapi 단독 (uvicorn access + IoT 인입 + WS)
+	docker compose logs -f --tail=100 fastapi
+
+logs-celery:  ## celery-worker 단독 (알람 태스크 처리 + ML forward)
+	docker compose logs -f --tail=100 celery-worker
+
+logs-beat:    ## celery-beat 단독 (retention 등 주기 태스크 스케줄링)
+	docker compose logs -f --tail=100 celery-beat
+
+logs-all:     ## drf + fastapi + celery 4개 통합 (요청→저장→알람 흐름 한 화면)
+	docker compose logs -f --tail=50 drf fastapi celery-worker celery-beat
+
+
+##@ 🔍 로그 필터 (이슈 추적·트러블슈팅)
+
+logs-locks:   ## Celery 'database is locked' 감시 (1단계 락 폭주 회귀 확인)
+	docker logs -f diconai-celery-worker-1 2>&1 | grep -E --line-buffered "database is locked|retry"
+
+logs-timeouts: ## fastapi 'action=timeout' 감시 (DRF 응답 지연 추적)
+	docker logs -f diconai-fastapi-1 2>&1 | grep -E --line-buffered "action=timeout|ERROR"
+
+logs-errors:  ## DRF 4xx/5xx + ERROR + Forbidden 감시
+	docker logs -f diconai-drf-1 2>&1 | grep -E --line-buffered " 4[0-9]{2} | 5[0-9]{2} |ERROR|Forbidden"
+
+logs-ai:      ## AI 추론 로그 (anomaly_inference + 가스 IF 추론 실패)
+	docker logs -f diconai-fastapi-1 2>&1 | grep -E --line-buffered "anomaly_inference|AI 추론"
+
+logs-retention: ## retention task 발사·실행 로그 (매일 09:30 KST)
+	docker logs -f diconai-celery-worker-1 2>&1 | grep -E --line-buffered "retention|run_data_retention"
 
 
 ##@ 🐚 컨테이너 안에서 실행
@@ -146,6 +183,137 @@ metrics:      ## 양 서버 /metrics 샘플 (http_requests_total 5줄씩)
 
 targets:      ## Prometheus가 scrape하는 3개 target 상태 (모두 health=up이어야 정상)
 	@curl -s 'http://localhost:9090/api/v1/targets?state=active' | python3 -m json.tool | grep -E '"job"|"health"'
+
+
+##@ 🎭 더미 송출 (개발·시연 부하 테스트)
+
+# Python procps 미설치 (slim 이미지). /proc 직접 순회로 PID 추적.
+# cmdline args 단위로 정확히 매치 (args[1]=='-m' and args[2].startswith('dummies.'))
+# — `python -c` 한 줄 명령 안에 'dummies.' 문자열이 있어도 오탐 안 함.
+define _DUMMIES_IS_DUMMY
+def _is_dummy(p):
+    try:
+        args = open(p).read().split(chr(0))
+    except Exception:
+        return None
+    if (len(args) >= 3 and args[0].endswith('python')
+            and args[1] == '-m' and args[2].startswith('dummies.')):
+        return args
+    return None
+endef
+
+define _DUMMIES_LIST_PY
+import glob
+$(_DUMMIES_IS_DUMMY)
+found = False
+for p in glob.glob('/proc/[0-9]*/cmdline'):
+    args = _is_dummy(p)
+    if args:
+        print(p.split('/')[2], ' '.join(args[:3]), sep='\t')
+        found = True
+if not found:
+    print('  (실행 중인 더미 없음)')
+endef
+export _DUMMIES_LIST_PY
+
+define _DUMMIES_STOP_PY
+import os, signal, glob
+$(_DUMMIES_IS_DUMMY)
+only = os.environ.get('ONLY', '').strip()
+target_module = f'dummies.{only}_dummy' if only else None
+n = 0
+for p in glob.glob('/proc/[0-9]*/cmdline'):
+    args = _is_dummy(p)
+    if not args:
+        continue
+    if target_module and args[2] != target_module:
+        continue
+    os.kill(int(p.split('/')[2]), signal.SIGINT)
+    n += 1
+label = f' ({only}_dummy only)' if only else ''
+print(f'  killed {n} processes{label}')
+endef
+export _DUMMIES_STOP_PY
+
+dummies-start:    ## 더미 송출 시작. s=gas|power|position 단일, 미지정 시 3종 전체
+	@if [ -n "$(s)" ]; then \
+	  docker exec -d diconai-fastapi-1 python -m dummies.$(s)_dummy; \
+	  echo "  started: $(s)_dummy"; \
+	else \
+	  docker exec -d diconai-fastapi-1 python -m dummies.power_dummy; \
+	  docker exec -d diconai-fastapi-1 python -m dummies.gas_dummy; \
+	  docker exec -d diconai-fastapi-1 python -m dummies.position_dummy; \
+	  echo "  started: power_dummy gas_dummy position_dummy"; \
+	fi
+	@sleep 1
+	@$(MAKE) -s dummies-list
+
+dummies-list:     ## 실행 중인 더미 프로세스 확인
+	@docker exec diconai-fastapi-1 python -c "$$_DUMMIES_LIST_PY"
+
+dummies-stop:     ## 더미 정상 종료 (SIGINT). s=gas|power|position 단일, 미지정 시 전체
+	@docker exec -e ONLY="$(s)" diconai-fastapi-1 python -c "$$_DUMMIES_STOP_PY"
+
+dummies-restart:  ## 더미 재기동 (stop → 2초 → start). s= 인자 동일하게 전파
+	@$(MAKE) -s dummies-stop s=$(s)
+	@sleep 2
+	@$(MAKE) -s dummies-start s=$(s)
+
+
+##@ 💾 SQLite DB 상태 (운영 점검·디버깅)
+
+define _DB_PRAGMA_PY
+import django, os
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+django.setup()
+from django.contrib.auth import get_user_model
+list(get_user_model().objects.all()[:1])
+from django.db import connection
+with connection.cursor() as c:
+    for pragma in ('journal_mode', 'busy_timeout', 'synchronous', 'foreign_keys'):
+        c.execute(f'PRAGMA {pragma}')
+        print(f'  {pragma:<20}: {c.fetchone()[0]}')
+print(f'  transaction_mode    : {connection.transaction_mode}')
+endef
+export _DB_PRAGMA_PY
+
+define _DB_COUNTS_PY
+import django, os
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+django.setup()
+from django.db import connection
+TABLES = [('power_data', 'measured_at'), ('gas_data', 'measured_at'),
+          ('worker_position', 'measured_at'), ('alarm_record', 'detected_at'),
+          ('event', 'detected_at'), ('ml_anomaly_result', 'occurred_at'),
+          ('integration_log', 'created_at')]
+with connection.cursor() as c:
+    print(f'  {"table":<22} {"rows":>12}  {"min_time":<20} {"max_time":<20}')
+    print(f'  {"-"*22} {"-"*12}  {"-"*20} {"-"*20}')
+    for t, col in TABLES:
+        try:
+            c.execute(f'SELECT COUNT(*) FROM "{t}"')
+            n = c.fetchone()[0]
+            mn = mx = ''
+            if n:
+                try:
+                    c.execute(f'SELECT MIN({col}), MAX({col}) FROM "{t}"')
+                    mn, mx = c.fetchone()
+                except Exception:
+                    pass
+            print(f'  {t:<22} {n:>12,}  {str(mn or ""):<20} {str(mx or ""):<20}')
+        except Exception:
+            pass
+endef
+export _DB_COUNTS_PY
+
+db-size:          ## DB 파일 + WAL/SHM 크기 (12GB 비대화 같은 폭증 감지)
+	@docker exec diconai-drf-1 sh -c 'ls -lh /app/db.sqlite3* 2>/dev/null || echo "  (DB 파일 없음)"'
+
+db-pragma:        ## PRAGMA 설정 (busy_timeout/journal_mode 검증)
+	@docker exec diconai-drf-1 python -c "$$_DB_PRAGMA_PY"
+
+db-counts:        ## 주요 테이블 row count + 시간 범위 (raw 비대화 추적)
+	@docker exec diconai-drf-1 python -c "$$_DB_COUNTS_PY"
 
 
 ##@ 🧹 정리

@@ -12,6 +12,7 @@ import logging
 import httpx
 from celery import shared_task
 from django.conf import settings
+from django.core.cache import cache
 from django.utils import timezone
 
 # ── Prometheus 메트릭 ─────────────────────────────────────────────────────
@@ -153,7 +154,9 @@ def fire_danger_alarm_task(
         )
 
         if event is not None:
-            ALARM_FIRED_TOTAL.labels(alarm_type="gas_threshold", risk_level="danger").inc()
+            ALARM_FIRED_TOTAL.labels(
+                alarm_type="gas_threshold", risk_level="danger"
+            ).inc()
             _push_to_ws(
                 {
                     "event_id": event.id,
@@ -164,6 +167,7 @@ def fire_danger_alarm_task(
                     "threshold_value": threshold,
                     "source_label": source_label,
                     "summary": summary,
+                    "message": alarm.get_short_message(),
                     "is_new_event": alarm is not None,
                 }
             )
@@ -221,7 +225,9 @@ def fire_warning_alarm_task(
         )
 
         if event is not None:
-            ALARM_FIRED_TOTAL.labels(alarm_type="gas_threshold", risk_level="warning").inc()
+            ALARM_FIRED_TOTAL.labels(
+                alarm_type="gas_threshold", risk_level="warning"
+            ).inc()
             _push_to_ws(
                 {
                     "event_id": event.id,
@@ -232,6 +238,7 @@ def fire_warning_alarm_task(
                     "threshold_value": threshold,
                     "source_label": source_label,
                     "summary": summary,
+                    "message": alarm.get_short_message(),
                     "is_new_event": alarm is not None,
                 }
             )
@@ -242,6 +249,13 @@ def fire_warning_alarm_task(
                 value,
                 alarm is not None,
             )
+
+        # [Step 5] 정상 종료 시 task_key 즉시 정리.
+        # normal 처리 (gas_alarm.py) 의 cache.delete 에 의존하지 않고 task 가 직접
+        # 책임 — normal 천이가 안 들어와도 잔류 키로 다음 WARNING 이 막히지 않게.
+        # retry 경로는 아래 except 에서 raise 후 finally 없이 종료 → 잔류 허용
+        # (_TASK_KEY_TTL=35s 로 자연 정리).
+        cache.delete(f"alarm:task:{sensor_id}:{gas_type}")
 
     except Exception as exc:
         logger.error("WARNING 알람 생성 실패: %s", exc)
@@ -280,7 +294,9 @@ def fire_geofence_alarm_task(
             detected_at=timezone.now(),
         )
         if event is not None:
-            ALARM_FIRED_TOTAL.labels(alarm_type="geofence_intrusion", risk_level=risk_level).inc()
+            ALARM_FIRED_TOTAL.labels(
+                alarm_type="geofence_intrusion", risk_level=risk_level
+            ).inc()
             _push_to_ws(
                 {
                     "event_id": event.id,
@@ -288,6 +304,7 @@ def fire_geofence_alarm_task(
                     "risk_level": risk_level,
                     "source_label": geofence_name,
                     "summary": summary,
+                    "message": alarm.get_short_message(),
                     "is_new_event": alarm is not None,
                 }
             )
@@ -311,12 +328,17 @@ def fire_clear_notification_task(
     gas_type: str,
 ):
     """정상화 알림 — 가스 농도 복귀 시 WS 알림만 발송. 이벤트 상태는 운영자가 직접 변경."""
+    from apps.alerts.models import AlarmRecord
+
     try:
         gas_name = _GAS_NAME.get(gas_type, gas_type.upper())
         summary = (
             f"[안전] {source_label} — {gas_name} 농도가 정상 범위로 복귀했습니다."
             " 관리자 확인 후 작업을 재개하세요."
         )
+        # AlarmRecord 객체는 생성 안 함 (정상화는 record 안 남김). 모델 메서드를
+        # ephemeral 인스턴스로 호출 — short message single source of truth 유지.
+        short_message = AlarmRecord(alarm_type="gas_clear").get_short_message()
 
         # 정상화 알림은 critical 아님 — push 실패해도 retry 안 함 (중복 발송 회피)
         _push_to_ws(
@@ -326,6 +348,7 @@ def fire_clear_notification_task(
                 "risk_level": "normal",
                 "source_label": source_label,
                 "summary": summary,
+                "message": short_message,
                 "is_new_event": False,
             },
             raise_on_failure=False,
@@ -371,7 +394,9 @@ def fire_power_danger_task(
             detected_at=timezone.now(),
         )
         if event is not None:
-            ALARM_FIRED_TOTAL.labels(alarm_type="power_overload", risk_level="danger").inc()
+            ALARM_FIRED_TOTAL.labels(
+                alarm_type="power_overload", risk_level="danger"
+            ).inc()
             _push_to_ws(
                 {
                     "event_id": event.id,
@@ -382,6 +407,7 @@ def fire_power_danger_task(
                     "threshold_value": threshold,
                     "source_label": source_label,
                     "summary": summary,
+                    "message": alarm.get_short_message(),
                     "is_new_event": alarm is not None,
                 }
             )
@@ -431,7 +457,9 @@ def fire_power_warning_task(
             detected_at=timezone.now(),
         )
         if event is not None:
-            ALARM_FIRED_TOTAL.labels(alarm_type="power_overload", risk_level="warning").inc()
+            ALARM_FIRED_TOTAL.labels(
+                alarm_type="power_overload", risk_level="warning"
+            ).inc()
             _push_to_ws(
                 {
                     "event_id": event.id,
@@ -442,6 +470,7 @@ def fire_power_warning_task(
                     "threshold_value": threshold,
                     "source_label": source_label,
                     "summary": summary,
+                    "message": alarm.get_short_message(),
                     "is_new_event": alarm is not None,
                 }
             )
@@ -452,6 +481,10 @@ def fire_power_warning_task(
                 value,
                 alarm is not None,
             )
+
+        # [Step 5] 정상 종료 시 task_key 즉시 정리 (가스 task 와 동일 패턴).
+        cache.delete(f"alarm:power:task:{device_id}:{channel}")
+
     except Exception as exc:
         logger.error("전력 WARNING 알람 생성 실패: %s", exc)
         raise self.retry(exc=exc)
@@ -465,11 +498,14 @@ def fire_power_clear_task(
     source_label: str,
 ):
     """전력 정상화 알림 — WS 알림만 발송. 이벤트 상태는 운영자가 직접 변경."""
+    from apps.alerts.models import AlarmRecord
+
     try:
         summary = (
             f"[안전] {source_label} — 전력이 정상 범위로 복귀했습니다."
             " 관리자 확인 후 작업을 재개하세요."
         )
+        short_message = AlarmRecord(alarm_type="power_clear").get_short_message()
         # 정상화 알림은 critical 아님 — push 실패해도 retry 안 함 (중복 발송 회피)
         _push_to_ws(
             {
@@ -478,6 +514,7 @@ def fire_power_clear_task(
                 "risk_level": "normal",
                 "source_label": source_label,
                 "summary": summary,
+                "message": short_message,
                 "is_new_event": False,
             },
             raise_on_failure=False,

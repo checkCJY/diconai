@@ -19,8 +19,15 @@ drf-server/staticfiles/
 drf-server/ml_models/
 fastapi-server/ml_models/
 
+# ML 학습 데이터 스냅샷 (parquet) — ml_models와 동일 정책. 운영 DB와 분리해 별도 보관.
+# 디렉토리는 유지(.gitkeep)해서 신규 환경에서 mount 경로 보장.
+drf-server/ml_datasets/*
+!drf-server/ml_datasets/.gitkeep
+
 # DB 수동 백업 — backfill 같은 대량 작업 전 보존용. 수백 MB 단위라 git 부적합.
 drf-server/db.sqlite3.backup_*
+# truncate 전 cold copy 보관 디렉토리 (12GB 단위). 2026-05-14 도입.
+drf-server/db_backups/
 
 # 평가/EDA ad-hoc 스크립트 — sprint 단위 1회용. changelog 의 명령어로 재현 가능.
 # 보존하지만 git 추적 X (다음 sprint 시 새로 작성하거나 재사용).
@@ -49,6 +56,10 @@ Thumbs.db
 
 # Prometheus multiprocess metric files (런타임 생성 파일, 커밋 불필요)
 drf-server/prometheus_multiproc/
+
+# Celery beat 런타임 schedule 상태 (PID·시각 기록, 사용자별).
+# 한 번 잘못 tracked되어 git rm --cached로 untrack 처리 (2026-05-14).
+drf-server/celerybeat-schedule
 
 .claude
 skill
