@@ -121,6 +121,28 @@ class AlarmRecord(BaseModel):
     def delete(self, *args, **kwargs):
         raise ValueError("AlarmRecord는 삭제할 수 없습니다.")
 
+    def get_short_message(self) -> str:
+        """이벤트 현황 패널·WS push payload 의 한 줄 message.
+
+        운영자 안내문(summary, 긴 한글)과 구분되는 도메인 사실만 담은 짧은 텍스트.
+        DRF AlarmRecordSerializer 와 Celery `_push_to_ws` 양쪽이 본 메서드를 호출
+        → API 응답 / WS payload 가 항상 같은 텍스트를 노출 (drift 방지).
+        """
+        if self.gas_type and self.measured_value is not None:
+            return f"{self.gas_type.upper()} 임계치 초과 ({self.measured_value} ppm)"
+        if self.power_device_id and self.measured_value is not None:
+            if self.alarm_type == "power_anomaly_ai":
+                return f"AI 이상 패턴 감지 ({self.measured_value} W)"
+            return f"전력 임계치 초과 ({self.measured_value} W)"
+        if self.geofence_id:
+            return "위험구역 진입"
+        if self.alarm_type == "sensor_fault":
+            return "센서 통신 이상"
+        if self.alarm_type in ("gas_clear", "power_clear"):
+            return "정상 복귀"
+        # 화면 정책 알람 (PPE, VR 교육 등) — choices 한글 라벨 사용.
+        return self.get_alarm_type_display()
+
     class Meta:
         db_table = "alarm_record"
         indexes = [

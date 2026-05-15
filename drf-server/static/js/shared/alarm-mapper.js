@@ -16,7 +16,10 @@ const AlarmMapper = (function () {
     return {
       alarm_level:    src.risk_level,
       is_new_event:   src.is_new_event,
-      message:        src.summary,
+      // [Step 3-4] 백엔드가 AlarmRecord.get_short_message() 결과를 message 필드로
+      // 보냄 (API serializer 와 동일 텍스트). 구버전 payload 호환을 위해 summary
+      // (긴 운영자 안내문) fallback 유지 — alarm-popup.js:183/284 도 같은 패턴.
+      message:        src.message || src.summary,
       sensor_name:    src.source_label,
       // 서버 발신 시각 우선(03 R3) — 누락 시 도착 시각으로 fallback
       timestamp:      src.created_at || new Date().toISOString(),

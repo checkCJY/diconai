@@ -261,7 +261,7 @@ class AlarmRecordViewSet(viewsets.ReadOnlyModelViewSet):
 
     @extend_schema(
         tags=["Alerts"],
-        summary="최근 24시간 알람 요약",
+        summary="최근 24시간 알람 요약 + 현재 미확인 이벤트 건수",
         responses={
             401: OpenApiResponse(description="인증 필요 (토큰 누락/만료)"),
             200: inline_serializer(
@@ -270,13 +270,25 @@ class AlarmRecordViewSet(viewsets.ReadOnlyModelViewSet):
                     "last_24h_total": serializers.IntegerField(),
                     "last_24h_danger": serializers.IntegerField(),
                     "last_24h_warning": serializers.IntegerField(),
+                    "unacknowledged_event_count": serializers.IntegerField(),
                 },
             ),
         },
     )
     @action(detail=False, methods=["get"])
     def summary(self, request):
-        """최근 24시간 AlarmRecord 요약"""
+        """최근 24시간 AlarmRecord 누적 + 현재 미확인 Event 건수.
+
+        [원안 디자인 — 미확인 카운트 추가]
+        24h 누적 (last_24h_*) 은 운영 통계용, 미확인 (unacknowledged_event_count) 은
+        "지금 운영자가 처리해야 할 사건 수". Event.status ∈ {active, acknowledged,
+        in_progress} 가 미확인. resolved 는 처리 완료라 제외.
+
+        이벤트 현황 패널의 '미확인 N건' 강조 박스 + 향후 D 옵션의 헤더 배지에서 사용.
+        """
+        from apps.alerts.models import Event
+        from apps.core.constants import EventStatus
+
         last_24h = timezone.now() - timedelta(hours=24)
         qs = AlarmRecord.objects.filter(created_at__gte=last_24h)
 
@@ -285,10 +297,20 @@ class AlarmRecordViewSet(viewsets.ReadOnlyModelViewSet):
             danger=Count("id", filter=Q(risk_level=RiskLevel.DANGER)),
             warning=Count("id", filter=Q(risk_level=RiskLevel.WARNING)),
         )
+
+        unack_count = Event.objects.filter(
+            status__in=[
+                EventStatus.ACTIVE,
+                EventStatus.ACKNOWLEDGED,
+                EventStatus.IN_PROGRESS,
+            ],
+        ).count()
+
         return Response(
             {
                 "last_24h_total": data["total"],
                 "last_24h_danger": data["danger"],
                 "last_24h_warning": data["warning"],
+                "unacknowledged_event_count": unack_count,
             }
         )
