@@ -457,6 +457,24 @@ const AlarmPopup = {
     }
   },
 
+  // fallback 폴링 — WS 가 60s 이상 끊긴 상태 지속 시 시작, 재연결 시 중단.
+  // ws-client.js 의 onFallbackStart/End 콜백이 트리거. catch-up endpoint 를 30s 주기로
+  // 호출해 _runCatchUp 흐름 그대로 재활용 (lastSeen 자동 갱신 + newAlarmEvent dispatch).
+  _fallbackPollingTimer: null,
+
+  _startFallbackPolling() {
+    if (this._fallbackPollingTimer) return;     // 중복 시작 차단
+    console.info('[AlarmPopup] WS 60s 지속 끊김 — catch-up 폴링 시작 (30s 주기)');
+    this._fallbackPollingTimer = setInterval(() => this._runCatchUp(), 30_000);
+  },
+
+  _stopFallbackPolling() {
+    if (!this._fallbackPollingTimer) return;
+    clearInterval(this._fallbackPollingTimer);
+    this._fallbackPollingTimer = null;
+    console.info('[AlarmPopup] WS 재연결 — fallback 폴링 중단');
+  },
+
   // 페이지 load / WS 재연결 시점 catch-up — drf 의 /alerts/api/alarms/catch-up/?since=
   // 을 호출해서 끊김 중 발생한 알람을 보충. 받은 알람은 newAlarmEvent CustomEvent 로
   // 발행하여 이벤트 패널에 누적 (is_new_event=false 라 팝업은 자연 skip — 지나간 알람).
@@ -529,8 +547,20 @@ const AlarmPopup = {
     document.getElementById('alarm-popup-drop-badge')?.addEventListener('click', () => this._goDetail());
 
     // 페이지 load 시점에 WS 끊김 중 미수신 알람 보충 (비동기 fire-and-forget).
-    // WS reconnect 마다 호출하는 흐름은 Phase 2 의 토큰 만료 재연결 작업에서 추가.
     this._runCatchUp();
+
+    // Phase 2 — WS 라이프사이클 hook (alarm-system-redesign.md C 옵션):
+    //   • onOpen        — 재연결마다 catch-up 재호출 (token 만료 → refresh 후 재연결 포함)
+    //   • onFallbackStart — 60s 지속 끊김 → 30s 폴링으로 degrade
+    //   • onFallbackEnd   — 재연결 성공 → 폴링 중단
+    // WSClient cache 가 path 기반(F5 보강)이라 alarm-ws.js 와 같은 instance 공유 — 중복
+    // 연결 발생 안 함. WSClient 미로드 페이지(예: 로그인 화면)는 silent skip.
+    if (typeof WSClient !== 'undefined') {
+      const ws = WSClient.connect('/ws/sensors/', { attachToken: true });
+      ws.onOpen(() => this._runCatchUp());
+      ws.onFallbackStart(() => this._startFallbackPolling());
+      ws.onFallbackEnd(() => this._stopFallbackPolling());
+    }
   },
 };
 
