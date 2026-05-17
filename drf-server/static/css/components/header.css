@@ -44,6 +44,20 @@
   width: 13px; height: 13px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
 }
+
+/* 알람 미확인 배지 (2026-05-17 D 옵션) — .badge 의 absolute/색 패턴 재활용.
+   카운트가 1~3자리 가변이라 width auto + min-width/padding 으로 적응형.
+   알림 종 아이콘 위 우측 상단에 작은 빨간 원으로 부착. */
+.alarm-badge-btn { position: relative; }
+.alarm-badge-count {
+  position: absolute; top: -2px; right: -2px;
+  background: var(--danger); color: #fff;
+  font-size: 9px; font-weight: 700; line-height: 1;
+  min-width: 14px; height: 14px;
+  padding: 0 4px; border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+}
 .logout-btn {
   background: var(--accent); color: #fff; border: none;
   padding: 5px 12px; border-radius: 5px;

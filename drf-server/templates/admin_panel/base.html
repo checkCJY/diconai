@@ -33,6 +33,15 @@
                         <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
                     </svg>
                 </button>
+                <!-- D 옵션 (2026-05-17) — 헤더 미확인 알람 배지. AlarmBadge (alarm-badge.js)
+                     가 fetch + newAlarmEvent 카운트. admin_panel 은 header.html 미사용
+                     (자체 topbar) 이라 같은 #btnAlarmBadge 를 별도 추가. JS·스토어는 공유. -->
+                <button id="btnAlarmBadge" class="icon-btn alarm-badge-btn" title="미확인 알람 — 이력 페이지로" aria-label="미확인 알람 보기">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6V11a6 6 0 1 0-12 0v5l-2 2v1h16v-1l-2-2z"/>
+                    </svg>
+                    <span class="alarm-badge-count" hidden>0</span>
+                </button>
                 <div class="topbar-actions">
                     <button id="btnLogout" class="btn-outline">로그아웃</button>
                 </div>

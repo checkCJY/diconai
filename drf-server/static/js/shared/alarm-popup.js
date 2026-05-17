@@ -51,6 +51,68 @@ const _AckStore = {
   },
 };
 
+// ── 2026-05-17 D 옵션 — 60s 클라이언트 dedup ─────────────────
+// 같은 (alarm_type, source, level) 알람이 60s 안 재발생 시 팝업 skip.
+// 백엔드 ALARM_REPOPUP_COOLDOWN_SEC (기본 60s) 와 일치 — 백엔드가 60s 후
+// 재푸시한 시점에 클라 TTL 만료라 자연 재발화 (차단형 정책 자동 충족).
+// _AckStore 와 같은 패턴 — localStorage 영속화 + JSON 직렬화 + TTL + silent fail.
+const _DEDUP_STORE_KEY = 'diconai:alarm:popup:dedup';
+const _DEDUP_TTL_MS    = 60_000;
+
+const _DedupStore = {
+  _map: null,  // Map<key, ts_ms>
+
+  _load() {
+    if (this._map !== null) return this._map;
+    try {
+      const raw = localStorage.getItem(_DEDUP_STORE_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      const now = Date.now();
+      const fresh = arr.filter(e => (now - e.ts) < _DEDUP_TTL_MS);
+      this._map = new Map(fresh.map(e => [e.k, e.ts]));
+      if (fresh.length !== arr.length) this._persist();
+    } catch (e) {
+      this._map = new Map();
+    }
+    return this._map;
+  },
+
+  // key 가 60s 안 도착했으면 true. fresh (60s 경과) 면 stale 정리 후 false.
+  has(key) {
+    if (!key) return false;
+    const map = this._load();
+    const ts = map.get(key);
+    if (ts == null) return false;
+    if ((Date.now() - ts) >= _DEDUP_TTL_MS) {
+      map.delete(key);
+      this._persist();
+      return false;
+    }
+    return true;
+  },
+
+  add(key) {
+    if (!key) return;
+    this._load().set(key, Date.now());
+    this._persist();
+  },
+
+  _persist() {
+    try {
+      const arr = Array.from(this._map.entries()).map(([k, ts]) => ({ k, ts }));
+      localStorage.setItem(_DEDUP_STORE_KEY, JSON.stringify(arr));
+    } catch (e) { /* silent */ }
+  },
+};
+
+// dedup 키 — event_id 우선, 없으면 (alarm_type, source, level) 합성.
+// event-panel.js 의 _dedupKey 와 같은 컨벤션.
+function _popupDedupKey(data) {
+  const eventId = data.event_id || data.id;
+  if (eventId != null) return `event:${eventId}`;
+  return `${data.alarm_type || 'unknown'}:${data.sensor_name || data.source_label || ''}:${data.alarm_level || ''}`;
+}
+
 // 마지막 수신 알람 시각 (unix sec). WS 끊김 후 재연결·페이지 새로고침 시
 // /alerts/api/alarms/catch-up/?since=<ts> 호출로 미수신 알람 보충 (시연 안전망).
 const _LastSeen = {
@@ -75,7 +137,12 @@ const _LastSeen = {
 // 차단하던 문제 해결. 우상단 토스트 stack 으로 비차단 표시 + DANGER 무응답 시 격상.
 // 모니터링 페이지 (dashboard / snb_details / event_detail 등) 는 기존 모달 유지.
 const _ADMIN_PATH_PREFIX = '/admin-panel/';
-const _TOAST_ESCALATE_MS = 10000;   // DANGER 무응답 → 모달 격상까지
+// DANGER 토스트 무응답 → 모달 격상까지 (2026-05-17 변경: 10s → 60s).
+// 10초는 너무 짧아 폼 작성 중 운영자가 의도적 무시할 시간조차 부족했음. 1분으로
+// 늘려 운영자가 정상 작업하다가 60s 안 토스트 확인 못 한 진짜 무응답 케이스에만
+// 격상. 동시에 백엔드 ALARM_REPOPUP_COOLDOWN_SEC (기본 60s) · 클라 _DEDUP_TTL_MS
+// (60s) 와 시간 척도 일관.
+const _TOAST_ESCALATE_MS = 60000;
 const _TOAST_TTL_MS      = { danger: 15000, warning: 10000 };
 
 function _resolveDisplayMode() {
@@ -96,19 +163,21 @@ const AlarmToastStack = {
     container.appendChild(item);
     if (eventId != null) this._items.set(eventId, item);
 
-    // 자동 사라짐 — DANGER 15s / WARNING 10s
-    const ttl = _TOAST_TTL_MS[level] || 10000;
-    item._timers = {
-      dismiss: setTimeout(() => this._dismiss(eventId, item), ttl),
-    };
-
-    // DANGER 격상 — 10s 무응답 시 같은 데이터로 모달 재진입
+    // 자동 사라짐 / 격상 timer 분기 (2026-05-17 수정):
+    //   DANGER → escalate timer 만 (60s) — dismiss 는 격상 시점에 _dismiss 가 처리
+    //   WARNING → dismiss timer 만 (10s) — 격상 없음
+    // 이전엔 DANGER 도 dismiss(15s) + escalate(원래 10s) 둘 다 set 했는데, 격상
+    // 시간을 10s → 60s 로 변경한 뒤로 dismiss(15s) 가 먼저 fire 되어 _dismiss 가
+    // escalate 를 clearTimeout — 격상이 안 되는 race 가 발생했음.
+    item._timers = {};
     if (level === 'danger') {
       item._timers.escalate = setTimeout(() => {
-        clearTimeout(item._timers.dismiss);
         this._dismiss(eventId, item);
         AlarmPopup.show(Object.assign({}, data, { __forceModal: true }));
       }, _TOAST_ESCALATE_MS);
+    } else {
+      const ttl = _TOAST_TTL_MS[level] || 10000;
+      item._timers.dismiss = setTimeout(() => this._dismiss(eventId, item), ttl);
     }
   },
 
@@ -275,6 +344,15 @@ const AlarmPopup = {
     // 이벤트 패널 표시 (newAlarmEvent) 는 alarm-ws.js 가 별도로 발행하므로 영향 없음.
     const eventId = data.event_id || data.id;
     if (_AckStore.has(eventId)) return;
+
+    // 2026-05-17 D 옵션 — 60s 클라 dedup. 같은 알람이 60s 안 재도착하면 팝업 skip
+    // (백엔드가 다중 페이지·다중 탭 에서 받게 한 경우 + 백엔드 cooldown 통과 직후 burst).
+    // 백엔드 ALARM_REPOPUP_COOLDOWN_SEC 와 일치 — 60s 후 재푸시 시점에 TTL 만료라
+    // 자연 재발화 (차단형 정책 자동 충족). 카운터 ↑ 는 alarm-badge.js 가 newAlarmEvent
+    // 구독으로 별도 처리 (dedup 무관 — 운영자 누적 인지).
+    const dedupKey = _popupDedupKey(data);
+    if (_DedupStore.has(dedupKey)) return;
+    _DedupStore.add(dedupKey);
 
     // 2026-05-15 Phase 2 A-mini: admin-panel/* 페이지는 차단형 모달이 폼 입력 손실 +
     // 운영자 무지성 닫기 학습을 유발 — 우상단 토스트 stack 으로 비차단 표시.

@@ -271,6 +271,7 @@ class AlarmRecordViewSet(viewsets.ReadOnlyModelViewSet):
                     "last_24h_danger": serializers.IntegerField(),
                     "last_24h_warning": serializers.IntegerField(),
                     "unacknowledged_event_count": serializers.IntegerField(),
+                    "user_unread_event_count": serializers.IntegerField(),
                 },
             ),
         },
@@ -284,9 +285,15 @@ class AlarmRecordViewSet(viewsets.ReadOnlyModelViewSet):
         "지금 운영자가 처리해야 할 사건 수". Event.status ∈ {active, acknowledged,
         in_progress} 가 미확인. resolved 는 처리 완료라 제외.
 
-        이벤트 현황 패널의 '미확인 N건' 강조 박스 + 향후 D 옵션의 헤더 배지에서 사용.
+        [2026-05-17 D 옵션 — user-scoped unread]
+        user_unread_event_count — 본인이 아직 ack 안 한 활성 이벤트 수 (Phase 1
+        EventAcknowledgement 활용). 헤더 미확인 배지의 초기값으로 사용. 글로벌
+        unacknowledged 와 달리 본 사람만 줄어드는 카운트.
         """
         from apps.alerts.models import Event
+        from apps.alerts.selectors.event_ack_selector import (
+            get_user_unread_event_count,
+        )
         from apps.core.constants import EventStatus
 
         last_24h = timezone.now() - timedelta(hours=24)
@@ -306,12 +313,15 @@ class AlarmRecordViewSet(viewsets.ReadOnlyModelViewSet):
             ],
         ).count()
 
+        user_unread = get_user_unread_event_count(request.user.id)
+
         return Response(
             {
                 "last_24h_total": data["total"],
                 "last_24h_danger": data["danger"],
                 "last_24h_warning": data["warning"],
                 "unacknowledged_event_count": unack_count,
+                "user_unread_event_count": user_unread,
             }
         )
 
