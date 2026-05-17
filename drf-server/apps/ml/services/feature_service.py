@@ -127,17 +127,36 @@ def build_features(
     )
 
 
+# 이성현 추가 — ARIMA 잔차 계산 함수 (학습 및 추론 공용)
+def compute_arima_residuals(
+    values: np.ndarray,
+    arima_result,
+) -> np.ndarray:
+    """학습된 ARIMA 파라미터를 values 에 적용해 잔차 배열을 반환한다.
+
+    잔차 = 실제값 - ARIMA 예측값. 값이 클수록 정상 패턴 이탈 → IF 이상 신호 보강.
+    arima_result: statsmodels ARIMAResultsWrapper (pkl 에서 로드한 객체).
+    """
+    new_result = arima_result.apply(endog=values.tolist())
+    resid = np.asarray(new_result.resid, dtype=np.float64)
+    # 첫 번째 원소는 NaN 인 경우가 있음 → 0 으로 대체
+    return np.where(np.isnan(resid), 0.0, resid)
+
+
 # 이성현 추가 — 다변량 피처 행렬 빌더 (여러 가스 TimeSeries 수평 스택)
+# 이성현 수정 — arima_results 매개변수 추가 (None 이면 기존 12피처 유지, 제공 시 15피처)
 def build_multi_features(
     series_list: list[TimeSeries],
     gas_names: list[str],
     window: int = DEFAULT_WINDOW,
     drop_warmup: bool = True,
+    arima_results: dict | None = None,
 ) -> FeatureMatrix:
     """여러 가스 TimeSeries → 다변량 피처 행렬.
 
-    각 가스 4피처(value, roll_mean_N, roll_std_N, diff)에 가스명 접두어를 붙여 수평 스택.
-    gas_names=["co","h2s","co2"] → 12피처 — ai/router.py _build_multi_feature_row 와 동일 순서.
+    arima_results={gas_name: ARIMAResultsWrapper} 를 넘기면
+    각 가스마다 arima_resid 1개를 추가 → 12피처 → 15피처.
+    gas_names=["co","h2s","co2"] → 15피처 — ai/router.py _build_multi_feature_row 와 동일 순서.
     """
     fms = [
         build_features(s, window=window, drop_warmup=drop_warmup) for s in series_list
@@ -146,9 +165,18 @@ def build_multi_features(
 
     columns: list[str] = []
     feature_parts: list[np.ndarray] = []
-    for gas_name, fm in zip(gas_names, fms):
+    # 이성현 수정 — series 도 같이 순회 (ARIMA 잔차 계산에 원본값 필요)
+    for gas_name, fm, series in zip(gas_names, fms, series_list):
         columns.extend(f"{gas_name}_{col}" for col in fm.columns)
         feature_parts.append(fm.features[-min_len:])
+        # 이성현 추가 — ARIMA 잔차 피처 (arima_results 없으면 건너뜀)
+        if arima_results and gas_name in arima_results:
+            resid = compute_arima_residuals(series.values, arima_results[gas_name])
+            if drop_warmup:
+                start = max(window - 1, 1)
+                resid = resid[start:]
+            columns.append(f"{gas_name}_arima_resid")
+            feature_parts.append(resid[-min_len:].reshape(-1, 1))
 
     return FeatureMatrix(
         columns=columns,

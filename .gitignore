@@ -11,6 +11,8 @@ fastapi-server/.venv/
 
 # Django
 drf-server/db.sqlite3
+drf-server/db.sqlite3-wal
+drf-server/db.sqlite3-shm
 drf-server/media/
 drf-server/staticfiles/
 

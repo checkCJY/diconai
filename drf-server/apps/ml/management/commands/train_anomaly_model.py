@@ -167,9 +167,28 @@ class Command(BaseCommand):
                     f"학습 데이터 부족: {min_len} rows (최소 {options['window'] * 10})"
                 )
             self.stdout.write(f"[2/5] feature engineering — window={options['window']}")
+            # 이성현 추가 — ARIMA pkl 로드 후 잔차 피처 활성화 (파일 없으면 경고 후 12피처 유지)
+            _models_dir = Path(settings.ML_MODELS_DIR)
+            arima_results = {}
+            for _gn in gas_names:
+                _p = _models_dir / f"arima_{_gn}.pkl"
+                if _p.exists():
+                    arima_results[_gn] = joblib.load(_p)["result"]
+                    self.stdout.write(f"      ARIMA 로드: arima_{_gn}.pkl")
+                else:
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f"      ARIMA 없음 (건너뜀): arima_{_gn}.pkl"
+                        )
+                    )
             fm = build_multi_features(
-                series_list, gas_names, window=options["window"], drop_warmup=True
+                series_list,
+                gas_names,
+                window=options["window"],
+                drop_warmup=True,
+                arima_results=arima_results if arima_results else None,
             )
+
         else:
             series = _fetch_series(sensor_type, opts)
             self.stdout.write(
