@@ -104,3 +104,14 @@
 /* ── 새로고침 로딩 스피너 ────────────────────────────────── */
 @keyframes spin { to { transform: rotate(360deg); } }
 .spinning { display: inline-block; animation: spin .7s linear infinite; }
+
+/* ── 사이트 전체 스크롤바 (다크 테마 — 2026-05-17) ──────
+   header.css 가 dashboard + snb_details 공용 로드라 여기에 통합.
+   admin_panel 은 admin.css 에 라이트 톤으로 별도 정의.
+   디자이너 시안 받으면 본 블록만 교체. */
+::-webkit-scrollbar      { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: var(--border, #30363d); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text2, #6e7681); }
+::-webkit-scrollbar-corner { background: transparent; }
+* { scrollbar-width: thin; scrollbar-color: var(--border, #30363d) transparent; }

@@ -70,3 +70,12 @@ th{background-color:#f8fafc;color:#64748b;font-weight:600;font-size:13px}
 .snb-sub a{display:flex;align-items:center;padding:8px 20px;color:#94a3b8;text-decoration:none;font-size:12px;gap:8px;white-space:nowrap}
 .snb-sub a:hover{background:#f8fafc;color:#64748b}
 .snb-sub a.active{background:#eff6ff;color:#3b82f6}
+
+/* 사이트 전체 스크롤바 (라이트 테마 — 2026-05-17). admin_panel 공용 로드 위치.
+   header.css 의 다크 톤과 짝 — 사이트 톤 일관 + 테마별 색만 분리. */
+::-webkit-scrollbar      { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: #cbd5e1; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+::-webkit-scrollbar-corner { background: transparent; }
+* { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
