@@ -178,6 +178,63 @@ body {
   padding: 2px 0;
 }
 
+/* source 단위 그룹 (2026-05-17) — 같은 가스 센서/전력 장비/지오펜스의 30분 윈도우
+   알람 묶음. 1건일 땐 일반 event-item 과 외형 동일 (moreEl/itemsEl hidden).
+   추가 알람 도착 시 moreEl 표시 + 위험도 색 갱신 + 펼침 list 채움. */
+.event-source-more {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text2);
+  background: var(--bg3);
+  padding: 1px 6px;
+  border-radius: 8px;
+  user-select: none;
+}
+.event-source-more:hover {
+  color: var(--text);
+  background: var(--bg2, #21262d);
+}
+.event-source-other-types {
+  font-weight: 500;
+  margin-left: 3px;
+  opacity: 0.85;
+}
+.event-source-items {
+  margin: 6px 0 0 22px;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+  color: var(--text2);
+}
+.event-source-items li {
+  padding: 3px 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 3px;
+}
+.event-source-items li:hover {
+  background: rgba(255, 255, 255, .04);
+}
+.event-source-items li > i + span {
+  flex: 1;
+  min-width: 0;
+}
+.event-source-li-icon {
+  display: inline-block;
+  vertical-align: middle;
+  width: 12px;
+  height: 12px;
+  stroke-width: 1.75;
+  flex-shrink: 0;
+}
+.event-source-li-time {
+  color: var(--text2);
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
 /* ── 공통 테이블 ────────────────────────────────────────── */
 .tbl          { width: 100%; border-collapse: collapse; font-size: 11px; }
 .tbl th       { color: var(--text2); font-weight: 500; padding: 2px 3px; text-align: left; border-bottom: 1px solid var(--border); }
