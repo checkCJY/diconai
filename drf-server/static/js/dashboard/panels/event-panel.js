@@ -20,20 +20,24 @@
 // ──────────────────────────────────────────────────────────
 const EventPanel = {
 
-  // alarm_type → 발생원 아이콘 (원안 디자인 — 작업자/가스/전력/구역).
-  // 이모지 사용 — 시연 단순 구현. 디자인 시스템 확정 후 SVG 교체 가능.
+  // alarm_type → Lucide 아이콘 이름 (lucide.dev). 이모지 → 단색 SVG 로 전환 (2026-05-17).
+  // CDN 은 main.html 에서 로드. 동적 추가된 element 는 addItem/addToClearGroup 끝에서
+  // lucide.createIcons() 로 [data-lucide] 속성 element 를 SVG 로 replace. 색은 currentColor
+  // 라 텍스트 색 (위험도) 자동 적용. 디자이너 SVG 받으면 본 매핑 그대로 갈아끼우면 됨.
   ICON_BY_TYPE: {
-    gas_threshold:        '🌫️',
-    power_overload:       '⚡',
-    power_anomaly_ai:     '🤖',
-    geofence_intrusion:   '🚸',
-    sensor_fault:         '⚠️',
-    ppe_violation:        '🦺',
-    vr_training_not_done: '📚',
-    safety_check_pending: '📋',
-    inspection_scheduled: '🔧',
-    batch_failed:         '🛑',
-    storage_overdue:      '📦',
+    gas_threshold:        'flame',
+    gas_clear:            'circle-check',
+    power_overload:       'zap',
+    power_anomaly_ai:     'brain-circuit',
+    power_clear:          'circle-check',
+    geofence_intrusion:   'map-pin',
+    sensor_fault:         'shield-alert',
+    ppe_violation:        'hard-hat',
+    vr_training_not_done: 'graduation-cap',
+    safety_check_pending: 'clipboard-check',
+    inspection_scheduled: 'wrench',
+    batch_failed:         'circle-x',
+    storage_overdue:      'package-x',
   },
 
   // 같은 패널 안에 동일 항목이 중복 추가되지 않도록 추적.
@@ -111,7 +115,8 @@ const EventPanel = {
           ? (typeof TimeFormat !== 'undefined' ? TimeFormat.short(data.timestamp) : new Date(data.timestamp).toLocaleTimeString())
           : '');
     const isResolved = data.status === 'resolved';
-    const icon       = this.ICON_BY_TYPE[data.alarm_type] || '🔔';
+    // fallback 'bell' — ICON_BY_TYPE 에 없는 신규 alarm_type 도 안전하게 SVG 렌더.
+    const icon       = this.ICON_BY_TYPE[data.alarm_type] || 'bell';
 
     const item = document.createElement('div');
     item.className       = 'event-item';
@@ -128,7 +133,7 @@ const EventPanel = {
     }
     item.innerHTML = `
       <div class="event-head">
-        <span><span class="event-icon">${icon}</span>${label}</span>
+        <span><i data-lucide="${icon}" class="event-icon"></i>${label}</span>
         <span class="sub">${time}</span>
       </div>
       <div class="${colorClass} event-desc">${data.message || data.alarm_type || ''}</div>
@@ -143,6 +148,8 @@ const EventPanel = {
     }
 
     this._trimList(listEl);
+    // [data-lucide] 속성 element 를 SVG 로 replace (idempotent — 이미 SVG 인 건 무시).
+    if (typeof lucide !== 'undefined') lucide.createIcons();
   },
 
   // ── 정상화 burst 그룹 추가/갱신 ──────────────────────────
@@ -172,7 +179,7 @@ const EventPanel = {
       ? (typeof TimeFormat !== 'undefined' ? TimeFormat.short(data.created_at) : new Date(data.created_at).toLocaleTimeString())
       : '';
     const colorClass = LevelMapper.toTextClass(data.alarm_level);
-    const icon       = this.ICON_BY_TYPE[data.alarm_type] || '🔔';
+    const icon       = this.ICON_BY_TYPE[data.alarm_type] || 'bell';
     const message    = data.message || '정상 복귀';
 
     const item = document.createElement('div');
@@ -180,7 +187,7 @@ const EventPanel = {
     item.dataset.dedupKey = groupKey;
     item.innerHTML = `
       <div class="event-head">
-        <span><span class="event-icon">${icon}</span><span class="event-clear-label">${source}</span></span>
+        <span><i data-lucide="${icon}" class="event-icon"></i><span class="event-clear-label">${source}</span></span>
         <span class="sub">${time}</span>
       </div>
       <div class="${colorClass} event-desc">
@@ -190,6 +197,8 @@ const EventPanel = {
       <ul class="event-clear-sources" hidden></ul>
     `;
     listEl.insertBefore(item, listEl.firstChild);
+    // [data-lucide] 속성 element 를 SVG 로 replace (idempotent).
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 
     const moreEl = item.querySelector('.event-clear-more');
     const moreCountEl = item.querySelector('.event-clear-more-count');

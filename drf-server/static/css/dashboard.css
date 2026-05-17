@@ -118,7 +118,11 @@ body {
 .event-head    { display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 12px; margin-bottom: 3px; }
 .event-head > span:first-child { display: flex; align-items: center; gap: 6px; }
 .event-desc    { font-size: 11px; padding-left: 22px; }
-.event-icon    { font-size: 14px; line-height: 1; display: inline-block; width: 18px; text-align: center; }
+/* event-icon — alarm_type 별 Lucide SVG (2026-05-17 이모지 대체).
+   lucide.createIcons() 가 <i data-lucide> 를 <svg class="event-icon"> 로 replace.
+   width/height 는 CSS 우선 (HTML 속성보다 강함). stroke 는 currentColor 라
+   부모 텍스트 색 자동 적용 (위험도 색 매핑은 추후 .event-head 에 colorClass 도입 시). */
+.event-icon    { display: inline-block; vertical-align: middle; width: 16px; height: 16px; stroke-width: 1.75; flex-shrink: 0; }
 .event-summary { margin-top: 8px; padding: 7px; background: var(--bg3); border-radius: 5px; font-size: 11px; color: var(--text2); line-height: 1.8; }
 .event-summary-icon { color: var(--accent); margin-right: 4px; }
 
