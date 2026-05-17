@@ -395,6 +395,7 @@ def fire_power_danger_task(
             source_label=source_label,
             summary=summary,
             detected_at=timezone.now(),
+            channel=channel,
         )
         if event is not None:
             ALARM_FIRED_TOTAL.labels(
@@ -458,6 +459,7 @@ def fire_power_warning_task(
             source_label=source_label,
             summary=summary,
             detected_at=timezone.now(),
+            channel=channel,
         )
         if event is not None:
             ALARM_FIRED_TOTAL.labels(

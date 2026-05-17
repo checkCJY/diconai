@@ -189,6 +189,9 @@ async def process_anomaly_inference(
                         "summary": summary,
                         "detected_at": measured_at,
                         "source_label": label,
+                        # AlarmRecord.channel 에 저장 → get_short_message 가 channel_meta
+                        # 로 라벨 ("송풍기A AI 이상 패턴 감지 (7925.8 W)") 생성.
+                        "channel": channel,
                     },
                     push_payload={
                         "alarm_type": "power_anomaly_ai",

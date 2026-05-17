@@ -212,6 +212,16 @@ class PowerDevice(DeviceBase):
     def __str__(self):
         return f"{self.power_id} ({self.device_id})"
 
+    def get_channel_label(self, channel: int) -> str:
+        """채널별 사용자 친화 라벨.
+
+        channel_meta[str(channel)]["name"] 우선 (운영자 등록 시 "송풍기A" 등),
+        미지정 시 "CH{N}" 폴백. monitoring/services/power_alarm._channel_label 과
+        AlarmRecord.get_short_message 양쪽이 본 메서드를 호출 — 라벨 규칙 단일화.
+        """
+        meta = (self.channel_meta or {}).get(str(channel)) or {}
+        return meta.get("name") or f"CH{channel}"
+
     def clean(self):
         for ch_key, meta in self.channel_meta.items():
             if not ch_key.isdigit() or not (1 <= int(ch_key) <= self.channel_count):

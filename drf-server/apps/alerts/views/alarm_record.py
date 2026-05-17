@@ -364,7 +364,8 @@ class AlarmRecordViewSet(viewsets.ReadOnlyModelViewSet):
 
         alarms = (
             AlarmRecord.objects.filter(created_at__gte=since_dt)
-            .select_related("event")
+            # power_device prefetch — get_short_message 가 channel_meta 조회 시 N+1 회피.
+            .select_related("event", "power_device")
             .order_by("created_at")[:100]
         )
 
