@@ -15,6 +15,8 @@ import time
 
 from fastapi import APIRouter, BackgroundTasks
 
+from core.metrics import SENSOR_LAST_RECEIVED
+
 from power.schemas.power import (
     PowerCurrentPayload,
     PowerIngestResponse,
@@ -55,6 +57,8 @@ _COMMON_RESPONSES = {
     responses=_COMMON_RESPONSES,
 )
 async def recv_onoff(payload: PowerOnOffPayload, bg: BackgroundTasks):
+    # P1 — 센서 마지막 수신 시각 갱신
+    SENSOR_LAST_RECEIVED.labels("power", payload.device_id).set(time.time())
     snapshot = payload.to_snapshot()
     measured_at = now_utc_iso()
     update_power_state("onoff", snapshot, measured_at)
@@ -79,6 +83,8 @@ async def recv_onoff(payload: PowerOnOffPayload, bg: BackgroundTasks):
     responses=_COMMON_RESPONSES,
 )
 async def recv_current(payload: PowerCurrentPayload, bg: BackgroundTasks):
+    # P1 — 센서 마지막 수신 시각 갱신
+    SENSOR_LAST_RECEIVED.labels("power", payload.device_id).set(time.time())
     channel_values = payload.to_channel_values()
     measured_at = now_utc_iso()
     update_power_state("current", channel_values, measured_at)
@@ -105,6 +111,8 @@ async def recv_current(payload: PowerCurrentPayload, bg: BackgroundTasks):
     responses=_COMMON_RESPONSES,
 )
 async def recv_voltage(payload: PowerVoltagePayload, bg: BackgroundTasks):
+    # P1 — 센서 마지막 수신 시각 갱신
+    SENSOR_LAST_RECEIVED.labels("power", payload.device_id).set(time.time())
     channel_values = payload.to_channel_values()
     measured_at = now_utc_iso()
     update_power_state("voltage", channel_values, measured_at)
@@ -134,6 +142,8 @@ async def recv_voltage(payload: PowerVoltagePayload, bg: BackgroundTasks):
     responses=_COMMON_RESPONSES,
 )
 async def recv_watt(payload: PowerWattPayload, bg: BackgroundTasks):
+    # P1 — 센서 마지막 수신 시각 갱신
+    SENSOR_LAST_RECEIVED.labels("power", payload.device_id).set(time.time())
     channel_values = payload.to_channel_values()
     measured_at = now_utc_iso()
     update_power_state("watt", channel_values, measured_at)

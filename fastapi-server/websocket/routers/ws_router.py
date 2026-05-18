@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from core.config import settings
-from core.metrics import E2E_ALARM_LATENCY
+from core.metrics import E2E_ALARM_LATENCY, WS_CONNECTIONS
 from services.drf_client import post_to_drf
 from websocket.auth import verify_jwt_from_ws_query
 from websocket.services.alarm_queue import pop_alarm_blocking
@@ -61,7 +61,8 @@ async def alarm_flush_loop():
             continue
         ingress_ts = payload.pop("ingress_ts", None)
         if ingress_ts is not None:
-            E2E_ALARM_LATENCY.observe(time.time() - ingress_ts)
+            risk_level = payload.get("risk_level", "unknown")
+            E2E_ALARM_LATENCY.labels(risk_level=risk_level).observe(time.time() - ingress_ts)
         if not sensor_clients:
             # 큐에서 pop했으나 연결된 클라 없음 → drop (의도, 큐에 다시 넣지 않음)
             continue
@@ -112,6 +113,7 @@ async def sensor_stream(websocket: WebSocket):
         await websocket.close(code=1008, reason="unauthenticated")
         return
     sensor_clients.append(websocket)
+    WS_CONNECTIONS.labels("sensor").inc()
     logger.info(f"[ws/sensors] action=connect total={len(sensor_clients)}")
     try:
         await websocket.send_json(build_broadcast_payload(include_alarms=False))
@@ -123,6 +125,7 @@ async def sensor_stream(websocket: WebSocket):
     finally:
         if websocket in sensor_clients:
             sensor_clients.remove(websocket)
+        WS_CONNECTIONS.labels("sensor").dec()
         logger.info(f"[ws/sensors] action=disconnect total={len(sensor_clients)}")
 
 
@@ -159,6 +162,7 @@ async def worker_stream(websocket: WebSocket, user_id: int):
         return
 
     worker_clients[user_id] = websocket
+    WS_CONNECTIONS.labels("worker").inc()
     logger.info(f"[ws/worker] action=connect user_id={user_id}")
     try:
         await websocket.receive_text()  # 연결 유지
@@ -170,6 +174,7 @@ async def worker_stream(websocket: WebSocket, user_id: int):
         )
     finally:
         worker_clients.pop(user_id, None)
+        WS_CONNECTIONS.labels("worker").dec()
         logger.info(f"[ws/worker] action=disconnect user_id={user_id}")
 
 
@@ -188,6 +193,7 @@ async def position_stream(websocket: WebSocket):
     필수 필드가 누락된 경우 에러 응답을 반환하고 다음 수신을 계속 대기한다.
     """
     await websocket.accept()
+    WS_CONNECTIONS.labels("position").inc()
     logger.info("[ws/position] action=connect")
     try:
         while True:
@@ -222,3 +228,5 @@ async def position_stream(websocket: WebSocket):
     except Exception as exc:
         logger.exception(f"[ws/position] action=stream_error error={exc!r}")
         await websocket.close()
+    finally:
+        WS_CONNECTIONS.labels("position").dec()

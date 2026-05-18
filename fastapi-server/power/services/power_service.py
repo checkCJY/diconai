@@ -17,6 +17,7 @@ from ai.router import _build_feature_row, _get_or_load
 from core.power_thresholds import POWER_THRESHOLDS
 from power.services.channel_meta_cache import get_channel_entry
 from power.services.threshold_eval import calculate_power_risk
+from core.metrics import AI_INFERENCE_DURATION, AI_INFERENCE_FAILED_TOTAL
 from services.anomaly_alarm import forward_inference_e2e
 from services.drf_client import post_to_drf
 from websocket.state import power_latest
@@ -111,10 +112,16 @@ async def process_anomaly_inference(
 
         try:
             entry = await _get_or_load("power")
+            if entry is None:
+                AI_INFERENCE_FAILED_TOTAL.labels("power_if", "model_not_loaded").inc()
+                continue
+            # P2 전 — IF 추론 실행 시간 측정
+            _infer_start = time.time()
             row = _build_feature_row(list(win), entry.window)
             score = float(entry.model.decision_function(row)[0])
             pred_int = int(entry.model.predict(row)[0])
             prediction = "anomaly" if pred_int == -1 else "normal"
+            AI_INFERENCE_DURATION.labels("power_if").observe(time.time() - _infer_start)
 
             threshold_risk = calculate_power_risk(value, data_type, device_id, channel)
             combined = combine_risk(threshold_risk, prediction)
@@ -212,6 +219,7 @@ async def process_anomaly_inference(
                 )
             )
         except Exception as exc:
+            AI_INFERENCE_FAILED_TOTAL.labels("power_if", "inference_error").inc()
             logger.warning(
                 "[anomaly_inference] failed device=%s ch=%s %s: %s",
                 device_id,
