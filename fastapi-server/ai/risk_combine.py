@@ -53,9 +53,12 @@ def combine_risk(threshold_risk: str, ml_prediction: str) -> str:
 
 # ---------------------------------------------------------------------------
 # W3 — 3축 매트릭스 (skill/plan/power-ai-un-downgrade-phase2-apply.md §7).
-# 두 AI 모델 (IF + ARIMA) 동의 시 한 단계 격상.
-# ARIMA pkl 없는 채널/sensor 는 caller 가 arima_violation=False 호출 →
-# 기존 2축 matrix 와 동일 결과 (fallback 효과).
+# 두 AI 모델 (IF + ARIMA) 동의 시 한 단계 격상 / 단일 AI 만 발화 시 보수적.
+# ⚠ 2축 matrix 와 다름 — 단일 AI 발화 시 본 3축이 한 단계 낮음:
+#   - 2축 ("warning", "anomaly") = "danger" (IF 단독으로 격상)
+#   - 3축 ("warning", "anomaly", False) = "warning" (두 AI 동의 시만 격상)
+# 의도: 두 AI 환경에서 한 쪽만 발화 시 신뢰도 ↓ 반영. ARIMA pkl 없는 채널은
+# caller 가 arima_violation=False 호출 → 본 3축 보수적 결과 적용 (2축 fallback X).
 # ---------------------------------------------------------------------------
 
 _MATRIX_3AXIS: dict[tuple[str, str, bool], str] = {
