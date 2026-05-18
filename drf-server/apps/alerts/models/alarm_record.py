@@ -109,7 +109,7 @@ class AlarmRecord(BaseModel):
     risk_level = models.CharField(
         max_length=10, choices=RiskLevel.choices, verbose_name="위험도"
     )
-    # W4 — AI 알람 한정 algorithm 출처 라벨 (ARIMA un-downgrade plan §8).
+    # W4.a — AI 알람 한정 algorithm 출처 라벨 (ARIMA un-downgrade plan §8).
     # power/gas anomaly_ai 알람만 채워지고 룰 기반은 빈 문자열 또는 NULL.
     # 값: "isolation_forest" | "arima" | "combined" | "night_abnormal" | "" | NULL
     # Critical #1 (0018) — null=True 추가: Django SQLite ALTER TABLE ADD COLUMN 이

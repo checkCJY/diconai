@@ -223,7 +223,7 @@ async def process_anomaly_inference(
                         combined = escalated
                         night_escalated = True
 
-            # W4 algorithm_source — AlarmRecord.algorithm_source 저장 (plan §8).
+            # W4.a algorithm_source — AlarmRecord.algorithm_source 저장 (plan §8).
             # 우선순위: night_abnormal > combined > arima > isolation_forest > 빈값.
             # should_fire=False (combined=normal/caution 중 일부) 면 alarm forward
             # skip 이라 algorithm_source 미사용이지만 ML forward 페이로드엔 동행.
@@ -316,7 +316,7 @@ async def process_anomaly_inference(
                         # AlarmRecord.channel 에 저장 → get_short_message 가 channel_meta
                         # 로 라벨 ("송풍기A AI 이상 패턴 감지 (7925.8 W)") 생성.
                         "channel": channel,
-                        # W4 — AlarmRecord.algorithm_source 저장용 (plan §8).
+                        # W4.a — AlarmRecord.algorithm_source 저장용 (plan §8).
                         "algorithm_source": algorithm_source,
                     },
                     push_payload={
