@@ -109,6 +109,19 @@ class AlarmRecord(BaseModel):
     risk_level = models.CharField(
         max_length=10, choices=RiskLevel.choices, verbose_name="위험도"
     )
+    # W4 — AI 알람 한정 algorithm 출처 라벨 (ARIMA Un-격하 plan §8).
+    # power/gas anomaly_ai 알람만 채워지고 룰 기반은 빈 문자열.
+    # 값: "isolation_forest" | "arima" | "combined" | "night_abnormal" | ""
+    algorithm_source = models.CharField(
+        max_length=30,
+        blank=True,
+        default="",
+        verbose_name="AI 알고리즘 출처",
+        help_text=(
+            "power/gas anomaly_ai 알람만 채움. isolation_forest / arima / "
+            "combined / night_abnormal. 룰 알람은 빈 문자열."
+        ),
+    )
     # created_at / updated_at / updated_by 는 BaseModel 상속 (save override로 수정 차단)
 
     def save(self, *args, **kwargs):

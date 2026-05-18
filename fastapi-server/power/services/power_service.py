@@ -201,6 +201,7 @@ async def process_anomaly_inference(
             # 추론 측이 measured_at hour KST 야간 + watt > 정격 30% 검사해 격상.
             # (SARIMAX 도입 시 ARIMA seasonal forecast 로 대체 — plan §7.1 후기)
             entry_meta = get_channel_entry(device_id, channel)
+            night_escalated = False
             if data_type == "watt" and _is_night_kst_iso(measured_at):
                 rated_w = entry_meta.get("rated_w")
                 if (
@@ -220,6 +221,22 @@ async def process_anomaly_inference(
                             escalated,
                         )
                         combined = escalated
+                        night_escalated = True
+
+            # W4 algorithm_source — AlarmRecord.algorithm_source 저장 (plan §8).
+            # 우선순위: night_abnormal > combined > arima > isolation_forest > 빈값.
+            # should_fire=False (combined=normal/caution 중 일부) 면 alarm forward
+            # skip 이라 algorithm_source 미사용이지만 ML forward 페이로드엔 동행.
+            if night_escalated:
+                algorithm_source = "night_abnormal"
+            elif prediction == "anomaly" and arima_violation:
+                algorithm_source = "combined"
+            elif arima_violation:
+                algorithm_source = "arima"
+            elif prediction == "anomaly":
+                algorithm_source = "isolation_forest"
+            else:
+                algorithm_source = ""
 
             features = {
                 "value": float(row[0, 0]),
@@ -299,6 +316,8 @@ async def process_anomaly_inference(
                         # AlarmRecord.channel 에 저장 → get_short_message 가 channel_meta
                         # 로 라벨 ("송풍기A AI 이상 패턴 감지 (7925.8 W)") 생성.
                         "channel": channel,
+                        # W4 — AlarmRecord.algorithm_source 저장용 (plan §8).
+                        "algorithm_source": algorithm_source,
                     },
                     push_payload={
                         "alarm_type": "power_anomaly_ai",
