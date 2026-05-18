@@ -284,13 +284,24 @@ drf-server (Django + DRF)                fastapi-server (FastAPI)
 [Celery worker — _push_to_ws({..., "message": alarm.get_short_message()})]
      │
      ▼
-[AlarmRecord.get_short_message() 호출]
+[AlarmRecord.get_short_message() 호출 — 본 commit 8976109 시점]
      │ if power_device_id and measured_value is not None:
      │     prefix = ""
      │     if self.channel is not None and self.power_device is not None:
      │         prefix = f"{self.power_device.get_channel_label(self.channel)} "
      │     # ↑ channel_meta 조회 — select_related 로 N+1 회피
+     │     if alarm_type == "power_anomaly_ai":
+     │         return f"{prefix}AI 이상 패턴 감지 ({self.measured_value} W)"
      │     return f"{prefix}전력 임계치 초과 ({self.measured_value} W)"
+     │
+     │ ▶ 후속 변경 (2026-05-18 W4, commit 2df4fe4):
+     │   AI 알람 분기에 ALGORITHM_SOURCE_LABEL 매핑 한 단계 추가 —
+     │     label = ALGORITHM_SOURCE_LABEL.get(self.algorithm_source or "", "AI")
+     │     return f"{prefix}{label} 이상 감지 ({measured_value} W)"
+     │   채널 prefix 흐름은 그대로. 결과 예시:
+     │   - "송풍기A IF+ARIMA 이상 감지 (7925.8 W)"
+     │   - "송풍기A IF 이상 감지 (8000.0 W)"
+     │   - algorithm_source NULL / 미매핑 → "AI" fallback
      ▼
 [PowerDevice.get_channel_label(channel)]  ★ 모델 메서드 신규
      │ meta = (self.channel_meta or {}).get(str(channel)) or {}
@@ -300,6 +311,7 @@ drf-server (Django + DRF)                fastapi-server (FastAPI)
      ▼
 [fastapi alarm_router → Redis push_alarm → alarm_flush_loop → 브라우저]
      │ payload.message = "보조 모터 1 전력 임계치 초과 (15.58 W)"
+     │ (W4 후속 — AI 알람의 경우 "송풍기A IF+ARIMA 이상 감지 (7925.8 W)")
      │
      ▼
 [alarm-mapper.fromSensorsAlarm(raw) → EventPanel.addItem]
@@ -410,7 +422,7 @@ drf-server (Django + DRF)                fastapi-server (FastAPI)
 | 메서드 | 위치 | 역할 | 호출자 |
 |---|---|---|---|
 | `PowerDevice.get_channel_label(channel)` | facilities/models/devices.py:215 | channel_meta[str(ch)]["name"] 우선, 폴백 "CHn" | `power_alarm._channel_label`, `AlarmRecord.get_short_message` |
-| `AlarmRecord.get_short_message` | alerts/models/alarm_record.py:128 | message 생성 — channel + `get_channel_label` prefix | `tasks._push_to_ws` payload, `AlarmRecordSerializer.get_message`, `catch_up` endpoint |
+| `AlarmRecord.get_short_message` | alerts/models/alarm_record.py:128 | message 생성 — channel + `get_channel_label` prefix. (W4 후속: AI 알람 분기에 `ALGORITHM_SOURCE_LABEL` 매핑 추가 — "AI 이상 패턴 감지" → "IF+ARIMA 이상 감지" 등) | `tasks._push_to_ws` payload, `AlarmRecordSerializer.get_message`, `catch_up` endpoint |
 | `create_alarm_and_event(..., channel=None)` | alerts/services/event_service.py:21 | AlarmRecord + Event 생성/병합 — 2 군데 `AlarmRecord.create()` 에 channel 전달 | `tasks.fire_power_*`, `AnomalyAlarmRecordCreateView.post` |
 | `_channel_label(device, channel)` | monitoring/services/power_alarm.py:92 | `device.get_channel_label(channel)` thin wrapper — 시그니처 보존, 호출자 영향 0 | `power_alarm.py` 내부 (label 변수) |
 
@@ -615,3 +627,46 @@ d624531 style(dashboard): main.html Lucide 주석 Django {# #} → HTML <!-- -->
 ```
 
 전체 7 commit, 머지 시 `git log --oneline 830a769^..56b0c1b` 로 추적 가능.
+
+### 6.7 후속 변경 (2026-05-18 W4) — `algorithm_source` 라벨
+
+본 세션 작업 후 ARIMA Un-격하 plan §8 의 W4 작업자가 같은 영역을 보강. 본 문서가 인용하는 코드의 stale 부분을 추적하기 위한 참조.
+
+#### W4 가 우리 흐름에 미친 영향
+
+| 본 문서 위치 | 본 commit (8976109) 시점 | W4 후속 변경 |
+|---|---|---|
+| 2.4 — `AlarmRecord.get_short_message` AI 분기 | `f"{prefix}AI 이상 패턴 감지 ..."` 단일 문자열 | `ALGORITHM_SOURCE_LABEL[algorithm_source]` 매핑 한 단계 추가 — `f"{prefix}{label} 이상 감지 ..."` |
+| 2.4 — 가스 anomaly_ai 분기 | 본 commit 무관 (W4 신설) | `gas_anomaly_ai` 도 같은 algorithm 라벨 prefix — `"CO IF 이상 감지 (290.0 ppm)"` |
+| 2.4 — 메시지 예시 | "보조 모터 1 전력 임계치 초과 (15.58 W)" | AI 알람의 경우 "송풍기A IF+ARIMA 이상 감지 (7925.8 W)" 같은 더 구체적 라벨 |
+| 3.4 — `create_alarm_and_event` 시그니처 | `(..., channel=)` 인자 추가 (본 commit) | `(..., algorithm_source=)` 인자 추가 (W4) — 두 파라미터 독립 동작 |
+| 2.4 fastapi 측 — `power_service.forward_inference_e2e` | `alarm_payload` 에 `channel` 추가 (본 commit) | `alarm_payload` 에 `algorithm_source` 도 추가 (W4) — fastapi 가 priority (night_abnormal > combined > arima > isolation_forest) 결정 후 전달 |
+
+#### W4 추가 자료구조
+
+```
+AlarmRecord (W4 후 모델 전체 알람 필드)
+├── channel (본 commit) — PowerDevice 채널 1~16
+├── algorithm_source (W4 신규) — "isolation_forest" | "arima" | "combined" | "night_abnormal" | ""
+│   └── 룰 알람: 빈 문자열, AI 알람: 4 종 중 하나
+└── (기존) facility / event / sensor / power_device / geofence / worker / ml_anomaly_result / ...
+
+constants.ALGORITHM_SOURCE_LABEL (W4 신규)
+├── "isolation_forest" → "IF"
+├── "arima" → "ARIMA"
+├── "combined" → "IF+ARIMA"
+└── "night_abnormal" → "야간 가동"
+```
+
+#### 관련 commit
+
+```
+2205a13 feat(alerts): W4 — AlarmRecord.algorithm_source + AI_TO_RULE_LEVEL 중복 정리
+        ↓ (모델 + migration 0017 + constants)
+2df4fe4 feat(alerts): AI 추론 가시성 — algorithm 라벨 + serializer + WS push payload
+        ↓ (get_short_message 분기 + serializer 노출 + fastapi push_payload)
+ccd15aa fix(ai): ARIMA 실동작 보강 + 토스트 algorithm 라벨
+        (ARIMA 학습 흐름 보강)
+```
+
+본 문서는 본 commit (8976109) 단위 인계서라 W4 의 본격 흐름은 ARIMA Un-격하 plan §8 또는 별도 W4 기술문서 참조. 본 노트는 stale 코드 인용 추적 목적.

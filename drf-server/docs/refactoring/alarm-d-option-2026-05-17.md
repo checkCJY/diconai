@@ -232,3 +232,28 @@ D 옵션 plan 의 5건 결정 사항 (D1~D5) + 차단형 정책 결정:
    - codereviews 문서 참조
 
 문의/이슈는 commit hash 기준: `git log --oneline e9c930e`.
+
+---
+
+## 후속 변경 (시간순)
+
+본 commit 이후 알람 영역에 영향을 준 후속 작업. 본 D 옵션 흐름과의 연관 추적용.
+
+### 2026-05-18 W4 — `AlarmRecord.algorithm_source` (ARIMA Un-격하 plan §8)
+
+D 옵션 흐름 (헤더 배지 + 60s 클라 dedup + 1분 격상) 과 **별개의 데이터 보강** 작업. 알람 메시지에 algorithm 출처 라벨 (IF / ARIMA / IF+ARIMA / 야간 가동) prefix 추가.
+
+**D 옵션과의 직접 연관 — 거의 없음**:
+- `_DedupStore` 는 (alarm_type, source, level) 기반이라 algorithm_source 영향 X
+- 헤더 배지의 카운트도 algorithm 무관 (user_unread_event_count 가 ack 여부만 봄)
+- 토스트 60s 격상도 메시지 내용 무관 (level 기준)
+
+**학습 시연 가치에 추가**:
+> 본 commit 의 학습 주제 6 (JWT user-scoped 카운트 / localStorage TTL / CustomEvent 구독 / Timer race 디버깅 / 테마 분리 / 헤더 통합 우회) 외에 **시연 시 algorithm 라벨 함께 시연 가능** — 알람 토스트·모달의 메시지가 "IF+ARIMA 이상 감지" 형태로 출처 명시되어 운영자가 어떤 알고리즘이 발화시켰는지 즉시 인지 가능. 시연자가 학습 자료로서 "이런 알람 출처 표시는 다음 W4 commit 에서 추가됐다" 흐름으로 설명 가능.
+
+**관련 commit**:
+- `2205a13` feat(alerts): W4 — `AlarmRecord.algorithm_source` + migration 0017 + constants
+- `2df4fe4` feat(alerts): AI 추론 가시성 — `get_short_message` algorithm 라벨 + serializer 노출 + WS push payload
+- `ccd15aa` fix(ai): ARIMA 실동작 보강 + 토스트 algorithm 라벨
+
+본 commit 의 코드 인용 부분은 W4 의 영향 받지 않음 (D 옵션 코드는 그대로). 본 문서 내용은 최신 코드 기준 stale 없음 — 노트만 추가.

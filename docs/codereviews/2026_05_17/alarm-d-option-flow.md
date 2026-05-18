@@ -496,3 +496,19 @@ WARNING alarm 도착:
 - 삭제 라인: 10
 - 신규 파일: 1 (alarm-badge.js)
 - 회귀 테스트: DRF 53/53
+
+### 6.6 후속 변경 (2026-05-18 W4) — `algorithm_source`
+
+본 commit 이후 ARIMA Un-격하 plan §8 의 W4 작업자가 알람 영역에 algorithm_source 필드 + 메시지 prefix 추가. D 옵션 흐름과 **직접 연관 없음** — 본 문서의 코드 인용은 모두 stale 없음.
+
+| D 옵션 코드 영역 | W4 의 영향 |
+|---|---|
+| `_DedupStore.has(key)` (alarm-popup.js) | 영향 없음 (key 는 alarm_type + source + level 기반, algorithm 무관) |
+| `AlarmBadge._onNewAlarm` (alarm-badge.js) | 영향 없음 (newAlarmEvent 단순 +1, message 내용 안 봄) |
+| `_TOAST_ESCALATE_MS` race fix (alarm-popup.js AlarmToastStack) | 영향 없음 (level 기반 분기, algorithm 무관) |
+| `get_user_unread_event_count` (selector) | 영향 없음 (EventAcknowledgement 기반, algorithm 무관) |
+| summary API 의 `user_unread_event_count` 필드 | 영향 없음 |
+
+**유일한 시각 변화** — 헤더 배지 클릭 시 이동하는 이력 페이지 (`/dashboard/monitoring/events/`) 의 메시지 컬럼이 W4 후 algorithm 라벨 prefix 포함 (예: "송풍기A IF+ARIMA 이상 감지"). 다만 본 D 옵션 commit 의 흐름과는 독립.
+
+W4 의 본격 흐름은 별도 기술문서 (ARIMA Un-격하 plan §8) 참조.
