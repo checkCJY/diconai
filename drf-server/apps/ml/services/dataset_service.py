@@ -212,3 +212,17 @@ def extract_labeled_gas_series(
         is_anomaly=arrays[2],
         anomaly_type=arrays[3],
     )
+
+
+# 이성현 추가 — 다변량 학습용: 여러 가스 TimeSeries 를 리스트로 반환
+def extract_normal_gas_multi_series(
+    sensor_id: int,
+    gas_names: list[str],
+    since: datetime,
+    until: datetime,
+) -> list[TimeSeries]:
+    """gas_names 각각에 대해 extract_normal_gas_series 를 호출해 리스트로 반환."""
+    return [
+        extract_normal_gas_series(sensor_id, gas_name, since, until)
+        for gas_name in gas_names
+    ]

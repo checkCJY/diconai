@@ -144,6 +144,13 @@ SCENARIOS: dict[str, dict[str, str]] = {
         "o3": "warning",
         "voc": "danger",
     },
+    # 이성현 추가 — C. 산소 농도 저하 시나리오 (O2만 서서히 내려가는 밀폐공간 질식 패턴)
+    "o2_depletion": {
+        "o2": "danger",
+    },
+    # 이성현 추가 — H. 센서 오류/통신 불량 시나리오 (전 가스값 0 고정, 레벨 정의 없음)
+    # _build_gas_values 에서 별도 분기 처리 — SCENARIOS 에는 빈 dict 로 등록
+    "sensor_fault": {},
 }
 
 _SCENARIO_NAMES = list(SCENARIOS.keys())
@@ -160,11 +167,23 @@ SCENARIO_PATTERNS: dict[str, dict[str, int]] = {
     "h2s_leak": {"ramp_up": 5, "hold": 30, "ramp_down": 5},
     "fire": {"ramp_up": 3, "hold": 20, "ramp_down": 5},  # 화재는 더 빠른 진입
     "chemical_spill": {"ramp_up": 5, "hold": 30, "ramp_down": 5},
+    # 이성현 추가 — C. 산소 농도 저하는 서서히 진행되므로 ramp_up/ramp_down 길게 설정
+    "o2_depletion": {"ramp_up": 10, "hold": 40, "ramp_down": 10},
+    # 이성현 추가 — H. 센서 오류는 갑작스럽게 발생하므로 ramp_up/ramp_down 최소화
+    "sensor_fault": {"ramp_up": 1, "hold": 10, "ramp_down": 1},
 }
 
 # 가중치 — 발생 빈도(가스 사고 통계 기반 초기값, 운영 데이터 축적 후 보정)
 # 4종 모두 유사 빈도 (전력 overload 처럼 dominant 시나리오 없음)
-SCENARIO_WEIGHTS = [6, 4, 4, 4]  # co_leak / h2s_leak / fire / chemical_spill
+# 이성현 추가 — o2_depletion 가중치 3 추가
+SCENARIO_WEIGHTS = [
+    6,
+    4,
+    4,
+    4,
+    3,
+    2,
+]  # co_leak / h2s_leak / fire / chemical_spill / o2_depletion / sensor_fault
 HOLD_TICKS_BY_SCENARIO = {k: v["hold"] for k, v in SCENARIO_PATTERNS.items()}
 
 # mixed 모드에서 매 틱마다 NORMAL 상태일 때 시나리오 진입할 확률.
@@ -240,6 +259,12 @@ def _build_gas_values(mode: str) -> tuple[dict[str, float | int], str | None]:
 
     # 시나리오 진행 중 — normal_pick 과 scenario_pick 을 weight 로 가중평균
     scenario = out.anomaly_type or "co_leak"
+    # 이성현 추가 — H. 센서 오류: 상태머신 보간 없이 전 가스값 0.0 고정 반환
+    if scenario == "sensor_fault":
+        return (
+            {gas: 0.0 for gas in GAS_NORMAL_RANGE},
+            "sensor_fault",
+        )
     scenario_levels = SCENARIOS[scenario]
     weight = out.scenario_weight
     gas_values: dict[str, float | int] = {}
