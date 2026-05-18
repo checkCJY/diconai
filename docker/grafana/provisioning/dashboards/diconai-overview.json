@@ -755,7 +755,8 @@
     },
     {
       "id": 21,
-      "title": "E2E 알람 latency p95 / p99 (C7 — IoT 수신 → WS 전송, 5m)",
+      "title": "E2E 알람 latency p95 — danger / warning 분리 (C7, 5m)",
+      "description": "danger SLO: p95 ≤ 1.5s. warning은 countdown=3s 설계상 항상 3.5s 이상 — 참고용.",
       "type": "timeseries",
       "gridPos": {
         "x": 12,
@@ -815,8 +816,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum(rate(e2e_alarm_latency_seconds_bucket[5m])) by (le))",
-          "legendFormat": "p95",
+          "expr": "histogram_quantile(0.95, sum(rate(e2e_alarm_latency_seconds_bucket{risk_level=\"danger\"}[5m])) by (le))",
+          "legendFormat": "danger p95",
           "refId": "A"
         },
         {
@@ -824,8 +825,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.99, sum(rate(e2e_alarm_latency_seconds_bucket[5m])) by (le))",
-          "legendFormat": "p99",
+          "expr": "histogram_quantile(0.95, sum(rate(e2e_alarm_latency_seconds_bucket{risk_level=\"warning\"}[5m])) by (le))",
+          "legendFormat": "warning p95 (참고용)",
           "refId": "B"
         }
       ]
@@ -878,6 +879,400 @@
           "expr": "sum by (path, status) (rate(http_requests_total{job=\"fastapi\", path=~\"/api/gas.*|/api/power.*|/api/positioning.*\", status=~\"4..|5..\"}[5m]))",
           "legendFormat": "{{path}} {{status}}",
           "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "title": "센서 마지막 수신 경과시간 (P1 — 가스/전력 통신 상태)",
+      "description": "IoT 센서에서 마지막으로 데이터가 들어온 이후 경과 시간. 300초(5분) 이상이면 통신 이상.",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 108,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 60
+              },
+              {
+                "color": "red",
+                "value": 300
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "time() - sensor_last_received_seconds{job=\"fastapi\"}",
+          "legendFormat": "{{sensor_type}} / {{sensor_id}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "title": "통신 이상 센서 (P1 — 5분 이상 무응답)",
+      "description": "마지막 수신으로부터 300초(5분) 이상 데이터가 없는 센서 목록. 값이 나타나면 즉시 점검 필요.",
+      "type": "stat",
+      "gridPos": {
+        "x": 0,
+        "y": 116,
+        "w": 24,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "thresholds": {
+          "steps": [
+            {
+              "color": "green",
+              "value": 0
+            },
+            {
+              "color": "red",
+              "value": 1
+            }
+          ]
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "count(time() - sensor_last_received_seconds{job=\"fastapi\"} > 300) or vector(0)",
+          "legendFormat": "이상 센서 수",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "title": "Redis 명령 latency p95 (P1 — lpush / brpop, 5m)",
+      "description": "alarm_queue LPUSH/BRPOP 명령 실행 시간. E2E latency 급등 시 Redis 병목 여부 판단용.",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 120,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.95, rate(redis_command_duration_seconds_bucket{job=\"fastapi\"}[5m])) by (command)",
+          "legendFormat": "{{command}} p95",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.99, rate(redis_command_duration_seconds_bucket{job=\"fastapi\"}[5m])) by (command)",
+          "legendFormat": "{{command}} p99",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "title": "WebSocket 연결 수 (타입별)",
+      "description": "현재 연결된 WebSocket 수. sensor=브라우저, worker=작업자 앱, position=IoT 위치 장비. 갑자기 0이 되면 전체 연결 끊김.",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 128,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "fastapi_ws_connections{job=\"fastapi\"}",
+          "legendFormat": "{{type}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "title": "AI 추론 소요시간 p95 (gas_if / power_if, 5m)",
+      "description": "Isolation Forest 추론 실행 시간. E2E latency 급등 시 Celery·DB·Redis가 정상이면 여기를 확인.",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 128,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.95, rate(ai_inference_duration_seconds_bucket{job=\"fastapi\"}[5m])) by (model_type)",
+          "legendFormat": "{{model_type}} p95",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 28,
+      "title": "AI 추론 실패 횟수 (model_type / reason, 5m)",
+      "description": "추론 실패 시 서비스는 유지되지만 AI 없이 룰 기반으로만 알람 발생. 카운터가 올라가면 AI가 꺼진 상태.",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 136,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "rate(ai_inference_failed_total{job=\"fastapi\"}[5m])",
+          "legendFormat": "{{model_type}} / {{reason}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 29,
+      "title": "Celery 태스크 실패 / 재시도 횟수 (5m)",
+      "description": "실패는 예외로 최종 종료된 태스크. 재시도는 실패 후 재큐잉된 횟수. 재시도가 쌓이면 FastAPI 불안정 신호.",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 136,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "rate(celery_task_failed_total{job=\"drf\"}[5m]) by (task_name)",
+          "legendFormat": "실패 — {{task_name}}",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "rate(celery_task_retried_total{job=\"drf\"}[5m]) by (task_name)",
+          "legendFormat": "재시도 — {{task_name}}",
+          "refId": "B"
         }
       ]
     }
