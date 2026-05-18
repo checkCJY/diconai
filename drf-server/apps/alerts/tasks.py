@@ -306,6 +306,9 @@ def fire_geofence_alarm_task(
                     "summary": summary,
                     "message": alarm.get_short_message(),
                     "is_new_event": alarm is not None,
+                    # 2026-05-15 알람 재설계: fastapi alarm_router 가 alarm.worker_id 기반으로
+                    # worker_clients 개인 전송 분기. 그동안 payload 누락으로 broadcast 만 되던 버그 픽스.
+                    "worker_id": worker_id,
                 }
             )
             logger.info(

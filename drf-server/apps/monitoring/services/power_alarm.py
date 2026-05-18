@@ -41,7 +41,7 @@ from apps.facilities.services.threshold_service import (
 )
 
 # state_key 캐시 유지 시간. [Step 4 — 1시간 → 1분 단축, 5번 문서 §9 정렬]
-# RENOTIFY_COOLDOWN_MINUTES=1 와 일치시켜 try_transition / Event cooldown 두 dedup
+# settings.ALARM_REPOPUP_COOLDOWN_SEC (기본 60s) 와 일치시켜 try_transition / Event cooldown 두 dedup
 # 계층 시간 정렬. 가스 측 동일 변경과 짝. 위험 지속 시 1분 cadence 는 escalation
 # 트리거 역할 — 운영자가 1분째 대응 안 하면 같은 알람 재푸시로 인지 유도.
 # 추후 1~2주 운영 데이터 후 재평가.

@@ -1,5 +1,5 @@
 from collections import defaultdict
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone as py_timezone
 
 from django.db.models import Count, Q
 from django.utils import timezone
@@ -312,5 +312,76 @@ class AlarmRecordViewSet(viewsets.ReadOnlyModelViewSet):
                 "last_24h_danger": data["danger"],
                 "last_24h_warning": data["warning"],
                 "unacknowledged_event_count": unack_count,
+            }
+        )
+
+    @extend_schema(
+        tags=["Alerts"],
+        summary="WS 재연결 catch-up — since 이후 24h 내 미수신 알람",
+        description=(
+            "클라이언트가 WS 끊김 후 재연결할 때 localStorage 의 last_seen_ts 를 "
+            "since 로 전달해 미수신 알람을 보충 (2026-05-15 알람 재설계). "
+            "fastapi 거치지 않고 클라가 drf 직접 호출 — simplicity. "
+            "응답 모양은 fastapi broadcast payload 와 동일해 클라 측 mapper 공용 처리 가능. "
+            "since=24h 이상 과거면 24h 까지로 클램프. 최대 100건 응답."
+        ),
+        parameters=[
+            OpenApiParameter(
+                name="since",
+                type=float,
+                required=True,
+                description="unix timestamp (초 단위). 누락/잘못된 값이면 빈 list 반환.",
+            ),
+        ],
+        responses={
+            200: inline_serializer(
+                name="AlarmCatchUpResponse",
+                fields={
+                    "alarms": serializers.ListField(child=serializers.DictField()),
+                },
+            ),
+            401: OpenApiResponse(description="인증 필요"),
+        },
+    )
+    @action(detail=False, methods=["get"], url_path="catch-up")
+    def catch_up(self, request):
+        """since 이후 24h 내 AlarmRecord 를 broadcast payload 모양으로 반환.
+
+        [상한] 24h 클램프 + 최대 100건 — race 패킷 폭주 방지.
+        [응답 키] fastapi alarm_router 의 AlarmPayload 와 동일 필드명. 누락 시 빈 list.
+        """
+        since_str = request.query_params.get("since")
+        if not since_str:
+            return Response({"alarms": []})
+        try:
+            since_dt = datetime.fromtimestamp(float(since_str), tz=py_timezone.utc)
+        except (ValueError, TypeError):
+            return Response({"alarms": []})
+
+        floor = timezone.now() - timedelta(hours=24)
+        if since_dt < floor:
+            since_dt = floor
+
+        alarms = (
+            AlarmRecord.objects.filter(created_at__gte=since_dt)
+            .select_related("event")
+            .order_by("created_at")[:100]
+        )
+
+        return Response(
+            {
+                "alarms": [
+                    {
+                        "event_id": a.event_id,
+                        "alarm_type": a.alarm_type,
+                        "risk_level": a.risk_level,
+                        "source_label": a.event.source_label if a.event_id else "",
+                        "summary": a.event.summary if a.event_id else "",
+                        "message": a.get_short_message(),
+                        "is_new_event": False,
+                        "created_at": a.created_at.isoformat(),
+                    }
+                    for a in alarms
+                ]
             }
         )

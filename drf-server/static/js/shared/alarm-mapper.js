@@ -28,6 +28,9 @@ const AlarmMapper = (function () {
       measured_value: src.measured_value,
       threshold_value: src.threshold_value,
       alarm_type:     src.alarm_type,
+      // 2026-05-15 알람 재설계: RESOLVED 신호 (update_status PATCH 시 박힘).
+      // AlarmPopup._handleResolved 가 이 필드를 받으면 같은 event_id 팝업 close + 토스트.
+      event_resolved_at: src.event_resolved_at || null,
     };
   }
 

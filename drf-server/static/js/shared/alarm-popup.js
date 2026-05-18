@@ -5,6 +5,71 @@
 
 'use strict';
 
+// ── 2026-05-15 알람 재설계: 클라이언트 측 user-scoped ack store ──
+// 본인이 "확인 완료" 한 event_id 를 localStorage 에 영속화. 같은 event_id 알람이
+// 백엔드 broadcast 로 다시 와도 이 클라에서만 팝업 skip. 다른 사용자 클라는 영향 0.
+// Phase 3 의 서버 측 ack 분기 (옵션 B) 가 들어오면 이 Set 은 보강재로 유지.
+const _ACK_STORE_KEY = 'diconai:alarm:acked_event_ids';
+const _LAST_SEEN_KEY = 'diconai:alarm:last_seen_ts';
+const _ACK_TTL_MS    = 24 * 60 * 60 * 1000;  // 24h — localStorage 무한 증가 차단
+
+const _AckStore = {
+  _map: null,  // Map<event_id, ack_ts_ms>
+
+  _load() {
+    if (this._map !== null) return this._map;
+    try {
+      const raw = localStorage.getItem(_ACK_STORE_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      const now = Date.now();
+      const fresh = arr.filter(e => (now - e.ts) < _ACK_TTL_MS);
+      this._map = new Map(fresh.map(e => [e.id, e.ts]));
+      if (fresh.length !== arr.length) this._persist();
+    } catch (e) {
+      this._map = new Map();
+    }
+    return this._map;
+  },
+
+  has(eventId) {
+    return eventId != null && this._load().has(eventId);
+  },
+
+  add(eventId) {
+    if (eventId == null) return;
+    this._load().set(eventId, Date.now());
+    this._persist();
+  },
+
+  _persist() {
+    try {
+      const arr = Array.from(this._map.entries()).map(([id, ts]) => ({ id, ts }));
+      localStorage.setItem(_ACK_STORE_KEY, JSON.stringify(arr));
+    } catch (e) {
+      console.warn('[AlarmPopup] ack store persist failed:', e);
+    }
+  },
+};
+
+// 마지막 수신 알람 시각 (unix sec). WS 끊김 후 재연결·페이지 새로고침 시
+// /alerts/api/alarms/catch-up/?since=<ts> 호출로 미수신 알람 보충 (시연 안전망).
+const _LastSeen = {
+  read() {
+    try {
+      const raw = localStorage.getItem(_LAST_SEEN_KEY);
+      const n = raw ? Number(raw) : 0;
+      return Number.isFinite(n) ? n : 0;
+    } catch (e) { return 0; }
+  },
+  write(unixSec) {
+    if (!Number.isFinite(unixSec)) return;
+    try {
+      const prev = this.read();
+      if (unixSec > prev) localStorage.setItem(_LAST_SEEN_KEY, String(unixSec));
+    } catch (e) { /* localStorage quota / disabled — silent */ }
+  },
+};
+
 // ── 위험/주의 레벨별 중앙 팝업 설정 ────────────────────────
 const _POPUP_CFG = {
   danger: {
@@ -80,14 +145,36 @@ const AlarmPopup = {
   GROUP_WINDOW_MS: 5000,     // 같은 센서·동일 레벨 연속 알람 그룹핑 윈도우
 
   show(data) {
+    // 2026-05-15 알람 재설계: 모든 수신 알람의 시각으로 last_seen 갱신 — skip 여부 무관.
+    // catch-up 정확도 (다음 reconnect 시 since 기준점) 를 위해 모든 path 에서 기록.
+    const tsRaw = data.timestamp || data.created_at;
+    if (tsRaw) {
+      const tsMs = new Date(tsRaw).getTime();
+      if (Number.isFinite(tsMs)) _LastSeen.write(Math.floor(tsMs / 1000));
+    }
+
+    // RESOLVED 신호 — 알람 자체가 아니라 "위험 해소" 메타 신호. 같은 event_id 떠있는
+    // 팝업 close + 큐에서 제거 + 우하단 짧은 토스트. alarm-popup.html 의 토스트 DOM 재사용.
+    if (data.event_resolved_at) {
+      this._handleResolved(data);
+      return;
+    }
+
     const level = data.alarm_level;
     if (level !== 'danger' && level !== 'warning') return;
 
-    // 옵션 B: 같은 센서·동일 레벨 5초 내 연속 알람은 마지막 큐 항목에 카운트만 누적
+    // user-scoped ack 분기 (Phase 1 옵션 A) — 본인이 이미 ack 한 event 면 팝업 skip.
+    // 이벤트 패널 표시 (newAlarmEvent) 는 alarm-ws.js 가 별도로 발행하므로 영향 없음.
+    const eventId = data.event_id || data.id;
+    if (_AckStore.has(eventId)) return;
+
+    // 같은 센서·동일 레벨 group window — 위험은 1초로 짧게 (재팝업 빠른 반응),
+    // 그 외(주의)는 기존 5초 유지 (전기 노이즈 등 burst 보호).
+    const windowMs = (level === 'danger') ? 1000 : this.GROUP_WINDOW_MS;
     const last = this.queue[this.queue.length - 1];
     if (last && last.sensor_name === data.sensor_name && last.alarm_level === data.alarm_level) {
       const lastTs = new Date(last.timestamp).getTime();
-      if (Number.isFinite(lastTs) && (Date.now() - lastTs) < this.GROUP_WINDOW_MS) {
+      if (Number.isFinite(lastTs) && (Date.now() - lastTs) < windowMs) {
         last.groupCount = (last.groupCount || 1) + 1;
         return;
       }
@@ -234,6 +321,52 @@ const AlarmPopup = {
     this._process();
   },
 
+  // RESOLVED 신호 처리 — 같은 event_id 떠있는 팝업 close + 큐 제거 + 위험 해소 토스트.
+  // close()는 acknowledged=false 로 호출 (운영자 자발 확인이 아닌 자동 해소).
+  _handleResolved(data) {
+    const eventId = data.event_id;
+    if (eventId == null) return;
+    if (this.isOpen && this._currentId === eventId) {
+      this.close({ acknowledged: false });
+    }
+    // 큐에 같은 event_id 가 남아있어도 자연 닫힘
+    this.queue = this.queue.filter(d => (d.event_id || d.id) !== eventId);
+    // 우하단 토스트로 "위험 해소" 안내 (AlarmToast 재사용)
+    if (typeof AlarmToast !== 'undefined') {
+      AlarmToast.show({
+        source_label: data.source_label || data.sensor_name || '',
+        message: '위험 해소',
+      });
+    }
+  },
+
+  // 페이지 load / WS 재연결 시점 catch-up — drf 의 /alerts/api/alarms/catch-up/?since=
+  // 을 호출해서 끊김 중 발생한 알람을 보충. 받은 알람은 newAlarmEvent CustomEvent 로
+  // 발행하여 이벤트 패널에 누적 (is_new_event=false 라 팝업은 자연 skip — 지나간 알람).
+  async _runCatchUp() {
+    const lastSeen = _LastSeen.read();
+    if (!lastSeen) return;  // 초기 방문 — catch-up 의미 없음
+    try {
+      const url = `/alerts/api/alarms/catch-up/?since=${lastSeen}`;
+      const res = (typeof Auth !== 'undefined' && Auth.apiFetch)
+        ? await Auth.apiFetch(url)
+        : await fetch(url, { credentials: 'include' });
+      if (!res || !res.ok) return;
+      const body = await res.json();
+      const alarms = body.alarms || [];
+      if (alarms.length === 0) return;
+      console.info(`[AlarmPopup] catch-up: ${alarms.length} missed alarms restored`);
+      for (const a of alarms) {
+        window.dispatchEvent(new CustomEvent('newAlarmEvent', { detail: a }));
+        // last_seen 갱신은 dispatched 측에서 처리되지 않을 수도 있으니 안전하게 직접
+        const tsMs = new Date(a.created_at).getTime();
+        if (Number.isFinite(tsMs)) _LastSeen.write(Math.floor(tsMs / 1000));
+      }
+    } catch (e) {
+      console.warn('[AlarmPopup] catch-up failed:', e);
+    }
+  },
+
   _goDetail() {
     const id = this._currentId;
     // 큐는 유지한 채 현재 팝업만 닫고 상세 페이지로 이동.
@@ -255,10 +388,32 @@ const AlarmPopup = {
     if (this._inited) return;
     this._inited = true;
     document.getElementById('alarm-popup-close')     ?.addEventListener('click', () => this.close());
-    document.getElementById('alarm-popup-confirm')   ?.addEventListener('click', () => this.close({ acknowledged: true }));
+    // "확인 완료" — 2026-05-15 알람 재설계:
+    //   1) 로컬 Set 즉시 추가 (서버 응답 대기 X — UI 반응성)
+    //   2) 백엔드 ack API 호출 (EventAcknowledgement row 생성, 운영 이력)
+    //   3) 팝업 close + droppedCount reset
+    // fire-and-forget — 네트워크 실패해도 로컬 Set 으로 본인 클라 표시는 정상 차단.
+    document.getElementById('alarm-popup-confirm')?.addEventListener('click', () => {
+      const eventId = this._currentId;
+      if (eventId != null) {
+        _AckStore.add(eventId);
+        const url = `/alerts/api/events/${eventId}/ack/`;
+        const promise = (typeof Auth !== 'undefined' && Auth.apiFetch)
+          ? Auth.apiFetch(url, { method: 'POST' })
+          : fetch(url, { method: 'POST', credentials: 'include' });
+        Promise.resolve(promise).catch(err => {
+          console.warn('[AlarmPopup] ack API failed:', err);
+        });
+      }
+      this.close({ acknowledged: true });
+    });
     document.getElementById('alarm-popup-detail')    ?.addEventListener('click', () => this._goDetail());
     // 누락 배지 클릭 시 이벤트 이력 페이지로 — 누락된 알람을 운영자가 확인 가능
     document.getElementById('alarm-popup-drop-badge')?.addEventListener('click', () => this._goDetail());
+
+    // 페이지 load 시점에 WS 끊김 중 미수신 알람 보충 (비동기 fire-and-forget).
+    // WS reconnect 마다 호출하는 흐름은 Phase 2 의 토큰 만료 재연결 작업에서 추가.
+    this._runCatchUp();
   },
 };
 
