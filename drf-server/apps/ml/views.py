@@ -22,6 +22,7 @@ class _ActiveMLModelSerializer(serializers.ModelSerializer):
             "version",
             "sensor_type",
             "algorithm",
+            "sensor_identifier",
             "file_path",
             "feature_columns",
             "params_json",
@@ -34,9 +35,13 @@ class _ActiveMLModelSerializer(serializers.ModelSerializer):
 
 class ActiveMLModelView(RetrieveAPIView):
     """
-    sensor_type 의 활성 ML 모델 메타 조회.
+    (sensor_type, algorithm, sensor_identifier) 매칭 단위 활성 ML 모델 메타 조회.
 
     GET /api/ml/models/active/?sensor_type=power
+      → 기본값 algorithm=isolation_forest, sensor_identifier="" 매칭 (기존 IF 회귀 0)
+    GET /api/ml/models/active/?sensor_type=power&algorithm=arima
+        &sensor_identifier=power:device_1:ch1:watt
+      → ARIMA 단일 시계열 모델 매칭 (W2.5 학습 결과)
     """
 
     serializer_class = _ActiveMLModelSerializer
@@ -47,16 +52,33 @@ class ActiveMLModelView(RetrieveAPIView):
     permission_classes: list = []
 
     def get_object(self):
-        sensor_type = self.request.query_params.get("sensor_type")
-        if sensor_type not in ("power", "gas"):
-            from rest_framework.exceptions import ValidationError
+        from rest_framework.exceptions import ValidationError
 
+        params = self.request.query_params
+        sensor_type = params.get("sensor_type")
+        algorithm = params.get("algorithm", MLModel.Algorithm.ISOLATION_FOREST.value)
+        sensor_identifier = params.get("sensor_identifier", "")
+
+        if sensor_type not in ("power", "gas"):
             raise ValidationError({"sensor_type": "must be power|gas"})
-        obj = MLModel.objects.filter(sensor_type=sensor_type, is_active=True).first()
+        if algorithm not in MLModel.Algorithm.values:
+            raise ValidationError(
+                {"algorithm": f"must be one of {MLModel.Algorithm.values}"}
+            )
+
+        obj = MLModel.objects.filter(
+            sensor_type=sensor_type,
+            algorithm=algorithm,
+            sensor_identifier=sensor_identifier,
+            is_active=True,
+        ).first()
         if obj is None:
             from django.http import Http404
 
-            raise Http404(f"no active model for sensor_type={sensor_type}")
+            raise Http404(
+                f"no active model for sensor_type={sensor_type} "
+                f"algorithm={algorithm} sensor_identifier={sensor_identifier!r}"
+            )
         return obj
 
 
