@@ -14,7 +14,9 @@
 #   normal/warning/danger — 전 채널 동일 레벨 (UI/알람 테스트)
 #   overload/voltage_drop/phase_loss/degradation/night_abnormal/motor_stuck
 #               — 단일 시나리오 강제 (격리 테스트). W0 에서 spike 제거,
-#                 night_abnormal(P0, KST 22~05만)/motor_stuck(P1) 추가.
+#                 night_abnormal/motor_stuck 신규. dummy 는 시각 게이트 없음 —
+#                 night_abnormal 의 "야간 시각" 판정은 W3 추론 측에서 처리
+#                 (measured_at hour 분기). dummy 책임 = 데이터 생성만.
 #
 # 실행: python -m dummies.power_dummy
 
@@ -156,8 +158,8 @@ SCENARIO_PATTERNS: dict[str, dict] = {
         "hold": 30,
         "ramp_down": 5,
     },
-    "night_abnormal": {  # P0 신규 — 야간 시간대만 진입 (KST 22~05, _is_night_kst_now 가드)
-        "w_factor": 3.00,  # 야간 base_load(0.15) × 3 → 가동 시간대 평균 수준 일탈
+    "night_abnormal": {  # P0 신규 — "야간 가동" 패턴 데이터 (시각 판정은 W3 추론 측)
+        "w_factor": 3.00,  # 정격 300% — 시각 무관 큰 anomaly. W3 에서 야간 시각 가중치 추가
         "a_factor": 3.00,
         "v_factor": 1.00,
         "ramp_up": 5,
@@ -242,35 +244,6 @@ def _compute_channel_tick(
 
 
 # ---------------------------------------------------------------------------
-# W0 야간 시간대 게이트 — night_abnormal 시나리오는 KST 22~05시에만 진입 가능.
-#  - mixed 모드: _scenario_weights_for_now() 가 야간 외 시간엔 weight 0 으로 떨굼
-#  - 단일 시나리오 강제: _apply_mode 안에서 명시적 skip + 경고 로그
-# _state_machine.maybe_trigger 변경 없이 dummy 측에서만 처리 (헬퍼는 도메인 비종속 유지).
-# ---------------------------------------------------------------------------
-_KST_NIGHT_GATE = (22, 5)  # (start_hour, end_hour) — start>end 는 자정 wrap-around
-_KST_UTC_OFFSET_HOURS = 9
-
-
-def _is_night_kst_now() -> bool:
-    """현재 시각이 KST 야간 시간대(22~05)에 속하는지 — night_abnormal 게이트 검사용."""
-    hour_kst = (datetime.now(timezone.utc).hour + _KST_UTC_OFFSET_HOURS) % 24
-    start, end = _KST_NIGHT_GATE
-    if start <= end:
-        return start <= hour_kst < end
-    return hour_kst >= start or hour_kst < end
-
-
-def _scenario_weights_for_now() -> list[int]:
-    """현재 시각 기준 가중치 — night_abnormal 은 야간 외 시간엔 weight 0 (선택 후보 제외)."""
-    if _is_night_kst_now():
-        return SCENARIO_WEIGHTS
-    return [
-        w if SCENARIO_NAMES[i] != "night_abnormal" else 0
-        for i, w in enumerate(SCENARIO_WEIGHTS)
-    ]
-
-
-# ---------------------------------------------------------------------------
 # 모드별 사전 처리 — fixed/단일 시나리오 모드 진입 강제
 # ---------------------------------------------------------------------------
 FIXED_LEVELS = {"normal", "warning", "danger"}
@@ -279,17 +252,16 @@ FIXED_LEVELS = {"normal", "warning", "danger"}
 def _apply_mode(mode: str) -> None:
     """매 틱 시작 시 호출. 시나리오 트리거 또는 강제 진입.
 
-    W0: night_abnormal 게이트 적용 — mixed 모드는 weight 동적 조정,
-    단일 시나리오 강제 진입은 야간 외 시간에 skip + 경고 로그.
+    dummy 는 시각 게이트 없음 — night_abnormal 의 "야간 시각" 판정은 W3
+    추론 측 책임 (measured_at hour 분기). 데이터는 시각 무관 항상 생성.
     """
     if mode == "mixed":
-        weights_now = _scenario_weights_for_now()
         for ch in range(1, 17):
             maybe_trigger(
                 _channel_states[ch],
                 probability=MIXED_TRIGGER_PROBABILITY,
                 scenarios=SCENARIO_NAMES,
-                weights=weights_now,
+                weights=SCENARIO_WEIGHTS,
                 hold_ticks_by_scenario=HOLD_TICKS_BY_SCENARIO,
                 ramp_up_ticks=5,
                 ramp_down_ticks=10,
@@ -297,13 +269,6 @@ def _apply_mode(mode: str) -> None:
         return
 
     if mode in SCENARIO_PATTERNS:
-        # night_abnormal 강제 진입은 KST 야간 시간대에서만 허용 (시연 시 시간 외 진입 방지)
-        if mode == "night_abnormal" and not _is_night_kst_now():
-            logger.warning(
-                "[night_abnormal] KST 야간 시간대(%d~%d) 이외 — 강제 진입 무시",
-                *_KST_NIGHT_GATE,
-            )
-            return
         # 단일 시나리오 강제 — multi 면 전 채널, 아니면 무작위 1개 모터 채널
         pattern = SCENARIO_PATTERNS[mode]
         targets = (
