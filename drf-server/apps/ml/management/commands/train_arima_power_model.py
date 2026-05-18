@@ -1,7 +1,7 @@
 """
 전력 ARIMA 오프라인 학습 + MLModel row 생성 (W2.5).
 
-ARIMA Un-격하 plan §6 (skill/plan/power-ai-un-downgrade-phase2-apply.md). 가스용
+ARIMA un-downgrade plan §6 (skill/plan/power-ai-un-downgrade-phase2-apply.md). 가스용
 train_arima_model.py 는 가스 영역 보호 결정에 따라 0 변경 유지 — 본 명령은
 전력 전용 신규. 가스 ARIMA 의 MLModel 통합은 가스 담당자 후속 task (plan §12).
 

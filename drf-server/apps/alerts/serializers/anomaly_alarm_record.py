@@ -34,7 +34,7 @@ class AnomalyAlarmRecordPayloadSerializer(serializers.Serializer):
     channel = serializers.IntegerField(
         required=False, allow_null=True, min_value=1, max_value=255
     )
-    # W4 — AI 알고리즘 출처 라벨 (ARIMA Un-격하 plan §8). 본 view 경유 알람은
+    # W4 — AI 알고리즘 출처 라벨 (ARIMA un-downgrade plan §8). 본 view 경유 알람은
     # 모두 AI 알람이라 일반적으로 비어있지 않음. 값: isolation_forest / arima /
     # combined / night_abnormal. 옛 fastapi 가 미전송 시 default "" 로 저장.
     algorithm_source = serializers.CharField(

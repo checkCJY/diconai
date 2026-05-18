@@ -72,7 +72,7 @@ class AlarmType(models.TextChoices):
 # Step 3 AI mute 가드에서 "AI 발화 레벨 이상의 룰 fire 를 60s suppress" 로직의 단일
 # 진실 공급원. 곳곳에 암묵 매핑이 박히면 회귀 — predict_warn 이 warning 인지 danger
 # 인지 의견 갈리는 순간 dedup 키 충돌·격상 bypass 깨짐.
-# W4 — 동일 dict 가 2회 정의되어 있던 것을 단일로 정리 (ARIMA Un-격하 plan §8).
+# W4 — 동일 dict 가 2회 정의되어 있던 것을 단일로 정리 (ARIMA un-downgrade plan §8).
 AI_TO_RULE_LEVEL: dict[str, str] = {
     "normal": RiskLevel.NORMAL.value,
     "caution": RiskLevel.WARNING.value,

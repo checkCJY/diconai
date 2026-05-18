@@ -1,4 +1,4 @@
-# ARIMA Un-격하 plan §4 (W1) — MLModel 스키마 변경.
+# ARIMA un-downgrade plan §4 (W1) — MLModel 스키마 변경.
 #  - model_type → algorithm RenameField (데이터 보존) + ARIMA choice 추가
 #  - sensor_identifier 신규 (기존 row 빈 문자열 default → IF 회귀 0)
 #  - 제약 변경: 2축(sensor_type, version) → 4축(sensor_type, algorithm,

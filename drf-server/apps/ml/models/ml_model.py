@@ -9,7 +9,7 @@ class MLModel(models.Model):
     학습 1회 = MLModel row 1건 + .pkl 파일 1개.
     .pkl 파일 실체는 settings.ML_MODELS_DIR 아래 저장 (MEDIA_ROOT 밖, 웹 서빙 차단).
 
-    W1 변경 (ARIMA Un-격하 plan §4):
+    W1 변경 (ARIMA un-downgrade plan §4):
     - ModelType → Algorithm 으로 rename + ARIMA choice 추가
     - model_type 필드 → algorithm 으로 RenameField (데이터 그대로 보존)
     - sensor_identifier 필드 추가 — ARIMA 등 단일 시계열 모델 단위 매칭용.

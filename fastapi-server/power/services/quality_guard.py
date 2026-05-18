@@ -2,7 +2,7 @@
 추론 측 sensor data quality guard — IF 학습 데이터에 통신/센서 오류가
 흡수되는 것 방지.
 
-ARIMA Un-격하 plan §W0 (skill/plan/power-ai-un-downgrade-phase2-apply.md §3)
+ARIMA un-downgrade plan §W0 (skill/plan/power-ai-un-downgrade-phase2-apply.md §3)
 의 일환. `process_anomaly_inference` 진입부에서 quality 를 검사한 뒤
 부적합 값은 윈도우 적재·추론을 skip + 사유 라벨을 로그에 남긴다.
 
