@@ -146,6 +146,7 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
     drf_payload = {
         "device_id": payload.device_id,
         "measured_at": payload.timestamp.isoformat(),
+        "ingress_ts": time.time(),
         "co": payload.co,
         "h2s": payload.h2s,
         "co2": payload.co2,

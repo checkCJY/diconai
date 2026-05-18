@@ -20,6 +20,7 @@ import logging
 
 from prometheus_client import Counter
 
+from core.metrics import ALARM_QUEUE_LENGTH
 from core.redis_client import get_redis
 
 ALARM_QUEUE_KEY = "diconai:ws:alarms"
@@ -117,6 +118,7 @@ async def push_alarm(payload: dict, *, dedup_ttl: int = PUSH_DEDUP_TTL_SEC) -> N
             return
     await r.lpush(ALARM_QUEUE_KEY, json.dumps(payload, ensure_ascii=False))
     await r.ltrim(ALARM_QUEUE_KEY, 0, MAX_QUEUE_LEN - 1)
+    ALARM_QUEUE_LENGTH.set(await queue_len())
 
 
 async def pop_alarm_blocking(timeout: int = 0) -> dict | None:
@@ -134,6 +136,7 @@ async def pop_alarm_blocking(timeout: int = 0) -> dict | None:
     if result is None:
         return None
     _, raw = result
+    ALARM_QUEUE_LENGTH.set(await queue_len())
     try:
         return json.loads(raw)
     except json.JSONDecodeError as exc:

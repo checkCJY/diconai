@@ -59,6 +59,8 @@ class AlarmPayload(BaseModel):
     message: str | None = None
     # ANOMALY 알람 전용 nested 메타 (다른 alarm_type 에선 None)
     anomaly_meta: AnomalyMeta | None = None
+    # E2E latency 측정용 — IoT 수신 시각(Unix time). alarm_flush_loop에서 소비.
+    ingress_ts: float | None = None
 
 
 @router.post(

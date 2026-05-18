@@ -7,11 +7,13 @@
 #                      worker_positions 공유 상태를 갱신한다.
 import asyncio
 import logging
+import time
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from core.config import settings
+from core.metrics import E2E_ALARM_LATENCY
 from services.drf_client import post_to_drf
 from websocket.auth import verify_jwt_from_ws_query
 from websocket.services.alarm_queue import pop_alarm_blocking
@@ -57,6 +59,9 @@ async def alarm_flush_loop():
             # Redis 일시 장애 — 짧게 대기 후 재시도 (busy-loop 방지)
             await asyncio.sleep(1)
             continue
+        ingress_ts = payload.pop("ingress_ts", None)
+        if ingress_ts is not None:
+            E2E_ALARM_LATENCY.observe(time.time() - ingress_ts)
         if not sensor_clients:
             # 큐에서 pop했으나 연결된 클라 없음 → drop (의도, 큐에 다시 넣지 않음)
             continue

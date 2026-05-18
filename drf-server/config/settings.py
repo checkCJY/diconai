@@ -349,6 +349,13 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.operations.tasks.queue_metrics_task.record_celery_queue_length",
         "schedule": timedelta(seconds=30),
     },
+    # SQLite DB 파일 크기를 60초마다 읽어 SQLITE_DB_SIZE Gauge에 기록한다.
+    # 5GB 경고 / 10GB 경보 기준 — 어제(2026-05-14) 12GB 비대화 사고 재발 방지.
+    # PG 전환 후 db_health_task 내부에서 SQLite가 아닌 경우 자동 스킵.
+    "db_health_metrics": {
+        "task": "apps.operations.tasks.db_health_task.record_db_health",
+        "schedule": timedelta(seconds=60),
+    },
 }
 
 # ── Cache (Redis) ─────────────────────────────────────────────

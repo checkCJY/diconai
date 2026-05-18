@@ -112,7 +112,7 @@ def _aggregate_risk(device_id: int, channel: int, axis: str, this_risk: str) -> 
     return _max_risk(levels)
 
 
-def trigger_power_alarms(objs: list, device) -> None:
+def trigger_power_alarms(objs: list, device, ingress_ts: float | None = None) -> None:
     """
     PowerData 일괄 저장 후 채널별 종합 위험도(W·A·V max)로 알람 라우팅한다.
 
@@ -170,7 +170,7 @@ def trigger_power_alarms(objs: list, device) -> None:
             # 원자 천이 — 직전 상태가 danger 아닐 때만 1회 fire (race-safe)
             if try_transition(state_key, RiskLevel.DANGER, _CACHE_TTL):
                 fire_power_danger_task.delay(
-                    device_id, channel, value, facility_id, label
+                    device_id, channel, value, facility_id, label, ingress_ts=ingress_ts
                 )
 
         elif aggregate == RiskLevel.WARNING:
@@ -195,6 +195,7 @@ def trigger_power_alarms(objs: list, device) -> None:
                 continue
             task = fire_power_warning_task.apply_async(
                 args=[device_id, channel, value, facility_id, label],
+                kwargs={"ingress_ts": ingress_ts},
                 countdown=WARNING_DURATION_SEC,
             )
             cache.set(task_key, task.id, _TASK_KEY_TTL)

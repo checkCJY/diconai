@@ -125,6 +125,7 @@ def fire_danger_alarm_task(
     value: float,
     facility_id: int,
     source_label: str,
+    ingress_ts: float | None = None,
 ):
     """DANGER 즉각 알람 — AlarmRecord/Event 생성 후 FastAPI WS 큐에 푸시."""
     from apps.alerts.services.event_service import create_alarm_and_event
@@ -153,7 +154,7 @@ def fire_danger_alarm_task(
             detected_at=timezone.now(),
         )
 
-        if event is not None:
+        if event is not None and alarm is not None:
             ALARM_FIRED_TOTAL.labels(
                 alarm_type="gas_threshold", risk_level="danger"
             ).inc()
@@ -169,6 +170,7 @@ def fire_danger_alarm_task(
                     "summary": summary,
                     "message": alarm.get_short_message(),
                     "is_new_event": alarm is not None,
+                    "ingress_ts": ingress_ts,
                 }
             )
             logger.info(
@@ -192,6 +194,7 @@ def fire_warning_alarm_task(
     value: float,
     facility_id: int,
     source_label: str,
+    ingress_ts: float | None = None,
 ):
     """WARNING 30초 지속 후 알람 — AlarmRecord/Event 생성 후 FastAPI WS 큐에 푸시.
 
@@ -224,7 +227,7 @@ def fire_warning_alarm_task(
             detected_at=timezone.now(),
         )
 
-        if event is not None:
+        if event is not None and alarm is not None:
             ALARM_FIRED_TOTAL.labels(
                 alarm_type="gas_threshold", risk_level="warning"
             ).inc()
@@ -240,6 +243,7 @@ def fire_warning_alarm_task(
                     "summary": summary,
                     "message": alarm.get_short_message(),
                     "is_new_event": alarm is not None,
+                    "ingress_ts": ingress_ts,
                 }
             )
             logger.info(
@@ -293,7 +297,7 @@ def fire_geofence_alarm_task(
             summary=summary,
             detected_at=timezone.now(),
         )
-        if event is not None:
+        if event is not None and alarm is not None:
             ALARM_FIRED_TOTAL.labels(
                 alarm_type="geofence_intrusion", risk_level=risk_level
             ).inc()
@@ -368,6 +372,7 @@ def fire_power_danger_task(
     value: float,
     facility_id: int,
     source_label: str,
+    ingress_ts: float | None = None,
 ):
     """전력 DANGER 즉각 알람 — AlarmRecord/Event 생성 후 FastAPI WS 큐에 푸시."""
     from apps.alerts.services.event_service import create_alarm_and_event
@@ -393,7 +398,7 @@ def fire_power_danger_task(
             summary=summary,
             detected_at=timezone.now(),
         )
-        if event is not None:
+        if event is not None and alarm is not None:
             ALARM_FIRED_TOTAL.labels(
                 alarm_type="power_overload", risk_level="danger"
             ).inc()
@@ -409,6 +414,7 @@ def fire_power_danger_task(
                     "summary": summary,
                     "message": alarm.get_short_message(),
                     "is_new_event": alarm is not None,
+                    "ingress_ts": ingress_ts,
                 }
             )
             logger.info(
@@ -431,6 +437,7 @@ def fire_power_warning_task(
     value: float,
     facility_id: int,
     source_label: str,
+    ingress_ts: float | None = None,
 ):
     """전력 WARNING 30초 지속 후 알람 — AlarmRecord/Event 생성 후 FastAPI WS 큐에 푸시."""
     from apps.alerts.services.event_service import create_alarm_and_event
@@ -456,7 +463,7 @@ def fire_power_warning_task(
             summary=summary,
             detected_at=timezone.now(),
         )
-        if event is not None:
+        if event is not None and alarm is not None:
             ALARM_FIRED_TOTAL.labels(
                 alarm_type="power_overload", risk_level="warning"
             ).inc()
@@ -472,6 +479,7 @@ def fire_power_warning_task(
                     "summary": summary,
                     "message": alarm.get_short_message(),
                     "is_new_event": alarm is not None,
+                    "ingress_ts": ingress_ts,
                 }
             )
             logger.info(
