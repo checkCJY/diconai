@@ -12,7 +12,11 @@
 # 모드:
 #   mixed       — 정상 90% + 가중치 적용 시나리오 10% (IF 학습 데이터셋 생성)
 #   normal/warning/danger — 전 채널 동일 레벨 (UI/알람 테스트)
-#   overload/voltage_drop/spike/phase_loss/degradation — 단일 시나리오 강제 (격리 테스트)
+#   overload/voltage_drop/phase_loss/degradation/night_abnormal/motor_stuck
+#               — 단일 시나리오 강제 (격리 테스트). W0 에서 spike 제거,
+#                 night_abnormal/motor_stuck 신규. dummy 는 시각 게이트 없음 —
+#                 night_abnormal 의 "야간 시각" 판정은 W3 추론 측에서 처리
+#                 (measured_at hour 분기). dummy 책임 = 데이터 생성만.
 #
 # 실행: python -m dummies.power_dummy
 
@@ -114,10 +118,14 @@ def base_load_ratio(hour: int, ch: int) -> float:
 
 
 # ---------------------------------------------------------------------------
-# 시나리오 5종 — (정격 대비 배수 W/A/V) + 상태머신 파라미터
+# 시나리오 6종 — (정격 대비 배수 W/A/V) + 상태머신 파라미터
+# W0 변경 (skill/plan/power-ai-un-downgrade-phase2-apply.md §3):
+#   - spike 제거 — 1틱 단발 급등은 정적 룰 임계치가 즉시 잡음 (ML 영역 아님)
+#   - night_abnormal 신규 (P0) — ARIMA seasonal/baseline 일탈 시연 (야간 시간대 한정)
+#   - motor_stuck 신규 (P1) — IF 다축 상관 학습 신호 (W↓+A↓ 동시 + V 유지)
 # ---------------------------------------------------------------------------
 SCENARIO_PATTERNS: dict[str, dict] = {
-    "overload": {
+    "overload": {  # P0 — 룰 + IF + ARIMA 모두 동의 (시연 핵심)
         "w_factor": 1.10,
         "a_factor": 1.10,
         "v_factor": 0.93,
@@ -125,7 +133,7 @@ SCENARIO_PATTERNS: dict[str, dict] = {
         "hold": 60,
         "ramp_down": 10,
     },
-    "voltage_drop": {
+    "voltage_drop": {  # 보조 — multi-channel 시나리오 (Phase 3 다채널 학습 가치)
         "w_factor": 0.85,
         "a_factor": 1.10,
         "v_factor": 0.88,
@@ -134,15 +142,7 @@ SCENARIO_PATTERNS: dict[str, dict] = {
         "ramp_down": 5,
         "multi": True,  # 전 채널에 적용
     },
-    "spike": {
-        "w_factor": 1.30,
-        "a_factor": 1.30,
-        "v_factor": 1.00,
-        "ramp_up": 1,
-        "hold": 1,
-        "ramp_down": 1,
-    },
-    "phase_loss": {
+    "phase_loss": {  # 보조 — 3상 결상 도메인 사고 패턴 (95% drop = 정적 임계치)
         "w_factor": 0.05,
         "a_factor": 0.05,
         "v_factor": 0.05,
@@ -150,7 +150,7 @@ SCENARIO_PATTERNS: dict[str, dict] = {
         "hold": 30,
         "ramp_down": 5,
     },
-    "degradation": {
+    "degradation": {  # P0 — ARIMA trend break 시연 가치
         "w_factor": 1.05,
         "a_factor": 1.05,
         "v_factor": 1.00,
@@ -158,16 +158,29 @@ SCENARIO_PATTERNS: dict[str, dict] = {
         "hold": 30,
         "ramp_down": 5,
     },
+    "night_abnormal": {  # P0 신규 — "야간 가동" 패턴 데이터 (시각 판정은 W3 추론 측)
+        "w_factor": 3.00,  # 정격 300% — 시각 무관 큰 anomaly. W3 에서 야간 시각 가중치 추가
+        "a_factor": 3.00,
+        "v_factor": 1.00,
+        "ramp_up": 5,
+        "hold": 120,  # 야간 시간대 충분히 유지
+        "ramp_down": 10,
+    },
+    "motor_stuck": {  # P1 신규 — 회전 정지 (W·A 동시 ↓, V 유지)
+        "w_factor": 0.10,
+        "a_factor": 0.10,
+        "v_factor": 1.00,
+        "ramp_up": 1,  # 급정지
+        "hold": 60,
+        "ramp_down": 1,
+    },
 }
 
 SCENARIO_NAMES = list(SCENARIO_PATTERNS.keys())
-SCENARIO_WEIGHTS = [
-    6,
-    4,
-    2,
-    2,
-    1,
-]  # roadmap §3-5: overload/voltage_drop/spike/phase_loss/degradation
+# W0 가중치 재분배 — P0 70 / P1 15 / 보조 15 (합 100).
+# 순서는 SCENARIO_PATTERNS dict 정의 순과 동일 (Python 3.7+ 정렬 보장):
+#   overload=30, voltage_drop=8, phase_loss=7, degradation=20, night_abnormal=20, motor_stuck=15
+SCENARIO_WEIGHTS = [30, 8, 7, 20, 20, 15]
 HOLD_TICKS_BY_SCENARIO = {k: v["hold"] for k, v in SCENARIO_PATTERNS.items()}
 
 # ---------------------------------------------------------------------------
@@ -237,7 +250,11 @@ FIXED_LEVELS = {"normal", "warning", "danger"}
 
 
 def _apply_mode(mode: str) -> None:
-    """매 틱 시작 시 호출. 시나리오 트리거 또는 강제 진입."""
+    """매 틱 시작 시 호출. 시나리오 트리거 또는 강제 진입.
+
+    dummy 는 시각 게이트 없음 — night_abnormal 의 "야간 시각" 판정은 W3
+    추론 측 책임 (measured_at hour 분기). 데이터는 시각 무관 항상 생성.
+    """
     if mode == "mixed":
         for ch in range(1, 17):
             maybe_trigger(

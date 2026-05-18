@@ -8,10 +8,20 @@ class MLModel(models.Model):
 
     학습 1회 = MLModel row 1건 + .pkl 파일 1개.
     .pkl 파일 실체는 settings.ML_MODELS_DIR 아래 저장 (MEDIA_ROOT 밖, 웹 서빙 차단).
+
+    W1 변경 (ARIMA un-downgrade plan §4):
+    - ModelType → Algorithm 으로 rename + ARIMA choice 추가
+    - model_type 필드 → algorithm 으로 RenameField (데이터 그대로 보존)
+    - sensor_identifier 필드 추가 — ARIMA 등 단일 시계열 모델 단위 매칭용.
+      빈 문자열 = sensor_type 단위 공유 (기존 IF 동작 유지)
+    - Meta constraints: (sensor_type, algorithm, sensor_identifier, version)
+      4축 unique + 활성 모델은 (sensor_type, algorithm, sensor_identifier)
+      단위 1건 제약 (기존 sensor_type 단위 → 매칭 단위로 확장)
     """
 
-    class ModelType(models.TextChoices):
+    class Algorithm(models.TextChoices):
         ISOLATION_FOREST = "isolation_forest", "Isolation Forest"
+        ARIMA = "arima", "ARIMA"
 
     class SensorType(models.TextChoices):
         POWER = "power", "전력"
@@ -19,18 +29,30 @@ class MLModel(models.Model):
 
     version = models.PositiveIntegerField(
         verbose_name="모델 버전",
-        help_text="동일 sensor_type 안에서 1부터 순차 증가",
+        help_text=(
+            "동일 (sensor_type, algorithm, sensor_identifier) 안에서 1부터 순차 증가"
+        ),
     )
     sensor_type = models.CharField(
         max_length=10,
         choices=SensorType.choices,
         verbose_name="센서 종류",
     )
-    model_type = models.CharField(
+    algorithm = models.CharField(
         max_length=30,
-        choices=ModelType.choices,
-        default=ModelType.ISOLATION_FOREST,
-        verbose_name="모델 타입",
+        choices=Algorithm.choices,
+        default=Algorithm.ISOLATION_FOREST,
+        verbose_name="모델 알고리즘",
+    )
+    sensor_identifier = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+        verbose_name="센서 식별자",
+        help_text=(
+            "ARIMA 등 단일 시계열 모델용. 예: 'power:device_1:ch3:watt'. "
+            "비어 있으면 sensor_type 단위 (전 sensor 공유)."
+        ),
     )
     trained_at = models.DateTimeField(auto_now_add=True, verbose_name="학습 완료 시각")
     file_path = models.CharField(
@@ -59,18 +81,30 @@ class MLModel(models.Model):
     is_active = models.BooleanField(
         default=False,
         verbose_name="활성 모델",
-        help_text="추론에 사용할 모델 1개당 1건만 True (sensor_type 별로)",
+        help_text=(
+            "추론에 사용할 모델 1개당 1건만 True "
+            "((sensor_type, algorithm, sensor_identifier) 단위)"
+        ),
     )
 
     def __str__(self) -> str:
-        return f"{self.sensor_type} v{self.version} ({self.model_type})"
+        sid = f":{self.sensor_identifier}" if self.sensor_identifier else ""
+        return f"{self.sensor_type}{sid} v{self.version} ({self.algorithm})"
 
     class Meta:
         db_table = "ml_model"
         constraints = [
             models.UniqueConstraint(
-                fields=["sensor_type", "version"],
-                name="uq_ml_model_sensor_version",
+                fields=["sensor_type", "algorithm", "sensor_identifier", "version"],
+                name="uq_ml_model_sensor_alg_id_version",
+            ),
+            # 활성 모델 1건 제약 — (sensor_type, algorithm, sensor_identifier) 단위.
+            # IF (sensor_identifier="") 와 ARIMA (sensor_identifier="power:..." 등) 가
+            # 같은 sensor_type 안에서 각각 1건씩 활성 가능.
+            models.UniqueConstraint(
+                fields=["sensor_type", "algorithm", "sensor_identifier"],
+                condition=models.Q(is_active=True),
+                name="uq_ml_model_active_per_match_unit",
             ),
         ]
         indexes = [

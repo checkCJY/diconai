@@ -33,6 +33,7 @@ def create_alarm_and_event(
     summary: str = "",
     detected_at=None,
     channel: int = None,
+    algorithm_source: str = "",
 ):
     """
     AlarmRecord + Event 생성/병합 핵심 로직
@@ -94,6 +95,7 @@ def create_alarm_and_event(
                 threshold_value=threshold_value,
                 risk_level=risk_level,
                 channel=channel,
+                algorithm_source=algorithm_source,
             )
             active_event.last_detected_at = detected_at
             # 위험도 상승 시 Event risk_level 업데이트
@@ -160,6 +162,7 @@ def create_alarm_and_event(
             threshold_value=threshold_value,
             risk_level=risk_level,
             channel=channel,
+            algorithm_source=algorithm_source,
         )
         EventLog.objects.create(
             event=event,

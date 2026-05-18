@@ -12,10 +12,18 @@ import time
 from collections import defaultdict, deque
 from datetime import datetime, timezone
 
-from ai.risk_combine import combine_risk
-from ai.router import _build_feature_row, _get_or_load
+from fastapi import HTTPException
+
+from ai.risk_combine import combine_risk_3axis
+from ai.router import (
+    _arima_forecast,
+    _build_feature_row,
+    _get_or_load,
+    _get_or_load_arima,
+)
 from core.power_thresholds import POWER_THRESHOLDS
 from power.services.channel_meta_cache import get_channel_entry
+from power.services.quality_guard import classify_sensor_status, is_inference_stuck
 from power.services.threshold_eval import calculate_power_risk
 from core.metrics import AI_INFERENCE_DURATION, AI_INFERENCE_FAILED_TOTAL
 from services.anomaly_alarm import forward_inference_e2e
@@ -55,6 +63,46 @@ RATE_LIMIT_SEC = 60
 
 DRF_POWER_EVENT_PATH = "/api/monitoring/power/event/"
 DRF_POWER_DATA_PATH = "/api/monitoring/power/data/"
+
+# W3.2 — night_abnormal 시각 분기 (dummy 는 시각 무관 데이터 생성, 추론 측이 판정).
+# measured_at 의 KST hour 가 야간(22~05) + watt 가 야간 baseline 초과 시
+# combined_risk 한 단계 격상. 임계치 = 정격 × NIGHT_THRESHOLD_RATIO (휴리스틱,
+# 향후 자동화 옵션: SARIMAX seasonal / IF hour 피처 / 시각별 동적 임계치 — 필수 아님).
+_KST_OFFSET_HOURS = 9
+_NIGHT_GATE_KST = (22, 5)  # 22~익일 05 KST
+_NIGHT_THRESHOLD_RATIO = 0.30  # 야간 base 0.15 의 2배 = 정격 30%
+_NIGHT_ESCALATION = {
+    "normal": "caution",
+    "caution": "warning",
+    "predict_warn": "warning",
+}
+
+# W4.a — algorithm_source 코드 → 운영자 친화 라벨 (drf-server constants.py 와 동기).
+# fastapi 측 summary 메시지 / 로그 prefix 에 사용. 알람 토스트가 받는 summary 가
+# 이 라벨을 포함 → 운영자가 "IF" / "ARIMA" / "IF+ARIMA" / "야간 가동" 구분 가능.
+_ALGORITHM_SOURCE_LABEL = {
+    "isolation_forest": "IF",
+    "arima": "ARIMA",
+    "combined": "IF+ARIMA",
+    "night_abnormal": "야간 가동",
+}
+
+
+def _is_night_kst_iso(measured_at_iso: str) -> bool:
+    """ISO 8601 measured_at 의 KST hour 가 야간 시간대(22~05)에 속하는지."""
+    try:
+        dt = datetime.fromisoformat(measured_at_iso)
+    except (ValueError, TypeError):
+        return False
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    utc_hour = dt.astimezone(timezone.utc).hour
+    kst_hour = (utc_hour + _KST_OFFSET_HOURS) % 24
+    start, end = _NIGHT_GATE_KST
+    if start <= end:
+        return start <= kst_hour < end
+    return kst_hour >= start or kst_hour < end
+
 
 # 페이로드 표시용 정격 % 임계치 (DRF facilities.Threshold "power_facility_default"와 동일)
 # 실제 알람 트리거는 DRF가 단일 진실 공급원. 본 모듈은 대시보드 색상 표시만 담당.
@@ -103,14 +151,36 @@ async def process_anomaly_inference(
     for channel, value in channel_values.items():
         if (channel, data_type) not in _INFERENCE_ENABLED_CHANNELS:
             continue
-        if value is None:
+        # W0 quality_guard — 통신 단절/센서 오버플로우 값은 IF 윈도우 적재 skip
+        # (학습 데이터 오염 + IF false negative 폭증 방지). raw 데이터 저장 흐름 영향 없음.
+        status = classify_sensor_status(value, data_type)
+        if status is not None:
+            logger.info(
+                "[anomaly_inference] skip device=%s ch=%s %s value=%s status=%s",
+                device_id,
+                channel,
+                data_type,
+                value,
+                status,
+            )
             continue
         win = _power_windows[(channel, data_type)]
         win.append(float(value))
         if len(win) < _INFERENCE_WINDOW:
             continue
+        # W0 stuck — 윈도우 가득 + 모든 값 동일 (분산 0) → 센서 고정 고장 추정 → 추론 skip
+        if is_inference_stuck(win):
+            logger.info(
+                "[anomaly_inference] skip device=%s ch=%s %s status=sensor_fault_stuck",
+                device_id,
+                channel,
+                data_type,
+            )
+            continue
 
         try:
+            sensor_identifier = f"power:device_{device_id}:ch{channel}:{data_type}"
+
             entry = await _get_or_load("power")
             if entry is None:
                 AI_INFERENCE_FAILED_TOTAL.labels("power_if", "model_not_loaded").inc()
@@ -123,27 +193,96 @@ async def process_anomaly_inference(
             prediction = "anomaly" if pred_int == -1 else "normal"
             AI_INFERENCE_DURATION.labels("power_if").observe(time.time() - _infer_start)
 
+            # W3.2 ARIMA 분기 — sensor_identifier 단위 매칭. 학습 안 된 채널은
+            # IF 단독 fallback (arima_violation=False). 모든 외부 호출 silent fail.
+            arima_result: dict | None = None
+            arima_violation = False
+            try:
+                entry_arima = await _get_or_load_arima("power", sensor_identifier)
+                arima_result = _arima_forecast(list(win), entry_arima.model)
+                arima_violation = bool(arima_result["is_violation"])
+            except HTTPException as exc:
+                if exc.status_code != 404:
+                    raise
+            except Exception as exc:
+                logger.warning(
+                    "[arima_forecast] failed sensor=%s: %s",
+                    sensor_identifier,
+                    exc,
+                )
+
             threshold_risk = calculate_power_risk(value, data_type, device_id, channel)
-            combined = combine_risk(threshold_risk, prediction)
+            combined = combine_risk_3axis(threshold_risk, prediction, arima_violation)
+
+            # W3.2 night_abnormal 시각 분기 — dummy 는 시각 무관 데이터 생성,
+            # 추론 측이 measured_at hour KST 야간 + watt > 정격 30% 검사해 격상.
+            # (향후 시각 컨텍스트 자동화 옵션 — SARIMAX / 다피처 IF / 동적 임계치. 필수 아님)
+            entry_meta = get_channel_entry(device_id, channel)
+            night_escalated = False
+            if data_type == "watt" and _is_night_kst_iso(measured_at):
+                rated_w = entry_meta.get("rated_w")
+                if (
+                    rated_w is not None
+                    and value > float(rated_w) * _NIGHT_THRESHOLD_RATIO
+                ):
+                    escalated = _NIGHT_ESCALATION.get(combined, combined)
+                    if escalated != combined:
+                        logger.info(
+                            "[night_abnormal] 야간 가동 의심 device=%s ch=%s "
+                            "value=%s threshold=%.0f combined=%s->%s",
+                            device_id,
+                            channel,
+                            value,
+                            float(rated_w) * _NIGHT_THRESHOLD_RATIO,
+                            combined,
+                            escalated,
+                        )
+                        combined = escalated
+                        night_escalated = True
+
+            # W4.a algorithm_source — AlarmRecord.algorithm_source 저장 (plan §8).
+            # 우선순위: night_abnormal > combined > arima > isolation_forest > 빈값.
+            # should_fire=False (combined=normal/caution 중 일부) 면 alarm forward
+            # skip 이라 algorithm_source 미사용이지만 ML forward 페이로드엔 동행.
+            if night_escalated:
+                algorithm_source = "night_abnormal"
+            elif prediction == "anomaly" and arima_violation:
+                algorithm_source = "combined"
+            elif arima_violation:
+                algorithm_source = "arima"
+            elif prediction == "anomaly":
+                algorithm_source = "isolation_forest"
+            else:
+                algorithm_source = ""
+
             features = {
                 "value": float(row[0, 0]),
                 "roll_mean": float(row[0, 1]),
                 "roll_std": float(row[0, 2]),
                 "diff": float(row[0, 3]),
             }
-            sensor_identifier = f"power:device_{device_id}:ch{channel}:{data_type}"
+            if arima_result is not None:
+                features["arima_forecast"] = arima_result["forecast"]
+                features["arima_ci_lower"] = arima_result["ci_lower"]
+                features["arima_ci_upper"] = arima_result["ci_upper"]
+                features["arima_violation"] = arima_violation
 
             logger.info(
                 "[anomaly_inference] device=%s ch=%s %s value=%s "
-                "threshold=%s pred=%s combined=%s score=%.4f",
+                "threshold=%s pred=%s arima_v=%s combined=%s score=%.4f "
+                "arima_fc=%s ci=[%s,%s]",
                 device_id,
                 channel,
                 data_type,
                 value,
                 threshold_risk,
                 prediction,
+                arima_violation,
                 combined,
                 score,
+                f"{arima_result['forecast']:.1f}" if arima_result else "n/a",
+                f"{arima_result['ci_lower']:.1f}" if arima_result else "n/a",
+                f"{arima_result['ci_upper']:.1f}" if arima_result else "n/a",
             )
 
             # should_fire = (발화 레벨) AND (rate limit 통과). False 면 helper 가
@@ -164,11 +303,13 @@ async def process_anomaly_inference(
                 else:
                     _last_fired_at[sensor_identifier] = now_ts
 
-            entry_meta = get_channel_entry(device_id, channel)
             label = entry_meta.get("name") or f"CH{channel}"
+            # W4.a — algorithm_source 라벨을 summary 에 prefix. 토스트가 즉시
+            # "IF" / "ARIMA" / "IF+ARIMA" / "야간 가동" 출처 구분 표시.
+            algo_label = _ALGORITHM_SOURCE_LABEL.get(algorithm_source, "AI")
             summary = (
-                f"[AI 이상 패턴] {label} {data_type}={value} "
-                f"(IF score {score:.4f}, combined={combined})"
+                f"[{algo_label} 이상 감지] {label} {data_type}={value} "
+                f"(score {score:.4f}, combined={combined})"
             )
             risk_level = _COMBINED_TO_RISK_LEVEL[combined]
 
@@ -199,6 +340,8 @@ async def process_anomaly_inference(
                         # AlarmRecord.channel 에 저장 → get_short_message 가 channel_meta
                         # 로 라벨 ("송풍기A AI 이상 패턴 감지 (7925.8 W)") 생성.
                         "channel": channel,
+                        # W4.a — AlarmRecord.algorithm_source 저장용 (plan §8).
+                        "algorithm_source": algorithm_source,
                     },
                     push_payload={
                         "alarm_type": "power_anomaly_ai",
@@ -213,6 +356,19 @@ async def process_anomaly_inference(
                             "device_id": device_id,
                             "channel": channel,
                             "data_type": data_type,
+                            # W4.a — UI 알람 토스트/이벤트 패널이 algorithm 출처 칩
+                            # 표시 (DB AlarmRecord.algorithm_source 와 동일 값).
+                            "algorithm_source": algorithm_source,
+                            # arima_result 가 있으면 forecast / CI 도 동행 — UI 가
+                            # "예측 1091 ± 신뢰구간 [645, 1538]" 같은 디테일 표시 가능.
+                            "arima_forecast": (
+                                arima_result["forecast"] if arima_result else None
+                            ),
+                            "arima_ci": (
+                                [arima_result["ci_lower"], arima_result["ci_upper"]]
+                                if arima_result
+                                else None
+                            ),
                         },
                     },
                     should_fire=should_fire,
