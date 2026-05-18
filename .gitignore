@@ -28,6 +28,8 @@ drf-server/ml_datasets/*
 
 # DB 수동 백업 — backfill 같은 대량 작업 전 보존용. 수백 MB 단위라 git 부적합.
 drf-server/db.sqlite3.backup_*
+# 마이그레이션 전 보존용 (.bak.YYYYMMDD-* 패턴). 동일 사유 — 큰 용량 + 임시 보존.
+drf-server/db.sqlite3.bak*
 # truncate 전 cold copy 보관 디렉토리 (12GB 단위). 2026-05-14 도입.
 drf-server/db_backups/
 
