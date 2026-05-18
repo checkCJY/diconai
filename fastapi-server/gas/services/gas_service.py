@@ -9,6 +9,9 @@
 import time
 import logging
 import asyncio
+import joblib
+from pathlib import Path
+from core.config import settings
 from services.anomaly_alarm import forward_inference_e2e
 from datetime import datetime, timezone
 
@@ -28,6 +31,18 @@ from ai.router import (
 
 
 logger = logging.getLogger(__name__)
+
+# 이성현 추가 — ARIMA pkl 모듈 레벨 로드 (실시간 잔차 계산용)
+# 이성현 수정 — statsmodels pickle 임포트 버그 대비 try-except 추가 (실패 시 12피처로 폴백)
+_arima_models: dict = {}
+for _gn in ["co", "h2s", "co2"]:
+    _p = Path(settings.ML_MODELS_DIR) / f"arima_{_gn}.pkl"
+    if _p.exists():
+        try:
+            _arima_models[_gn] = joblib.load(_p)["result"]
+        except Exception:
+            pass
+
 
 # 이성현 작업
 # co, h2s, co2값을 담아두는 버퍼 , 최대 30개 , 슬라이딩 윈도우 구현에 맞음
@@ -80,6 +95,7 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
                     "co2": list(_co2_window),
                 },
                 entry.window,
+                arima_results=_arima_models if _arima_models else None,  # 이성현 추가
             )
             pred = int(entry.model.predict(row)[0])
             score = float(entry.model.decision_function(row)[0])

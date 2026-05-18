@@ -14,5 +14,7 @@ pyyaml==6.0.3
 redis==5.2.1
 requests==2.34.0
 scikit-learn==1.8.0
+pandas==2.3.3
+statsmodels==0.14.2
 uvicorn[standard]==0.44.0
 websockets==16.0
