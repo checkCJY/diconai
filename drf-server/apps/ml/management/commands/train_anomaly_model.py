@@ -258,7 +258,7 @@ class Command(BaseCommand):
             row = MLModel.objects.create(
                 version=version,
                 sensor_type=sensor_type,
-                model_type=MLModel.ModelType.ISOLATION_FOREST,
+                algorithm=MLModel.Algorithm.ISOLATION_FOREST,
                 file_path=file_name,
                 training_data_range_from=since,
                 training_data_range_to=until,

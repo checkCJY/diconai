@@ -21,7 +21,7 @@ class _ActiveMLModelSerializer(serializers.ModelSerializer):
             "id",
             "version",
             "sensor_type",
-            "model_type",
+            "algorithm",
             "file_path",
             "feature_columns",
             "params_json",
