@@ -59,16 +59,13 @@ class AlarmPayload(BaseModel):
     message: str | None = None
     # ANOMALY 알람 전용 nested 메타 (다른 alarm_type 에선 None)
     anomaly_meta: AnomalyMeta | None = None
-<<<<<<< HEAD
     # 2026-05-15 알람 재설계: Event 가 RESOLVED 로 전이된 시각.
     # 운영자가 update_status 를 RESOLVED 로 호출하면 drf 가 이 필드를 채워서 broadcast.
     # 클라는 이 필드가 박혀있으면 같은 event_id 로 떠있는 팝업을 close + "위험 해소" 토스트.
     # 일반 알람에선 None.
     event_resolved_at: str | None = None
-=======
     # E2E latency 측정용 — IoT 수신 시각(Unix time). alarm_flush_loop에서 소비.
     ingress_ts: float | None = None
->>>>>>> 9092e5d (feat(monitoring): P0 메트릭 11종 구현 및 Prometheus multiproc 버그 수정(59번 내용 누락))
 
 
 @router.post(
