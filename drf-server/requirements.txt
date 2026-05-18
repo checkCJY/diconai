@@ -12,6 +12,7 @@ httpx==0.28.1
 joblib==1.5.3
 numpy==2.4.4
 pillow==12.2.0
+statsmodels==0.14.2
 prometheus-client==0.21.1
 psycopg2-binary==2.9.11
 redis==5.2.1

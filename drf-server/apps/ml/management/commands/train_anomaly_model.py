@@ -37,9 +37,14 @@ from apps.ml.models import MLModel
 from apps.ml.services.dataset_service import (
     TimeSeries,
     extract_normal_gas_series,
+    extract_normal_gas_multi_series,
     extract_normal_power_series,
 )
-from apps.ml.services.feature_service import DEFAULT_WINDOW, build_features
+from apps.ml.services.feature_service import (
+    DEFAULT_WINDOW,
+    build_features,
+    build_multi_features,
+)
 
 
 def _parse_dt(s: str) -> datetime:
@@ -100,11 +105,12 @@ class Command(BaseCommand):
             help="(power) 측정 종류",
         )
         parser.add_argument("--sensor-id", type=int, help="(gas) GasSensor.id")
+        # 이성현 수정 — 단일(co) 또는 다변량(co,h2s,co2) 콤마 구분 입력 지원
         parser.add_argument(
             "--gas-name",
-            choices=("co", "h2s", "co2", "o2", "no2", "so2", "o3", "nh3", "voc"),
-            help="(gas) 학습할 가스 종류",
+            help="(gas) 학습할 가스 종류. 단일: co  다변량: co,h2s,co2",
         )
+
         parser.add_argument("--since", required=True, help="ISO 또는 YYYY-MM-DD")
         parser.add_argument("--until", required=True, help="ISO 또는 YYYY-MM-DD")
         parser.add_argument("--window", type=int, default=DEFAULT_WINDOW)
@@ -141,17 +147,60 @@ class Command(BaseCommand):
             raise CommandError("sensor-type=gas 는 --sensor-id / --gas-name 필수.")
 
         self.stdout.write(f"[1/5] dataset 추출 — sensor_type={sensor_type}")
-        series = _fetch_series(sensor_type, opts)
-        self.stdout.write(
-            f"      raw rows = {len(series)} (sensor_identifier={series.sensor_identifier})"
-        )
-        if len(series) < options["window"] * 10:
-            raise CommandError(
-                f"학습 데이터 부족: {len(series)} rows (최소 {options['window'] * 10})"
+        # 이성현 수정 — gas 다변량 분기: gas_name 콤마 분리 후 multi series 추출
+        if sensor_type == "gas":
+            _VALID = {"co", "h2s", "co2", "o2", "no2", "so2", "o3", "nh3", "voc"}
+            gas_names = [g.strip() for g in opts["gas_name"].split(",")]
+            invalid = [g for g in gas_names if g not in _VALID]
+            if invalid:
+                raise CommandError(f"알 수 없는 gas_name: {invalid}")
+            series_list = extract_normal_gas_multi_series(
+                sensor_id=opts["sensor_id"],
+                gas_names=gas_names,
+                since=opts["since"],
+                until=opts["until"],
+            )
+            min_len = min(len(s) for s in series_list)
+            self.stdout.write(f"      raw rows = {min_len} (gas_names={gas_names})")
+            if min_len < options["window"] * 10:
+                raise CommandError(
+                    f"학습 데이터 부족: {min_len} rows (최소 {options['window'] * 10})"
+                )
+            self.stdout.write(f"[2/5] feature engineering — window={options['window']}")
+            # 이성현 추가 — ARIMA pkl 로드 후 잔차 피처 활성화 (파일 없으면 경고 후 12피처 유지)
+            _models_dir = Path(settings.ML_MODELS_DIR)
+            arima_results = {}
+            for _gn in gas_names:
+                _p = _models_dir / f"arima_{_gn}.pkl"
+                if _p.exists():
+                    arima_results[_gn] = joblib.load(_p)["result"]
+                    self.stdout.write(f"      ARIMA 로드: arima_{_gn}.pkl")
+                else:
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f"      ARIMA 없음 (건너뜀): arima_{_gn}.pkl"
+                        )
+                    )
+            fm = build_multi_features(
+                series_list,
+                gas_names,
+                window=options["window"],
+                drop_warmup=True,
+                arima_results=arima_results if arima_results else None,
             )
 
-        self.stdout.write(f"[2/5] feature engineering — window={options['window']}")
-        fm = build_features(series, window=options["window"], drop_warmup=True)
+        else:
+            series = _fetch_series(sensor_type, opts)
+            self.stdout.write(
+                f"      raw rows = {len(series)} (sensor_identifier={series.sensor_identifier})"
+            )
+            if len(series) < options["window"] * 10:
+                raise CommandError(
+                    f"학습 데이터 부족: {len(series)} rows (최소 {options['window'] * 10})"
+                )
+            self.stdout.write(f"[2/5] feature engineering — window={options['window']}")
+            fm = build_features(series, window=options["window"], drop_warmup=True)
+
         self.stdout.write(
             f"      feature shape = {fm.features.shape}, columns = {fm.columns}"
         )
@@ -213,7 +262,7 @@ class Command(BaseCommand):
                 file_path=file_name,
                 training_data_range_from=since,
                 training_data_range_to=until,
-                training_sample_count=len(series),
+                training_sample_count=len(fm),
                 feature_columns=fm.columns,
                 params_json=params,
                 is_active=options["activate"],
