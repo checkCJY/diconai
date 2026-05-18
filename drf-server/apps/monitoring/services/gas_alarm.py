@@ -66,7 +66,7 @@ def _revoke(task_id: str) -> None:
     celery_app.control.revoke(task_id, terminate=True)
 
 
-def trigger_gas_alarms(gas_data) -> list[dict]:
+def trigger_gas_alarms(gas_data, ingress_ts: float | None = None) -> list[dict]:
     """
     가스 데이터 수신 시 위험도별 알람 라우팅.
 
@@ -97,7 +97,7 @@ def trigger_gas_alarms(gas_data) -> list[dict]:
             # 원자 천이 — 직전 상태가 danger 아닐 때만 1회 fire (race-safe)
             if try_transition(state_key, "danger", _CACHE_TTL):
                 fire_danger_alarm_task.delay(
-                    sensor_id, gas, value, facility_id, source_label
+                    sensor_id, gas, value, facility_id, source_label, ingress_ts=ingress_ts
                 )
 
         elif risk == "warning":
@@ -111,6 +111,7 @@ def trigger_gas_alarms(gas_data) -> list[dict]:
                 continue
             task = fire_warning_alarm_task.apply_async(
                 args=[sensor_id, gas, value, facility_id, source_label],
+                kwargs={"ingress_ts": ingress_ts},
                 countdown=WARNING_DURATION_SEC,
             )
             cache.set(task_key, task.id, _TASK_KEY_TTL)

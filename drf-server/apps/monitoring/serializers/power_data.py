@@ -1,10 +1,12 @@
 # monitoring/serializers/power_data.py
+import time
+
 from django.db import IntegrityError, OperationalError
 
 from rest_framework import serializers
 
 from apps.core.constants import RiskLevel, SensorStatus
-from apps.core.metrics import DB_SAVE_TOTAL
+from apps.core.metrics import DB_SAVE_DURATION, DB_SAVE_TOTAL
 from apps.facilities.models.devices import PowerDevice
 from apps.monitoring.models import PowerData, PowerEvent
 from apps.monitoring.services.power_alarm import trigger_power_alarms
@@ -106,8 +108,10 @@ class PowerDataBulkIngestSerializer(serializers.Serializer):
     measured_at = serializers.DateTimeField()
     data_type = serializers.ChoiceField(choices=PowerData.DataType.choices)
     channels = _ChannelEntrySerializer(many=True)
+    ingress_ts = serializers.FloatField(required=False, allow_null=True, default=None)
 
     def create(self, validated_data):
+        ingress_ts = validated_data.pop("ingress_ts", None)
         device = PowerDevice.objects.get(device_id=validated_data["device_id"])
         objs = [
             PowerData(
@@ -126,6 +130,7 @@ class PowerDataBulkIngestSerializer(serializers.Serializer):
         # DB_SAVE_TOTAL: bulk_create 호출 성공/실패를 추적한다.
         # ignore_conflicts=True이므로 중복 행은 조용히 skip — IntegrityError는 실질적으로 발생 안 함.
         # 그러나 SQLite "database is locked"은 발생 가능하므로 OperationalError를 캡처한다.
+        _t = time.perf_counter()
         try:
             PowerData.objects.bulk_create(objs, ignore_conflicts=True)
         except OperationalError as e:
@@ -138,6 +143,8 @@ class PowerDataBulkIngestSerializer(serializers.Serializer):
         except Exception:
             DB_SAVE_TOTAL.labels(model="power", result="error", error_type="other").inc()
             raise
+        finally:
+            DB_SAVE_DURATION.labels(model="power").observe(time.perf_counter() - _t)
 
         DB_SAVE_TOTAL.labels(model="power", result="ok", error_type="").inc()
 
@@ -152,5 +159,5 @@ class PowerDataBulkIngestSerializer(serializers.Serializer):
                 channel__in=[o.channel for o in objs],
             )
         )
-        trigger_power_alarms(saved, device)
+        trigger_power_alarms(saved, device, ingress_ts=ingress_ts)
         return saved

@@ -8,7 +8,7 @@ if [ -n "${PROMETHEUS_MULTIPROC_DIR}" ]; then
     mkdir -p "${PROMETHEUS_MULTIPROC_DIR}"
     # 재기동 시 이전 프로세스가 남긴 stale .db 파일 제거.
     # 비정상 종료된 .db 파일이 남으면 MultiProcessCollector가 JSON 파싱 실패 → /metrics 500.
-    find "${PROMETHEUS_MULTIPROC_DIR}" -name "*.db" -delete
+    find "${PROMETHEUS_MULTIPROC_DIR}" -name "*.db" -delete 2>/dev/null || true
 fi
 
 # RUN_MIGRATIONS=0 으로 두면 celery-worker/beat 컨테이너에서 중복 실행 방지.

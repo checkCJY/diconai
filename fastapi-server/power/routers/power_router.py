@@ -11,6 +11,8 @@
 #   1. Pydantic 스키마로 수신 데이터 검증 후 채널 딕셔너리로 변환
 #   2. power_latest 공유 상태 즉시 갱신 → WebSocket 브로드캐스트에 즉시 반영
 #   3. DRF 저장은 BackgroundTask로 비동기 처리 → 응답을 블로킹하지 않음
+import time
+
 from fastapi import APIRouter, BackgroundTasks
 
 from power.schemas.power import (
@@ -88,6 +90,7 @@ async def recv_current(payload: PowerCurrentPayload, bg: BackgroundTasks):
             "measured_at": measured_at,
             "data_type": "current",
             "channels": to_channel_list(channel_values, payload.to_anomaly_map()),
+            "ingress_ts": time.time(),
         },
     )
     return {"status": "ok", "updated": "current"}
@@ -113,6 +116,7 @@ async def recv_voltage(payload: PowerVoltagePayload, bg: BackgroundTasks):
             "measured_at": measured_at,
             "data_type": "voltage",
             "channels": to_channel_list(channel_values, payload.to_anomaly_map()),
+            "ingress_ts": time.time(),
         },
     )
     return {"status": "ok", "updated": "voltage"}
@@ -145,6 +149,7 @@ async def recv_watt(payload: PowerWattPayload, bg: BackgroundTasks):
             "measured_at": measured_at,
             "data_type": "watt",
             "channels": to_channel_list(channel_values, payload.to_anomaly_map()),
+            "ingress_ts": time.time(),
         },
     )
     return {"status": "ok", "updated": "watt"}
