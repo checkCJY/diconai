@@ -67,6 +67,20 @@ DB_SAVE_TOTAL = Counter(
     ["model", "result", "error_type"],
 )
 
+# DB 저장 latency Histogram.
+# DB_SAVE_TOTAL(성공/실패 여부)과 함께 쓰면 "저장은 되는데 느린가"를 구분할 수 있다.
+# PG 전환 전후 동일 메트릭으로 비교하면 전환 효과를 수치로 증명할 수 있다.
+# (SQLite p95 ≥ 50ms / PG p95 ≥ 20ms 이면 각각 이상 신호)
+#
+# 레이블:
+#   model : "gas" | "power"
+DB_SAVE_DURATION = Histogram(
+    "db_save_duration_seconds",
+    "DB save latency for GasData and PowerData (ORM create / bulk_create)",
+    ["model"],
+    buckets=[0.005, 0.01, 0.025, 0.05, 0.1, 0.5, 1.0, 5.0],
+)
+
 # ── Celery 큐 길이 메트릭 ────────────────────────────────────────────────────
 # Redis의 Celery 큐를 LLEN 명령으로 읽어 대기 중인 태스크 수를 기록한다.
 # Celery Beat(queue_metrics_task)이 30초마다 갱신한다.
@@ -116,6 +130,41 @@ GEOFENCE_CHECK_DURATION = Histogram(
     buckets=[0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0],
 )
 
+
+# ── SQLite DB 파일 크기 메트릭 ───────────────────────────────────────────────
+# Beat 태스크(db_health_task)가 60초마다 os.path.getsize()로 읽어 갱신한다.
+# 어제(2026-05-14) 12GB 비대화 사고의 재발 방지용 — 5GB 경고 / 10GB 경보 기준.
+# PG 전환 후에는 이 메트릭이 자연히 0으로 수렴한다.
+SQLITE_DB_SIZE = Gauge(
+    "sqlite_db_size_bytes",
+    "SQLite database file size in bytes",
+    multiprocess_mode="liveall",
+)
+
+# ── Celery 태스크 실행시간 / 대기시간 메트릭 ─────────────────────────────────
+# C1: 태스크가 실제로 실행된 시간 (task_prerun → task_postrun).
+# C2: 태스크가 큐에 들어간 시점부터 워커가 꺼낼 때까지 대기한 시간.
+#
+# 두 메트릭을 분리하는 이유:
+#   - C1이 높으면 "태스크 로직 자체가 느린 것" (DB 락, 외부 API 지연 등)
+#   - C2가 높으면 "worker가 태스크를 소화 못 하는 것" (worker 증설 필요)
+#   - celery_queue_length가 짧아도 C1이 높으면 알람이 지연될 수 있다.
+#
+# 레이블:
+#   task_name : 태스크 모듈 경로 (예: apps.alerts.tasks.fire_gas_alarm_task)
+CELERY_TASK_DURATION = Histogram(
+    "celery_task_duration_seconds",
+    "Celery task execution time from task_prerun to task_postrun",
+    ["task_name"],
+    buckets=[0.01, 0.05, 0.1, 0.5, 1.0, 5.0, 30.0],
+)
+
+CELERY_TASK_QUEUED = Histogram(
+    "celery_task_queued_seconds",
+    "Celery task wait time from enqueue to worker pickup",
+    ["task_name"],
+    buckets=[0.01, 0.05, 0.1, 0.5, 1.0, 5.0, 30.0],
+)
 
 # ── AI 우선순위 mute 메트릭 ───────────────────────────────────────────────────
 # Step 3 — AI 발화 시 같은 채널의 룰 알람을 60s 동안 mute 한다. 룰 fire 가 가드로

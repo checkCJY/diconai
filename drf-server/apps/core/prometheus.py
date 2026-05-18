@@ -60,11 +60,16 @@ class PrometheusMiddleware:
 
 def metrics_view(_request):
     # PROMETHEUS_MULTIPROC_DIR 설정 시 모든 프로세스의 메트릭을 합산해 반환.
+    # drf/celery 컨테이너가 서브디렉토리를 분리해 사용하므로 두 경로를 모두 집계한다.
     # 미설정(로컬 단독 실행) 시 기존 단일 프로세스 방식으로 동작.
     if os.environ.get("PROMETHEUS_MULTIPROC_DIR"):
         from prometheus_client import CollectorRegistry
         from prometheus_client.multiprocess import MultiProcessCollector
         registry = CollectorRegistry()
-        MultiProcessCollector(registry)
+        base = os.path.dirname(os.environ["PROMETHEUS_MULTIPROC_DIR"])
+        for subdir in ("drf", "celery"):
+            path = os.path.join(base, subdir)
+            if os.path.isdir(path):
+                MultiProcessCollector(registry, path=path)
         return HttpResponse(generate_latest(registry), content_type=CONTENT_TYPE_LATEST)
     return HttpResponse(generate_latest(), content_type=CONTENT_TYPE_LATEST)

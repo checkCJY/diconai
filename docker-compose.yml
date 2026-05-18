@@ -35,10 +35,12 @@ services:
       FASTAPI_INTERNAL_URL: http://fastapi:8001
       DJANGO_DEBUG: "True"      # 개발: 템플릿/정적 핫리로드 활성 (운영에선 False)
       COLLECT_STATIC: "0"       # WHITENOISE_USE_FINDERS=True → collectstatic 불필요
-      # prometheus_client multiprocess 모드 — gunicorn + celery-worker가 이 디렉토리에
-      # 메트릭 파일을 쓰고, /metrics 엔드포인트에서 합산해 노출한다.
-      # celery-worker 서비스에도 동일 경로 지정 필수 (두 컨테이너가 /app 볼륨 공유).
-      PROMETHEUS_MULTIPROC_DIR: /app/prometheus_multiproc
+      # prometheus_client multiprocess 모드 — drf/celery 컨테이너가 서브디렉토리별로 분리해 쓴다.
+      # 같은 /app 볼륨을 공유하지만 두 컨테이너 모두 PID 1이라 동일 경로를 쓰면 histogram_1.db 충돌.
+      # entrypoint.sh가 재시작 시 $PROMETHEUS_MULTIPROC_DIR 안의 *.db를 청소하는데,
+      # 경로가 같으면 Celery 재시작이 DRF worker 파일까지 삭제해 /metrics에서 DRF 메트릭이 사라짐.
+      # → drf/celery 서브디렉토리로 격리. metrics_view에서 두 경로를 합산해 노출.
+      PROMETHEUS_MULTIPROC_DIR: /app/prometheus_multiproc/drf
     volumes:
       # 소스 핫리로드용 — 코드/템플릿/정적 변경이 별도 빌드 없이 즉시 컨테이너에 노출.
       # 하위 db.sqlite3/media는 명시적 mount로 source 경계를 분명히 함 (영속 데이터 표시).
@@ -104,9 +106,9 @@ services:
       FASTAPI_INTERNAL_URL: http://fastapi:8001
       RUN_MIGRATIONS: "0"
       COLLECT_STATIC: "0"
-      # drf 서비스와 동일 경로 — /app 볼륨을 공유하므로 같은 디렉토리에 메트릭 파일 기록.
-      # drf의 /metrics 엔드포인트에서 두 프로세스 메트릭을 합산해 Prometheus에 노출.
-      PROMETHEUS_MULTIPROC_DIR: /app/prometheus_multiproc
+      # drf 서비스와 별도 서브디렉토리 사용 — PID 충돌·상호 파일 삭제 방지 (→ drf 주석 참고).
+      # drf의 /metrics가 /app/prometheus_multiproc/drf + /app/prometheus_multiproc/celery 두 경로를 합산.
+      PROMETHEUS_MULTIPROC_DIR: /app/prometheus_multiproc/celery
     volumes:
       # 소스 핫리로드 — drf 서비스와 동일하게 호스트 코드를 마운트해야
       # tasks.py 등 worker 코드 변경이 별도 빌드 없이 restart만으로 반영된다.
