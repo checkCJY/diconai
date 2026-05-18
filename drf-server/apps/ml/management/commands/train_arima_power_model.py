@@ -29,6 +29,7 @@ from django.db import transaction
 from django.utils.dateparse import parse_datetime
 from statsmodels.tsa.arima.model import ARIMA
 
+from apps.facilities.models import PowerDevice
 from apps.ml.models import MLModel
 from apps.ml.services.dataset_service import extract_normal_power_series
 
@@ -92,8 +93,17 @@ class Command(BaseCommand):
         since = _parse_dt(options["since"])
         until = _parse_dt(options["until"])
         order = (options["p"], options["d"], options["q"])
+        # device_id (PK, --device-id 인자) → raw device_id (mac 주소) 변환.
+        # 추론 측 (fastapi power_service) 의 sensor_identifier 생성과 일관성 보장:
+        # 가스/전력 추론 모두 raw mac 사용 ("power:device_{mac}:ch{n}:{type}").
+        # PK 사용 시 매칭 실패 → 404 silent fallback → ARIMA 미동작.
+        try:
+            device_obj = PowerDevice.objects.get(pk=options["device_id"])
+        except PowerDevice.DoesNotExist as exc:
+            raise CommandError(f"PowerDevice PK={options['device_id']} 없음") from exc
+        raw_device_id = device_obj.device_id
         sensor_identifier = (
-            f"power:device_{options['device_id']}"
+            f"power:device_{raw_device_id}"
             f":ch{options['channel']}:{options['data_type']}"
         )
 

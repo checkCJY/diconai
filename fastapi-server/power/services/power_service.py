@@ -76,6 +76,16 @@ _NIGHT_ESCALATION = {
     "predict_warn": "warning",
 }
 
+# W4.a — algorithm_source 코드 → 운영자 친화 라벨 (drf-server constants.py 와 동기).
+# fastapi 측 summary 메시지 / 로그 prefix 에 사용. 알람 토스트가 받는 summary 가
+# 이 라벨을 포함 → 운영자가 "IF" / "ARIMA" / "IF+ARIMA" / "야간 가동" 구분 가능.
+_ALGORITHM_SOURCE_LABEL = {
+    "isolation_forest": "IF",
+    "arima": "ARIMA",
+    "combined": "IF+ARIMA",
+    "night_abnormal": "야간 가동",
+}
+
 
 def _is_night_kst_iso(measured_at_iso: str) -> bool:
     """ISO 8601 measured_at 의 KST hour 가 야간 시간대(22~05)에 속하는지."""
@@ -252,7 +262,8 @@ async def process_anomaly_inference(
 
             logger.info(
                 "[anomaly_inference] device=%s ch=%s %s value=%s "
-                "threshold=%s pred=%s arima_v=%s combined=%s score=%.4f",
+                "threshold=%s pred=%s arima_v=%s combined=%s score=%.4f "
+                "arima_fc=%s ci=[%s,%s]",
                 device_id,
                 channel,
                 data_type,
@@ -262,6 +273,9 @@ async def process_anomaly_inference(
                 arima_violation,
                 combined,
                 score,
+                f"{arima_result['forecast']:.1f}" if arima_result else "n/a",
+                f"{arima_result['ci_lower']:.1f}" if arima_result else "n/a",
+                f"{arima_result['ci_upper']:.1f}" if arima_result else "n/a",
             )
 
             # should_fire = (발화 레벨) AND (rate limit 통과). False 면 helper 가
@@ -283,9 +297,12 @@ async def process_anomaly_inference(
                     _last_fired_at[sensor_identifier] = now_ts
 
             label = entry_meta.get("name") or f"CH{channel}"
+            # W4.a — algorithm_source 라벨을 summary 에 prefix. 토스트가 즉시
+            # "IF" / "ARIMA" / "IF+ARIMA" / "야간 가동" 출처 구분 표시.
+            algo_label = _ALGORITHM_SOURCE_LABEL.get(algorithm_source, "AI")
             summary = (
-                f"[AI 이상 패턴] {label} {data_type}={value} "
-                f"(IF score {score:.4f}, combined={combined})"
+                f"[{algo_label} 이상 감지] {label} {data_type}={value} "
+                f"(score {score:.4f}, combined={combined})"
             )
             risk_level = _COMBINED_TO_RISK_LEVEL[combined]
 

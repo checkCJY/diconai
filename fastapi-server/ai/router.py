@@ -259,23 +259,28 @@ def _compute_arima_resid(values: list[float], arima_result) -> float:
 
 # W3 — ARIMA forecast + 신뢰구간 위반 판정 (skill/plan/power-ai-un-downgrade-phase2-apply.md §7).
 def _arima_forecast(values: list[float], arima_result, alpha: float = 0.05) -> dict:
-    """슬라이딩 윈도우에 ARIMA 적용 → 1-step ahead forecast + 신뢰구간 (W3 신규).
+    """슬라이딩 윈도우에 ARIMA 적용 → 진짜 1-step ahead forecast + 신뢰구간 (W3 신규).
+
+    검증 흐름:
+      1. values[:-1] (마지막 값 제외) 로 새 fit (training)
+      2. 1-step ahead forecast — values[-1] 시점의 예측값
+      3. actual = values[-1] (forecast 의 비교 대상, fit 에는 안 들어감)
+      4. is_violation = actual 이 forecast 의 95% CI 밖
+
+    ⚠ 초기 plan §5.1 코드는 apply(values) 전체 fit 후 actual=values[-1] 비교 —
+    actual 이 fit 의 일부라 forecast 가 actual 근처로 따라감 → 자기충족 false
+    negative. 본 함수는 values[:-1] 로 수정해 진짜 외부 값 비교.
 
     Args:
-        values: 최근 N 틱 raw 측정값. ARIMA result.apply(endog=values) 로 새 fit.
+        values: 최근 N 틱 raw 측정값. 최소 길이 2 이상 (training + 1 actual).
         arima_result: 학습된 ARIMAResultsWrapper (statsmodels).
         alpha: 신뢰구간 유의수준 (default 0.05 → 95% CI).
-
-    Returns:
-        {
-            "forecast": 다음 시점 예측값,
-            "ci_lower": (1-alpha) 신뢰구간 하한,
-            "ci_upper": (1-alpha) 신뢰구간 상한,
-            "actual": 마지막 실측값,
-            "is_violation": actual < ci_lower or actual > ci_upper,
-        }
     """
-    new_result = arima_result.apply(endog=values)
+    if len(values) < 2:
+        raise ValueError(
+            f"_arima_forecast 는 최소 2개 값 필요 (받은 길이 {len(values)})"
+        )
+    new_result = arima_result.apply(endog=values[:-1])
     forecast_obj = new_result.get_forecast(steps=1)
     # conf_int 는 statsmodels 버전에 따라 ndarray 또는 DataFrame — np.asarray 로 통일.
     ci_arr = np.asarray(forecast_obj.conf_int(alpha=alpha))
