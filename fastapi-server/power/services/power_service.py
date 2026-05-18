@@ -66,7 +66,7 @@ DRF_POWER_DATA_PATH = "/api/monitoring/power/data/"
 # W3.2 — night_abnormal 시각 분기 (dummy 는 시각 무관 데이터 생성, 추론 측이 판정).
 # measured_at 의 KST hour 가 야간(22~05) + watt 가 야간 baseline 초과 시
 # combined_risk 한 단계 격상. 임계치 = 정격 × NIGHT_THRESHOLD_RATIO (휴리스틱,
-# 추후 SARIMAX 시 ARIMA seasonal forecast 로 대체 가능).
+# 향후 자동화 옵션: SARIMAX seasonal / IF hour 피처 / 시각별 동적 임계치 — 필수 아님).
 _KST_OFFSET_HOURS = 9
 _NIGHT_GATE_KST = (22, 5)  # 22~익일 05 KST
 _NIGHT_THRESHOLD_RATIO = 0.30  # 야간 base 0.15 의 2배 = 정격 30%
@@ -199,7 +199,7 @@ async def process_anomaly_inference(
 
             # W3.2 night_abnormal 시각 분기 — dummy 는 시각 무관 데이터 생성,
             # 추론 측이 measured_at hour KST 야간 + watt > 정격 30% 검사해 격상.
-            # (SARIMAX 도입 시 ARIMA seasonal forecast 로 대체 — plan §7.1 후기)
+            # (향후 시각 컨텍스트 자동화 옵션 — SARIMAX / 다피처 IF / 동적 임계치. 필수 아님)
             entry_meta = get_channel_entry(device_id, channel)
             night_escalated = False
             if data_type == "watt" and _is_night_kst_iso(measured_at):
