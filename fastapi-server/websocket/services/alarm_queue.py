@@ -17,10 +17,11 @@
 
 import json
 import logging
+import time
 
 from prometheus_client import Counter
 
-from core.metrics import ALARM_QUEUE_LENGTH
+from core.metrics import ALARM_QUEUE_LENGTH, REDIS_COMMAND_DURATION
 from core.redis_client import get_redis
 
 ALARM_QUEUE_KEY = "diconai:ws:alarms"
@@ -121,7 +122,10 @@ async def push_alarm(payload: dict, *, dedup_ttl: int = PUSH_DEDUP_TTL_SEC) -> N
             push_alarm_dedup_hits.inc()
             logger.info("[push_alarm] dedup hit fp=%s", fp)
             return
+    # P1 — LPUSH 실행시간 측정. E2E latency 급등 시 Redis 병목 여부 판단 근거.
+    _t = time.perf_counter()
     await r.lpush(ALARM_QUEUE_KEY, json.dumps(payload, ensure_ascii=False))
+    REDIS_COMMAND_DURATION.labels("lpush").observe(time.perf_counter() - _t)
     await r.ltrim(ALARM_QUEUE_KEY, 0, MAX_QUEUE_LEN - 1)
     ALARM_QUEUE_LENGTH.set(await queue_len())
 
@@ -134,7 +138,10 @@ async def pop_alarm_blocking(timeout: int = 0) -> dict | None:
     """
     r = get_redis()
     try:
+        # P1 — BRPOP 실행시간 측정. timeout 대기 시간은 제외하고 실제 명령 왕복만 측정.
+        _t = time.perf_counter()
         result = await r.brpop(ALARM_QUEUE_KEY, timeout=timeout)
+        REDIS_COMMAND_DURATION.labels("brpop").observe(time.perf_counter() - _t)
     except Exception as exc:
         logger.warning(f"[alarm_queue] action=brpop_error error={exc!r}")
         return None

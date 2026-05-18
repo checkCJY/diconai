@@ -2,7 +2,14 @@ import os
 import time
 
 from celery import Celery
-from celery.signals import before_task_publish, task_prerun, task_postrun, worker_process_shutdown
+from celery.signals import (
+    before_task_publish,
+    task_failure,
+    task_postrun,
+    task_prerun,
+    task_retry,
+    worker_process_shutdown,
+)
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 
@@ -49,6 +56,27 @@ def on_task_postrun(task_id: str, task, **kwargs):
     start = _task_start_times.pop(task_id, None)
     if start is not None:
         CELERY_TASK_DURATION.labels(task_name=task.name).observe(time.time() - start)
+
+
+@task_failure.connect
+def on_task_failure(task_id: str, exception, **kwargs):
+    # 태스크가 예외로 최종 실패했을 때 (재시도 없이 종료된 경우).
+    # task_postrun은 성공/실패 구분 없이 호출되므로 이 시그널로 따로 카운트한다.
+    from apps.core.metrics import CELERY_TASK_FAILED_TOTAL
+
+    sender = kwargs.get("sender")
+    task_name = getattr(sender, "name", "unknown")
+    CELERY_TASK_FAILED_TOTAL.labels(task_name=task_name).inc()
+
+
+@task_retry.connect
+def on_task_retry(request, reason, **kwargs):
+    # 태스크가 실패 후 재시도 큐에 들어갈 때 호출.
+    # 재시도가 쌓이면 FastAPI 불안정 또는 DB 락 신호 — alarm_ws_push_failed_total과 함께 확인.
+    from apps.core.metrics import CELERY_TASK_RETRIED_TOTAL
+
+    task_name = getattr(request, "task", "unknown")
+    CELERY_TASK_RETRIED_TOTAL.labels(task_name=task_name).inc()
 
 
 @worker_process_shutdown.connect

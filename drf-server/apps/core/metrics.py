@@ -138,7 +138,7 @@ GEOFENCE_CHECK_DURATION = Histogram(
 SQLITE_DB_SIZE = Gauge(
     "sqlite_db_size_bytes",
     "SQLite database file size in bytes",
-    multiprocess_mode="liveall",
+    multiprocess_mode="max",
 )
 
 # ── Celery 태스크 실행시간 / 대기시간 메트릭 ─────────────────────────────────
@@ -179,4 +179,25 @@ RULE_FIRE_SUPPRESSED_BY_AI_TOTAL = Counter(
     "rule_fire_suppressed_by_ai_total",
     "Rule alarm fire skipped because an AI alarm fired on the same channel recently",
     ["device_id", "channel", "level"],
+)
+
+# ── Celery 태스크 실패 / 재시도 메트릭 (P2 전) ───────────────────────────────
+# task_postrun은 성공/실패 무관하게 호출되므로 실패 여부를 구분할 수 없다.
+# task_failure / task_retry 시그널로 각각 카운트한다.
+#
+# 실패 카운터가 올라가면 알람 미발송 원인 추적 시작점이 된다.
+# 재시도 카운터가 꾸준히 올라가면 FastAPI 불안정 또는 DB 락 신호.
+#
+# 레이블:
+#   task_name : 태스크 모듈 경로 (예: apps.alerts.tasks.fire_gas_alarm_task)
+CELERY_TASK_FAILED_TOTAL = Counter(
+    "celery_task_failed_total",
+    "Celery task failures (exception raised, not retried)",
+    ["task_name"],
+)
+
+CELERY_TASK_RETRIED_TOTAL = Counter(
+    "celery_task_retried_total",
+    "Celery task retry count (re-enqueued after failure)",
+    ["task_name"],
 )
