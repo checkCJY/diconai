@@ -257,6 +257,40 @@ def _compute_arima_resid(values: list[float], arima_result) -> float:
         return 0.0
 
 
+# W3 — ARIMA forecast + 신뢰구간 위반 판정 (skill/plan/power-ai-un-downgrade-phase2-apply.md §7).
+def _arima_forecast(values: list[float], arima_result, alpha: float = 0.05) -> dict:
+    """슬라이딩 윈도우에 ARIMA 적용 → 1-step ahead forecast + 신뢰구간 (W3 신규).
+
+    Args:
+        values: 최근 N 틱 raw 측정값. ARIMA result.apply(endog=values) 로 새 fit.
+        arima_result: 학습된 ARIMAResultsWrapper (statsmodels).
+        alpha: 신뢰구간 유의수준 (default 0.05 → 95% CI).
+
+    Returns:
+        {
+            "forecast": 다음 시점 예측값,
+            "ci_lower": (1-alpha) 신뢰구간 하한,
+            "ci_upper": (1-alpha) 신뢰구간 상한,
+            "actual": 마지막 실측값,
+            "is_violation": actual < ci_lower or actual > ci_upper,
+        }
+    """
+    new_result = arima_result.apply(endog=values)
+    forecast_obj = new_result.get_forecast(steps=1)
+    # conf_int 는 statsmodels 버전에 따라 ndarray 또는 DataFrame — np.asarray 로 통일.
+    ci_arr = np.asarray(forecast_obj.conf_int(alpha=alpha))
+    ci_lower = float(ci_arr[0, 0])
+    ci_upper = float(ci_arr[0, 1])
+    actual = float(values[-1])
+    return {
+        "forecast": float(np.asarray(forecast_obj.predicted_mean)[0]),
+        "ci_lower": ci_lower,
+        "ci_upper": ci_upper,
+        "actual": actual,
+        "is_violation": actual < ci_lower or actual > ci_upper,
+    }
+
+
 # 이성현 수정 — arima_results 매개변수 추가 (None 이면 12피처, 제공 시 15피처)
 def _build_multi_feature_row(
     windows: dict[str, list[float]],

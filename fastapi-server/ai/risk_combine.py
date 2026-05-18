@@ -49,3 +49,54 @@ def combine_risk(threshold_risk: str, ml_prediction: str) -> str:
             f"ml_prediction={ml_prediction!r}"
         )
     return _MATRIX[key]
+
+
+# ---------------------------------------------------------------------------
+# W3 — 3축 매트릭스 (skill/plan/power-ai-un-downgrade-phase2-apply.md §7).
+# 두 AI 모델 (IF + ARIMA) 동의 시 한 단계 격상.
+# ARIMA pkl 없는 채널/sensor 는 caller 가 arima_violation=False 호출 →
+# 기존 2축 matrix 와 동일 결과 (fallback 효과).
+# ---------------------------------------------------------------------------
+
+_MATRIX_3AXIS: dict[tuple[str, str, bool], str] = {
+    # (threshold, if_prediction, arima_violation) → combined
+    ("normal", "normal", False): "normal",
+    ("normal", "normal", True): "predict_warn",
+    ("normal", "anomaly", False): "predict_warn",
+    ("normal", "anomaly", True): "warning",
+    ("warning", "normal", False): "caution",
+    ("warning", "normal", True): "warning",
+    ("warning", "anomaly", False): "warning",
+    ("warning", "anomaly", True): "danger",
+    ("danger", "normal", False): "danger",
+    ("danger", "normal", True): "danger",
+    ("danger", "anomaly", False): "danger",
+    ("danger", "anomaly", True): "danger",
+}
+
+
+def combine_risk_3axis(
+    threshold_risk: str,
+    if_prediction: str,
+    arima_violation: bool,
+) -> str:
+    """3축 결합 — threshold × IF × ARIMA → combined_risk (W3 신규).
+
+    두 AI 모델 동의 시 한 단계 격상 (warning → danger 등). 단일 발화 시
+    기존 2축 매트릭스와 같은 결과.
+
+    Args:
+        threshold_risk: "normal" | "warning" | "danger"
+        if_prediction: "normal" | "anomaly"
+        arima_violation: True 면 ARIMA forecast 95% 신뢰구간 위반, False 면 정상범위
+
+    Raises:
+        ValueError: 매트릭스에 없는 조합 (운영 데이터에서 발견 시 즉시 fail-fast)
+    """
+    key = (threshold_risk, if_prediction, arima_violation)
+    if key not in _MATRIX_3AXIS:
+        raise ValueError(
+            f"Unknown 3axis combination: threshold_risk={threshold_risk!r}, "
+            f"if_prediction={if_prediction!r}, arima_violation={arima_violation!r}"
+        )
+    return _MATRIX_3AXIS[key]
