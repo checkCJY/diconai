@@ -33,11 +33,14 @@ ALLOWED_MODES = {
     "warning",
     "danger",
     # power_dummy 단일 시나리오 모드 (IF 학습 데이터 격리 테스트)
+    # W0 변경 (skill/plan/power-ai-un-downgrade-phase2-apply.md §3):
+    # spike 제거, night_abnormal/motor_stuck 신규. dummies/_scenario.py 와 동기화.
     "overload",
     "voltage_drop",
-    "spike",
     "phase_loss",
     "degradation",
+    "night_abnormal",
+    "motor_stuck",
     # gas_dummy 단일 시나리오 모드
     "co_leak",
     "h2s_leak",
@@ -68,7 +71,7 @@ if settings.DUMMY_SCENARIO_MODE in ALLOWED_MODES:
     description=(
         "더미 스크립트가 polling으로 호출. 환경변수 `DUMMY_SCENARIO_MODE`로 부팅 시 초기값.\n\n"
         "모드: `mixed` / `normal` / `warning` / `danger` / "
-        "전력 `overload`·`voltage_drop`·`spike`·`phase_loss`·`degradation` / "
+        "전력 `overload`·`voltage_drop`·`phase_loss`·`degradation`·`night_abnormal`·`motor_stuck` / "
         "가스 `co_leak`·`h2s_leak`·`fire`·`chemical_spill`."
     ),
 )
@@ -85,7 +88,8 @@ async def get_mode() -> dict:
         "- `mixed`: 확률 기반 (기본 동작)\n"
         "- `normal` / `warning` / `danger`: 전 채널/가스 동일 레벨 강제\n\n"
         "**전력 전용 단일 시나리오 모드** (IF 학습 격리 테스트 — 가스/위치는 fallback 'mixed')\n"
-        "- `overload` / `voltage_drop` / `spike` / `phase_loss` / `degradation`\n\n"
+        "- `overload` / `voltage_drop` / `phase_loss` / `degradation`\n"
+        "- `night_abnormal` (KST 22~05 시간대 외 진입 무시) / `motor_stuck`\n\n"
         "**가스 전용 단일 시나리오 모드** (IF 학습 격리 테스트 — 전력/위치는 fallback 'mixed')\n"
         "- `co_leak` / `h2s_leak` / `fire` / `chemical_spill`"
     ),

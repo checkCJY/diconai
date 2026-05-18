@@ -25,11 +25,14 @@ ALLOWED_MODES = {
     "warning",
     "danger",
     # power_dummy 단일 시나리오 모드 — 가스/위치 더미는 fallback("mixed") 처리.
+    # W0 변경 (skill/plan/power-ai-un-downgrade-phase2-apply.md §3):
+    # spike 제거, night_abnormal/motor_stuck 신규.
     "overload",
     "voltage_drop",
-    "spike",
     "phase_loss",
     "degradation",
+    "night_abnormal",
+    "motor_stuck",
     # gas_dummy 단일 시나리오 모드 — 전력/위치 더미는 fallback("mixed") 처리.
     "co_leak",
     "h2s_leak",

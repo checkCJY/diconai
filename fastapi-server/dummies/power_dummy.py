@@ -12,7 +12,9 @@
 # 모드:
 #   mixed       — 정상 90% + 가중치 적용 시나리오 10% (IF 학습 데이터셋 생성)
 #   normal/warning/danger — 전 채널 동일 레벨 (UI/알람 테스트)
-#   overload/voltage_drop/spike/phase_loss/degradation — 단일 시나리오 강제 (격리 테스트)
+#   overload/voltage_drop/phase_loss/degradation/night_abnormal/motor_stuck
+#               — 단일 시나리오 강제 (격리 테스트). W0 에서 spike 제거,
+#                 night_abnormal(P0, KST 22~05만)/motor_stuck(P1) 추가.
 #
 # 실행: python -m dummies.power_dummy
 
@@ -114,10 +116,14 @@ def base_load_ratio(hour: int, ch: int) -> float:
 
 
 # ---------------------------------------------------------------------------
-# 시나리오 5종 — (정격 대비 배수 W/A/V) + 상태머신 파라미터
+# 시나리오 6종 — (정격 대비 배수 W/A/V) + 상태머신 파라미터
+# W0 변경 (skill/plan/power-ai-un-downgrade-phase2-apply.md §3):
+#   - spike 제거 — 1틱 단발 급등은 정적 룰 임계치가 즉시 잡음 (ML 영역 아님)
+#   - night_abnormal 신규 (P0) — ARIMA seasonal/baseline 일탈 시연 (야간 시간대 한정)
+#   - motor_stuck 신규 (P1) — IF 다축 상관 학습 신호 (W↓+A↓ 동시 + V 유지)
 # ---------------------------------------------------------------------------
 SCENARIO_PATTERNS: dict[str, dict] = {
-    "overload": {
+    "overload": {  # P0 — 룰 + IF + ARIMA 모두 동의 (시연 핵심)
         "w_factor": 1.10,
         "a_factor": 1.10,
         "v_factor": 0.93,
@@ -125,7 +131,7 @@ SCENARIO_PATTERNS: dict[str, dict] = {
         "hold": 60,
         "ramp_down": 10,
     },
-    "voltage_drop": {
+    "voltage_drop": {  # 보조 — multi-channel 시나리오 (Phase 3 다채널 학습 가치)
         "w_factor": 0.85,
         "a_factor": 1.10,
         "v_factor": 0.88,
@@ -134,15 +140,7 @@ SCENARIO_PATTERNS: dict[str, dict] = {
         "ramp_down": 5,
         "multi": True,  # 전 채널에 적용
     },
-    "spike": {
-        "w_factor": 1.30,
-        "a_factor": 1.30,
-        "v_factor": 1.00,
-        "ramp_up": 1,
-        "hold": 1,
-        "ramp_down": 1,
-    },
-    "phase_loss": {
+    "phase_loss": {  # 보조 — 3상 결상 도메인 사고 패턴 (95% drop = 정적 임계치)
         "w_factor": 0.05,
         "a_factor": 0.05,
         "v_factor": 0.05,
@@ -150,7 +148,7 @@ SCENARIO_PATTERNS: dict[str, dict] = {
         "hold": 30,
         "ramp_down": 5,
     },
-    "degradation": {
+    "degradation": {  # P0 — ARIMA trend break 시연 가치
         "w_factor": 1.05,
         "a_factor": 1.05,
         "v_factor": 1.00,
@@ -158,16 +156,29 @@ SCENARIO_PATTERNS: dict[str, dict] = {
         "hold": 30,
         "ramp_down": 5,
     },
+    "night_abnormal": {  # P0 신규 — 야간 시간대만 진입 (KST 22~05, _is_night_kst_now 가드)
+        "w_factor": 3.00,  # 야간 base_load(0.15) × 3 → 가동 시간대 평균 수준 일탈
+        "a_factor": 3.00,
+        "v_factor": 1.00,
+        "ramp_up": 5,
+        "hold": 120,  # 야간 시간대 충분히 유지
+        "ramp_down": 10,
+    },
+    "motor_stuck": {  # P1 신규 — 회전 정지 (W·A 동시 ↓, V 유지)
+        "w_factor": 0.10,
+        "a_factor": 0.10,
+        "v_factor": 1.00,
+        "ramp_up": 1,  # 급정지
+        "hold": 60,
+        "ramp_down": 1,
+    },
 }
 
 SCENARIO_NAMES = list(SCENARIO_PATTERNS.keys())
-SCENARIO_WEIGHTS = [
-    6,
-    4,
-    2,
-    2,
-    1,
-]  # roadmap §3-5: overload/voltage_drop/spike/phase_loss/degradation
+# W0 가중치 재분배 — P0 70 / P1 15 / 보조 15 (합 100).
+# 순서는 SCENARIO_PATTERNS dict 정의 순과 동일 (Python 3.7+ 정렬 보장):
+#   overload=30, voltage_drop=8, phase_loss=7, degradation=20, night_abnormal=20, motor_stuck=15
+SCENARIO_WEIGHTS = [30, 8, 7, 20, 20, 15]
 HOLD_TICKS_BY_SCENARIO = {k: v["hold"] for k, v in SCENARIO_PATTERNS.items()}
 
 # ---------------------------------------------------------------------------
@@ -231,20 +242,54 @@ def _compute_channel_tick(
 
 
 # ---------------------------------------------------------------------------
+# W0 야간 시간대 게이트 — night_abnormal 시나리오는 KST 22~05시에만 진입 가능.
+#  - mixed 모드: _scenario_weights_for_now() 가 야간 외 시간엔 weight 0 으로 떨굼
+#  - 단일 시나리오 강제: _apply_mode 안에서 명시적 skip + 경고 로그
+# _state_machine.maybe_trigger 변경 없이 dummy 측에서만 처리 (헬퍼는 도메인 비종속 유지).
+# ---------------------------------------------------------------------------
+_KST_NIGHT_GATE = (22, 5)  # (start_hour, end_hour) — start>end 는 자정 wrap-around
+_KST_UTC_OFFSET_HOURS = 9
+
+
+def _is_night_kst_now() -> bool:
+    """현재 시각이 KST 야간 시간대(22~05)에 속하는지 — night_abnormal 게이트 검사용."""
+    hour_kst = (datetime.now(timezone.utc).hour + _KST_UTC_OFFSET_HOURS) % 24
+    start, end = _KST_NIGHT_GATE
+    if start <= end:
+        return start <= hour_kst < end
+    return hour_kst >= start or hour_kst < end
+
+
+def _scenario_weights_for_now() -> list[int]:
+    """현재 시각 기준 가중치 — night_abnormal 은 야간 외 시간엔 weight 0 (선택 후보 제외)."""
+    if _is_night_kst_now():
+        return SCENARIO_WEIGHTS
+    return [
+        w if SCENARIO_NAMES[i] != "night_abnormal" else 0
+        for i, w in enumerate(SCENARIO_WEIGHTS)
+    ]
+
+
+# ---------------------------------------------------------------------------
 # 모드별 사전 처리 — fixed/단일 시나리오 모드 진입 강제
 # ---------------------------------------------------------------------------
 FIXED_LEVELS = {"normal", "warning", "danger"}
 
 
 def _apply_mode(mode: str) -> None:
-    """매 틱 시작 시 호출. 시나리오 트리거 또는 강제 진입."""
+    """매 틱 시작 시 호출. 시나리오 트리거 또는 강제 진입.
+
+    W0: night_abnormal 게이트 적용 — mixed 모드는 weight 동적 조정,
+    단일 시나리오 강제 진입은 야간 외 시간에 skip + 경고 로그.
+    """
     if mode == "mixed":
+        weights_now = _scenario_weights_for_now()
         for ch in range(1, 17):
             maybe_trigger(
                 _channel_states[ch],
                 probability=MIXED_TRIGGER_PROBABILITY,
                 scenarios=SCENARIO_NAMES,
-                weights=SCENARIO_WEIGHTS,
+                weights=weights_now,
                 hold_ticks_by_scenario=HOLD_TICKS_BY_SCENARIO,
                 ramp_up_ticks=5,
                 ramp_down_ticks=10,
@@ -252,6 +297,13 @@ def _apply_mode(mode: str) -> None:
         return
 
     if mode in SCENARIO_PATTERNS:
+        # night_abnormal 강제 진입은 KST 야간 시간대에서만 허용 (시연 시 시간 외 진입 방지)
+        if mode == "night_abnormal" and not _is_night_kst_now():
+            logger.warning(
+                "[night_abnormal] KST 야간 시간대(%d~%d) 이외 — 강제 진입 무시",
+                *_KST_NIGHT_GATE,
+            )
+            return
         # 단일 시나리오 강제 — multi 면 전 채널, 아니면 무작위 1개 모터 채널
         pattern = SCENARIO_PATTERNS[mode]
         targets = (

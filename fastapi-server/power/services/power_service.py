@@ -16,6 +16,7 @@ from ai.risk_combine import combine_risk
 from ai.router import _build_feature_row, _get_or_load
 from core.power_thresholds import POWER_THRESHOLDS
 from power.services.channel_meta_cache import get_channel_entry
+from power.services.quality_guard import classify_sensor_status, is_inference_stuck
 from power.services.threshold_eval import calculate_power_risk
 from services.anomaly_alarm import forward_inference_e2e
 from services.drf_client import post_to_drf
@@ -102,11 +103,31 @@ async def process_anomaly_inference(
     for channel, value in channel_values.items():
         if (channel, data_type) not in _INFERENCE_ENABLED_CHANNELS:
             continue
-        if value is None:
+        # W0 quality_guard — 통신 단절/센서 오버플로우 값은 IF 윈도우 적재 skip
+        # (학습 데이터 오염 + IF false negative 폭증 방지). raw 데이터 저장 흐름 영향 없음.
+        status = classify_sensor_status(value, data_type)
+        if status is not None:
+            logger.info(
+                "[anomaly_inference] skip device=%s ch=%s %s value=%s status=%s",
+                device_id,
+                channel,
+                data_type,
+                value,
+                status,
+            )
             continue
         win = _power_windows[(channel, data_type)]
         win.append(float(value))
         if len(win) < _INFERENCE_WINDOW:
+            continue
+        # W0 stuck — 윈도우 가득 + 모든 값 동일 (분산 0) → 센서 고정 고장 추정 → 추론 skip
+        if is_inference_stuck(win):
+            logger.info(
+                "[anomaly_inference] skip device=%s ch=%s %s status=sensor_fault_stuck",
+                device_id,
+                channel,
+                data_type,
+            )
             continue
 
         try:
