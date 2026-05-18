@@ -90,9 +90,13 @@ def _revoke(task_id: str) -> None:
 
 
 def _channel_label(device, channel: int) -> str:
-    """PowerDevice.channel_meta[str(ch)]["name"] → 미지정 시 "CH{n}"."""
-    meta = (device.channel_meta or {}).get(str(channel)) or {}
-    return meta.get("name") or f"CH{channel}"
+    """PowerDevice.get_channel_label 의 thin wrapper (2026-05-17 통합).
+
+    기존엔 본 모듈에 채널 라벨 로직이 직접 있었음. AlarmRecord.get_short_message
+    가 같은 라벨을 만들려고 보니 중복 — PowerDevice 모델 메서드로 단일화.
+    호출자(power_alarm 흐름)는 시그니처 변경 없이 그대로 사용.
+    """
+    return device.get_channel_label(channel)
 
 
 def _max_risk(levels: list[str]) -> str:

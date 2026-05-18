@@ -49,6 +49,16 @@
           <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
         </svg>
       </button>
+      <!-- D 옵션 (2026-05-17) — 헤더 미확인 알람 배지. AlarmBadge (alarm-badge.js) 가
+           초기값을 /alerts/api/alarms/summary/ 의 user_unread_event_count 로 fetch,
+           newAlarmEvent CustomEvent 수신마다 카운터 ↑, 클릭 시 이력 페이지 + reset.
+           종 아이콘은 항상 표시 (관리 시스템 컨벤션) — 카운트 동그라미만 count ≥ 1 일 때 노출. -->
+      <button id="btnAlarmBadge" class="icon-btn alarm-badge-btn" title="미확인 알람 — 이력 페이지로" aria-label="미확인 알람 보기">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6V11a6 6 0 1 0-12 0v5l-2 2v1h16v-1l-2-2z"/>
+        </svg>
+        <span class="alarm-badge-count" hidden>0</span>
+      </button>
     </div>
     <button id="btnLogout" class="logout-btn">로그아웃</button>
   </div>

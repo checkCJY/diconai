@@ -29,3 +29,8 @@ class AnomalyAlarmRecordPayloadSerializer(serializers.Serializer):
     detected_at = serializers.DateTimeField()
     source_label = serializers.CharField(allow_blank=True)
     ml_anomaly_result_id = serializers.IntegerField(required=False, allow_null=True)
+    # PowerDevice 알람 시 채널 (1~16). 가스는 NULL 허용. AlarmRecord.channel 에 저장 →
+    # get_short_message 가 channel + power_device.channel_meta 로 라벨 ("송풍기A") 생성.
+    channel = serializers.IntegerField(
+        required=False, allow_null=True, min_value=1, max_value=255
+    )

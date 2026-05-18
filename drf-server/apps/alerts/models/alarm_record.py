@@ -96,6 +96,12 @@ class AlarmRecord(BaseModel):
         default="",
         verbose_name="가스 종류 (GAS_THRESHOLD 시)",
     )
+    # PowerDevice 알람 시 채널 (1~16). PowerDevice 1대 안 16개 측정점 (송풍기/압연기 등)
+    # 중 어느 채널이 알람인지 추적. get_short_message 가 channel + power_device.channel_meta
+    # 로 운영자 친화 라벨 ("송풍기A 임계치 초과 (15.58 W)") 생성. 가스/지오펜스는 NULL.
+    channel = models.PositiveSmallIntegerField(
+        null=True, blank=True, verbose_name="PowerDevice 채널 (1~16)"
+    )
     measured_value = models.FloatField(null=True, blank=True, verbose_name="측정값")
     threshold_value = models.FloatField(
         null=True, blank=True, verbose_name="초과 임계치"
@@ -131,9 +137,15 @@ class AlarmRecord(BaseModel):
         if self.gas_type and self.measured_value is not None:
             return f"{self.gas_type.upper()} 임계치 초과 ({self.measured_value} ppm)"
         if self.power_device_id and self.measured_value is not None:
+            # PowerDevice 1대 안 16채널 중 어느 측정점인지 운영자 친화 라벨 prefix.
+            # channel_meta 에 등록된 이름("송풍기A") 우선, 없으면 "CH{N}". channel 자체가
+            # NULL 인 옛 데이터는 prefix 생략 (post-channel-migration backfill 안 함).
+            prefix = ""
+            if self.channel is not None and self.power_device is not None:
+                prefix = f"{self.power_device.get_channel_label(self.channel)} "
             if self.alarm_type == "power_anomaly_ai":
-                return f"AI 이상 패턴 감지 ({self.measured_value} W)"
-            return f"전력 임계치 초과 ({self.measured_value} W)"
+                return f"{prefix}AI 이상 패턴 감지 ({self.measured_value} W)"
+            return f"{prefix}전력 임계치 초과 ({self.measured_value} W)"
         if self.geofence_id:
             return "위험구역 진입"
         if self.alarm_type == "sensor_fault":

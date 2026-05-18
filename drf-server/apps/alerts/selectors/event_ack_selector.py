@@ -38,3 +38,38 @@ def get_acked_user_ids(event_id: int) -> set[int]:
             "user_id", flat=True
         )
     )
+
+
+def get_user_unread_event_count(user_id: int) -> int:
+    """
+    특정 user 가 ack 안 한 active/acknowledged/in_progress Event 개수 반환.
+
+    [도입 배경 — 2026-05-17 D 옵션 헤더 미확인 배지]
+    헤더의 "🔔 N" 배지 초기값 — 본인이 아직 확인 완료 안 한 활성 이벤트 수.
+    글로벌 unacknowledged_event_count (Event.status 기반) 와 달리, user-scoped
+    ack (Phase 1 EventAcknowledgement) 을 기준으로 본 사람만 카운트 ↓.
+
+    [성능]
+    NOT EXISTS subquery — EventAcknowledgement.UniqueConstraint(event, user) 인덱스
+    가 자동 활용. count() 단일 SQL.
+
+    Args:
+        user_id: 조회 대상 user 의 PK.
+
+    Returns:
+        ack 안 한 활성 이벤트 개수. 운영자가 처리해야 할 사건 수.
+    """
+    from apps.alerts.models import Event
+    from apps.core.constants import EventStatus
+
+    return (
+        Event.objects.filter(
+            status__in=[
+                EventStatus.ACTIVE,
+                EventStatus.ACKNOWLEDGED,
+                EventStatus.IN_PROGRESS,
+            ],
+        )
+        .exclude(event_acknowledgements__user_id=user_id)
+        .count()
+    )
