@@ -332,6 +332,19 @@ async def process_anomaly_inference(
                             "device_id": device_id,
                             "channel": channel,
                             "data_type": data_type,
+                            # W4.a — UI 알람 토스트/이벤트 패널이 algorithm 출처 칩
+                            # 표시 (DB AlarmRecord.algorithm_source 와 동일 값).
+                            "algorithm_source": algorithm_source,
+                            # arima_result 가 있으면 forecast / CI 도 동행 — UI 가
+                            # "예측 1091 ± 신뢰구간 [645, 1538]" 같은 디테일 표시 가능.
+                            "arima_forecast": (
+                                arima_result["forecast"] if arima_result else None
+                            ),
+                            "arima_ci": (
+                                [arima_result["ci_lower"], arima_result["ci_upper"]]
+                                if arima_result
+                                else None
+                            ),
                         },
                     },
                     should_fire=should_fire,

@@ -27,6 +27,9 @@ class AlarmRecordSerializer(serializers.ModelSerializer):
             "geofence_name",
             "event",
             "created_at",
+            # W4.a — AI 알람 algorithm 출처 (isolation_forest / arima / combined /
+            # night_abnormal / "" / NULL). UI 가 별도 칩 표시 가능.
+            "algorithm_source",
         ]
 
     def get_sensor_name(self, obj):

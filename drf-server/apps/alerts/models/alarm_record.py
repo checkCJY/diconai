@@ -153,6 +153,15 @@ class AlarmRecord(BaseModel):
         → API 응답 / WS payload 가 항상 같은 텍스트를 노출 (drift 방지).
         """
         if self.gas_type and self.measured_value is not None:
+            # AI 알람이면 algorithm 출처 라벨 prefix (예: "CO ARIMA 이상 감지")
+            if self.alarm_type == "gas_anomaly_ai":
+                from apps.core.constants import ALGORITHM_SOURCE_LABEL
+
+                label = ALGORITHM_SOURCE_LABEL.get(self.algorithm_source or "", "AI")
+                return (
+                    f"{self.gas_type.upper()} {label} 이상 감지 "
+                    f"({self.measured_value} ppm)"
+                )
             return f"{self.gas_type.upper()} 임계치 초과 ({self.measured_value} ppm)"
         if self.power_device_id and self.measured_value is not None:
             # PowerDevice 1대 안 16채널 중 어느 측정점인지 운영자 친화 라벨 prefix.
@@ -162,7 +171,12 @@ class AlarmRecord(BaseModel):
             if self.channel is not None and self.power_device is not None:
                 prefix = f"{self.power_device.get_channel_label(self.channel)} "
             if self.alarm_type == "power_anomaly_ai":
-                return f"{prefix}AI 이상 패턴 감지 ({self.measured_value} W)"
+                # algorithm_source 라벨 표시 ("송풍기A IF+ARIMA 이상 감지 ...").
+                # 빈값/NULL 또는 미매핑 코드는 "AI" fallback.
+                from apps.core.constants import ALGORITHM_SOURCE_LABEL
+
+                label = ALGORITHM_SOURCE_LABEL.get(self.algorithm_source or "", "AI")
+                return f"{prefix}{label} 이상 감지 ({self.measured_value} W)"
             return f"{prefix}전력 임계치 초과 ({self.measured_value} W)"
         if self.geofence_id:
             return "위험구역 진입"
