@@ -23,6 +23,7 @@ from ai.router import (
     _get_or_load_arima,
 )
 from core.power_thresholds import POWER_THRESHOLDS
+from power.services.change_point_service import detect_change_point
 from power.services.channel_meta_cache import get_channel_entry
 from power.services.quality_guard import classify_sensor_status, is_inference_stuck
 from power.services.threshold_eval import calculate_power_risk
@@ -224,6 +225,23 @@ async def process_anomaly_inference(
             # 로깅만, 5축 결합·algorithm_source 반영은 §F 에서 진행 → 발화 영향 0.
             z_score_anomaly = _zscore_check(win, float(value), threshold=3.0)
 
+            # E1 — Change Point (STEP E / plan §E1). 별도 _cp_windows (maxlen=60)
+            # 채널별 누적 → two-window 비교. STABLE→SHIFT 전이 시점만 True. 본
+            # commit 도 산출·로깅만 (§F 까지 발화 영향 0).
+            change_point, cp_meta = detect_change_point(
+                (channel, data_type), float(value)
+            )
+            if change_point:
+                logger.info(
+                    "[change_point] device=%s ch=%s %s STABLE→SHIFT "
+                    "mean_shift=%.2f std_ratio=%.2f",
+                    device_id,
+                    channel,
+                    data_type,
+                    cp_meta["mean_shift"],
+                    cp_meta["std_ratio"],
+                )
+
             # W3.2 ARIMA 분기 — sensor_identifier 단위 매칭. 학습 안 된 채널은
             # IF 단독 fallback (arima_violation=False). 모든 외부 호출 silent fail.
             arima_result: dict | None = None
@@ -300,8 +318,8 @@ async def process_anomaly_inference(
 
             logger.info(
                 "[anomaly_inference] device=%s ch=%s %s value=%s "
-                "threshold=%s pred=%s arima_v=%s z=%s combined=%s score=%.4f "
-                "arima_fc=%s ci=[%s,%s]",
+                "threshold=%s pred=%s arima_v=%s z=%s cp=%s combined=%s "
+                "score=%.4f arima_fc=%s ci=[%s,%s]",
                 device_id,
                 channel,
                 data_type,
@@ -310,6 +328,7 @@ async def process_anomaly_inference(
                 prediction,
                 arima_violation,
                 z_score_anomaly,
+                change_point,
                 combined,
                 score,
                 f"{arima_result['forecast']:.1f}" if arima_result else "n/a",
