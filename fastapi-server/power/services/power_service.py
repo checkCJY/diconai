@@ -79,19 +79,6 @@ _NIGHT_ESCALATION = {
     "predict_warn": "warning",
 }
 
-# W4.a — algorithm_source 코드 → 운영자 친화 라벨 (drf-server constants.py 와 동기).
-# fastapi 측 summary 메시지 / 로그 prefix 에 사용. 알람 토스트가 받는 summary 가
-# 이 라벨을 포함 → 운영자가 "IF" / "ARIMA" / "IF+ARIMA" / "야간 가동" 구분 가능.
-_ALGORITHM_SOURCE_LABEL = {
-    "isolation_forest": "IF",
-    "arima": "ARIMA",
-    "combined": "IF+ARIMA",
-    "night_abnormal": "야간 가동",
-    # §F — 5축 정책 엔진 도입 시 추가 (plan §F + STEP 5 키워드 직접 노출).
-    "zscore": "Z-score",
-    "change_point": "급변",
-}
-
 
 def _zscore_check(
     window: deque, value: float, threshold: float = 3.0
@@ -387,13 +374,11 @@ async def process_anomaly_inference(
                     _last_fired_at[sensor_identifier] = now_ts
 
             label = entry_meta.get("name") or f"CH{channel}"
-            # W4.a — algorithm_source 라벨을 summary 에 prefix. 토스트가 즉시
-            # "IF" / "ARIMA" / "IF+ARIMA" / "야간 가동" 출처 구분 표시.
-            algo_label = _ALGORITHM_SOURCE_LABEL.get(algorithm_source, "AI")
-            summary = (
-                f"[{algo_label} 이상 감지] {label} {data_type}={value} "
-                f"(score {score:.4f}, combined={combined})"
-            )
+            # T1+T6: 운영자 친화 포맷. algorithm_source 는 anomaly_meta 로 분리되어
+            # UI 칩으로 시각화 (zscore/급변/IF/ARIMA/IF+ARIMA/야간 가동). 따라서
+            # summary 텍스트는 ML 기술용어 (score, combined) 와 출처 라벨 모두 제거.
+            # 천단위 구분 (Python {:,.1f}) 으로 가독성 ↑.
+            summary = f"{label} 이상 패턴 ({value:,.1f} W)"
             risk_level = _COMBINED_TO_RISK_LEVEL[combined]
 
             # ML forward + push + AlarmRecord forward 를 helper 단일 호출로 캡슐화.

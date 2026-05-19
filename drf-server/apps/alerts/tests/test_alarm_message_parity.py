@@ -46,7 +46,15 @@ from apps.alerts.serializers import AlarmRecordSerializer
                 "power_device_id": 1,
                 "measured_value": 7768.8,
             },
-            "AI 이상 패턴 감지 (7768.8 W)",
+            "이상 패턴 (7,768.8 W)",
+        ),
+        (
+            {
+                "alarm_type": "power_anomaly_ai",
+                "power_device_id": 1,
+                "measured_value": 12.0,
+            },
+            "이상 패턴 (12.0 W)",
         ),
         ({"alarm_type": "geofence_intrusion", "geofence_id": 1}, "위험구역 진입"),
         ({"alarm_type": "sensor_fault"}, "센서 통신 이상"),

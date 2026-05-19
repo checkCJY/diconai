@@ -171,18 +171,24 @@ class AlarmRecord(BaseModel):
             if self.channel is not None and self.power_device is not None:
                 prefix = f"{self.power_device.get_channel_label(self.channel)} "
             if self.alarm_type == "power_anomaly_ai":
-                # algorithm_source 라벨 표시 ("송풍기A IF+ARIMA 이상 감지 ...").
-                # 빈값/NULL 또는 미매핑 코드는 "AI" fallback.
-                from apps.core.constants import ALGORITHM_SOURCE_LABEL
-
-                label = ALGORITHM_SOURCE_LABEL.get(self.algorithm_source or "", "AI")
-                return f"{prefix}{label} 이상 감지 ({self.measured_value} W)"
-            return f"{prefix}전력 임계치 초과 ({self.measured_value} W)"
+                # T1+T6: algorithm_source 는 anomaly_meta 로 분리되어 UI 칩으로 시각화.
+                # 텍스트는 깔끔하게. 천단위 구분으로 가독성 ↑.
+                return f"{prefix}이상 패턴 ({self.measured_value:,.1f} W)"
+            return f"{prefix}전력 임계치 초과 ({self.measured_value:,.1f} W)"
         if self.geofence_id:
             return "위험구역 진입"
         if self.alarm_type == "sensor_fault":
             return "센서 통신 이상"
-        if self.alarm_type in ("gas_clear", "power_clear"):
+        # T1+T6: 정상화 메시지에도 device/gas prefix 포함 → 운영자가 어느 센서가
+        # 복귀했는지 즉시 인지. push payload 의 message 필드 단일 진실 공급원.
+        if self.alarm_type == "power_clear":
+            prefix = ""
+            if self.channel is not None and self.power_device is not None:
+                prefix = f"{self.power_device.get_channel_label(self.channel)} "
+            return f"{prefix}정상 복귀"
+        if self.alarm_type == "gas_clear":
+            if self.gas_type:
+                return f"{self.gas_type.upper()} 정상 복귀"
             return "정상 복귀"
         # 화면 정책 알람 (PPE, VR 교육 등) — choices 한글 라벨 사용.
         return self.get_alarm_type_display()
