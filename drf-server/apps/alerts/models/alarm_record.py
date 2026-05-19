@@ -171,10 +171,16 @@ class AlarmRecord(BaseModel):
             if self.channel is not None and self.power_device is not None:
                 prefix = f"{self.power_device.get_channel_label(self.channel)} "
             if self.alarm_type == "power_anomaly_ai":
-                # T1+T6: algorithm_source 는 anomaly_meta 로 분리되어 UI 칩으로 시각화.
-                # 텍스트는 깔끔하게. 천단위 구분으로 가독성 ↑.
-                return f"{prefix}이상 패턴 ({self.measured_value:,.1f} W)"
-            return f"{prefix}전력 임계치 초과 ({self.measured_value:,.1f} W)"
+                # T1+T6: algorithm_source 별 운영자 친화 워딩. 칩 없이 텍스트로
+                # 알고리즘 본질 구분 (IF=수치, ARIMA=패턴, combined=동시 등).
+                from apps.core.constants import ALGORITHM_SOURCE_PHRASE
+
+                phrase = ALGORITHM_SOURCE_PHRASE.get(
+                    self.algorithm_source or "", "AI 이상 탐지"
+                )
+                return f"{prefix}{phrase} ({self.measured_value:,.1f} W)"
+            # 룰 기반 — ML 동적 탐지와 구분하는 "정적 임계치 초과" 표기.
+            return f"{prefix}정적 임계치 초과 ({self.measured_value:,.1f} W)"
         if self.geofence_id:
             return "위험구역 진입"
         if self.alarm_type == "sensor_fault":

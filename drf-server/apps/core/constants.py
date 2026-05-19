@@ -82,6 +82,26 @@ ALGORITHM_SOURCE_LABEL: dict[str, str] = {
 }
 
 
+# T1+T6 (2026-05-19) — algorithm_source 코드 → 운영자 친화 워딩.
+# 칩·아이콘 없이 텍스트만으로 알고리즘 본질 구분 가능하도록 각 알고리즘 동작을 반영.
+# - IF (Isolation Forest) = 분포 outlier → "이상 수치 탐지"
+# - ARIMA = 시계열 예측 잔차 → "이상 패턴 탐지"
+# - Z-score = sliding window 통계 → "통계 이상 수치"
+# - Change Point = 변화점 검출 → "패턴 변화 탐지"
+# - combined = IF+ARIMA 동시 발화 (최고 신뢰도) → "이상 수치·패턴 동시 탐지"
+# - night_abnormal = 운영 시간 외 baseline 초과 → "야간 이상 가동"
+# 룰 기반 (power_overload) = "정적 임계치 초과" — ML 의 동적 탐지와 구분.
+# fastapi-server/power/services/power_service.py 와 단일 동기화.
+ALGORITHM_SOURCE_PHRASE: dict[str, str] = {
+    "isolation_forest": "이상 수치 탐지",
+    "arima": "이상 패턴 탐지",
+    "combined": "이상 수치·패턴 동시 탐지",
+    "zscore": "통계 이상 수치",
+    "change_point": "패턴 변화 탐지",
+    "night_abnormal": "야간 이상 가동",
+}
+
+
 # AI 추론 위험도 → 룰 측 RiskLevel 매핑.
 # AI 모델은 4단계(normal/caution/predict_warn/danger), 룰은 3단계(normal/warning/danger).
 # Step 3 AI mute 가드에서 "AI 발화 레벨 이상의 룰 fire 를 60s suppress" 로직의 단일

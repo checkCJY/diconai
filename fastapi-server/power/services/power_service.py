@@ -66,6 +66,18 @@ RATE_LIMIT_SEC = 60
 DRF_POWER_EVENT_PATH = "/api/monitoring/power/event/"
 DRF_POWER_DATA_PATH = "/api/monitoring/power/data/"
 
+# T1+T6 (2026-05-19) — algorithm_source 코드 → 운영자 친화 워딩. 칩·아이콘 없이
+# 텍스트만으로 알고리즘 본질 구분 (drf-server constants.py ALGORITHM_SOURCE_PHRASE
+# 와 단일 동기). 본 dict 에 없는 algorithm_source 는 "AI 이상 탐지" fallback.
+_ALGORITHM_SOURCE_PHRASE = {
+    "isolation_forest": "이상 수치 탐지",
+    "arima": "이상 패턴 탐지",
+    "combined": "이상 수치·패턴 동시 탐지",
+    "zscore": "통계 이상 수치",
+    "change_point": "패턴 변화 탐지",
+    "night_abnormal": "야간 이상 가동",
+}
+
 # W3.2 — night_abnormal 시각 분기 (dummy 는 시각 무관 데이터 생성, 추론 측이 판정).
 # measured_at 의 KST hour 가 야간(22~05) + watt 가 야간 baseline 초과 시
 # combined_risk 한 단계 격상. 임계치 = 정격 × NIGHT_THRESHOLD_RATIO (휴리스틱,
@@ -374,11 +386,10 @@ async def process_anomaly_inference(
                     _last_fired_at[sensor_identifier] = now_ts
 
             label = entry_meta.get("name") or f"CH{channel}"
-            # T1+T6: 운영자 친화 포맷. algorithm_source 는 anomaly_meta 로 분리되어
-            # UI 칩으로 시각화 (zscore/급변/IF/ARIMA/IF+ARIMA/야간 가동). 따라서
-            # summary 텍스트는 ML 기술용어 (score, combined) 와 출처 라벨 모두 제거.
-            # 천단위 구분 (Python {:,.1f}) 으로 가독성 ↑.
-            summary = f"{label} 이상 패턴 ({value:,.1f} W)"
+            # T1+T6: algorithm_source 별 운영자 친화 워딩. 칩 없이 텍스트로 알고리즘
+            # 본질 구분 (drf-server constants.py ALGORITHM_SOURCE_PHRASE 와 단일 동기).
+            phrase = _ALGORITHM_SOURCE_PHRASE.get(algorithm_source, "AI 이상 탐지")
+            summary = f"{label} {phrase} ({value:,.1f} W)"
             risk_level = _COMBINED_TO_RISK_LEVEL[combined]
 
             # ML forward + push + AlarmRecord forward 를 helper 단일 호출로 캡슐화.
