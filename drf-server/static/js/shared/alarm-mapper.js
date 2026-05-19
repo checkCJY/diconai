@@ -31,6 +31,9 @@ const AlarmMapper = (function () {
       // 2026-05-15 알람 재설계: RESOLVED 신호 (update_status PATCH 시 박힘).
       // AlarmPopup._handleResolved 가 이 필드를 받으면 같은 event_id 팝업 close + 토스트.
       event_resolved_at: src.event_resolved_at || null,
+      // T3 (2026-05-19) — 다중 관리자 환경에서 EventAck 한 사용자명 list.
+      // 토스트·모달 본문에 "(N 확인 중)" 시그널 표시. dedup 과 분리 유지 (안전망).
+      event_ack_users: Array.isArray(src.event_ack_users) ? src.event_ack_users : [],
     };
   }
 

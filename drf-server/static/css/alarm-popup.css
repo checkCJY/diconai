@@ -155,6 +155,14 @@
   color: var(--text);
   letter-spacing: 0.2px;
 }
+/* T3 ack 시그널 — "(N 확인 중)" 작은 텍스트로 다중 관리자 코디네이션 시그널 */
+.alarm-popup-desc .msg-ack-signal {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px; font-weight: 500;
+  color: var(--text2);
+  font-style: italic;
+}
 /* 하단 버튼 행 */
 .alarm-popup-btn-row {
   display: flex; gap: 8px;
@@ -275,4 +283,12 @@
 }
 .alarm-toast-stack-msg {
   color: var(--text2, #8b949e); line-height: 1.4; word-break: keep-all;
+}
+/* T3 ack 시그널 — 토스트 본문 아래 "(N 확인 중)" 작은 italic 텍스트.
+   다중 관리자 환경에서 다른 운영자가 처리 중임을 인지 (dedup 과 별개 시그널). */
+.alarm-toast-stack-ack {
+  margin-top: 4px;
+  font-size: 11px; font-weight: 500;
+  color: var(--text2, #8b949e);
+  font-style: italic;
 }

@@ -52,9 +52,10 @@ const _AckStore = {
 };
 
 // ── 2026-05-17 D 옵션 — 60s 클라이언트 dedup ─────────────────
-// 같은 (alarm_type, source, level) 알람이 60s 안 재발생 시 팝업 skip.
+// 같은 (alarm_type, source, level) 알람이 60s 안 재발생 시 팝업 skip (operator UX).
 // 백엔드 ALARM_REPOPUP_COOLDOWN_SEC (기본 60s) 와 일치 — 백엔드가 60s 후
 // 재푸시한 시점에 클라 TTL 만료라 자연 재발화 (차단형 정책 자동 충족).
+// T3 (2026-05-19): 30s 하향 검토 후 60s 유지 결정 — "폭주 회피" 우선.
 // _AckStore 와 같은 패턴 — localStorage 영속화 + JSON 직렬화 + TTL + silent fail.
 const _DEDUP_STORE_KEY = 'diconai:alarm:popup:dedup';
 const _DEDUP_TTL_MS    = 60_000;
@@ -111,6 +112,16 @@ function _popupDedupKey(data) {
   const eventId = data.event_id || data.id;
   if (eventId != null) return `event:${eventId}`;
   return `${data.alarm_type || 'unknown'}:${data.sensor_name || data.source_label || ''}:${data.alarm_level || ''}`;
+}
+
+// T3 (2026-05-19) — 다중 관리자 환경 ack 시그널 텍스트 생성.
+// 백엔드 push_payload.event_ack_users 가 비어있으면 빈 문자열 (시그널 미표시).
+// 1명: "(홍길동 확인 중)" / 2명: "(홍길동, 김민수 확인 중)" / 3명+: "(홍길동 외 N명 확인 중)"
+function _formatAckSignal(ackUsers) {
+  if (!Array.isArray(ackUsers) || ackUsers.length === 0) return '';
+  if (ackUsers.length === 1) return `(${ackUsers[0]} 확인 중)`;
+  if (ackUsers.length === 2) return `(${ackUsers[0]}, ${ackUsers[1]} 확인 중)`;
+  return `(${ackUsers[0]} 외 ${ackUsers.length - 1}명 확인 중)`;
 }
 
 // 마지막 수신 알람 시각 (unix sec). WS 끊김 후 재연결·페이지 새로고침 시
@@ -221,7 +232,17 @@ const AlarmToastStack = {
     msgEl.className = 'alarm-toast-stack-msg';
     msgEl.textContent = msg;
 
+    // T3 — 다중 관리자 환경 ack 시그널. 0명이면 미렌더 (단일 운영자 환경 영향 0).
+    const ackText = _formatAckSignal(data.event_ack_users);
+    let ackEl = null;
+    if (ackText) {
+      ackEl = document.createElement('div');
+      ackEl.className = 'alarm-toast-stack-ack';
+      ackEl.textContent = ackText;
+    }
+
     item.append(header, sensorEl, msgEl);
+    if (ackEl) item.append(ackEl);
     // 토스트 클릭 — 격상 즉시 트리거 (사용자가 본 것으로 인지)
     item.addEventListener('click', (ev) => {
       if (ev.target === closeBtn) return;
@@ -484,6 +505,14 @@ const AlarmPopup = {
         thrEl.className = 'msg-threshold';
         thrEl.textContent = `위험 기준 ${data.threshold_value} 초과 (측정 ${data.measured_value})`;
         msgEl.appendChild(thrEl);
+      }
+      // T3 — 다중 관리자 환경 ack 시그널 (모달도 토스트와 동일 패턴).
+      const ackText = _formatAckSignal(data.event_ack_users);
+      if (ackText) {
+        const ackEl = document.createElement('span');
+        ackEl.className = 'msg-ack-signal';
+        ackEl.textContent = ackText;
+        msgEl.appendChild(ackEl);
       }
     }
 

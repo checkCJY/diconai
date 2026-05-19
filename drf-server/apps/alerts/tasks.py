@@ -48,6 +48,26 @@ _GAS_NAME = {
 }
 
 
+def _get_event_ack_names(event_id: int | None) -> list[str]:
+    """T3 (2026-05-19) — 활성 Event 의 EventAck 사용자명 list.
+
+    push_payload 의 `event_ack_users` 필드용. 다중 관리자 환경에서 운영자 A 가
+    이미 "확인 완료" 클릭한 알람이 재발화 시 다른 운영자 B 의 토스트에
+    "(A 확인 중)" 시그널 표시. ack 와 dedup 은 분리 유지 (안전망) + 시그널만 보강.
+
+    Returns: [user.name, ...] 빈 list 면 시그널 미표시.
+    """
+    if not event_id:
+        return []
+    from apps.alerts.models import EventAcknowledgement
+
+    return list(
+        EventAcknowledgement.objects.filter(event_id=event_id)
+        .select_related("user")
+        .values_list("user__name", flat=True)
+    )
+
+
 def _push_to_ws(alarm_data: dict, *, raise_on_failure: bool = True) -> None:
     """FastAPI WebSocket 브로드캐스트 큐에 알람을 추가한다.
 
@@ -169,6 +189,9 @@ def fire_danger_alarm_task(
                     "source_label": source_label,
                     "summary": summary,
                     "message": alarm.get_short_message(),
+                    # T3 (2026-05-19) — 활성 Event 의 EventAck 사용자명 list.
+                    # 다중 관리자 환경에서 토스트에 "(N 확인 중)" 시그널 표시용.
+                    "event_ack_users": _get_event_ack_names(event.id),
                     "is_new_event": alarm is not None,
                     "ingress_ts": ingress_ts,
                 }
@@ -242,6 +265,9 @@ def fire_warning_alarm_task(
                     "source_label": source_label,
                     "summary": summary,
                     "message": alarm.get_short_message(),
+                    # T3 (2026-05-19) — 활성 Event 의 EventAck 사용자명 list.
+                    # 다중 관리자 환경에서 토스트에 "(N 확인 중)" 시그널 표시용.
+                    "event_ack_users": _get_event_ack_names(event.id),
                     "is_new_event": alarm is not None,
                     "ingress_ts": ingress_ts,
                 }
@@ -309,6 +335,9 @@ def fire_geofence_alarm_task(
                     "source_label": geofence_name,
                     "summary": summary,
                     "message": alarm.get_short_message(),
+                    # T3 (2026-05-19) — 활성 Event 의 EventAck 사용자명 list.
+                    # 다중 관리자 환경에서 토스트에 "(N 확인 중)" 시그널 표시용.
+                    "event_ack_users": _get_event_ack_names(event.id),
                     "is_new_event": alarm is not None,
                     # 2026-05-15 알람 재설계: fastapi alarm_router 가 alarm.worker_id 기반으로
                     # worker_clients 개인 전송 분기. 그동안 payload 누락으로 broadcast 만 되던 버그 픽스.
@@ -417,6 +446,9 @@ def fire_power_danger_task(
                     "source_label": source_label,
                     "summary": summary,
                     "message": alarm.get_short_message(),
+                    # T3 (2026-05-19) — 활성 Event 의 EventAck 사용자명 list.
+                    # 다중 관리자 환경에서 토스트에 "(N 확인 중)" 시그널 표시용.
+                    "event_ack_users": _get_event_ack_names(event.id),
                     "is_new_event": alarm is not None,
                     "ingress_ts": ingress_ts,
                 }
@@ -483,6 +515,9 @@ def fire_power_warning_task(
                     "source_label": source_label,
                     "summary": summary,
                     "message": alarm.get_short_message(),
+                    # T3 (2026-05-19) — 활성 Event 의 EventAck 사용자명 list.
+                    # 다중 관리자 환경에서 토스트에 "(N 확인 중)" 시그널 표시용.
+                    "event_ack_users": _get_event_ack_names(event.id),
                     "is_new_event": alarm is not None,
                     "ingress_ts": ingress_ts,
                 }
