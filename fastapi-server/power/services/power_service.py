@@ -416,6 +416,10 @@ async def process_anomaly_inference(
                         "risk_level": risk_level,
                         "source_label": label,
                         "summary": summary,
+                        # T1+T6: message 단일 진실 공급원 필드 — drf-side tasks.py 의
+                        # _push_to_ws 패턴과 동일. JS AlarmMapper 가 summary fallback
+                        # 없이 message 만 읽도록 (drift 방지).
+                        "message": summary,
                         "is_new_event": True,
                         "measured_value": value,
                         # 룰 기반 알람과 동일 키. alarm_flush_loop 이 E2E latency 측정.

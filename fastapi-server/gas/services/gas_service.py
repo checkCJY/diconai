@@ -20,7 +20,11 @@ from fastapi import HTTPException
 from core.gas_thresholds import calculate_individual_risks
 from gas.schemas.gas import GasDataPayload
 from services.drf_client import DrfClientError, post_to_drf
-from core.metrics import AI_INFERENCE_DURATION, AI_INFERENCE_FAILED_TOTAL, SENSOR_LAST_RECEIVED
+from core.metrics import (
+    AI_INFERENCE_DURATION,
+    AI_INFERENCE_FAILED_TOTAL,
+    SENSOR_LAST_RECEIVED,
+)
 from websocket.state import gas_latest, latest_gas_snapshot
 from collections import (
     deque,
@@ -159,6 +163,9 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
                             "risk_level": "danger",  # 위험도
                             "source_label": "가스센서 AI 이상탐지",  # 화면 표시용 출처 이름
                             "summary": f"가스 이상 감지 (AI) | CO:{payload.co} H2S:{payload.h2s} CO2:{payload.co2}",  # 팝업에 보여줄 요약
+                            # T1+T6: message 단일 진실 공급원 필드 (drf-side tasks.py 패턴).
+                            # 가스 텍스트 내용 변경 X — 인프라 일관성만 (가스 담당자 PR 영역 보호).
+                            "message": f"가스 이상 감지 (AI) | CO:{payload.co} H2S:{payload.h2s} CO2:{payload.co2}",
                             "is_new_event": True,  # 새 이벤트 여부
                             "gas_type": "co",  # 대표 가스 종류
                             "measured_value": payload.co,  # 대표 측정값
