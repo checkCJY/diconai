@@ -1044,7 +1044,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, rate(redis_command_duration_seconds_bucket{job=\"fastapi\"}[5m])) by (command)",
+          "expr": "histogram_quantile(0.95, sum by (le, command) (rate(redis_command_duration_seconds_bucket{job=\"fastapi\"}[5m])))",
           "legendFormat": "{{command}} p95",
           "refId": "A"
         },
@@ -1053,7 +1053,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.99, rate(redis_command_duration_seconds_bucket{job=\"fastapi\"}[5m])) by (command)",
+          "expr": "histogram_quantile(0.99, sum by (le, command) (rate(redis_command_duration_seconds_bucket{job=\"fastapi\"}[5m])))",
           "legendFormat": "{{command}} p99",
           "refId": "B"
         }
