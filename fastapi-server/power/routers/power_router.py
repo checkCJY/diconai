@@ -83,8 +83,10 @@ async def recv_onoff(payload: PowerOnOffPayload, bg: BackgroundTasks):
     responses=_COMMON_RESPONSES,
 )
 async def recv_current(payload: PowerCurrentPayload, bg: BackgroundTasks):
-    # P1 — 센서 마지막 수신 시각 갱신
-    SENSOR_LAST_RECEIVED.labels("power", payload.device_id).set(time.time())
+    # E2E 레이턴시 측정 시작점 — 요청 도착 직후를 기준으로 잡아야 SLO 정확.
+    # bg.add_task 등록 시점에 잡으면 그 사이 동기 작업(update_power_state 등)이 누락된다.
+    ingress_ts = time.time()
+    SENSOR_LAST_RECEIVED.labels("power", payload.device_id).set(ingress_ts)
     channel_values = payload.to_channel_values()
     measured_at = now_utc_iso()
     update_power_state("current", channel_values, measured_at)
@@ -96,7 +98,7 @@ async def recv_current(payload: PowerCurrentPayload, bg: BackgroundTasks):
             "measured_at": measured_at,
             "data_type": "current",
             "channels": to_channel_list(channel_values, payload.to_anomaly_map()),
-            "ingress_ts": time.time(),
+            "ingress_ts": ingress_ts,
         },
     )
     return {"status": "ok", "updated": "current"}
@@ -111,8 +113,9 @@ async def recv_current(payload: PowerCurrentPayload, bg: BackgroundTasks):
     responses=_COMMON_RESPONSES,
 )
 async def recv_voltage(payload: PowerVoltagePayload, bg: BackgroundTasks):
-    # P1 — 센서 마지막 수신 시각 갱신
-    SENSOR_LAST_RECEIVED.labels("power", payload.device_id).set(time.time())
+    # E2E 시작점 — recv_current 와 동일 패턴 (핸들러 첫 줄에서 ingress_ts 캡처).
+    ingress_ts = time.time()
+    SENSOR_LAST_RECEIVED.labels("power", payload.device_id).set(ingress_ts)
     channel_values = payload.to_channel_values()
     measured_at = now_utc_iso()
     update_power_state("voltage", channel_values, measured_at)
@@ -124,7 +127,7 @@ async def recv_voltage(payload: PowerVoltagePayload, bg: BackgroundTasks):
             "measured_at": measured_at,
             "data_type": "voltage",
             "channels": to_channel_list(channel_values, payload.to_anomaly_map()),
-            "ingress_ts": time.time(),
+            "ingress_ts": ingress_ts,
         },
     )
     return {"status": "ok", "updated": "voltage"}
@@ -142,14 +145,17 @@ async def recv_voltage(payload: PowerVoltagePayload, bg: BackgroundTasks):
     responses=_COMMON_RESPONSES,
 )
 async def recv_watt(payload: PowerWattPayload, bg: BackgroundTasks):
-    # P1 — 센서 마지막 수신 시각 갱신
-    SENSOR_LAST_RECEIVED.labels("power", payload.device_id).set(time.time())
+    # E2E 시작점 — process_anomaly_inference(AI 추론) 보다 먼저 잡아야
+    # 추론 소요 시간이 E2E 측정에 정확히 포함된다.
+    ingress_ts = time.time()
+    SENSOR_LAST_RECEIVED.labels("power", payload.device_id).set(ingress_ts)
     channel_values = payload.to_channel_values()
     measured_at = now_utc_iso()
     update_power_state("watt", channel_values, measured_at)
     # 트랙 1 v2 — IF 추론 + push_alarm + DRF MLAnomalyResult forward (ch1·watt)
+    # ingress_ts 전달 — AI 알람도 룰 기반과 동일하게 E2E latency 측정에 포함.
     await process_anomaly_inference(
-        payload.device_id, channel_values, "watt", measured_at
+        payload.device_id, channel_values, "watt", measured_at, ingress_ts=ingress_ts
     )
     bg.add_task(
         post_power_to_drf,
@@ -159,7 +165,7 @@ async def recv_watt(payload: PowerWattPayload, bg: BackgroundTasks):
             "measured_at": measured_at,
             "data_type": "watt",
             "channels": to_channel_list(channel_values, payload.to_anomaly_map()),
-            "ingress_ts": time.time(),
+            "ingress_ts": ingress_ts,
         },
     )
     return {"status": "ok", "updated": "watt"}
