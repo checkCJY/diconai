@@ -12,6 +12,7 @@ import time
 from collections import defaultdict, deque
 from datetime import datetime, timezone
 
+import numpy as np
 from fastapi import HTTPException
 
 from ai.risk_combine import combine_risk_3axis
@@ -86,6 +87,32 @@ _ALGORITHM_SOURCE_LABEL = {
     "combined": "IF+ARIMA",
     "night_abnormal": "야간 가동",
 }
+
+
+def _zscore_check(window: deque, value: float, threshold: float = 3.0) -> bool:
+    """Z-score 기반 이상 판정 (STEP D / plan §D2 — power-zscore-changepoint-apply).
+
+    Sliding Window 의 mean/std 계산 후 |z| >= threshold 면 ANOMALY_WARNING.
+    EPS=1e-9 로 std=0 인 분모 폭발 방지. window 길이가 _INFERENCE_WINDOW 미만이면
+    False (초반 통계 불안정 — STEP 1 의 min_periods 안전장치 패턴).
+
+    Args:
+        window: 최근 N개 값 deque (`_power_windows[(channel,data_type)]`).
+                현재 value 가 이미 append 된 상태로 전달되어도 무방 — pandas rolling
+                패턴과 동일하게 현재값 포함 mean/std 사용 (N=30 에서 1/N 영향 미미).
+        value: 현재 측정값.
+        threshold: Z-score 임계 (기본 3.0 — STEP 1 권고 3σ. 시연 후 튜닝).
+
+    Returns:
+        |z| >= threshold 면 True (5축 정책 엔진의 ANOMALY_WARNING 입력 — §F).
+    """
+    if len(window) < _INFERENCE_WINDOW:
+        return False
+    arr = np.array(window, dtype=float)
+    mean = arr.mean()
+    std = arr.std()
+    z = abs(value - mean) / (std + 1e-9)
+    return bool(z >= threshold)
 
 
 def _is_night_kst_iso(measured_at_iso: str) -> bool:
@@ -193,6 +220,10 @@ async def process_anomaly_inference(
             prediction = "anomaly" if pred_int == -1 else "normal"
             AI_INFERENCE_DURATION.labels("power_if").observe(time.time() - _infer_start)
 
+            # D2 — Z-score 통계 이상 판정 (STEP D / plan §D2). 본 commit 은 산출·
+            # 로깅만, 5축 결합·algorithm_source 반영은 §F 에서 진행 → 발화 영향 0.
+            z_score_anomaly = _zscore_check(win, float(value), threshold=3.0)
+
             # W3.2 ARIMA 분기 — sensor_identifier 단위 매칭. 학습 안 된 채널은
             # IF 단독 fallback (arima_violation=False). 모든 외부 호출 silent fail.
             arima_result: dict | None = None
@@ -269,7 +300,7 @@ async def process_anomaly_inference(
 
             logger.info(
                 "[anomaly_inference] device=%s ch=%s %s value=%s "
-                "threshold=%s pred=%s arima_v=%s combined=%s score=%.4f "
+                "threshold=%s pred=%s arima_v=%s z=%s combined=%s score=%.4f "
                 "arima_fc=%s ci=[%s,%s]",
                 device_id,
                 channel,
@@ -278,6 +309,7 @@ async def process_anomaly_inference(
                 threshold_risk,
                 prediction,
                 arima_violation,
+                z_score_anomaly,
                 combined,
                 score,
                 f"{arima_result['forecast']:.1f}" if arima_result else "n/a",
