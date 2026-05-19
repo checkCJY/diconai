@@ -93,12 +93,14 @@ _ALGORITHM_SOURCE_LABEL = {
 }
 
 
-def _zscore_check(window: deque, value: float, threshold: float = 3.0) -> bool:
+def _zscore_check(
+    window: deque, value: float, threshold: float = 3.0
+) -> tuple[bool, float]:
     """Z-score 기반 이상 판정 (STEP D / plan §D2 — power-zscore-changepoint-apply).
 
     Sliding Window 의 mean/std 계산 후 |z| >= threshold 면 ANOMALY_WARNING.
     EPS=1e-9 로 std=0 인 분모 폭발 방지. window 길이가 _INFERENCE_WINDOW 미만이면
-    False (초반 통계 불안정 — STEP 1 의 min_periods 안전장치 패턴).
+    (False, 0.0) (초반 통계 불안정 — STEP 1 의 min_periods 안전장치 패턴).
 
     Args:
         window: 최근 N개 값 deque (`_power_windows[(channel,data_type)]`).
@@ -108,15 +110,16 @@ def _zscore_check(window: deque, value: float, threshold: float = 3.0) -> bool:
         threshold: Z-score 임계 (기본 3.0 — STEP 1 권고 3σ. 시연 후 튜닝).
 
     Returns:
-        |z| >= threshold 면 True (5축 정책 엔진의 ANOMALY_WARNING 입력 — §F).
+        (is_anomaly, z) — is_anomaly 는 |z| >= threshold, z 는 실제 |z| 값 (로깅용).
+        코드리뷰 2026-05-19 §3.1 — Z-score 발화 시점 가시성 보강.
     """
     if len(window) < _INFERENCE_WINDOW:
-        return False
+        return False, 0.0
     arr = np.array(window, dtype=float)
     mean = arr.mean()
     std = arr.std()
     z = abs(value - mean) / (std + 1e-9)
-    return bool(z >= threshold)
+    return bool(z >= threshold), float(z)
 
 
 def _is_night_kst_iso(measured_at_iso: str) -> bool:
@@ -224,19 +227,26 @@ async def process_anomaly_inference(
             prediction = "anomaly" if pred_int == -1 else "normal"
             AI_INFERENCE_DURATION.labels("power_if").observe(time.time() - _infer_start)
 
-            # D2 — Z-score 통계 이상 판정 (STEP D / plan §D2). 본 commit 은 산출·
-            # 로깅만, 5축 결합·algorithm_source 반영은 §F 에서 진행 → 발화 영향 0.
-            z_score_anomaly = _zscore_check(win, float(value), threshold=3.0)
+            # D2 — Z-score 통계 이상 판정 (STEP D / plan §D2).
+            z_score_anomaly, z_value = _zscore_check(win, float(value), threshold=3.0)
+            if z_score_anomaly:
+                logger.info(
+                    "[zscore] device=%s ch=%s %s value=%s |z|=%.2f >= 3.0",
+                    device_id,
+                    channel,
+                    data_type,
+                    value,
+                    z_value,
+                )
 
             # E1 — Change Point (STEP E / plan §E1). 별도 _cp_windows (maxlen=60)
-            # 채널별 누적 → two-window 비교. STABLE→SHIFT 전이 시점만 True. 본
-            # commit 도 산출·로깅만 (§F 까지 발화 영향 0).
+            # 채널별 누적 → two-window 비교. STABLE→SHIFT 전이 시점만 True.
             change_point, cp_meta = detect_change_point(
                 (channel, data_type), float(value)
             )
             if change_point:
                 logger.info(
-                    "[change_point] device=%s ch=%s %s STABLE→SHIFT "
+                    "[change_point] device=%s ch=%s %s STABLE->SHIFT "
                     "mean_shift=%.2f std_ratio=%.2f",
                     device_id,
                     channel,
@@ -266,7 +276,9 @@ async def process_anomaly_inference(
             threshold_risk = calculate_power_risk(value, data_type, device_id, channel)
             # §F — 5축 우선순위 엔진. base = 3축 매트릭스 (W3 회귀 보존) +
             # Z-score / CP 는 base=normal 일 때만 predict_warn 으로 격상.
-            combined = combine_risk_5axis(
+            # escalation_source = "zscore" | "change_point" | "" — algorithm_source
+            # 결정 시 "z/cp 가 실제 격상에 기여" 판정 근거 (코드리뷰 §2.1 보강).
+            combined, escalation_source = combine_risk_5axis(
                 threshold_risk,
                 prediction,
                 arima_violation,
@@ -301,18 +313,19 @@ async def process_anomaly_inference(
                         night_escalated = True
 
             # W4.a + §F algorithm_source — AlarmRecord.algorithm_source 저장.
-            # 신규 priority (plan §F): night > combined > change_point > arima >
-            # zscore > IF > 빈값. should_fire=False 면 미사용이지만 ML forward
-            # 페이로드엔 동행.
+            # priority: night > combined > change_point* > arima > zscore* > IF.
+            # *) z/cp 는 escalation_source 가 일치할 때만 라벨로 채택 — base 가 이미
+            #    발화 등급인데 z/cp 발생한 케이스에서 라벨이 driver 와 어긋나는 문제
+            #    방지 (코드리뷰 2026-05-19 §2.1 보강).
             if night_escalated:
                 algorithm_source = "night_abnormal"
             elif prediction == "anomaly" and arima_violation:
                 algorithm_source = "combined"
-            elif change_point:
+            elif escalation_source == "change_point":
                 algorithm_source = "change_point"
             elif arima_violation:
                 algorithm_source = "arima"
-            elif z_score_anomaly:
+            elif escalation_source == "zscore":
                 algorithm_source = "zscore"
             elif prediction == "anomaly":
                 algorithm_source = "isolation_forest"

@@ -11,19 +11,20 @@ import pytest
 
 from power.services.change_point_service import (
     _cp_states,
-    _cp_windows,
     detect_change_point,
+    reset_state,
 )
 
 
 @pytest.fixture(autouse=True)
 def _reset_state():
-    """모듈 단위 dict 가 테스트 간 누적되지 않도록 매 테스트 시작 시 비움."""
-    _cp_windows.clear()
-    _cp_states.clear()
+    """모듈 단위 dict 가 테스트 간 누적되지 않도록 매 테스트 시작/종료 시 비움.
+
+    public reset_state() 헬퍼 사용 — 코드리뷰 §3.3 (테스트 격리 책임 분산 방지).
+    """
+    reset_state()
     yield
-    _cp_windows.clear()
-    _cp_states.clear()
+    reset_state()
 
 
 KEY = (1, "watt")

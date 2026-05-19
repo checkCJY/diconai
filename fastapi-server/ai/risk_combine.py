@@ -123,7 +123,7 @@ def combine_risk_5axis(
     arima_violation: bool,
     z_score_anomaly: bool,
     change_point: bool,
-) -> str:
+) -> tuple[str, str]:
     """5축 결합 — STEP 5 우선순위 매트릭스 (CRITICAL > ML_ANOMALY >
     ANOMALY_WARNING > TREND_SHIFT > PREDICTIVE_ALERT > NORMAL).
 
@@ -144,11 +144,20 @@ def combine_risk_5axis(
         change_point: STEP E STABLE→SHIFT 전이 (추세 변화 시점)
 
     Returns:
-        "normal" | "caution" | "predict_warn" | "warning" | "danger"
+        (combined, escalation_source) 튜플.
+        - combined: "normal" | "caution" | "predict_warn" | "warning" | "danger"
+        - escalation_source: "" | "zscore" | "change_point"
+          base 가 normal 일 때 z/cp 가 격상에 기여했으면 그 라벨, 아니면 "".
+          caller (algorithm_source 결정 흐름) 가 "z/cp 가 실제 risk 격상에 기여했나"
+          판단에 사용 — base 가 이미 발화 등급이면 z/cp 무시되므로 escalation_source=""
+          반환 → 라벨 의미론 일관성 (코드리뷰 2026-05-19 §2.1 보강).
+        - z/cp 둘 다 True 면 change_point 우선 (algorithm_source priority 매핑).
     """
     base = combine_risk_3axis(threshold_risk, if_prediction, arima_violation)
     if base != "normal":
-        return base
-    if z_score_anomaly or change_point:
-        return "predict_warn"
-    return "normal"
+        return base, ""
+    if change_point:
+        return "predict_warn", "change_point"
+    if z_score_anomaly:
+        return "predict_warn", "zscore"
+    return "normal", ""

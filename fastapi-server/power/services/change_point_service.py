@@ -86,3 +86,19 @@ def detect_change_point(key: tuple[int, str], value: float) -> tuple[bool, dict]
         "std_ratio": std_ratio,
         "state": _cp_states[key],
     }
+
+
+def reset_state(key: tuple[int, str] | None = None) -> None:
+    """채널 단위 또는 전체 CP 상태 초기화 — 주로 테스트 격리용 (코드리뷰 §3.3).
+
+    운영 코드는 사용 X — fastapi 재시작 시 모듈 단위 dict 가 자연 초기화 됨.
+
+    Args:
+        key: (channel, data_type) — 특정 채널만 초기화. None 이면 전체.
+    """
+    if key is None:
+        _cp_windows.clear()
+        _cp_states.clear()
+    else:
+        _cp_windows.pop(key, None)
+        _cp_states.pop(key, None)
