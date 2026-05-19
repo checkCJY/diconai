@@ -12,9 +12,10 @@ import time
 from collections import defaultdict, deque
 from datetime import datetime, timezone
 
+import numpy as np
 from fastapi import HTTPException
 
-from ai.risk_combine import combine_risk_3axis
+from ai.risk_combine import combine_risk_5axis
 from ai.router import (
     _arima_forecast,
     _build_feature_row,
@@ -22,6 +23,7 @@ from ai.router import (
     _get_or_load_arima,
 )
 from core.power_thresholds import POWER_THRESHOLDS
+from power.services.change_point_service import detect_change_point
 from power.services.channel_meta_cache import get_channel_entry
 from power.services.quality_guard import classify_sensor_status, is_inference_stuck
 from power.services.threshold_eval import calculate_power_risk
@@ -85,7 +87,39 @@ _ALGORITHM_SOURCE_LABEL = {
     "arima": "ARIMA",
     "combined": "IF+ARIMA",
     "night_abnormal": "야간 가동",
+    # §F — 5축 정책 엔진 도입 시 추가 (plan §F + STEP 5 키워드 직접 노출).
+    "zscore": "Z-score",
+    "change_point": "급변",
 }
+
+
+def _zscore_check(
+    window: deque, value: float, threshold: float = 3.0
+) -> tuple[bool, float]:
+    """Z-score 기반 이상 판정 (STEP D / plan §D2 — power-zscore-changepoint-apply).
+
+    Sliding Window 의 mean/std 계산 후 |z| >= threshold 면 ANOMALY_WARNING.
+    EPS=1e-9 로 std=0 인 분모 폭발 방지. window 길이가 _INFERENCE_WINDOW 미만이면
+    (False, 0.0) (초반 통계 불안정 — STEP 1 의 min_periods 안전장치 패턴).
+
+    Args:
+        window: 최근 N개 값 deque (`_power_windows[(channel,data_type)]`).
+                현재 value 가 이미 append 된 상태로 전달되어도 무방 — pandas rolling
+                패턴과 동일하게 현재값 포함 mean/std 사용 (N=30 에서 1/N 영향 미미).
+        value: 현재 측정값.
+        threshold: Z-score 임계 (기본 3.0 — STEP 1 권고 3σ. 시연 후 튜닝).
+
+    Returns:
+        (is_anomaly, z) — is_anomaly 는 |z| >= threshold, z 는 실제 |z| 값 (로깅용).
+        코드리뷰 2026-05-19 §3.1 — Z-score 발화 시점 가시성 보강.
+    """
+    if len(window) < _INFERENCE_WINDOW:
+        return False, 0.0
+    arr = np.array(window, dtype=float)
+    mean = arr.mean()
+    std = arr.std()
+    z = abs(value - mean) / (std + 1e-9)
+    return bool(z >= threshold), float(z)
 
 
 def _is_night_kst_iso(measured_at_iso: str) -> bool:
@@ -193,6 +227,34 @@ async def process_anomaly_inference(
             prediction = "anomaly" if pred_int == -1 else "normal"
             AI_INFERENCE_DURATION.labels("power_if").observe(time.time() - _infer_start)
 
+            # D2 — Z-score 통계 이상 판정 (STEP D / plan §D2).
+            z_score_anomaly, z_value = _zscore_check(win, float(value), threshold=3.0)
+            if z_score_anomaly:
+                logger.info(
+                    "[zscore] device=%s ch=%s %s value=%s |z|=%.2f >= 3.0",
+                    device_id,
+                    channel,
+                    data_type,
+                    value,
+                    z_value,
+                )
+
+            # E1 — Change Point (STEP E / plan §E1). 별도 _cp_windows (maxlen=60)
+            # 채널별 누적 → two-window 비교. STABLE→SHIFT 전이 시점만 True.
+            change_point, cp_meta = detect_change_point(
+                (channel, data_type), float(value)
+            )
+            if change_point:
+                logger.info(
+                    "[change_point] device=%s ch=%s %s STABLE->SHIFT "
+                    "mean_shift=%.2f std_ratio=%.2f",
+                    device_id,
+                    channel,
+                    data_type,
+                    cp_meta["mean_shift"],
+                    cp_meta["std_ratio"],
+                )
+
             # W3.2 ARIMA 분기 — sensor_identifier 단위 매칭. 학습 안 된 채널은
             # IF 단독 fallback (arima_violation=False). 모든 외부 호출 silent fail.
             arima_result: dict | None = None
@@ -212,7 +274,17 @@ async def process_anomaly_inference(
                 )
 
             threshold_risk = calculate_power_risk(value, data_type, device_id, channel)
-            combined = combine_risk_3axis(threshold_risk, prediction, arima_violation)
+            # §F — 5축 우선순위 엔진. base = 3축 매트릭스 (W3 회귀 보존) +
+            # Z-score / CP 는 base=normal 일 때만 predict_warn 으로 격상.
+            # escalation_source = "zscore" | "change_point" | "" — algorithm_source
+            # 결정 시 "z/cp 가 실제 격상에 기여" 판정 근거 (코드리뷰 §2.1 보강).
+            combined, escalation_source = combine_risk_5axis(
+                threshold_risk,
+                prediction,
+                arima_violation,
+                z_score_anomaly,
+                change_point,
+            )
 
             # W3.2 night_abnormal 시각 분기 — dummy 는 시각 무관 데이터 생성,
             # 추론 측이 measured_at hour KST 야간 + watt > 정격 30% 검사해 격상.
@@ -240,16 +312,21 @@ async def process_anomaly_inference(
                         combined = escalated
                         night_escalated = True
 
-            # W4.a algorithm_source — AlarmRecord.algorithm_source 저장 (plan §8).
-            # 우선순위: night_abnormal > combined > arima > isolation_forest > 빈값.
-            # should_fire=False (combined=normal/caution 중 일부) 면 alarm forward
-            # skip 이라 algorithm_source 미사용이지만 ML forward 페이로드엔 동행.
+            # W4.a + §F algorithm_source — AlarmRecord.algorithm_source 저장.
+            # priority: night > combined > change_point* > arima > zscore* > IF.
+            # *) z/cp 는 escalation_source 가 일치할 때만 라벨로 채택 — base 가 이미
+            #    발화 등급인데 z/cp 발생한 케이스에서 라벨이 driver 와 어긋나는 문제
+            #    방지 (코드리뷰 2026-05-19 §2.1 보강).
             if night_escalated:
                 algorithm_source = "night_abnormal"
             elif prediction == "anomaly" and arima_violation:
                 algorithm_source = "combined"
+            elif escalation_source == "change_point":
+                algorithm_source = "change_point"
             elif arima_violation:
                 algorithm_source = "arima"
+            elif escalation_source == "zscore":
+                algorithm_source = "zscore"
             elif prediction == "anomaly":
                 algorithm_source = "isolation_forest"
             else:
@@ -269,8 +346,8 @@ async def process_anomaly_inference(
 
             logger.info(
                 "[anomaly_inference] device=%s ch=%s %s value=%s "
-                "threshold=%s pred=%s arima_v=%s combined=%s score=%.4f "
-                "arima_fc=%s ci=[%s,%s]",
+                "threshold=%s pred=%s arima_v=%s z=%s cp=%s combined=%s "
+                "score=%.4f arima_fc=%s ci=[%s,%s]",
                 device_id,
                 channel,
                 data_type,
@@ -278,6 +355,8 @@ async def process_anomaly_inference(
                 threshold_risk,
                 prediction,
                 arima_violation,
+                z_score_anomaly,
+                change_point,
                 combined,
                 score,
                 f"{arima_result['forecast']:.1f}" if arima_result else "n/a",
@@ -368,6 +447,17 @@ async def process_anomaly_inference(
                                 [arima_result["ci_lower"], arima_result["ci_upper"]]
                                 if arima_result
                                 else None
+                            ),
+                            # §F — 5축 정책 엔진 입력 4·5축 동행. UI 가 출처 칩
+                            # 외에 어떤 축이 발화했는지 디테일 표시 가능 (예:
+                            # "급변 감지 mean_shift=4.2 std_ratio=1.1").
+                            "z_score_anomaly": z_score_anomaly,
+                            "change_point": change_point,
+                            "cp_mean_shift": (
+                                cp_meta.get("mean_shift") if change_point else None
+                            ),
+                            "cp_std_ratio": (
+                                cp_meta.get("std_ratio") if change_point else None
                             ),
                         },
                     },

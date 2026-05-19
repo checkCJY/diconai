@@ -2,11 +2,14 @@
 
 W3.1 (un-downgrade plan §7) — 3축 매트릭스 combine_risk_3axis 추가. /review
 Critical #2 의 회귀 가드: 매트릭스 12 cell + 두 AI 동의 시 격상 의도 보호.
+
+§F (plan power-zscore-changepoint-apply §F) — 5축 우선순위 함수
+combine_risk_5axis 추가. base=combine_risk_3axis 위임으로 3축 회귀 보존.
 """
 
 import pytest
 
-from ai.risk_combine import combine_risk, combine_risk_3axis
+from ai.risk_combine import combine_risk, combine_risk_3axis, combine_risk_5axis
 
 
 @pytest.mark.parametrize(
@@ -104,3 +107,97 @@ def test_combine_risk_3axis_unknown_combination_raises():
         combine_risk_3axis("invalid_level", "normal", False)
     with pytest.raises(ValueError, match="Unknown 3axis combination"):
         combine_risk_3axis("normal", "invalid_pred", False)
+
+
+# ---------------------------------------------------------------------------
+# §F — combine_risk_5axis 는 (combined, escalation_source) 튜플 반환.
+# escalation_source = "zscore" | "change_point" | "" — base=normal 일 때 z/cp
+# 가 실제 격상에 기여하면 라벨, 아니면 "" (caller 의 algorithm_source 결정
+# 흐름이 사용). 코드리뷰 2026-05-19 §2.1 보강.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "threshold,if_pred,arima,z,cp,expected_combined,expected_source",
+    [
+        # 회귀 — 5축 모두 False 면 3축 결과 + source=""
+        ("normal", "normal", False, False, False, "normal", ""),
+        ("warning", "normal", False, False, False, "caution", ""),
+        ("danger", "normal", False, False, False, "danger", ""),
+        # base=normal + Z-score → predict_warn + source=zscore
+        ("normal", "normal", False, True, False, "predict_warn", "zscore"),
+        # base=normal + CP → predict_warn + source=change_point
+        ("normal", "normal", False, False, True, "predict_warn", "change_point"),
+        # base=normal + 둘 다 → predict_warn + source=change_point (CP 우선)
+        ("normal", "normal", False, True, True, "predict_warn", "change_point"),
+        # base=caution + Z-score → caution 유지 + source="" (z 격상 기여 X)
+        ("warning", "normal", False, True, False, "caution", ""),
+        ("warning", "normal", False, False, True, "caution", ""),
+        # base=danger + 모든 5축 → danger + source="" (z/cp 격상 기여 X)
+        ("danger", "anomaly", True, True, True, "danger", ""),
+        # 두 AI 동의 격상 (base=warning) + Z-score → warning + source=""
+        ("normal", "anomaly", True, True, False, "warning", ""),
+        # IF 단독 격상 (base=predict_warn) + CP → predict_warn + source=""
+        ("normal", "anomaly", False, False, True, "predict_warn", ""),
+        # ARIMA 단독 (base=predict_warn) + Z-score → predict_warn + source=""
+        ("normal", "normal", True, True, False, "predict_warn", ""),
+    ],
+)
+def test_combine_risk_5axis_priority_matrix(
+    threshold, if_pred, arima, z, cp, expected_combined, expected_source
+):
+    combined, source = combine_risk_5axis(threshold, if_pred, arima, z, cp)
+    assert combined == expected_combined
+    assert source == expected_source
+
+
+def test_combine_risk_5axis_preserves_3axis_regression():
+    """base 인 combine_risk_3axis 결과를 그대로 반환 (회귀 가드).
+
+    Z-score / CP 5축 입력이 둘 다 False 일 때 5축 결과 == 3축 + source="".
+    """
+    for t in ("normal", "warning", "danger"):
+        for p in ("normal", "anomaly"):
+            for a in (True, False):
+                expected = combine_risk_3axis(t, p, a)
+                actual, source = combine_risk_5axis(t, p, a, False, False)
+                assert (
+                    actual == expected
+                ), f"5축 회귀 깨짐: ({t}, {p}, {a}) 3축={expected} 5축={actual}"
+                assert (
+                    source == ""
+                ), f"z/cp=False 일 때 source 는 빈 문자열이어야 함: {source!r}"
+
+
+def test_combine_risk_5axis_zscore_only_escalates_base_normal():
+    """Z-score 격상은 base=normal 일 때만 — 다른 base 면 무시 (우선순위 매핑)."""
+    combined, source = combine_risk_5axis("normal", "normal", False, True, False)
+    assert combined == "predict_warn"
+    assert source == "zscore"
+    # base=caution (warning + IF normal) → caution 유지 + source="" (z 기여 X)
+    combined, source = combine_risk_5axis("warning", "normal", False, True, False)
+    assert combined == "caution"
+    assert source == ""
+
+
+def test_combine_risk_5axis_cp_only_escalates_base_normal():
+    """CP 격상도 같은 우선순위 — base=normal 일 때만 predict_warn + source=cp."""
+    combined, source = combine_risk_5axis("normal", "normal", False, False, True)
+    assert combined == "predict_warn"
+    assert source == "change_point"
+    combined, source = combine_risk_5axis("danger", "normal", False, False, True)
+    assert combined == "danger"
+    assert source == ""  # base=danger 면 cp 격상 기여 X
+
+
+def test_combine_risk_5axis_zcp_both_true_prefers_change_point():
+    """z + cp 둘 다 True 면 source=change_point (CP 우선 — algorithm_source priority 일치)."""
+    combined, source = combine_risk_5axis("normal", "normal", False, True, True)
+    assert combined == "predict_warn"
+    assert source == "change_point"
+
+
+def test_combine_risk_5axis_3axis_unknown_bubbles_up():
+    """잘못된 input → base 호출에서 ValueError 그대로 bubble up (fail-fast)."""
+    with pytest.raises(ValueError, match="Unknown 3axis combination"):
+        combine_risk_5axis("invalid_level", "normal", False, False, False)

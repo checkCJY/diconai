@@ -396,7 +396,9 @@ async def predict(req: PredictRequest) -> PredictResponse:
     # _get_or_load가 None을 반환하면 모델 미등록 상태 — API 호출자에게 404 반환.
     # 내부 서비스(gas_service, power_service)는 None 체크 후 model_not_loaded 메트릭 기록.
     if entry is None:
-        raise HTTPException(status_code=404, detail=f"active 모델 없음 (sensor_type={req.sensor_type})")
+        raise HTTPException(
+            status_code=404, detail=f"active 모델 없음 (sensor_type={req.sensor_type})"
+        )
     row = _build_feature_row(req.window_values, entry.window)
 
     score = float(entry.model.decision_function(row)[0])

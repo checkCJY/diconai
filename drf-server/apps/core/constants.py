@@ -75,6 +75,10 @@ ALGORITHM_SOURCE_LABEL: dict[str, str] = {
     "arima": "ARIMA",
     "combined": "IF+ARIMA",
     "night_abnormal": "야간 가동",
+    # §F — 5축 정책 엔진 도입 (plan power-zscore-changepoint-apply §F).
+    # STEP 5 키워드 직접 노출 — fastapi 측 _ALGORITHM_SOURCE_LABEL 와 단일 동기화.
+    "zscore": "Z-score",
+    "change_point": "급변",
 }
 
 
