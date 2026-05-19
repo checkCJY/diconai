@@ -2,11 +2,14 @@
 
 W3.1 (un-downgrade plan §7) — 3축 매트릭스 combine_risk_3axis 추가. /review
 Critical #2 의 회귀 가드: 매트릭스 12 cell + 두 AI 동의 시 격상 의도 보호.
+
+§F (plan power-zscore-changepoint-apply §F) — 5축 우선순위 함수
+combine_risk_5axis 추가. base=combine_risk_3axis 위임으로 3축 회귀 보존.
 """
 
 import pytest
 
-from ai.risk_combine import combine_risk, combine_risk_3axis
+from ai.risk_combine import combine_risk, combine_risk_3axis, combine_risk_5axis
 
 
 @pytest.mark.parametrize(
@@ -104,3 +107,75 @@ def test_combine_risk_3axis_unknown_combination_raises():
         combine_risk_3axis("invalid_level", "normal", False)
     with pytest.raises(ValueError, match="Unknown 3axis combination"):
         combine_risk_3axis("normal", "invalid_pred", False)
+
+
+# ---------------------------------------------------------------------------
+# §F — combine_risk_5axis (5축 우선순위 함수). STEP 5 우선순위 매트릭스 매핑.
+# base = combine_risk_3axis 으로 위임 → 3축 회귀 보존 + Z-score / CP 는 base=
+# normal 일 때만 predict_warn 으로 격상.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "threshold,if_pred,arima,z,cp,expected",
+    [
+        # 회귀 — 5축 모두 False 면 3축 결과 그대로
+        ("normal", "normal", False, False, False, "normal"),
+        ("warning", "normal", False, False, False, "caution"),
+        ("danger", "normal", False, False, False, "danger"),
+        # base=normal + Z-score → predict_warn (ANOMALY_WARNING)
+        ("normal", "normal", False, True, False, "predict_warn"),
+        # base=normal + CP → predict_warn (TREND_SHIFT)
+        ("normal", "normal", False, False, True, "predict_warn"),
+        # base=normal + 둘 다 → predict_warn (같은 등급, 중복 격상 X)
+        ("normal", "normal", False, True, True, "predict_warn"),
+        # base=caution + Z-score → caution 유지 (base != normal → Z-score 무시)
+        ("warning", "normal", False, True, False, "caution"),
+        ("warning", "normal", False, False, True, "caution"),
+        # base=danger + 모든 5축 → danger (CRITICAL 최상위)
+        ("danger", "anomaly", True, True, True, "danger"),
+        # 두 AI 동의 격상 (base=warning) + Z-score → warning 유지
+        ("normal", "anomaly", True, True, False, "warning"),
+        # IF 단독 격상 (base=predict_warn) + CP → predict_warn 유지
+        ("normal", "anomaly", False, False, True, "predict_warn"),
+        # ARIMA 단독 (base=predict_warn) + Z-score → predict_warn 유지
+        ("normal", "normal", True, True, False, "predict_warn"),
+    ],
+)
+def test_combine_risk_5axis_priority_matrix(threshold, if_pred, arima, z, cp, expected):
+    assert combine_risk_5axis(threshold, if_pred, arima, z, cp) == expected
+
+
+def test_combine_risk_5axis_preserves_3axis_regression():
+    """base 인 combine_risk_3axis 결과를 그대로 반환 (회귀 가드).
+
+    Z-score / CP 5축 입력이 둘 다 False 일 때 5축 결과 == 3축 결과.
+    """
+    for t in ("normal", "warning", "danger"):
+        for p in ("normal", "anomaly"):
+            for a in (True, False):
+                expected = combine_risk_3axis(t, p, a)
+                actual = combine_risk_5axis(t, p, a, False, False)
+                assert (
+                    actual == expected
+                ), f"5축 회귀 깨짐: ({t}, {p}, {a}) 3축={expected} 5축={actual}"
+
+
+def test_combine_risk_5axis_zscore_only_escalates_base_normal():
+    """Z-score 격상은 base=normal 일 때만 — 다른 base 면 무시 (우선순위 매핑)."""
+    # base=normal → predict_warn 으로 격상
+    assert combine_risk_5axis("normal", "normal", False, True, False) == "predict_warn"
+    # base=caution (warning + IF normal) → caution 유지
+    assert combine_risk_5axis("warning", "normal", False, True, False) == "caution"
+
+
+def test_combine_risk_5axis_cp_only_escalates_base_normal():
+    """CP 격상도 같은 우선순위 — base=normal 일 때만 predict_warn."""
+    assert combine_risk_5axis("normal", "normal", False, False, True) == "predict_warn"
+    assert combine_risk_5axis("danger", "normal", False, False, True) == "danger"
+
+
+def test_combine_risk_5axis_3axis_unknown_bubbles_up():
+    """잘못된 input → base 호출에서 ValueError 그대로 bubble up (fail-fast)."""
+    with pytest.raises(ValueError, match="Unknown 3axis combination"):
+        combine_risk_5axis("invalid_level", "normal", False, False, False)

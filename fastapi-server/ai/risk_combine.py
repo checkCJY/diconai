@@ -103,3 +103,52 @@ def combine_risk_3axis(
             f"if_prediction={if_prediction!r}, arima_violation={arima_violation!r}"
         )
     return _MATRIX_3AXIS[key]
+
+
+# ---------------------------------------------------------------------------
+# §F — 5축 우선순위 함수 (skill/plan/power-zscore-changepoint-apply.md §F).
+# STEP 5 우선순위 매트릭스 직접 매핑 — 48-cell dict 회피.
+#
+# [설계 결정 — 2026-05-19, plan §1]
+# base = combine_risk_3axis (W3 매트릭스 12-cell 회귀 보존) 으로 threshold ×
+# IF × ARIMA 부분은 그대로 사용. Z-score / CP 는 base 가 "normal" 일 때만
+# "predict_warn" 으로 격상 (조기 경고 신호). base 가 이미 caution/predict_warn/
+# warning/danger 면 ML/threshold 우선 → Z-score / CP 무시 (STEP 5 우선순위 일치).
+# ---------------------------------------------------------------------------
+
+
+def combine_risk_5axis(
+    threshold_risk: str,
+    if_prediction: str,
+    arima_violation: bool,
+    z_score_anomaly: bool,
+    change_point: bool,
+) -> str:
+    """5축 결합 — STEP 5 우선순위 매트릭스 (CRITICAL > ML_ANOMALY >
+    ANOMALY_WARNING > TREND_SHIFT > PREDICTIVE_ALERT > NORMAL).
+
+    [매핑]
+    - threshold danger          → base="danger"      (CRITICAL)
+    - IF anomaly + ARIMA viol   → base 격상           (ML_ANOMALY 강함)
+    - IF anomaly 단독           → base               (ML_ANOMALY)
+    - ARIMA viol 단독           → base               (PREDICTIVE_ALERT)
+    - Z-score True              → "predict_warn"     (ANOMALY_WARNING, base=normal 일 때)
+    - CP True                   → "predict_warn"     (TREND_SHIFT, base=normal 일 때)
+    - 모두 False                → "normal"           (NORMAL)
+
+    Args:
+        threshold_risk: "normal" | "warning" | "danger"
+        if_prediction: "normal" | "anomaly"
+        arima_violation: ARIMA 95% CI 위반 여부
+        z_score_anomaly: STEP D Z-score |z| >= threshold (조기 경고)
+        change_point: STEP E STABLE→SHIFT 전이 (추세 변화 시점)
+
+    Returns:
+        "normal" | "caution" | "predict_warn" | "warning" | "danger"
+    """
+    base = combine_risk_3axis(threshold_risk, if_prediction, arima_violation)
+    if base != "normal":
+        return base
+    if z_score_anomaly or change_point:
+        return "predict_warn"
+    return "normal"

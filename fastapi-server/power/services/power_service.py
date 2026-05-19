@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 import numpy as np
 from fastapi import HTTPException
 
-from ai.risk_combine import combine_risk_3axis
+from ai.risk_combine import combine_risk_5axis
 from ai.router import (
     _arima_forecast,
     _build_feature_row,
@@ -87,6 +87,9 @@ _ALGORITHM_SOURCE_LABEL = {
     "arima": "ARIMA",
     "combined": "IF+ARIMA",
     "night_abnormal": "야간 가동",
+    # §F — 5축 정책 엔진 도입 시 추가 (plan §F + STEP 5 키워드 직접 노출).
+    "zscore": "Z-score",
+    "change_point": "급변",
 }
 
 
@@ -261,7 +264,15 @@ async def process_anomaly_inference(
                 )
 
             threshold_risk = calculate_power_risk(value, data_type, device_id, channel)
-            combined = combine_risk_3axis(threshold_risk, prediction, arima_violation)
+            # §F — 5축 우선순위 엔진. base = 3축 매트릭스 (W3 회귀 보존) +
+            # Z-score / CP 는 base=normal 일 때만 predict_warn 으로 격상.
+            combined = combine_risk_5axis(
+                threshold_risk,
+                prediction,
+                arima_violation,
+                z_score_anomaly,
+                change_point,
+            )
 
             # W3.2 night_abnormal 시각 분기 — dummy 는 시각 무관 데이터 생성,
             # 추론 측이 measured_at hour KST 야간 + watt > 정격 30% 검사해 격상.
@@ -289,16 +300,20 @@ async def process_anomaly_inference(
                         combined = escalated
                         night_escalated = True
 
-            # W4.a algorithm_source — AlarmRecord.algorithm_source 저장 (plan §8).
-            # 우선순위: night_abnormal > combined > arima > isolation_forest > 빈값.
-            # should_fire=False (combined=normal/caution 중 일부) 면 alarm forward
-            # skip 이라 algorithm_source 미사용이지만 ML forward 페이로드엔 동행.
+            # W4.a + §F algorithm_source — AlarmRecord.algorithm_source 저장.
+            # 신규 priority (plan §F): night > combined > change_point > arima >
+            # zscore > IF > 빈값. should_fire=False 면 미사용이지만 ML forward
+            # 페이로드엔 동행.
             if night_escalated:
                 algorithm_source = "night_abnormal"
             elif prediction == "anomaly" and arima_violation:
                 algorithm_source = "combined"
+            elif change_point:
+                algorithm_source = "change_point"
             elif arima_violation:
                 algorithm_source = "arima"
+            elif z_score_anomaly:
+                algorithm_source = "zscore"
             elif prediction == "anomaly":
                 algorithm_source = "isolation_forest"
             else:
@@ -419,6 +434,17 @@ async def process_anomaly_inference(
                                 [arima_result["ci_lower"], arima_result["ci_upper"]]
                                 if arima_result
                                 else None
+                            ),
+                            # §F — 5축 정책 엔진 입력 4·5축 동행. UI 가 출처 칩
+                            # 외에 어떤 축이 발화했는지 디테일 표시 가능 (예:
+                            # "급변 감지 mean_shift=4.2 std_ratio=1.1").
+                            "z_score_anomaly": z_score_anomaly,
+                            "change_point": change_point,
+                            "cp_mean_shift": (
+                                cp_meta.get("mean_shift") if change_point else None
+                            ),
+                            "cp_std_ratio": (
+                                cp_meta.get("std_ratio") if change_point else None
                             ),
                         },
                     },
