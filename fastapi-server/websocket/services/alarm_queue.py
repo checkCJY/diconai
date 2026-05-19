@@ -138,10 +138,10 @@ async def pop_alarm_blocking(timeout: int = 0) -> dict | None:
     """
     r = get_redis()
     try:
-        # P1 — BRPOP 실행시간 측정. timeout 대기 시간은 제외하고 실제 명령 왕복만 측정.
-        _t = time.perf_counter()
+        # timeout=0 은 무한 대기라 측정값에 알람 도착 대기 시간이 전부 포함된다.
+        # histogram 버킷(최대 0.5s)을 대부분 초과해 +Inf에 쌓이므로 측정하지 않는다.
+        # Redis 병목 진단은 LPUSH 측정값(push_alarm 함수)으로 충분하다.
         result = await r.brpop(ALARM_QUEUE_KEY, timeout=timeout)
-        REDIS_COMMAND_DURATION.labels("brpop").observe(time.perf_counter() - _t)
     except Exception as exc:
         logger.warning(f"[alarm_queue] action=brpop_error error={exc!r}")
         return None

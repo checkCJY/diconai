@@ -3,8 +3,6 @@
 # HTTP 수준 메트릭(_HTTP_REQUESTS_TOTAL 등)은 app.py에 있다.
 # 이 파일은 비즈니스 도메인 메트릭만 다룬다.
 
-import time as _time
-
 from prometheus_client import Counter, Gauge, Histogram
 
 # ── DRF 호출 실패 메트릭 ──────────────────────────────────────────────────────

@@ -71,6 +71,11 @@ class _CachedArimaModel:
 _cache: dict[tuple[str, str, str], _CachedModel | _CachedArimaModel] = {}
 _cache_lock = Lock()
 
+# "모델 없음(404)" 상태 캐시 — (sensor_type, algorithm, sensor_identifier) → 마지막 확인 시각.
+# 모델 미등록 환경에서 데이터 1건마다 DRF를 찌르지 않도록 60초 억제.
+_NO_MODEL_TTL_SEC = 60
+_no_model_at: dict[tuple[str, str, str], float] = {}
+
 
 def _is_expired(entry: _CachedModel) -> bool:
     ttl = settings.ML_MODEL_CACHE_TTL_SEC
@@ -97,13 +102,7 @@ async def _fetch_active_model_meta(
     async with httpx.AsyncClient(timeout=settings.DRF_REQUEST_TIMEOUT_SEC) as client:
         res = await client.get(url, params=params)
         if res.status_code == 404:
-            raise HTTPException(
-                status_code=404,
-                detail=(
-                    f"active 모델 없음 (sensor_type={sensor_type} "
-                    f"algorithm={algorithm} sensor_identifier={sensor_identifier!r})"
-                ),
-            )
+            return None  # 모델 미등록 — None 반환으로 model_not_loaded 분기 활성화
         res.raise_for_status()
         return res.json()
 
@@ -163,8 +162,17 @@ async def _get_or_load(
         entry = _cache.get(cache_key)
         if isinstance(entry, _CachedModel) and not _is_expired(entry):
             return entry
+        # 60초 안에 이미 404 확인했으면 DRF 재호출 없이 바로 None.
+        # 모델 미등록 환경에서 데이터 1건마다 DRF를 찌르는 낭비를 방지.
+        if time.time() - _no_model_at.get(cache_key, 0) < _NO_MODEL_TTL_SEC:
+            return None
 
     meta = await _fetch_active_model_meta(sensor_type, algorithm, sensor_identifier)
+    if meta is None:
+        # 404 — 모델 미등록. 60초 캐시 후 None 반환 → caller의 model_not_loaded 분기 활성화.
+        with _cache_lock:
+            _no_model_at[cache_key] = time.time()
+        return None
     model, columns, window = _load_pkl(meta["file_path"])
     entry = _CachedModel(
         model=model,
@@ -200,8 +208,16 @@ async def _get_or_load_arima(
         entry = _cache.get(cache_key)
         if isinstance(entry, _CachedArimaModel) and not _is_expired(entry):
             return entry
+        # 60초 안에 이미 404 확인했으면 DRF 재호출 없이 바로 None.
+        if time.time() - _no_model_at.get(cache_key, 0) < _NO_MODEL_TTL_SEC:
+            return None
 
     meta = await _fetch_active_model_meta(sensor_type, algorithm, sensor_identifier)
+    if meta is None:
+        # 404 — 모델 미등록. 60초 캐시 후 None 반환 → caller의 model_not_loaded 분기 활성화.
+        with _cache_lock:
+            _no_model_at[cache_key] = time.time()
+        return None
     model, order = _load_arima_pkl(meta["file_path"])
     entry = _CachedArimaModel(
         model=model,
@@ -377,6 +393,10 @@ async def predict(req: PredictRequest) -> PredictResponse:
         raise HTTPException(status_code=400, detail="sensor_type must be power|gas")
 
     entry = await _get_or_load(req.sensor_type)
+    # _get_or_load가 None을 반환하면 모델 미등록 상태 — API 호출자에게 404 반환.
+    # 내부 서비스(gas_service, power_service)는 None 체크 후 model_not_loaded 메트릭 기록.
+    if entry is None:
+        raise HTTPException(status_code=404, detail=f"active 모델 없음 (sensor_type={req.sensor_type})")
     row = _build_feature_row(req.window_values, entry.window)
 
     score = float(entry.model.decision_function(row)[0])

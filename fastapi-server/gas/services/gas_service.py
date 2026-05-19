@@ -93,8 +93,8 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
         try:
             entry = await _get_or_load("gas")
             if entry is None:
+                # 모델 미등록 — AI 없이 룰 기반으로만 처리. DRF 저장은 아래 로직으로 계속 진행.
                 AI_INFERENCE_FAILED_TOTAL.labels("gas_if", "model_not_loaded").inc()
-                return await _save_gas_data(payload, individual_risks)
             # P2 전 — IF 추론 실행 시간 측정
             _infer_start = time.time()
             row = _build_multi_feature_row(
