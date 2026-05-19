@@ -70,6 +70,6 @@ def get_user_unread_event_count(user_id: int) -> int:
                 EventStatus.IN_PROGRESS,
             ],
         )
-        .exclude(event_acknowledgements__user_id=user_id)
+        .exclude(acknowledgements__user_id=user_id)
         .count()
     )
