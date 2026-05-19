@@ -56,9 +56,11 @@ _FIRE_LEVELS = {"caution", "predict_warn", "danger"}
 # 다른 채널은 학습 분포 안 맞아 false positive ↑ → §3 multi-channel sprint 까지 비활성.
 _INFERENCE_ENABLED_CHANNELS: set[tuple[int, str]] = {(1, "watt")}
 
-# 알람 발화 rate limit — 같은 sensor_identifier 60초당 1회.
-# 폭주 방지 (overload HOLD 60틱 동안 매 추론 push_alarm → 브라우저 폭주 차단).
-# rate limit 은 push_alarm 에만 적용. MLAnomalyResult forward 는 매번 (운영 추적 유지).
+# 알람 발화 rate limit — 같은 sensor_identifier 60초당 1회 (operator UX).
+# 의도: 같은 센서에서 같은 위험이 60s 안 재발생 시 알람 push skip
+#       (브라우저·운영자 폭주 회피). MLAnomalyResult forward 는 매번 (운영 추적 유지).
+# 단위: sensor_identifier (예: power:device_1:ch1:watt).
+# T3 (2026-05-19): 30s 하향 검토 후 60s 유지 결정 — "폭주 회피 > 시연 가시성".
 # severity escalation bypass (caution → danger 격상 시 즉시 발화) 는 planB followups.
 _last_fired_at: dict[str, float] = {}
 RATE_LIMIT_SEC = 60

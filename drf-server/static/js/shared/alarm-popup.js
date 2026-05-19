@@ -108,10 +108,15 @@ const _DedupStore = {
 
 // dedup 키 — event_id 우선, 없으면 (alarm_type, source, level) 합성.
 // event-panel.js 의 _dedupKey 와 같은 컨벤션.
+// T3 (2026-05-19) — RESOLVED 신호 (event_resolved_at 박힘) 는 알람과 다른 의미.
+// dedup TTL 안이라도 운영자가 "위험 해소" 인지 필수. timestamp suffix 로 별도 key.
 function _popupDedupKey(data) {
   const eventId = data.event_id || data.id;
-  if (eventId != null) return `event:${eventId}`;
-  return `${data.alarm_type || 'unknown'}:${data.sensor_name || data.source_label || ''}:${data.alarm_level || ''}`;
+  const resolvedSuffix = data.event_resolved_at
+    ? `:resolved:${data.event_resolved_at}`
+    : '';
+  if (eventId != null) return `event:${eventId}${resolvedSuffix}`;
+  return `${data.alarm_type || 'unknown'}:${data.sensor_name || data.source_label || ''}:${data.alarm_level || ''}${resolvedSuffix}`;
 }
 
 // T3 (2026-05-19) — 다중 관리자 환경 ack 시그널 텍스트 생성.
