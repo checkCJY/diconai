@@ -64,6 +64,10 @@ class AlarmPayload(BaseModel):
     # 클라는 이 필드가 박혀있으면 같은 event_id 로 떠있는 팝업을 close + "위험 해소" 토스트.
     # 일반 알람에선 None.
     event_resolved_at: str | None = None
+    # T3 (2026-05-19) — 다중 관리자 환경 ack 시그널. 활성 Event 의 EventAck 한 사용자명 list.
+    # 토스트·모달 본문에 "(N 확인 중)" 시그널 표시용 (dedup 과 분리 — 안전망 유지).
+    # AlarmPayload.model_config="extra:ignore" 라 명시 정의 필수 (누락 시 silent drop).
+    event_ack_users: list[str] = []
     # E2E latency 측정용 — IoT 수신 시각(Unix time). alarm_flush_loop에서 소비.
     ingress_ts: float | None = None
 
