@@ -174,6 +174,7 @@ async def process_anomaly_inference(
     channel_values: dict,
     data_type: str,
     measured_at: str,
+    ingress_ts: float | None = None,
 ) -> None:
     """[트랙 1 v2] IF 추론 + combine_risk + push_alarm + DRF MLAnomalyResult forward.
 
@@ -181,6 +182,9 @@ async def process_anomaly_inference(
     윈도우 누적 < _INFERENCE_WINDOW 면 skip. push_alarm 은 발화 levels 일 때만,
     MLAnomalyResult forward 는 추론 매번 (운영 추적용). 모든 외부 호출 silent fail —
     DRF 저장 흐름과 fastapi 응답 시간에 영향 없음.
+
+    ingress_ts — 핸들러 진입 시각. AI 알람 push_payload 에 실어 alarm_flush_loop 의
+    E2E latency 측정에 사용 (룰 기반 알람과 동일 경로). None 이면 측정 skip.
     """
     for channel, value in channel_values.items():
         if (channel, data_type) not in _INFERENCE_ENABLED_CHANNELS:
@@ -429,6 +433,8 @@ async def process_anomaly_inference(
                         "summary": summary,
                         "is_new_event": True,
                         "measured_value": value,
+                        # 룰 기반 알람과 동일 키. alarm_flush_loop 이 E2E latency 측정.
+                        "ingress_ts": ingress_ts,
                         "anomaly_meta": {
                             "combined_risk": combined,
                             "anomaly_score": score,

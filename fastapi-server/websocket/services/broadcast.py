@@ -9,7 +9,6 @@
 #   - 위치: worker_positions (IoT 장비로부터 갱신된 작업자 좌표)
 #
 # 파트별 함수로 분리되어 있으므로 단위 테스트 시 개별 호출 가능.
-import random
 from datetime import datetime, timezone
 
 from core.config import settings
@@ -23,6 +22,13 @@ from websocket.state import (
 
 # 직전 총 전력값 — 증감률 계산용
 _prev_total_kw: float | None = None
+
+# 가스 페이로드 키 — stale 시 null 로 채워 프론트가 key 부재로 깨지지 않게 한다.
+# gas/services/gas_service.py 의 gas_snapshot 빌더와 키 목록이 1:1 로 일치해야 한다.
+# 가스 필드 추가/제거 시 두 곳 동시 업데이트.
+_GAS_VALUE_KEYS = ("co", "h2s", "co2", "o2", "no2", "so2", "o3", "nh3", "voc")
+_GAS_RISK_KEYS = tuple(f"{g}_risk" for g in _GAS_VALUE_KEYS)
+_GAS_NULL_PAYLOAD = {k: None for k in _GAS_VALUE_KEYS + _GAS_RISK_KEYS}
 
 
 # ── 1. stale 판정 ───────────────────────────────────────────
@@ -44,18 +50,20 @@ def is_stale(updated_at_iso: str | None, threshold_sec: float | None = None) -> 
     return age > threshold
 
 
-# ── 2. AI 예측 더미 필드 ────────────────────────────────────
-def build_ai_dummy_fields(total_power_kw: float, equipment: list[dict]) -> dict:
-    """AI 예측 영역의 더미 값. 실제 모델 연동 시 교체 예정."""
-    ai_eta_min = random.randint(15, 40)
-    ai_max_load_kw = round(total_power_kw * random.uniform(1.05, 1.2), 1)
-    ai_max_load_pct = round(ai_max_load_kw / max(total_power_kw, 0.001) * 100)
-    ai_power_equipment = equipment[0]["name"] if equipment else "압연기"
+# ── 2. AI 예측 필드 ────────────────────────────────────────
+def build_ai_prediction_fields(equipment: list[dict]) -> dict:
+    """AI 예측 영역. 실제 모델 연동 전까지 수치는 None 송신.
+
+    프론트는 None 케이스를 "예측 준비 중" 또는 "-"로 표시한다.
+    ai_power_equipment 라벨만 equipment 첫 채널 기준으로 채워 시각 일관성을
+    유지하고, 데이터 미수신 시(equipment 빈 리스트)에는 None.
+    전력 AI Phase 2 (un-downgrade) 적용 시 세 수치 필드를 실제 예측값으로 교체.
+    """
     return {
-        "ai_power_equipment": ai_power_equipment,
-        "ai_eta_min": ai_eta_min,
-        "ai_max_load_kw": ai_max_load_kw,
-        "ai_max_load_pct": ai_max_load_pct,
+        "ai_power_equipment": equipment[0]["name"] if equipment else None,
+        "ai_eta_min": None,
+        "ai_max_load_kw": None,
+        "ai_max_load_pct": None,
     }
 
 
@@ -69,8 +77,6 @@ def build_broadcast_payload(include_alarms: bool = True) -> dict:
     빈 alarms[]만 송신 (호환 모드 — 프론트가 alarms 키 존재를 가정).
     """
     global _prev_total_kw
-
-    is_danger = random.random() < settings.DUMMY_RISK_PROBABILITY
 
     power_stale = is_stale(power_latest.get("updated_at"))
     gas_stale = is_stale(gas_latest.get("updated_at"))
@@ -92,25 +98,20 @@ def build_broadcast_payload(include_alarms: bool = True) -> dict:
             power_change_pct = 0.0
         _prev_total_kw = total_power_kw
 
-    # AI 더미 필드는 total_power_kw가 있을 때만 생성 (None이면 산술 연산 불가).
-    ai_fields = (
-        build_ai_dummy_fields(total_power_kw, equipment)
-        if total_power_kw is not None
-        else {}
-    )
-
     payload = {
-        "device_id": "sensor-01",
-        "timestamp": datetime.now().isoformat(),
-        "level": "위험" if is_danger else "정상",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "total_power_kw": total_power_kw,
         "power_change_pct": power_change_pct,
         "equipment": equipment,
-        "power_loading": len(equipment) == 0,
+        # power_loading = 전력 데이터 도착 여부(stale). 채널 ON/OFF 와는 별개.
+        # 기존 `len(equipment)==0` 은 build_equipment() 결과와 정확히 일치(데이터
+        # 미수신 시에만 빈 리스트) 했지만, 의미가 모호해 stale 직접 반영으로 단순화.
+        "power_loading": power_stale,
         "gas_loading": gas_stale,
-        **ai_fields,
+        **build_ai_prediction_fields(equipment),
         "worker_positions": dict(worker_positions),
         "alarms": [],
-        **(latest_gas_snapshot if not gas_stale else {}),
+        # gas_stale 이어도 가스 키는 항상 유지 (값만 None). 프론트가 키 부재로 깨지지 않도록.
+        **(latest_gas_snapshot if not gas_stale else _GAS_NULL_PAYLOAD),
     }
     return payload
