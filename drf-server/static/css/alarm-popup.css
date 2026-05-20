@@ -114,10 +114,13 @@
 .alarm-popup-type-label {
   font-size: 11px; color: var(--text2); letter-spacing: .5px;
 }
-/* 행동 메시지 */
+/* 행동 메시지 — T2+T6 (2026-05-20) — 도메인별 긴 문구 가독성. 기존 18px·bold·center
+   유지 + line-height 1.45 (긴 문구 줄바꿈 자연) + word-break: keep-all (한글 단어
+   중간 깨짐 방지). 한 줄 짧은 워딩 ("즉시 대피하세요!") 도 시각 변화 X. */
 .alarm-popup-action {
   text-align: center; font-size: 18px; font-weight: 700;
   margin: 0 0 12px; color: var(--danger);
+  line-height: 1.45; word-break: keep-all;
 }
 .alarm-popup-action.caution-text { color: var(--caution); }
 .alarm-popup-action.safe-text    { color: var(--safe); }
