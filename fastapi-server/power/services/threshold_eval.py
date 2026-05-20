@@ -172,3 +172,36 @@ def evaluate_static_risk_from_cache(
     if warning_max is None or danger_max is None:
         return "normal"
     return _evaluate_unidirectional(pct, float(warning_max), float(danger_max))
+
+
+def get_static_threshold_abs(
+    risk: str,
+    data_type: str,
+    device_id: str | None,
+    channel: int,
+) -> float | None:
+    """T2+T6 — risk level 의 임계치 절대값 환산 (모달 thrEl 컨텍스트용).
+
+    `evaluate_static_risk_from_cache` 가 fire 결정한 risk level (warning/danger) 의
+    정격 × % 절대값. 예: rated_w=7500, warning_max=80% → 6000W. 모달이 "위험 기준
+    6000 초과 (측정 X)" 표시. normal / 캐시 미존재 / 정격 미설정 → None.
+
+    voltage 양방향 — warning_max 기준 (상한). 향후 양방향 정확 표시 필요 시 별도
+    helper (warning_min/max 둘 다 반환) 도입 검토.
+    """
+    if risk == "normal":
+        return None
+    item = _DRF_ITEM_BY_DATA_TYPE.get(data_type)
+    if item is None:
+        return None
+    meta = get_threshold_meta(item)
+    if not meta:
+        return None
+    entry = get_channel_entry(device_id, channel)
+    rated = entry.get(_RATED_KEY_BY_DATA_TYPE[data_type])
+    if not rated:
+        return None
+    pct = meta.get(f"{risk}_max")  # warning_max | danger_max
+    if pct is None:
+        return None
+    return round(float(rated) * float(pct) / 100.0, 1)

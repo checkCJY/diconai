@@ -196,8 +196,10 @@ class AlarmRecord(BaseModel):
                     self.algorithm_source or "", "AI 이상 탐지"
                 )
                 return f"{prefix}{phrase} ({self.measured_value:,.1f} W)"
-            # 룰 기반 — ML 동적 탐지와 구분하는 "정적 임계치 초과" 표기.
-            return f"{prefix}정적 임계치 초과 ({self.measured_value:,.1f} W)"
+            # T2+T6 (2026-05-20) — "정적" 기술 용어 제거. 가스 ("CO 임계치 초과") 톤
+            # 통일. 운영자에게 "정적룰 vs AI" 분류는 source 컬럼 + cover-badge 로
+            # 표현되니 본문은 도메인 사실 (임계치 초과) 만.
+            return f"{prefix}임계치 초과 ({self.measured_value:,.1f} W)"
         if self.geofence_id:
             return "위험구역 진입"
         if self.alarm_type == "sensor_fault":

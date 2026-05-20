@@ -596,11 +596,14 @@ const AlarmPopup = {
         bodyEl.textContent = msg;
         msgEl.appendChild(bodyEl);
       }
-      // 임계값 컨텍스트 — 운영자가 정상/위험 기준을 즉시 비교 가능 (P2 추가, 피드백 #3)
+      // 임계값 컨텍스트 — 운영자가 정상/위험 기준을 즉시 비교 가능 (P2 추가, 피드백 #3).
+      // T2+T6 (2026-05-20) — label level 분기. 기존 "위험 기준" 하드코딩이 warning
+      // 알람에도 표시되던 톤 불일치 해소.
       if (data.measured_value != null && data.threshold_value != null) {
         const thrEl = document.createElement('span');
         thrEl.className = 'msg-threshold';
-        thrEl.textContent = `위험 기준 ${data.threshold_value} 초과 (측정 ${data.measured_value})`;
+        const thrLabel = level === 'danger' ? '위험 기준' : '주의 기준';
+        thrEl.textContent = `${thrLabel} ${data.threshold_value} 초과 (측정 ${data.measured_value})`;
         msgEl.appendChild(thrEl);
       }
       // T3 — 다중 관리자 환경 ack 시그널 (모달도 토스트와 동일 패턴).

@@ -36,6 +36,7 @@ from power.services.quality_guard import classify_sensor_status, is_inference_st
 from power.services.threshold_eval import (
     calculate_power_risk,
     evaluate_static_risk_from_cache,
+    get_static_threshold_abs,
 )
 from services.ai_mute import AIInferenceState, mark_ai_recent, mark_ai_state
 from services.anomaly_alarm import forward_inference_e2e
@@ -155,12 +156,16 @@ def _build_static_push_payload(
     label: str,
     value: float,
     ingress_ts: float | None,
+    threshold_value: float | None = None,
 ) -> dict:
     """T4 D2 — source=static_* 알람 push payload 조립.
 
     anomaly_meta 없음 (AI 추론 결과 부재 또는 미반영). summary 는 [t4-source-
     message-spec.md §4](skill/alarm/t4-source-message-spec.md) 의 source 별 패턴.
     AI source 알람은 별 helper (`_build_ai_push_payload` — process 안 inline) 사용.
+
+    T2+T6 (2026-05-20) — message 의 "정적" 기술 용어 제거 (가스 톤 통일).
+    threshold_value 인자 추가 — 모달 thrEl ("위험/주의 기준 X 초과 (측정 Y)") 컨텍스트.
     """
     prefix = "[긴급]" if decision.risk_level == "danger" else "[주의]"
     tail = (
@@ -169,8 +174,8 @@ def _build_static_push_payload(
         else " — 즉시 확인하고 관리자에게 보고하세요."
     )
     summary = f"{prefix} {label} 전력 과부하 ({value:,.1f}W){tail}"
-    message = f"{label} 정적 임계치 초과 ({value:,.1f} W)"
-    return {
+    message = f"{label} 임계치 초과 ({value:,.1f} W)"
+    payload = {
         "alarm_type": decision.alarm_type,
         "risk_level": decision.risk_level,
         "source": decision.source,
@@ -182,6 +187,9 @@ def _build_static_push_payload(
         "measured_value": value,
         "ingress_ts": ingress_ts,
     }
+    if threshold_value is not None:
+        payload["threshold_value"] = threshold_value
+    return payload
 
 
 # 페이로드 표시용 정격 % 임계치 (DRF facilities.Threshold "power_facility_default"와 동일)
@@ -220,14 +228,19 @@ async def _push_static_decision(
     label: str,
     value: float,
     ingress_ts: float | None,
+    threshold_value: float | None = None,
 ) -> None:
     """T4 D2 — decide_alarm 결정 (source=static_*) 의 push 실행.
 
     DISABLED / WARMING_UP / INFERRED_FAILED 분기에서 공통 호출. AlarmRecord forward
     는 본 commit 비범위 (시연 후 활성화 결정 시 별 commit). AI_BROADCAST_LATENCY
     는 source=ai 만 측정 — 정적 분기는 측정 대상 아님.
+
+    T2+T6 (2026-05-20) — threshold_value 전달 → 모달 thrEl 표시 (가스 톤 통일).
     """
-    payload = _build_static_push_payload(decision, label, value, ingress_ts)
+    payload = _build_static_push_payload(
+        decision, label, value, ingress_ts, threshold_value
+    )
     try:
         await push_alarm(payload)
     except Exception:
@@ -286,6 +299,10 @@ async def process_anomaly_inference(
         static_risk = evaluate_static_risk_from_cache(
             value, data_type, device_id, channel
         )
+        # T2+T6 — 모달 thrEl ("위험 기준 X 초과") 컨텍스트 절대값. normal 시 None.
+        static_threshold_abs = get_static_threshold_abs(
+            static_risk, data_type, device_id, channel
+        )
         entry_meta = get_channel_entry(device_id, channel)
         label = entry_meta.get("name") or f"CH{channel}"
 
@@ -300,7 +317,9 @@ async def process_anomaly_inference(
                 static_risk=static_risk,
             )
             if decision is not None:
-                await _push_static_decision(decision, label, float(value), ingress_ts)
+                await _push_static_decision(
+                    decision, label, float(value), ingress_ts, static_threshold_abs
+                )
             continue
 
         # 3. 윈도우 누적
@@ -316,7 +335,9 @@ async def process_anomaly_inference(
                 static_risk=static_risk,
             )
             if decision is not None:
-                await _push_static_decision(decision, label, float(value), ingress_ts)
+                await _push_static_decision(
+                    decision, label, float(value), ingress_ts, static_threshold_abs
+                )
             continue
 
         # W0 stuck — 윈도우 가득 + 모든 값 동일 → 센서 고정 고장. AI 평가 skip
@@ -593,7 +614,7 @@ async def process_anomaly_inference(
                 # static_cover_miss — AI 활성 채널에서 AI 정상 + 정적 발화.
                 # AlarmRecord 영속화는 본 D2 비범위 (alarm_payload=None).
                 push_payload = _build_static_push_payload(
-                    decision, label, float(value), ingress_ts
+                    decision, label, float(value), ingress_ts, static_threshold_abs
                 )
                 alarm_payload = None
 
@@ -627,7 +648,7 @@ async def process_anomaly_inference(
                 )
                 if decision is not None:
                     await _push_static_decision(
-                        decision, label, float(value), ingress_ts
+                        decision, label, float(value), ingress_ts, static_threshold_abs
                     )
             except Exception:
                 logger.exception(
