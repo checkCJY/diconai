@@ -201,6 +201,11 @@ class AlarmRecord(BaseModel):
             # 표현되니 본문은 도메인 사실 (임계치 초과) 만.
             return f"{prefix}임계치 초과 ({self.measured_value:,.1f} W)"
         if self.geofence_id:
+            # T2+T6 (2026-05-20) — 작업자 이름 컨텍스트 추가. 모달 sensor 영역에
+            # 이미 geofence 이름 (source_label) 있음 — 본문은 "누가" 들어갔는지가
+            # 운영자가 가장 알고 싶은 정보. worker FK 미존재 시 기존 단순 텍스트.
+            if self.worker_id and self.worker and self.worker.name:
+                return f"{self.worker.name} 작업자 진입"
             return "위험구역 진입"
         if self.alarm_type == "sensor_fault":
             return "센서 통신 이상"
