@@ -272,6 +272,10 @@ const EventPanel = {
 
     const item = document.createElement('div');
     item.className = 'event-item event-item--source-group';
+    // T4 — source 가 cover 면 행 톤도 노랑 (CSS .alarm-popup-static-cover 재사용 —
+    // 모달·토스트·이벤트 패널 3 곳이 같은 톤 사전).
+    const tone = (typeof AlarmMapper !== 'undefined') ? AlarmMapper.sourceTone(data.alarm_source) : 'risk';
+    if (tone === 'cover') item.classList.add('alarm-popup-static-cover');
     item.style.opacity = isResolved ? '0.5' : '1';
     // dataset.dedupKey = groupKey (LRU 제거 시 _sourceGroups 정리 매칭).
     item.dataset.dedupKey = groupKey;
@@ -284,6 +288,9 @@ const EventPanel = {
         window.location.href = `/dashboard/monitoring/events/${eventId}/`;
       });
     }
+    // T4 — cover 배지 한 줄 (사유 라벨 — "AI 미탐 의심" 등). 빈 문자열이면 미렌더.
+    const coverLabel = (typeof AlarmMapper !== 'undefined') ? AlarmMapper.sourceBadge(data.alarm_source) : '';
+    const coverHtml = coverLabel ? `<span class="cover-badge event-cover-badge">${coverLabel}</span>` : '';
     item.innerHTML = `
       <div class="event-head">
         <span><i data-lucide="${icon}" class="event-icon"></i>${label}</span>
@@ -291,6 +298,7 @@ const EventPanel = {
       </div>
       <div class="${colorClass} event-desc">
         <span>${data.message || data.alarm_type || ''}</span>
+        ${coverHtml}
         <span class="event-source-more" hidden> · 외 <span class="event-source-more-count">0</span>건<span class="event-source-other-types"></span></span>
       </div>
       <ul class="event-source-items" hidden></ul>

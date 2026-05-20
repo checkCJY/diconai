@@ -210,6 +210,9 @@ const AlarmToastStack = {
   _createItem(data, level) {
     const item = document.createElement('div');
     item.className = `alarm-toast-stack-item ${level}`;
+    // T4 — cover 톤 클래스 추가 (CSS 가 노랑 톤 진정 + cover-badge 노출).
+    const tone = AlarmMapper.sourceTone(data.alarm_source);
+    if (tone === 'cover') item.classList.add('alarm-popup-static-cover');
     const sensor = data.sensor_name || data.source_label || '';
     const msg    = data.message     || data.summary      || '';
     const badge  = (level === 'danger') ? '⚠ 위험' : '⚠ 주의';
@@ -246,7 +249,24 @@ const AlarmToastStack = {
       ackEl.textContent = ackText;
     }
 
+    // T4 — cover 배지 (source 별 사유 라벨) + reason 문구. 토스트도 모달과 동일 패턴.
+    const coverBadge = AlarmMapper.sourceBadge(data.alarm_source);
+    let coverBadgeEl = null;
+    if (coverBadge) {
+      coverBadgeEl = document.createElement('div');
+      coverBadgeEl.className = 'alarm-toast-stack-cover-badge cover-badge';
+      coverBadgeEl.textContent = coverBadge;
+    }
+    let reasonEl = null;
+    if (data.alarm_reason) {
+      reasonEl = document.createElement('div');
+      reasonEl.className = 'alarm-toast-stack-cover-reason';
+      reasonEl.textContent = data.alarm_reason;
+    }
+
     item.append(header, sensorEl, msgEl);
+    if (coverBadgeEl) item.append(coverBadgeEl);
+    if (reasonEl) item.append(reasonEl);
     if (ackEl) item.append(ackEl);
     // 토스트 클릭 — 격상 즉시 트리거 (사용자가 본 것으로 인지)
     item.addEventListener('click', (ev) => {
@@ -460,6 +480,13 @@ const AlarmPopup = {
     popup.classList.add(`level-${level}`);
     _playAlarmSound(level);
 
+    // T4 — source 별 시각 톤. 'cover' = AI 미탐/실패/워밍업 보완 알람 (노랑 + 배지).
+    // 'risk' = 기존 위험도 분기 그대로. cover 톤은 alarm-popup-static-cover 클래스
+    // 가 빨강·노랑 펄스를 진정시켜 운영자가 "주역 vs 보조" 즉시 구분.
+    popup.classList.remove('alarm-popup-static-cover');
+    const tone = AlarmMapper.sourceTone(data.alarm_source);
+    if (tone === 'cover') popup.classList.add('alarm-popup-static-cover');
+
     const timeEl = document.getElementById('alarm-popup-time');
     if (timeEl) {
       const ts = data.timestamp || data.created_at;
@@ -518,6 +545,21 @@ const AlarmPopup = {
         ackEl.className = 'msg-ack-signal';
         ackEl.textContent = ackText;
         msgEl.appendChild(ackEl);
+      }
+
+      // T4 — source 가 cover 면 배지 + reason 문구 렌더. AI 단독·일반 룰 알람은 미렌더.
+      const badgeLabel = AlarmMapper.sourceBadge(data.alarm_source);
+      if (badgeLabel) {
+        const badgeEl = document.createElement('span');
+        badgeEl.className = 'msg-cover-badge cover-badge';
+        badgeEl.textContent = badgeLabel;
+        msgEl.appendChild(badgeEl);
+      }
+      if (data.alarm_reason) {
+        const reasonEl = document.createElement('span');
+        reasonEl.className = 'msg-cover-reason';
+        reasonEl.textContent = data.alarm_reason;
+        msgEl.appendChild(reasonEl);
       }
     }
 

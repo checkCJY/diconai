@@ -292,3 +292,63 @@
   color: var(--text2, #8b949e);
   font-style: italic;
 }
+
+/* ==========================================================
+   T4 — source=static_cover_* 보완 알람 시각 톤
+   ==========================================================
+   AI 가 단일 결정자로 발화한 알람 (source=ai) 은 기존 빨강·노랑 그대로.
+   AI 미탐 의심 / 워밍업 / 추론 실패 / 비활성 채널은 "보완" 의미로 톤 약화 +
+   배지 라벨로 운영자가 "주역 vs 보조" 즉시 구분. plan §5.1 매트릭스 §6 D4.
+   ========================================================== */
+
+/* 모달 — danger 빨간 펄스 / warning 노란 펄스를 진정시키고 노랑 단색 톤으로 통일. */
+#alarm-popup.alarm-popup-static-cover {
+  border-color: var(--caution);
+  animation: none;
+  box-shadow: 0 6px 24px rgba(0,0,0,.5), 0 0 12px rgba(227,179,65,.25);
+}
+#alarm-popup.alarm-popup-static-cover.level-danger,
+#alarm-popup.alarm-popup-static-cover.level-warning {
+  animation: none;
+}
+
+/* 토스트 — 노랑 좌측 보더, 펄스 제거. cover-badge 가 사유 라벨 노출. */
+.alarm-toast-stack-item.alarm-popup-static-cover {
+  border-left-color: var(--caution);
+  animation: none;
+}
+
+/* cover-badge — 모달 메시지 행 / 토스트 본문 아래 작은 노랑 칩.
+   reason 문구와 짝 — 배지 = 짧은 라벨, reason = 상세 사유. */
+.cover-badge {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(227,179,65,.18);
+  border: 1px solid var(--caution);
+  color: var(--caution);
+  font-size: 11px; font-weight: 600;
+}
+
+/* 모달 reason — 메시지 영역 안 별도 행 (배지 옆이 아닌 아래). */
+.msg-cover-reason {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text2, #8b949e);
+}
+.msg-cover-badge {
+  margin-left: 6px;  /* sensor 이름·msg-body 와 한 행 안 시각 분리 */
+}
+
+/* 토스트 reason — 토스트 본문 아래 작은 italic 텍스트 (ack 시그널 옆 패턴). */
+.alarm-toast-stack-cover-reason {
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--text2, #8b949e);
+  font-style: italic;
+}
+.alarm-toast-stack-cover-badge {
+  margin-top: 6px;
+}
