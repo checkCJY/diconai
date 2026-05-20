@@ -301,25 +301,28 @@
    배지 라벨로 운영자가 "주역 vs 보조" 즉시 구분. plan §5.1 매트릭스 §6 D4.
    ========================================================== */
 
-/* 모달 — danger 빨간 펄스 / warning 노란 펄스를 진정시키고 노랑 단색 톤으로 통일. */
-#alarm-popup.alarm-popup-static-cover {
+/* 모달 — danger 빨간 펄스 / warning 노란 펄스 모두 진정. cover 톤 source 는 어떤
+   risk_level (warning/danger) 이어도 시각은 "보조" — 노랑 단색·정적. specificity
+   강화 — id 1 + class 2 (.alarm-popup-static-cover.level-*) > level-* 단독 rule. */
+#alarm-popup.alarm-popup-static-cover,
+#alarm-popup.alarm-popup-static-cover.level-danger,
+#alarm-popup.alarm-popup-static-cover.level-warning {
   border-color: var(--caution);
   animation: none;
   box-shadow: 0 6px 24px rgba(0,0,0,.5), 0 0 12px rgba(227,179,65,.25);
 }
-#alarm-popup.alarm-popup-static-cover.level-danger,
-#alarm-popup.alarm-popup-static-cover.level-warning {
-  animation: none;
-}
 
 /* 토스트 — 노랑 좌측 보더, 펄스 제거. cover-badge 가 사유 라벨 노출. */
-.alarm-toast-stack-item.alarm-popup-static-cover {
+.alarm-toast-stack-item.alarm-popup-static-cover,
+.alarm-toast-stack-item.danger.alarm-popup-static-cover,
+.alarm-toast-stack-item.warning.alarm-popup-static-cover {
   border-left-color: var(--caution);
   animation: none;
 }
 
 /* cover-badge — 모달 메시지 행 / 토스트 본문 아래 작은 노랑 칩.
-   reason 문구와 짝 — 배지 = 짧은 라벨, reason = 상세 사유. */
+   reason 문구와 짝 — 배지 = 짧은 라벨, reason = 상세 사유. block 으로 강제해
+   다음 reason 행과 자연 줄바꿈 (이전 inline 인접 렌더 버그 fix). */
 .cover-badge {
   display: inline-block;
   margin-top: 6px;
@@ -331,24 +334,28 @@
   font-size: 11px; font-weight: 600;
 }
 
-/* 모달 reason — 메시지 영역 안 별도 행 (배지 옆이 아닌 아래). */
+/* 모달 — 배지·reason 영역. 부모 flex/inline 영향 받아도 줄바꿈 보장 위해 div 사용
+   (alarm-popup.js 가 element 생성 — 본 CSS 와 짝). */
+.msg-cover-badge {
+  display: block;       /* 이전: inline-block + margin-left → 인접 인라인 붙음 */
+  margin-top: 6px;
+}
 .msg-cover-reason {
   display: block;
   margin-top: 4px;
   font-size: 12px;
   color: var(--text2, #8b949e);
 }
-.msg-cover-badge {
-  margin-left: 6px;  /* sensor 이름·msg-body 와 한 행 안 시각 분리 */
-}
 
 /* 토스트 reason — 토스트 본문 아래 작은 italic 텍스트 (ack 시그널 옆 패턴). */
+.alarm-toast-stack-cover-badge {
+  display: block;
+  margin-top: 6px;
+}
 .alarm-toast-stack-cover-reason {
+  display: block;
   margin-top: 3px;
   font-size: 11px;
   color: var(--text2, #8b949e);
   font-style: italic;
-}
-.alarm-toast-stack-cover-badge {
-  margin-top: 6px;
 }

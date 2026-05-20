@@ -250,6 +250,83 @@ def test_payload_fingerprint_clear_alarm():
 
 
 # ──────────────────────────────────────────────────────────────────────
+# T4 D2 patch — 정적 cover push 폭주 dedup
+#
+# [배경] D2 의 process_anomaly_inference 가 모든 채널 매 sample 평가 → 같은
+# (source, source_label, risk_level) 조합이 1초당 push 됐던 폭주. fingerprint
+# 분기에 power_overload + source 추가로 30s 1회 통과.
+# ──────────────────────────────────────────────────────────────────────
+
+
+def test_payload_fingerprint_cover_alarm():
+    """T4 cover 알람 fingerprint — cover:{source}:{source_label}:{risk_level}."""
+    fp = alarm_queue._payload_fingerprint(
+        {
+            "alarm_type": "power_overload",
+            "risk_level": "warning",
+            "source": "static_cover_warmup",
+            "source_label": "공조설비",
+        }
+    )
+    assert fp == "cover:static_cover_warmup:공조설비:warning"
+
+
+def test_payload_fingerprint_cover_distinct_sources_get_distinct_fp():
+    """같은 채널이라도 source 가 다르면 fingerprint 다름 → 둘 다 push."""
+    fp_warmup = alarm_queue._payload_fingerprint(
+        {
+            "alarm_type": "power_overload",
+            "risk_level": "danger",
+            "source": "static_cover_warmup",
+            "source_label": "송풍기",
+        }
+    )
+    fp_miss = alarm_queue._payload_fingerprint(
+        {
+            "alarm_type": "power_overload",
+            "risk_level": "danger",
+            "source": "static_cover_miss",
+            "source_label": "송풍기",
+        }
+    )
+    assert fp_warmup != fp_miss
+
+
+def test_payload_fingerprint_cover_missing_source_returns_none():
+    """source 누락 — fingerprint 불가 → None (옛 발신자 백워드 호환)."""
+    fp = alarm_queue._payload_fingerprint(
+        {
+            "alarm_type": "power_overload",
+            "risk_level": "warning",
+            "source_label": "송풍기",
+        }
+    )
+    assert fp is None
+
+
+@pytest.mark.asyncio
+async def test_push_alarm_dedupes_cover_same_source_label_channel():
+    """T4 — 같은 (source, source_label, risk) 조합 두 번 push → 1번만 LPUSH."""
+    redis_mock = AsyncMock()
+    redis_mock.set = AsyncMock(side_effect=[True, False])  # 첫 통과, 두 번째 dedup hit
+
+    payload = {
+        "alarm_type": "power_overload",
+        "risk_level": "warning",
+        "source": "static_no_ai_available",
+        "source_label": "보조 모터 1",
+    }
+
+    with patch("websocket.services.alarm_queue.get_redis", return_value=redis_mock):
+        await alarm_queue.push_alarm(payload)
+        await alarm_queue.push_alarm(payload)
+
+    # SET NX 두 번 시도, LPUSH 는 첫 통과 시 1회만.
+    assert redis_mock.set.await_count == 2
+    assert redis_mock.lpush.await_count == 1
+
+
+# ──────────────────────────────────────────────────────────────────────
 # 2026-05-15 알람 재설계 — RESOLVED 신호 fingerprint 분리
 #
 # [배경] update_status PATCH RESOLVED → drf _push_to_ws → 본 모듈 push_alarm.

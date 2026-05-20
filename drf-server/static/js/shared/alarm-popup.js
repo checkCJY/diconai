@@ -249,13 +249,17 @@ const AlarmToastStack = {
       ackEl.textContent = ackText;
     }
 
-    // T4 — cover 배지 (source 별 사유 라벨) + reason 문구. 토스트도 모달과 동일 패턴.
+    // T4 — cover 배지 + reason 문구. 토스트도 모달과 동일 패턴.
+    // wrapper div 안 inner span — wrapper 가 줄바꿈 보장, inner 가 노랑 칩 시각.
     const coverBadge = AlarmMapper.sourceBadge(data.alarm_source);
     let coverBadgeEl = null;
     if (coverBadge) {
       coverBadgeEl = document.createElement('div');
-      coverBadgeEl.className = 'alarm-toast-stack-cover-badge cover-badge';
-      coverBadgeEl.textContent = coverBadge;
+      coverBadgeEl.className = 'alarm-toast-stack-cover-badge';
+      const innerCB = document.createElement('span');
+      innerCB.className = 'cover-badge';
+      innerCB.textContent = coverBadge;
+      coverBadgeEl.appendChild(innerCB);
     }
     let reasonEl = null;
     if (data.alarm_reason) {
@@ -548,15 +552,19 @@ const AlarmPopup = {
       }
 
       // T4 — source 가 cover 면 배지 + reason 문구 렌더. AI 단독·일반 룰 알람은 미렌더.
+      // div 사용 — 부모가 flex 등이어도 줄바꿈 보장 (span 인접 렌더 버그 fix).
       const badgeLabel = AlarmMapper.sourceBadge(data.alarm_source);
       if (badgeLabel) {
-        const badgeEl = document.createElement('span');
-        badgeEl.className = 'msg-cover-badge cover-badge';
-        badgeEl.textContent = badgeLabel;
+        const badgeEl = document.createElement('div');
+        badgeEl.className = 'msg-cover-badge';
+        const inner = document.createElement('span');
+        inner.className = 'cover-badge';
+        inner.textContent = badgeLabel;
+        badgeEl.appendChild(inner);
         msgEl.appendChild(badgeEl);
       }
       if (data.alarm_reason) {
-        const reasonEl = document.createElement('span');
+        const reasonEl = document.createElement('div');
         reasonEl.className = 'msg-cover-reason';
         reasonEl.textContent = data.alarm_reason;
         msgEl.appendChild(reasonEl);
