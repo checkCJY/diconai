@@ -181,6 +181,22 @@ RULE_FIRE_SUPPRESSED_BY_AI_TOTAL = Counter(
     ["device_id", "channel", "level"],
 )
 
+# T4 D3 — STATIC_THRESHOLD_AT_FASTAPI=True 시 DRF 정적 fire skip 카운터.
+# 활성화 모드의 동작 확인 + 시연 후 mismatch 분석 자료. 비활성화 모드에선 inc 0.
+STATIC_FIRE_SUPPRESSED_BY_FASTAPI_TOTAL = Counter(
+    "static_fire_suppressed_by_fastapi_total",
+    "DRF static fire skipped because fastapi is the single decision-maker (T4)",
+    ["device_id", "channel", "level"],
+)
+
+# T4 D3 — shadow_audit mismatch 카운터. DRF 정적 평가는 fire 해야 함이라 판단했는데
+# fastapi 가 실제 알람 안 만든 케이스 누적. 1~2주 운영 후 0/낮음이면 활성화 안전.
+STATIC_AUDIT_MISMATCH_TOTAL = Counter(
+    "static_audit_mismatch_total",
+    "Shadow audit: DRF would-fire but fastapi produced no AlarmRecord in window",
+    ["device_id", "channel", "would_fire"],
+)
+
 # ── Celery 태스크 실패 / 재시도 메트릭 (P2 전) ───────────────────────────────
 # task_postrun은 성공/실패 무관하게 호출되므로 실패 여부를 구분할 수 없다.
 # task_failure / task_retry 시그널로 각각 카운트한다.

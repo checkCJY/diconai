@@ -194,6 +194,10 @@ def fire_danger_alarm_task(
                     "event_ack_users": _get_event_ack_names(event.id),
                     "is_new_event": alarm is not None,
                     "ingress_ts": ingress_ts,
+                    # T4 D3 — DRF 룰 단독 fire (레거시 경로). 활성화 모드에서는
+                    # fastapi 가 직접 push 하므로 본 fallback 미사용.
+                    "source": "static_legacy",
+                    "reason": None,
                 }
             )
             logger.info(
@@ -270,6 +274,10 @@ def fire_warning_alarm_task(
                     "event_ack_users": _get_event_ack_names(event.id),
                     "is_new_event": alarm is not None,
                     "ingress_ts": ingress_ts,
+                    # T4 D3 — DRF 룰 단독 fire (레거시 경로). 활성화 모드에서는
+                    # fastapi 가 직접 push 하므로 본 fallback 미사용.
+                    "source": "static_legacy",
+                    "reason": None,
                 }
             )
             logger.info(
@@ -451,6 +459,10 @@ def fire_power_danger_task(
                     "event_ack_users": _get_event_ack_names(event.id),
                     "is_new_event": alarm is not None,
                     "ingress_ts": ingress_ts,
+                    # T4 D3 — DRF 룰 단독 fire (레거시 경로). 활성화 모드에서는
+                    # fastapi 가 직접 push 하므로 본 fallback 미사용.
+                    "source": "static_legacy",
+                    "reason": None,
                 }
             )
             logger.info(
@@ -520,6 +532,10 @@ def fire_power_warning_task(
                     "event_ack_users": _get_event_ack_names(event.id),
                     "is_new_event": alarm is not None,
                     "ingress_ts": ingress_ts,
+                    # T4 D3 — DRF 룰 단독 fire (레거시 경로). 활성화 모드에서는
+                    # fastapi 가 직접 push 하므로 본 fallback 미사용.
+                    "source": "static_legacy",
+                    "reason": None,
                 }
             )
             logger.info(

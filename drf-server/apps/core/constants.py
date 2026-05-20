@@ -102,6 +102,62 @@ ALGORITHM_SOURCE_PHRASE: dict[str, str] = {
 }
 
 
+# T4 — AlarmRecord.source + push_payload.source 단일 진실 공급원.
+# algorithm_source (AI 안 알고리즘 출처: IF/ARIMA/...) 와 직교 차원.
+# "검출 주체가 AI 냐 정적룰이냐" 1차원만 표현.
+#
+# STATIC_LEGACY 는 T4 도입 전 데이터 backfill 전용 — 신규 알람에 사용 금지.
+# decide_alarm 매트릭스 (D2) 는 STATIC_LEGACY 를 결과로 반환하지 않는다.
+class AlarmSource(models.TextChoices):
+    AI = "ai", "AI"
+    STATIC_COVER_MISS = "static_cover_miss", "정적 보완 (AI 미탐 의심)"
+    STATIC_COVER_INFERENCE_FAIL = (
+        "static_cover_inference_fail",
+        "정적 보완 (AI 추론 실패)",
+    )
+    STATIC_COVER_WARMUP = "static_cover_warmup", "정적 보완 (AI 워밍업)"
+    STATIC_NO_AI_AVAILABLE = "static_no_ai_available", "정적 (AI 비활성 채널)"
+    STATIC_LEGACY = "static_legacy", "정적 (T4 전 데이터)"
+
+
+# source 별 운영자 친화 reason 문구 — push_payload.reason 필드 + 모달 사유 텍스트.
+# None 인 source 는 reason 표시 생략 (일반 알람과 동일 톤).
+# fastapi-server 측 동일 dict 와 단일 동기 — 키 변경 시 양쪽 갱신 필수.
+ALARM_SOURCE_REASON: dict[str, str | None] = {
+    "ai": None,
+    "static_cover_miss": "AI 미탐 의심 — 정적 임계치 초과",
+    "static_cover_inference_fail": "AI 추론 실패 보완",
+    "static_cover_warmup": "AI 윈도우 빌드 중 — 정적룰 보완",
+    "static_no_ai_available": None,
+    "static_legacy": None,
+}
+
+
+# source 별 토스트·모달 배지 라벨 (프론트 분기용).
+# 빈 문자열인 source 는 배지 미표시 — D4 alarm-popup.js 가 truthy 체크로 분기.
+ALARM_SOURCE_BADGE: dict[str, str] = {
+    "ai": "",
+    "static_cover_miss": "AI 미탐 의심",
+    "static_cover_inference_fail": "AI 추론 실패 보완",
+    "static_cover_warmup": "AI 준비 중 보완",
+    "static_no_ai_available": "",
+    "static_legacy": "",
+}
+
+
+# source 별 CSS 시각 톤 키 — 프론트 alarm-popup / event-panel 분기 (D4).
+# - "risk"  : 기존 risk_level 분기 (danger=빨강 / warning=노랑) 그대로
+# - "cover" : 노랑 + .cover-badge (보조 알람 — 운영자 인지 톤 1단계 약화)
+ALARM_SOURCE_TONE: dict[str, str] = {
+    "ai": "risk",
+    "static_cover_miss": "cover",
+    "static_cover_inference_fail": "cover",
+    "static_cover_warmup": "cover",
+    "static_no_ai_available": "risk",
+    "static_legacy": "risk",
+}
+
+
 # AI 추론 위험도 → 룰 측 RiskLevel 매핑.
 # AI 모델은 4단계(normal/caution/predict_warn/danger), 룰은 3단계(normal/warning/danger).
 # Step 3 AI mute 가드에서 "AI 발화 레벨 이상의 룰 fire 를 60s suppress" 로직의 단일

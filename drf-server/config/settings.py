@@ -219,6 +219,9 @@ FASTAPI_INTERNAL_URL = env("FASTAPI_INTERNAL_URL", default="http://127.0.0.1:800
 # 빈 문자열이면 인증 비활성 (기존 동작 유지). 운영에서는 양 서비스에 동일 값 설정.
 INTERNAL_SERVICE_TOKEN = env("INTERNAL_SERVICE_TOKEN", default="")
 
+# T4 D3 — True 시 DRF 정적 fire skip (fastapi 단일 결정자). False = 레거시.
+STATIC_THRESHOLD_AT_FASTAPI = env.bool("STATIC_THRESHOLD_AT_FASTAPI", default=False)
+
 # ── 프론트엔드 노출용 URL (config.js로 주입) ───────────────
 # 브라우저가 fastapi-server에 접속할 때 사용하는 공개 주소.
 # 운영 환경에서는 도메인/HTTPS로 교체.

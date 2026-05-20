@@ -2,7 +2,7 @@
 from django.conf import settings
 from django.db import models
 
-from apps.core.constants import AlarmType, GasTypeChoices, RiskLevel
+from apps.core.constants import AlarmSource, AlarmType, GasTypeChoices, RiskLevel
 from apps.core.models.base import BaseModel
 
 
@@ -125,6 +125,23 @@ class AlarmRecord(BaseModel):
         help_text=(
             "power/gas anomaly_ai 알람만 채움. isolation_forest / arima / "
             "combined / night_abnormal. 룰 알람은 빈 문자열 또는 NULL."
+        ),
+    )
+    # T4 — 검출 주체 (AI vs 정적룰). algorithm_source 와 직교 차원 — 같은 행에
+    # 동시 존재 가능. decide_alarm 매트릭스 (D2) 가 결정. STATIC_LEGACY 는 T4
+    # 도입 전 데이터 backfill 전용 — 신규 알람에 사용 금지. null=True 는 0017
+    # 패턴과 동일 (SQLite ALTER TABLE 안전).
+    source = models.CharField(
+        max_length=30,
+        choices=AlarmSource.choices,
+        blank=True,
+        null=True,
+        default="",
+        verbose_name="검출 주체 (AI vs 정적)",
+        help_text=(
+            "T4 도입 후 알람: ai / static_cover_miss / static_cover_inference_fail "
+            "/ static_cover_warmup / static_no_ai_available. T4 전 데이터는 "
+            "static_legacy (backfill)."
         ),
     )
     # created_at / updated_at / updated_by 는 BaseModel 상속 (save override로 수정 차단)

@@ -22,6 +22,34 @@ def test_alarm_payload_without_anomaly_meta_ok():
     assert p.anomaly_meta is None
 
 
+# T4 D3 — source / reason 필드 검증.
+
+
+def test_alarm_payload_source_reason_default_none():
+    """source / reason 미지정 시 None — 옛 발신자 호환."""
+    p = AlarmPayload(**_base_payload())
+    assert p.source is None
+    assert p.reason is None
+
+
+def test_alarm_payload_accepts_source_reason():
+    """T4 신규 — source / reason 명시 지정 통과."""
+    p = AlarmPayload(
+        **_base_payload(),
+        source="static_cover_miss",
+        reason="AI 미탐 의심 — 정적 임계치 초과",
+    )
+    assert p.source == "static_cover_miss"
+    assert p.reason == "AI 미탐 의심 — 정적 임계치 초과"
+
+
+def test_alarm_payload_silent_drops_unknown_key():
+    """extra=ignore — 미정의 키 통과하되 모델에 안 들어감."""
+    p = AlarmPayload(**_base_payload(), surprise_field="dropped")
+    # 알 수 없는 키는 무시됨 (T3 silent drop 패턴 — push_alarm_handler 에서 WARN 로깅)
+    assert not hasattr(p, "surprise_field")
+
+
 def test_alarm_payload_with_anomaly_meta_ok():
     p = AlarmPayload(
         **_base_payload(),

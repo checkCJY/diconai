@@ -37,7 +37,9 @@ class AnomalyMeta(BaseModel):
 
 
 class AlarmPayload(BaseModel):
-    # 미정의 필드는 통과시키지 않음 — DRF Celery 측이 명시 필드만 보내야 함
+    # 미정의 필드는 통과시키지 않음 — DRF Celery 측이 명시 필드만 보내야 함.
+    # T4 D3 — extra=ignore 유지 (시연 후 staged forbid 전환, plan §1 #5). 본 commit
+    # 에서는 push_alarm_handler 가 unknown 키 WARN 로깅으로 silent drop 가시화.
     model_config = {"extra": "ignore"}
 
     alarm_type: str
@@ -70,6 +72,13 @@ class AlarmPayload(BaseModel):
     event_ack_users: list[str] = []
     # E2E latency 측정용 — IoT 수신 시각(Unix time). alarm_flush_loop에서 소비.
     ingress_ts: float | None = None
+    # T4 D3 — 검출 주체 (ai / static_cover_* / static_no_ai_available / static_legacy).
+    # decide_alarm 매트릭스 (D2) 결과 또는 DRF tasks.py fallback. 프론트가 시각 톤·
+    # 배지 분기 (D4). None 허용 — 옛 발신자 호환.
+    source: str | None = None
+    # T4 D3 — source 별 운영자 친화 사유 문구 (ALARM_SOURCE_REASON lookup 결과).
+    # 모달·토스트 보조 텍스트. ai / static_no_ai_available / static_legacy 는 None.
+    reason: str | None = None
 
 
 @router.post(
@@ -88,6 +97,24 @@ class AlarmPayload(BaseModel):
     },
 )
 async def push_alarm_handler(request: Request, alarm: AlarmPayload):
+    # T4 D3 — AlarmPayload.model_config=extra:ignore 라 미정의 필드는 silent drop.
+    # T3 (event_ack_users 누락) 같은 사고 재발 방지를 위해 raw body 의 키를 모델
+    # 정의 필드와 비교해 차이를 WARN. forbid 전환 (시연 후) 전 1단계 가시화.
+    try:
+        raw_body = await request.json()
+        if isinstance(raw_body, dict):
+            unknown = set(raw_body) - set(AlarmPayload.model_fields)
+            if unknown:
+                logger.warning(
+                    "[alarm_router] unknown payload keys=%s alarm_type=%s "
+                    "— silent drop (extra=ignore)",
+                    sorted(unknown),
+                    raw_body.get("alarm_type"),
+                )
+    except Exception:
+        # raw body 파싱 실패는 본 흐름 비차단 — Pydantic 검증 단계에서 422 처리.
+        pass
+
     # 인증 정책:
     #   - INTERNAL_SERVICE_TOKEN 설정 시 → Bearer 토큰으로만 검증 (IP 체크 생략).
     #     도커 네트워크에선 celery-worker가 컨테이너 IP(예: 172.x.x.x)로 접속하므로
