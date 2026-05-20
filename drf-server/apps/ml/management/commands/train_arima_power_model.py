@@ -80,7 +80,10 @@ class Command(BaseCommand):
         parser.add_argument(
             "--max-rows",
             type=int,
-            default=3000,
+            default=10000,
+            # 3000 (이전 default) 시 5분 주기 데이터 기준 ~10일 윈도우 — 하루의 시간대
+            # 변동(주간 0.55 / 야간 0.15) 일부만 학습되어 ConvergenceWarning + ci 폭 0
+            # 회귀 발생 (2026-05-21 확인). 10000 으로 전체 시간대 패턴 학습 보장.
             help="학습에 사용할 최근 row 수 상한 (학습 시간 제한)",
         )
         parser.add_argument(

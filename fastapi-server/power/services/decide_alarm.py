@@ -35,11 +35,17 @@ class AlarmDecision:
 
 
 def _ai_combined_to_risk_level(combined: str) -> str:
-    """AI 4단계 → UI 3단계 RiskLevel 매핑 (RiskLevel 3단계 한계로 합침)."""
+    """AI 5단계 → UI 3단계 RiskLevel 매핑 (RiskLevel 3단계 한계로 합침).
+
+    combine_risk_5axis 출력 도메인:
+        normal / caution / predict_warn / warning / danger
+    "warning" 누락 시 silent fallback "normal" → 시연 알람 미발화 회귀.
+    """
     return {
         "normal": "normal",
         "caution": "warning",
         "predict_warn": "warning",
+        "warning": "warning",
         "danger": "danger",
     }.get(combined, "normal")
 
@@ -69,7 +75,7 @@ def decide_alarm(
     Args:
         ai_state: get_ai_state 결과. None 은 Redis 장애·만료 — DISABLED 동등 분기.
         ai_combined_risk: combine_risk_5axis 결과 ('normal' / 'caution' /
-            'predict_warn' / 'danger'). FIRED 일 때 risk_level 환산용.
+            'predict_warn' / 'warning' / 'danger'). FIRED 일 때 risk_level 환산용.
         static_risk: evaluate_static_risk_from_cache 결과
             ('normal' / 'warning' / 'danger'). 'warning'|'danger' = fired.
 
