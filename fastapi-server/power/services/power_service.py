@@ -27,7 +27,17 @@ from power.services.change_point_service import detect_change_point
 from power.services.channel_meta_cache import get_channel_entry
 from power.services.quality_guard import classify_sensor_status, is_inference_stuck
 from power.services.threshold_eval import calculate_power_risk
-from core.metrics import AI_INFERENCE_DURATION, AI_INFERENCE_FAILED_TOTAL
+from core.metrics import (
+    AI_INFERENCE_DURATION,
+    AI_INFERENCE_FAILED_TOTAL,
+    # 정휘훈 작업 — 전력 AI 흐름별 모니터링 메트릭
+    POWER_AI_QUALITY_SKIP_TOTAL,
+    POWER_AI_RATE_LIMITED_TOTAL,
+    POWER_AI_AXIS_FIRED_TOTAL,
+    POWER_AI_INFERENCE_TOTAL,
+    POWER_AI_COMBINED_TOTAL,
+    POWER_AI_ALARM_FIRED_TOTAL,
+)
 from services.anomaly_alarm import forward_inference_e2e
 from services.drf_client import post_to_drf
 from websocket.state import power_latest
@@ -201,6 +211,9 @@ async def process_anomaly_inference(
                 value,
                 status,
             )
+            # 정휘훈 작업 — comm_failure / sensor_fault_overflow skip 카운터.
+            # 이 값이 올라가면 센서 불량으로 AI가 조용히 멈춰있는 상태.
+            POWER_AI_QUALITY_SKIP_TOTAL.labels(status).inc()
             continue
         win = _power_windows[(channel, data_type)]
         win.append(float(value))
@@ -214,15 +227,24 @@ async def process_anomaly_inference(
                 channel,
                 data_type,
             )
+            # 정휘훈 작업 — sensor_fault_stuck skip 카운터.
+            POWER_AI_QUALITY_SKIP_TOTAL.labels("sensor_fault_stuck").inc()
             continue
 
         try:
             sensor_identifier = f"power:device_{device_id}:ch{channel}:{data_type}"
 
-            entry = await _get_or_load("power")
+            # sensor_identifier 를 명시해야 DRF ActiveMLModelView 에서 정확히 매칭됨.
+            # _get_or_load 기본값 sensor_identifier="" 로 호출하면 DRF 가 404 반환 —
+            # train_anomaly_model 이 "power:device_1:ch1:watt" 로 등록했기 때문.
+            entry = await _get_or_load("power", sensor_identifier=sensor_identifier)
             if entry is None:
                 AI_INFERENCE_FAILED_TOTAL.labels("power_if", "model_not_loaded").inc()
                 continue
+            # 정휘훈 작업 — 추론 실행 횟수 카운터.
+            # quality_guard·윈도우 warmup을 모두 통과한 실제 추론 횟수.
+            # 갑자기 0이 되면 FastAPI 재시작으로 윈도우가 초기화된 신호.
+            POWER_AI_INFERENCE_TOTAL.inc()
             # P2 전 — IF 추론 실행 시간 측정
             _infer_start = time.time()
             row = _build_feature_row(list(win), entry.window)
@@ -316,6 +338,10 @@ async def process_anomaly_inference(
                         combined = escalated
                         night_escalated = True
 
+            # 정휘훈 작업 — 최종 판정 분포 카운터 (야간 격상 후 최종 combined 기준).
+            # danger 비율이 너무 높으면 과탐지, normal이 99%이면 과소탐지 신호.
+            POWER_AI_COMBINED_TOTAL.labels(combined).inc()
+
             # W4.a + §F algorithm_source — AlarmRecord.algorithm_source 저장.
             # priority: night > combined > change_point* > arima > zscore* > IF.
             # *) z/cp 는 escalation_source 가 일치할 때만 라벨로 채택 — base 가 이미
@@ -370,6 +396,21 @@ async def process_anomaly_inference(
 
             # should_fire = (발화 레벨) AND (rate limit 통과). False 면 helper 가
             # push/alarm forward skip, ML forward 만 진행 (운영 추적 유지).
+            # 정휘훈 작업 — 5축 발화 카운터.
+            # combined이 발화 레벨일 때 어느 축이 기여했는지 기록.
+            # 특정 axis만 과도하게 높으면 해당 임계값 조정 필요 신호.
+            if combined in _FIRE_LEVELS:
+                if prediction == "anomaly":
+                    POWER_AI_AXIS_FIRED_TOTAL.labels("if").inc()
+                if arima_violation:
+                    POWER_AI_AXIS_FIRED_TOTAL.labels("arima").inc()
+                if z_score_anomaly:
+                    POWER_AI_AXIS_FIRED_TOTAL.labels("zscore").inc()
+                if change_point:
+                    POWER_AI_AXIS_FIRED_TOTAL.labels("change_point").inc()
+                if night_escalated:
+                    POWER_AI_AXIS_FIRED_TOTAL.labels("night").inc()
+
             should_fire = combined in _FIRE_LEVELS
             if should_fire:
                 now_ts = time.time()
@@ -382,9 +423,15 @@ async def process_anomaly_inference(
                         combined,
                         now_ts - last_ts,
                     )
+                    # 정휘훈 작업 — rate limit 억제 카운터.
+                    # 이 값이 높으면 이상이 지속되는데 운영자에게 안 전달되는 상태.
+                    POWER_AI_RATE_LIMITED_TOTAL.inc()
                     should_fire = False
                 else:
                     _last_fired_at[sensor_identifier] = now_ts
+                    # 정휘훈 작업 — rate limit 통과 실제 발화 카운터.
+                    # combined danger 횟수 대비 이 값이 낮으면 rate limit 또는 Redis/WS 문제.
+                    POWER_AI_ALARM_FIRED_TOTAL.labels(algorithm_source).inc()
 
             label = entry_meta.get("name") or f"CH{channel}"
             # W4.a — algorithm_source 라벨을 summary 에 prefix. 토스트가 즉시
