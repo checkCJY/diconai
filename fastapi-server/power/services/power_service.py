@@ -70,9 +70,15 @@ _COMBINED_TO_RISK_LEVEL = {
 }
 _FIRE_LEVELS = {"caution", "predict_warn", "danger"}
 
-# 본 sprint active 모델은 (device_1, ch1, watt) 한 채널만 학습됨.
-# 다른 채널은 학습 분포 안 맞아 false positive ↑ → §3 multi-channel sprint 까지 비활성.
-_INFERENCE_ENABLED_CHANNELS: set[tuple[int, str]] = {(1, "watt")}
+# 시연용 PoC 확장 (2026-05-20): 부하 프로파일 다양성 검증을 위해 ch1 외 3개 채널 추가.
+# ch9 (메인 전력반 15kW 3상) / ch14 (공조 5.5kW) / ch15 (조명 1kW 220V 단상).
+# 각 채널별 IF + ARIMA 모델이 별도 학습됨 (sensor_identifier mac 단위 매칭).
+_INFERENCE_ENABLED_CHANNELS: set[tuple[int, str]] = {
+    (1, "watt"),
+    (9, "watt"),
+    (14, "watt"),
+    (15, "watt"),
+}
 
 # 알람 발화 rate limit — 같은 sensor_identifier 60초당 1회 (operator UX).
 # 의도: 같은 센서에서 같은 위험이 60s 안 재발생 시 알람 push skip

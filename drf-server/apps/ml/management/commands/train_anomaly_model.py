@@ -33,6 +33,7 @@ from django.db import transaction
 from django.utils.dateparse import parse_datetime
 from sklearn.ensemble import IsolationForest
 
+from apps.facilities.models import PowerDevice
 from apps.ml.models import MLModel
 from apps.ml.services.dataset_service import (
     TimeSeries,
@@ -255,8 +256,15 @@ class Command(BaseCommand):
         # fastapi 측 W2 _get_or_load 가 sensor_identifier 기반 우선 매칭, 없으면 ""
         # fallback 으로 정리.
         if sensor_type == "power":
+            # PK → raw mac 변환. 추론 측 (fastapi power_service) sensor_identifier
+            # 와 일관성 보장: "power:device_{mac}:ch{n}:{type}". PK 그대로 사용 시
+            # 추론에서 매칭 실패 → silent fallback 으로 IF 미동작.
+            try:
+                device_obj = PowerDevice.objects.get(pk=opts["device_id"])
+            except PowerDevice.DoesNotExist as exc:
+                raise CommandError(f"PowerDevice PK={opts['device_id']} 없음") from exc
             sensor_identifier = (
-                f"power:device_{opts['device_id']}"
+                f"power:device_{device_obj.device_id}"
                 f":ch{opts['channel']}:{opts['data_type']}"
             )
         elif sensor_type == "gas":
