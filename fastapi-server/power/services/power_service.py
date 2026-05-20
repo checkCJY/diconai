@@ -66,9 +66,10 @@ _COMBINED_TO_RISK_LEVEL = {
     "normal": "normal",
     "caution": "warning",
     "predict_warn": "warning",
+    "warning": "warning",
     "danger": "danger",
 }
-_FIRE_LEVELS = {"caution", "predict_warn", "danger"}
+_FIRE_LEVELS = {"caution", "predict_warn", "warning", "danger"}
 
 # 시연용 PoC 확장 (2026-05-20): 부하 프로파일 다양성 검증을 위해 ch1 외 3개 채널 추가.
 # ch9 (메인 전력반 15kW 3상) / ch14 (공조 5.5kW) / ch15 (조명 1kW 220V 단상).

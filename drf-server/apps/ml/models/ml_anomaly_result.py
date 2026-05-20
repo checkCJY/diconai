@@ -15,9 +15,13 @@ class MLAnomalyResult(models.Model):
         ANOMALY = "anomaly", "이상"
 
     class RiskClassified(models.TextChoices):
+        # fastapi combine_risk_5axis 와 vocab 동기화 (2026-05-21).
+        # 외부 리뷰어 #1 (a/c path 충돌) 본체 해결: "warning" 은 3축 매트릭스에서
+        # 정적 임계 + AI 신호 부분 동의 시 의도적 격상값. 누락 시 forward 400 발생.
         NORMAL = "normal", "정상"
         CAUTION = "caution", "주의"
         PREDICT_WARN = "predict_warn", "예측경고"
+        WARNING = "warning", "경고"
         DANGER = "danger", "위험"
 
     ml_model = models.ForeignKey(
