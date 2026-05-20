@@ -127,3 +127,84 @@ AI_INFERENCE_FAILED_TOTAL = Counter(
     "AI inference failures (model not loaded or exception during predict)",
     ["model_type", "reason"],
 )
+
+# ── 전력 AI 모니터링 메트릭 (정휘훈 작업) ────────────────────────────────────
+# 전력 AI 추론 흐름의 각 구간을 메트릭으로 관찰한다.
+# "AI가 왜 안 움직이냐"는 질문이 왔을 때 Grafana만 보고 원인 구간을 특정하는 것이 목표.
+
+# quality_guard skip 횟수 —
+#   센서 불량(통신 단절/오버플로우/고착)으로 AI 윈도우 적재가 skip된 횟수.
+#   이 카운터가 올라가면 데이터는 들어오는데 AI가 조용히 멈춰있는 상태.
+#   reason 레이블로 어떤 종류의 불량인지 구분해 센서 점검 방향을 잡는다.
+#
+# 레이블:
+#   reason : "comm_failure"        — 센서 통신 단절 (-1 또는 None)
+#            "sensor_fault_overflow" — 물리적으로 말이 안 되는 큰 값
+#            "sensor_fault_stuck"    — 30개가 전부 동일값 (센서 고착 고장)
+POWER_AI_QUALITY_SKIP_TOTAL = Counter(
+    "power_ai_quality_skip_total",
+    "Number of power AI inference skips due to sensor data quality issues",
+    ["reason"],
+)
+
+# rate limit 억제 횟수 —
+#   같은 채널에서 60초 이내 재발화가 억제된 횟수.
+#   "알람이 1번만 왔다"는 신고가 왔을 때 이 카운터를 보면 즉시 원인 확인 가능.
+#   이 값이 높으면 이상이 지속되고 있지만 운영자에게 전달이 안 되는 상태.
+POWER_AI_RATE_LIMITED_TOTAL = Counter(
+    "power_ai_rate_limited_total",
+    "Number of power AI alarms suppressed by rate limit (60s per channel)",
+)
+
+# 5축 발화 횟수 —
+#   IF / ARIMA / Z-score / Change Point / 야간 가동 중 어느 축이 이상 판정에 기여했는지.
+#   특정 axis 카운터만 비정상적으로 높으면 그 축이 과탐지하고 있는 것.
+#   오탐 신고가 왔을 때 어느 임계값을 조정해야 할지 특정하는 근거로 사용.
+#
+# 레이블:
+#   axis : "if"           — Isolation Forest 이상 판정
+#          "arima"        — ARIMA 신뢰구간 이탈
+#          "zscore"       — Z-score 3σ 초과
+#          "change_point" — Change Point STABLE→SHIFT 전이
+#          "night"        — 야간 가동 격상
+POWER_AI_AXIS_FIRED_TOTAL = Counter(
+    "power_ai_axis_fired_total",
+    "Number of times each detection axis contributed to power AI anomaly judgment",
+    ["axis"],
+)
+
+# 추론 실행 횟수 —
+#   AI 추론이 실제로 실행된 횟수 (quality_guard / 윈도우 미충족 skip 이후).
+#   sensor_last_received 갱신 횟수 대비 이 값이 낮으면 skip이 많다는 신호.
+#   갑자기 0이 되면 FastAPI 재시작으로 윈도우가 초기화됐을 가능성.
+POWER_AI_INFERENCE_TOTAL = Counter(
+    "power_ai_inference_total",
+    "Number of power AI inference executions (after quality_guard and window warmup)",
+)
+
+# 최종 판정 분포 —
+#   5축 종합 후 나온 판정 결과(normal/caution/predict_warn/danger)가 각각 몇 번인지.
+#   danger 비율이 90% 이상이면 AI가 너무 예민한 것, normal이 99% 이상이면 너무 둔한 것.
+#   일주일치 추이를 보면 모델 재학습이 필요한 시점 판단 가능.
+#
+# 레이블:
+#   combined : "normal" | "caution" | "predict_warn" | "danger"
+POWER_AI_COMBINED_TOTAL = Counter(
+    "power_ai_combined_total",
+    "Distribution of power AI combined risk judgments",
+    ["combined"],
+)
+
+# 실제 알람 발화 횟수 —
+#   rate limit을 통과해서 실제로 Redis 큐까지 전달된 알람 횟수.
+#   combined danger 횟수 대비 이 값이 낮으면 rate limit이 타이트하거나 전달 문제.
+#   갑자기 0이 되면 추론은 되는데 브라우저에 안 닿는 상태 — Redis/WS 확인 필요.
+#
+# 레이블:
+#   algorithm_source : "isolation_forest" | "arima" | "combined" | "zscore" |
+#                      "change_point" | "night_abnormal"
+POWER_AI_ALARM_FIRED_TOTAL = Counter(
+    "power_ai_alarm_fired_total",
+    "Number of power AI alarms actually fired (passed rate limit and sent to Redis queue)",
+    ["algorithm_source"],
+)
