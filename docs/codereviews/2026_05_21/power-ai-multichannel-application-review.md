@@ -528,6 +528,13 @@ docker compose exec drf curl -sS -w "\nHTTP_STATUS=%{http_code}\n" \
 
 ## 6. 팀원·팀장 환경 설정 가이드
 
+> **전제**: Docker Compose 가 이미 가동 중 (`drf`, `fastapi` Up).
+> **주의**: `.pkl` 파일은 `.gitignore` 정책상 git 에 안 들어감 (`drf-server/ml_models/`). **각자 학습 필수** — STEP 3·4 건너뛰면 시연 화면에 IF/ARIMA 추론 0건.
+>
+> 이 섹션만 처음부터 끝까지 따라 실행하면 됩니다. 다른 섹션 점프 불필요.
+
+---
+
 ### STEP 0 — 코드 받기
 
 ```bash
@@ -536,45 +543,274 @@ git checkout feature/0519_power_add_chanel
 git pull
 ```
 
-### STEP 1 — DRF migration 적용
+**이걸 받으면 같이 오는 것**: 코드 + migration 파일 + 문서. **안 오는 것**: 학습된 `.pkl` 모델 (각자 학습).
 
-```bash
-docker compose exec drf python manage.py showmigrations ml
-```
+---
 
-`[X] 0003_alter_mlanomalyresult_risk_classified` 확인. 없으면:
+### STEP 1 — DRF migration 적용 (RiskClassified WARNING enum)
+
+왜: forward payload 의 `risk_classified="warning"` 을 DRF 가 받아주려면 enum 추가 필요. 안 하면 추론 시 DRF 400 폭주.
 
 ```bash
 docker compose exec drf python manage.py migrate ml
 ```
 
-### STEP 2 — 모델 학습 (위 §4 STEP 1, STEP 2)
+확인:
 
-ch1/9/14/15 IF + ARIMA 총 8회 학습.
+```bash
+docker compose exec drf python manage.py showmigrations ml
+```
 
-### STEP 3 — fastapi 재시작 + 캐시 갱신
+**기대 출력** (`0003` 옆에 `[X]` 표시):
 
-활성화 플래그가 코드 변경이라 재시작 필요:
+```
+ml
+ [X] 0001_initial
+ [X] 0002_algorithm_sensor_identifier
+ [X] 0003_alter_mlanomalyresult_risk_classified
+```
+
+---
+
+### STEP 2 — 학습 데이터 기간 확인
+
+학습 명령에 `--since` / `--until` 을 넣어야 하는데, **DB 에 실제 데이터가 있는 기간** 으로 잡아야 함. 더미가 돌고 있는 환경이라면 보통 최근 7~14일.
+
+```bash
+docker compose exec drf python manage.py shell -c "
+from apps.monitoring.models import PowerData
+qs = PowerData.objects.filter(power_device_id=1, channel=1, data_type='watt')
+print(f'min: {qs.order_by(\"measured_at\").first().measured_at}')
+print(f'max: {qs.order_by(\"-measured_at\").first().measured_at}')
+print(f'count: {qs.count()}')
+"
+```
+
+**기대 출력 예시**:
+
+```
+min: 2026-05-13 00:00:01+00:00
+max: 2026-05-20 23:59:58+00:00
+count: 31451
+```
+
+→ 이 기간을 아래 STEP 3·4 의 `SINCE` / `UNTIL` 환경변수에 넣으세요.
+
+---
+
+### STEP 3 — ARIMA 학습 (4채널, ~5분)
+
+왜: ARIMA 는 시계열 예측 기반 이상탐지. 채널별 부하 패턴이 달라 채널마다 별도 모델 필요.
+
+```bash
+SINCE=2026-05-13
+UNTIL=2026-05-20
+
+for CH in 1 9 14 15; do
+  docker compose exec -T drf python manage.py train_arima_power_model \
+    --device-id 1 \
+    --channel $CH \
+    --data-type watt \
+    --since $SINCE --until $UNTIL \
+    --activate
+done
+```
+
+**각 채널에서 기대 출력** (4번 반복):
+
+```
+[1/4] dataset 추출 — power:device_63200c3afd12:chN:watt (...)
+[2/4] ARIMA(1, 1, 1) 학습 중 — 최근 10000 rows 사용
+[3/4] joblib.dump → /app/ml_models/power_arima_v{N}_...pkl
+[4/4] MLModel row 생성 — version v{N}
+학습 완료
+  MLModel.id          = {새 id}
+  sensor_identifier   = power:device_63200c3afd12:chN:watt
+  order               = (1, 1, 1)
+  is_active           = True
+```
+
+**⚠ 실패 신호**: `ConvergenceWarning: Maximum Likelihood optimization failed` 가 보이면 ARIMA fit 실패. `--max-rows 10000` (default) 인데도 발생 시 학습 데이터 기간을 더 넓혀보세요.
+
+---
+
+### STEP 4 — IF 학습 (4채널, ~3분)
+
+왜: IF (IsolationForest) 는 통계 기반 이상탐지. ARIMA 와 독립적으로 학습 (각자 다른 신호 잡음).
+
+```bash
+for CH in 1 9 14 15; do
+  docker compose exec -T drf python manage.py train_anomaly_model \
+    --sensor-type power \
+    --device-id 1 \
+    --channel $CH \
+    --data-type watt \
+    --since $SINCE --until $UNTIL \
+    --contamination 0.01 \
+    --activate
+done
+```
+
+**각 채널에서 기대 출력** (4번 반복):
+
+```
+[1/5] dataset 추출 — sensor_type=power
+      raw rows = {N} (sensor_identifier=power:device_63200c3afd12:chN:watt)
+[2/5] feature engineering — window=30
+      feature shape = ({N-29}, 4), columns = ['value', 'roll_mean_30', 'roll_std_30', 'diff']
+[3/5] IsolationForest fit — contamination=0.01, n_estimators=100
+[4/5] joblib.dump → /app/ml_models/power_if_v{N}.pkl
+[5/5] MLModel row 생성 — version v{N} sensor_identifier='power:device_63200c3afd12:chN:watt'
+학습 완료
+  MLModel.id           = {새 id}
+  in-sample anomaly    = ~1% (contamination 설정 1.00%)
+```
+
+**⚠ 실패 신호**: `sensor_identifier='power:device_1:chN:watt'` (PK 표기) 가 보이면 옛 코드로 학습 중. `git pull` 다시 확인.
+
+---
+
+### STEP 5 — 학습 결과 점검
+
+총 8개 모델 (IF 4 + ARIMA 4) 이 활성 상태인지 확인:
+
+```bash
+docker compose exec -T drf python manage.py shell -c "
+from apps.ml.models import MLModel
+for m in MLModel.objects.filter(sensor_type='power', is_active=True).order_by('algorithm', 'sensor_identifier'):
+    print(f'id={m.id:>2} {m.algorithm:>18} ver={m.version} sid={m.sensor_identifier!r}')
+"
+```
+
+**기대 출력** (id 번호는 환경마다 다름):
+
+```
+id=XX              arima ver=N sid='power:device_63200c3afd12:ch1:watt'
+id=XX              arima ver=N sid='power:device_63200c3afd12:ch9:watt'
+id=XX              arima ver=N sid='power:device_63200c3afd12:ch14:watt'
+id=XX              arima ver=N sid='power:device_63200c3afd12:ch15:watt'
+id=XX   isolation_forest ver=N sid='power:device_63200c3afd12:ch1:watt'
+id=XX   isolation_forest ver=N sid='power:device_63200c3afd12:ch9:watt'
+id=XX   isolation_forest ver=N sid='power:device_63200c3afd12:ch14:watt'
+id=XX   isolation_forest ver=N sid='power:device_63200c3afd12:ch15:watt'
+```
+
+**핵심 체크 4가지**:
+- 행이 정확히 **8줄**
+- `sensor_identifier` 가 모두 **`power:device_63200c3afd12:chN:watt`** 형식 (`device_1` 아님)
+- 4채널: 1, 9, 14, 15 만 (다른 채널 X)
+- 두 algorithm: `arima` + `isolation_forest`
+
+→ 하나라도 빠지면 STEP 3·4 재실행.
+
+---
+
+### STEP 6 — fastapi 재시작 + 캐시 갱신
+
+왜:
+- 재시작: `_INFERENCE_ENABLED_CHANNELS` 4채널 변경은 코드 import 시점에 한 번만 읽음. 재시작해야 반영.
+- 캐시 갱신: 학습 직후 새 `.pkl` 을 fastapi 가 즉시 로드하도록 강제.
 
 ```bash
 docker compose restart fastapi
 ```
 
-이후 캐시 evict (학습 후 새 모델 로드 강제):
+**healthy 대기**:
+
+```bash
+until docker compose ps fastapi | grep -q "healthy"; do sleep 2; done
+echo "fastapi healthy"
+```
+
+**캐시 evict**:
 
 ```bash
 curl -X POST "http://localhost:8001/ai/reload?sensor_type=power"
 ```
 
-### STEP 4 — 더미 실행
+**기대 응답** (8개 evicted key 가 나옴):
+
+```json
+{"status":"ok","evicted":[
+  ["power","isolation_forest","power:device_63200c3afd12:ch1:watt"],
+  ["power","arima","power:device_63200c3afd12:ch1:watt"],
+  ["power","isolation_forest","power:device_63200c3afd12:ch9:watt"],
+  ["power","arima","power:device_63200c3afd12:ch9:watt"],
+  ["power","isolation_forest","power:device_63200c3afd12:ch14:watt"],
+  ["power","arima","power:device_63200c3afd12:ch14:watt"],
+  ["power","isolation_forest","power:device_63200c3afd12:ch15:watt"],
+  ["power","arima","power:device_63200c3afd12:ch15:watt"]
+]}
+```
+
+→ evicted 가 8개가 아니거나 비어있으면, fastapi 재시작 직후라 캐시가 비어있는 상태. 정상 (다음 추론 시 새로 로드됨).
+
+---
+
+### STEP 7 — 더미 실행 (추론 분기 trigger)
+
+왜: `.pkl` 파일이 있어도 데이터가 안 들어오면 추론이 실행되지 않음. 더미가 watt 데이터를 흘려줘야 추론 분기 진입.
 
 ```bash
 docker exec -d diconai-fastapi-1 python -m dummies.power_dummy
 ```
 
-### STEP 5 — 적용 증거 확인 (위 §5 항목 5-1 ~ 5-4 순서대로 실행)
+(`-d` = detached. 컨테이너 안에서 백그라운드 실행)
 
-8개 로드 라인 + 4채널 추론 활동 + ci 폭 0건 + DRF 400 0건 — 4가지 모두 통과해야 적용 완료.
+**90초 정도 기다리세요** (추론 window 30틱 × 3초 = warming-up).
+
+---
+
+### STEP 8 — 적용 검증 (4단계)
+
+**8-1. 모델 로드 라인 8개 확인 (IF 4 + ARIMA 4)**
+
+```bash
+docker compose logs fastapi --since 5m | grep -E "IF loaded|ARIMA loaded" | sort -u
+```
+
+**기대**: 8줄. ch1/9/14/15 각각 IF·ARIMA. 빠진 채널 있으면 STEP 6 캐시 evict 재시도.
+
+**8-2. 4채널 추론 활동 확인**
+
+```bash
+for ch in 1 9 14 15; do
+  total=$(docker compose logs fastapi --since 3m | grep -c "ch=${ch} watt")
+  printf "ch%-3s: %s건\n" "$ch" "$total"
+done
+```
+
+**기대**: 4채널 모두 100건 이상 (3분 기준 더미 3초 주기 = ~60건 ×  data_type 1종). 0건 채널이 있으면 STEP 5 활성 모델 확인.
+
+**8-3. ARIMA CI 폭 정상 (ci 폭 0 비율 0%)**
+
+```bash
+docker compose logs fastapi --since 3m | \
+  grep -oE "arima_fc=[0-9.]+ ci=\[[0-9.]+,[0-9.]+\]" | head -100 | \
+  awk -F'[][,= ]' '{ w=$6-$5; if(w<0.1) z++; else nz++ } END {
+    printf "ci 폭 0:    %d 건\nci 폭 > 0: %d 건\n", z+0, nz+0 }'
+```
+
+**기대**: `ci 폭 0: 0 건` (전체가 폭 > 0). 75% 이상이 폭 0 이면 ARIMA fit 실패 — STEP 3 재실행.
+
+**8-4. DRF forward 400 0건**
+
+```bash
+docker compose logs fastapi --since 3m | grep -c "anomaly_forward_ml.*non_success.*status=400"
+```
+
+**기대**: `0`. 1건이라도 나오면 STEP 1 migration 미적용.
+
+---
+
+### 4가지 모두 통과 = 적용 완료
+
+| 체크 | 통과 기준 |
+|---|---|
+| 8-1 모델 로드 | 8개 라인 (IF 4 + ARIMA 4) |
+| 8-2 추론 활동 | 4채널 모두 100건↑ |
+| 8-3 ARIMA CI | ci 폭 0 비율 0% |
+| 8-4 DRF 400 | 0건 |
 
 ---
 
