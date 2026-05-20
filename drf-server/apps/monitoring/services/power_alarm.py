@@ -18,7 +18,12 @@
 #
 # 채널 라벨: PowerDevice.channel_meta[str(ch)]["name"] 우선, 미지정 시 "CH{n}".
 
+import logging
+from datetime import timedelta
+
+from django.conf import settings
 from django.core.cache import cache
+from django.utils import timezone
 
 from apps.alerts.services.alarm_dedupe import (
     clear_state,
@@ -33,12 +38,23 @@ from apps.alerts.tasks import (
     fire_power_warning_task,
 )
 from apps.core.constants import RiskLevel
-from apps.core.metrics import RULE_FIRE_SUPPRESSED_BY_AI_TOTAL
+from apps.core.metrics import (
+    RULE_FIRE_SUPPRESSED_BY_AI_TOTAL,
+    STATIC_AUDIT_MISMATCH_TOTAL,
+    STATIC_FIRE_SUPPRESSED_BY_FASTAPI_TOTAL,
+)
 from apps.facilities.services.threshold_service import (
     evaluate_current_risk,
     evaluate_power_risk,
     evaluate_voltage_risk,
 )
+
+logger = logging.getLogger(__name__)
+
+# T4 D3 — shadow_audit 비교 window. fastapi 결정 도착까지 round-trip + Celery
+# worker queue + AlarmRecord 생성 여유. 너무 짧으면 false mismatch, 너무 길면
+# 누락 감지 둔감. 5s 기본값 — 시연 후 실측으로 튜닝.
+_AUDIT_WINDOW_SEC = 5
 
 # state_key 캐시 유지 시간. [Step 4 — 1시간 → 1분 단축, 5번 문서 §9 정렬]
 # settings.ALARM_REPOPUP_COOLDOWN_SEC (기본 60s) 와 일치시켜 try_transition / Event cooldown 두 dedup
@@ -116,6 +132,42 @@ def _aggregate_risk(device_id: int, channel: int, axis: str, this_risk: str) -> 
     return _max_risk(levels)
 
 
+def _shadow_audit(device_id: int, channel: int, would_fire_level: str) -> None:
+    """T4 D3 — DRF 정적 평가 결과를 fastapi 결정과 비교 (활성화 모드 전용).
+
+    비활성화 모드 (STATIC_THRESHOLD_AT_FASTAPI=False) 에선 호출 안 됨. 활성화 후
+    DRF 가 fire 했을 알람과 fastapi 가 실제 만든 AlarmRecord 의 정합성 모니터링
+    — 직전 _AUDIT_WINDOW_SEC 안 같은 채널 AlarmRecord 가 없으면 mismatch (fastapi
+    누락 의심).
+
+    1~2주 운영 후 mismatch counter 가 0/낮음이면 정식 제거 (환경변수·shadow_audit
+    삭제). plan §6.1.
+    """
+    if not would_fire_level or would_fire_level == RiskLevel.NORMAL:
+        return  # 정적 평가가 발화 안 했으면 비교 불요
+
+    from apps.alerts.models import AlarmRecord
+
+    cutoff = timezone.now() - timedelta(seconds=_AUDIT_WINDOW_SEC)
+    recent = AlarmRecord.objects.filter(
+        power_device_id=device_id,
+        channel=channel,
+        created_at__gte=cutoff,
+    ).exists()
+    if not recent:
+        STATIC_AUDIT_MISMATCH_TOTAL.labels(
+            device_id=str(device_id),
+            channel=str(channel),
+            would_fire=would_fire_level,
+        ).inc()
+        logger.warning(
+            "[shadow_audit] mismatch device=%s ch=%s would_fire=%s",
+            device_id,
+            channel,
+            would_fire_level,
+        )
+
+
 def trigger_power_alarms(objs: list, device, ingress_ts: float | None = None) -> None:
     """
     PowerData 일괄 저장 후 채널별 종합 위험도(W·A·V max)로 알람 라우팅한다.
@@ -146,6 +198,17 @@ def trigger_power_alarms(objs: list, device, ingress_ts: float | None = None) ->
 
         this_risk = eval_fn(value, channel=channel, device_id=device_id)
         aggregate = _aggregate_risk(device_id, channel, axis_name, this_risk)
+
+        # T4 D3 — 활성화 모드: fastapi 가 단일 결정자라 DRF 정적 fire 전부 skip.
+        # shadow_audit 으로 정합성 모니터링만 수행. 기본값 False → 분기 미진입.
+        if settings.STATIC_THRESHOLD_AT_FASTAPI:
+            STATIC_FIRE_SUPPRESSED_BY_FASTAPI_TOTAL.labels(
+                device_id=str(device_id),
+                channel=str(channel),
+                level=aggregate,
+            ).inc()
+            _shadow_audit(device_id, channel, aggregate)
+            continue
 
         state_key = _state_key(device_id, channel)
         task_key = _task_key(device_id, channel)

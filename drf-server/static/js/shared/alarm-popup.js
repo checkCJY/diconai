@@ -11,7 +11,11 @@
 // Phase 3 의 서버 측 ack 분기 (옵션 B) 가 들어오면 이 Set 은 보강재로 유지.
 const _ACK_STORE_KEY = 'diconai:alarm:acked_event_ids';
 const _LAST_SEEN_KEY = 'diconai:alarm:last_seen_ts';
-const _ACK_TTL_MS    = 24 * 60 * 60 * 1000;  // 24h — localStorage 무한 증가 차단
+// T5 (2026-05-20) — 24h → 60s 단축. 24h 영구 차단 가설 (진단 문서 §3.1) 이 시연
+// 중 모달 클릭 한 번이 24시간 침묵을 만들 위험. 60s 면 RESOLVED 안 눌러도 다음
+// repopup cooldown (settings.ALARM_REPOPUP_COOLDOWN_SEC=60s) 직후 자연 회복.
+// RESOLVED 즉시 해제는 _handleResolved 안 _AckStore.remove(eventId) 가 처리.
+const _ACK_TTL_MS    = 60_000;  // 60s — 진단 문서 §7 옵션 (a)
 
 const _AckStore = {
   _map: null,  // Map<event_id, ack_ts_ms>
@@ -41,6 +45,14 @@ const _AckStore = {
     this._persist();
   },
 
+  // T5 — RESOLVED 시 동기 삭제 (_handleResolved 호출). 운영자가 "조치 완료" 누른
+  // 시점에 본인 ack 도 같이 해제 — 멘탈 모델 정합 (진단 문서 §7 옵션 b).
+  remove(eventId) {
+    if (eventId == null) return;
+    const map = this._load();
+    if (map.delete(eventId)) this._persist();
+  },
+
   _persist() {
     try {
       const arr = Array.from(this._map.entries()).map(([id, ts]) => ({ id, ts }));
@@ -52,9 +64,10 @@ const _AckStore = {
 };
 
 // ── 2026-05-17 D 옵션 — 60s 클라이언트 dedup ─────────────────
-// 같은 (alarm_type, source, level) 알람이 60s 안 재발생 시 팝업 skip.
+// 같은 (alarm_type, source, level) 알람이 60s 안 재발생 시 팝업 skip (operator UX).
 // 백엔드 ALARM_REPOPUP_COOLDOWN_SEC (기본 60s) 와 일치 — 백엔드가 60s 후
 // 재푸시한 시점에 클라 TTL 만료라 자연 재발화 (차단형 정책 자동 충족).
+// T3 (2026-05-19): 30s 하향 검토 후 60s 유지 결정 — "폭주 회피" 우선.
 // _AckStore 와 같은 패턴 — localStorage 영속화 + JSON 직렬화 + TTL + silent fail.
 const _DEDUP_STORE_KEY = 'diconai:alarm:popup:dedup';
 const _DEDUP_TTL_MS    = 60_000;
@@ -107,10 +120,25 @@ const _DedupStore = {
 
 // dedup 키 — event_id 우선, 없으면 (alarm_type, source, level) 합성.
 // event-panel.js 의 _dedupKey 와 같은 컨벤션.
+// T3 (2026-05-19) — RESOLVED 신호 (event_resolved_at 박힘) 는 알람과 다른 의미.
+// dedup TTL 안이라도 운영자가 "위험 해소" 인지 필수. timestamp suffix 로 별도 key.
 function _popupDedupKey(data) {
   const eventId = data.event_id || data.id;
-  if (eventId != null) return `event:${eventId}`;
-  return `${data.alarm_type || 'unknown'}:${data.sensor_name || data.source_label || ''}:${data.alarm_level || ''}`;
+  const resolvedSuffix = data.event_resolved_at
+    ? `:resolved:${data.event_resolved_at}`
+    : '';
+  if (eventId != null) return `event:${eventId}${resolvedSuffix}`;
+  return `${data.alarm_type || 'unknown'}:${data.sensor_name || data.source_label || ''}:${data.alarm_level || ''}${resolvedSuffix}`;
+}
+
+// T3 (2026-05-19) — 다중 관리자 환경 ack 시그널 텍스트 생성.
+// 백엔드 push_payload.event_ack_users 가 비어있으면 빈 문자열 (시그널 미표시).
+// 1명: "(홍길동 확인 중)" / 2명: "(홍길동, 김민수 확인 중)" / 3명+: "(홍길동 외 N명 확인 중)"
+function _formatAckSignal(ackUsers) {
+  if (!Array.isArray(ackUsers) || ackUsers.length === 0) return '';
+  if (ackUsers.length === 1) return `(${ackUsers[0]} 확인 중)`;
+  if (ackUsers.length === 2) return `(${ackUsers[0]}, ${ackUsers[1]} 확인 중)`;
+  return `(${ackUsers[0]} 외 ${ackUsers.length - 1}명 확인 중)`;
 }
 
 // 마지막 수신 알람 시각 (unix sec). WS 끊김 후 재연결·페이지 새로고침 시
@@ -194,6 +222,9 @@ const AlarmToastStack = {
   _createItem(data, level) {
     const item = document.createElement('div');
     item.className = `alarm-toast-stack-item ${level}`;
+    // T4 — cover 톤 클래스 추가 (CSS 가 노랑 톤 진정 + cover-badge 노출).
+    const tone = AlarmMapper.sourceTone(data.alarm_source);
+    if (tone === 'cover') item.classList.add('alarm-popup-static-cover');
     const sensor = data.sensor_name || data.source_label || '';
     const msg    = data.message     || data.summary      || '';
     const badge  = (level === 'danger') ? '⚠ 위험' : '⚠ 주의';
@@ -221,7 +252,38 @@ const AlarmToastStack = {
     msgEl.className = 'alarm-toast-stack-msg';
     msgEl.textContent = msg;
 
+    // T3 — 다중 관리자 환경 ack 시그널. 0명이면 미렌더 (단일 운영자 환경 영향 0).
+    const ackText = _formatAckSignal(data.event_ack_users);
+    let ackEl = null;
+    if (ackText) {
+      ackEl = document.createElement('div');
+      ackEl.className = 'alarm-toast-stack-ack';
+      ackEl.textContent = ackText;
+    }
+
+    // T4 — cover 배지 + reason 문구. 토스트도 모달과 동일 패턴.
+    // wrapper div 안 inner span — wrapper 가 줄바꿈 보장, inner 가 노랑 칩 시각.
+    const coverBadge = AlarmMapper.sourceBadge(data.alarm_source);
+    let coverBadgeEl = null;
+    if (coverBadge) {
+      coverBadgeEl = document.createElement('div');
+      coverBadgeEl.className = 'alarm-toast-stack-cover-badge';
+      const innerCB = document.createElement('span');
+      innerCB.className = 'cover-badge';
+      innerCB.textContent = coverBadge;
+      coverBadgeEl.appendChild(innerCB);
+    }
+    let reasonEl = null;
+    if (data.alarm_reason) {
+      reasonEl = document.createElement('div');
+      reasonEl.className = 'alarm-toast-stack-cover-reason';
+      reasonEl.textContent = data.alarm_reason;
+    }
+
     item.append(header, sensorEl, msgEl);
+    if (coverBadgeEl) item.append(coverBadgeEl);
+    if (reasonEl) item.append(reasonEl);
+    if (ackEl) item.append(ackEl);
     // 토스트 클릭 — 격상 즉시 트리거 (사용자가 본 것으로 인지)
     item.addEventListener('click', (ev) => {
       if (ev.target === closeBtn) return;
@@ -269,8 +331,53 @@ const _POPUP_CFG = {
   },
 };
 
+// T2+T6 (2026-05-20) — 도메인별 행동 안내. 운영자가 알람 보고 "무엇을 해야 하는가"
+// 즉시 인지하도록 alarm_type × level 매트릭스. 미정의 type 은 _POPUP_CFG default
+// actionText 로 fallback (기존 "즉시 대피하세요! / 주의하세요!"). clear 알람은 modal
+// 안 띄우므로 본 dict 미정의 (토스트만, 별 sprint 확장).
+const _ACTION_TEXT = {
+  gas_threshold: {
+    danger:  '작업자 즉시 대피 / 외부 환기 가동 · 책임자 통보',
+    warning: '작업 중단 + 환기 / 농도 추이 확인',
+  },
+  gas_anomaly_ai: {
+    danger:  '해당 구역 작업자 대피 / AI 누출 의심 — 센서 위치 확인',
+    warning: '해당 센서 농도 모니터링 / 이상 지속 시 점검',
+  },
+  power_overload: {
+    danger:  '해당 설비 즉시 정지 / 부하·발열 점검',
+    warning: '설비 부하·온도 확인',
+  },
+  power_anomaly_ai: {
+    danger:  '설비 정지 후 정밀 점검 (AI 이상 패턴)',
+    warning: '부하·발열 추이 확인 / 이상 지속 시 정지',
+  },
+  geofence_intrusion: {
+    danger:  '해당 작업자 즉시 이탈 지시 / 위치·안전 확인',
+    warning: '작업자 위치 확인 / 구역 이탈 안내',
+  },
+  ppe_violation: {
+    danger:  'PPE 착용 지시',
+    warning: 'PPE 착용 지시',
+  },
+  sensor_fault: {
+    danger:  '센서 통신 상태 확인 / 지속 시 설비팀 연락',
+    warning: '센서 통신 상태 확인 / 지속 시 설비팀 연락',
+  },
+  batch_failed: {
+    danger:  '배치 로그 확인 + 재실행',
+    warning: '배치 로그 확인 + 재실행',
+  },
+  storage_overdue: {
+    danger:  '보관 주기 도래 — 점검·갱신 처리',
+    warning: '보관 주기 도래 — 점검·갱신 처리',
+  },
+};
+
 // 위험도별 자동닫힘 (ms) — danger는 운영자 확인 시간 충분 확보 (P2-2).
-const _AUTO_CLOSE_MS = { danger: 15000, warning: 10000 };
+// T5 (2026-05-20) — warning 10s → 30s. 10s 는 운영자가 메시지 읽기 전 사라짐.
+// 30s 면 텍스트 확인 + 확인 완료 클릭 충분. danger 는 15s 유지 (격상 펄스 → 모달).
+const _AUTO_CLOSE_MS = { danger: 15000, warning: 30000 };
 const _PULSE_COUNT_THRESHOLD = 10;  // 그룹 카운트 ≥ 이 값이면 펄스 애니메이션
 
 // 위험도별 비프음 — Web Audio API로 합성 (외부 mp3 의존 없음).
@@ -434,6 +541,13 @@ const AlarmPopup = {
     popup.classList.add(`level-${level}`);
     _playAlarmSound(level);
 
+    // T4 — source 별 시각 톤. 'cover' = AI 미탐/실패/워밍업 보완 알람 (노랑 + 배지).
+    // 'risk' = 기존 위험도 분기 그대로. cover 톤은 alarm-popup-static-cover 클래스
+    // 가 빨강·노랑 펄스를 진정시켜 운영자가 "주역 vs 보조" 즉시 구분.
+    popup.classList.remove('alarm-popup-static-cover');
+    const tone = AlarmMapper.sourceTone(data.alarm_source);
+    if (tone === 'cover') popup.classList.add('alarm-popup-static-cover');
+
     const timeEl = document.getElementById('alarm-popup-time');
     if (timeEl) {
       const ts = data.timestamp || data.created_at;
@@ -449,7 +563,11 @@ const AlarmPopup = {
 
     const actionEl = document.getElementById('alarm-popup-action');
     if (actionEl) {
-      actionEl.textContent = cfg.actionText;
+      // T2+T6 — alarm_type 별 행동 안내 우선. fallback cfg.actionText (기존 워딩).
+      // _ACTION_TEXT 에 없는 type (vr_training_not_done / inspection_scheduled 등)
+      // 은 default "즉시 대피하세요! / 주의하세요!" 그대로 — 시연 가능성 낮은 영역.
+      const actionText = _ACTION_TEXT[data.alarm_type]?.[level] || cfg.actionText;
+      actionEl.textContent = actionText;
       actionEl.className   = `${cfg.actionClass} ${LevelMapper.toTextClass(level)}`.trim();
     }
 
@@ -478,12 +596,42 @@ const AlarmPopup = {
         bodyEl.textContent = msg;
         msgEl.appendChild(bodyEl);
       }
-      // 임계값 컨텍스트 — 운영자가 정상/위험 기준을 즉시 비교 가능 (P2 추가, 피드백 #3)
+      // 임계값 컨텍스트 — 운영자가 정상/위험 기준을 즉시 비교 가능 (P2 추가, 피드백 #3).
+      // T2+T6 (2026-05-20) — label level 분기. 기존 "위험 기준" 하드코딩이 warning
+      // 알람에도 표시되던 톤 불일치 해소.
       if (data.measured_value != null && data.threshold_value != null) {
         const thrEl = document.createElement('span');
         thrEl.className = 'msg-threshold';
-        thrEl.textContent = `위험 기준 ${data.threshold_value} 초과 (측정 ${data.measured_value})`;
+        const thrLabel = level === 'danger' ? '위험 기준' : '주의 기준';
+        thrEl.textContent = `${thrLabel} ${data.threshold_value} 초과 (측정 ${data.measured_value})`;
         msgEl.appendChild(thrEl);
+      }
+      // T3 — 다중 관리자 환경 ack 시그널 (모달도 토스트와 동일 패턴).
+      const ackText = _formatAckSignal(data.event_ack_users);
+      if (ackText) {
+        const ackEl = document.createElement('span');
+        ackEl.className = 'msg-ack-signal';
+        ackEl.textContent = ackText;
+        msgEl.appendChild(ackEl);
+      }
+
+      // T4 — source 가 cover 면 배지 + reason 문구 렌더. AI 단독·일반 룰 알람은 미렌더.
+      // div 사용 — 부모가 flex 등이어도 줄바꿈 보장 (span 인접 렌더 버그 fix).
+      const badgeLabel = AlarmMapper.sourceBadge(data.alarm_source);
+      if (badgeLabel) {
+        const badgeEl = document.createElement('div');
+        badgeEl.className = 'msg-cover-badge';
+        const inner = document.createElement('span');
+        inner.className = 'cover-badge';
+        inner.textContent = badgeLabel;
+        badgeEl.appendChild(inner);
+        msgEl.appendChild(badgeEl);
+      }
+      if (data.alarm_reason) {
+        const reasonEl = document.createElement('div');
+        reasonEl.className = 'msg-cover-reason';
+        reasonEl.textContent = data.alarm_reason;
+        msgEl.appendChild(reasonEl);
       }
     }
 
@@ -526,6 +674,10 @@ const AlarmPopup = {
     }
     // 큐에 같은 event_id 가 남아있어도 자연 닫힘
     this.queue = this.queue.filter(d => (d.event_id || d.id) !== eventId);
+    // T5 — 운영자가 "조치 완료" 누른 시점에 본인 _AckStore 도 동기 삭제. 같은
+    // source 다음 신규 Event 가 (다른 event_id) 도착하면 _AckStore 통과 → 모달
+    // 정상 등장. 진단 문서 §7 옵션 (b) — 멘탈 모델 정합.
+    _AckStore.remove(eventId);
     // 우하단 토스트로 "위험 해소" 안내 (AlarmToast 재사용)
     if (typeof AlarmToast !== 'undefined') {
       AlarmToast.show({

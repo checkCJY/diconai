@@ -8,12 +8,19 @@ from apps.monitoring.views import (
     PowerChannelMetaView,
     PowerDataBulkIngestView,
     PowerEventIngestView,
+    PowerThresholdMetaView,
     PowerThresholdView,
 )
 
 urlpatterns = [
     path("gas/", GasDataCreateView.as_view(), name="gas-data-create"),
     path("power/thresholds/", PowerThresholdView.as_view(), name="power-thresholds"),
+    # T4 D1b — fastapi 5분 sync 용 정격 % 임계치 (power_facility_default 그룹).
+    path(
+        "power/threshold-meta/",
+        PowerThresholdMetaView.as_view(),
+        name="power-threshold-meta",
+    ),
     path(
         "power/channel-meta/",
         PowerChannelMetaView.as_view(),

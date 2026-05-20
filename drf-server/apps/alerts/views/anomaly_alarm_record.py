@@ -61,6 +61,7 @@ class AnomalyAlarmRecordCreateView(APIView):
             detected_at=data["detected_at"],
             channel=data.get("channel"),
             algorithm_source=data.get("algorithm_source", ""),
+            source=data.get("source", ""),
             **fk_kwargs,
         )
 

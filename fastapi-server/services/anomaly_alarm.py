@@ -1,35 +1,31 @@
-"""AI 이상탐지 추론 결과의 DRF forward + WS push 공용 helper.
+"""AI 이상탐지 추론 결과의 DRF forward helper.
 
-[목적]
-power/gas service 가 IF 추론 후 호출. 3가지 외부 호출을 단일 task 안에 캡슐화:
-  1. push_alarm — Redis 알람 큐 (브라우저 broadcast). ML 의존성 없음.
-  2. MLAnomalyResult forward — 추론 매번 (운영 추적용).
-  3. AnomalyAlarmRecord forward — 발화 시 (rate limit 통과 후). ml_id 의존.
+[T4 D2 변경]
+push_alarm / mark_ai_recent 호출은 본 함수에서 제거 — 호출자 (power_service.
+process_anomaly_inference) 가 decide_alarm 매트릭스 결정 후 직접 호출. 본 함수는
+DRF 영속화만 담당:
+  1. MLAnomalyResult forward — 추론 매번 (운영 추적용).
+  2. AnomalyAlarmRecord forward — alarm_payload 있을 때 (decide_alarm fire 결정).
 
-[설계 결정 — 본 sprint plan 참고]
-- push 는 ML 의존성 없음 → 독립 task 즉시 발사 (C12 효과 보존, push 가 ML latency
-  /SQLite lock 에 묶이지 않음).
+[설계 결정]
 - ML → alarm 은 sequential (ml_id 의존). gather + return_exceptions 의 silent
   invisible 함정 회피.
 - 모든 외부 호출 silent fail + Prometheus counter (stage label) + logger.exception.
-- kill switch FORWARD_ANOMALY_TO_DRF=false 시 즉시 return (push 까지 모두 비활성).
+- kill switch FORWARD_ANOMALY_TO_DRF=false 시 즉시 return.
 - timeout=2.0 명시 — httpx default 5s 너무 길어 fire-and-forget 패턴에 부적합.
 
-[호출자]
-power/gas service 가 `asyncio.create_task(forward_inference_e2e(...))` 로 wrap.
-helper 안에서 또 task 분기 → push 만 별도 task (ML await 전에 fire).
+[T4 D2 이전 흐름 (참고)]
+이전엔 본 함수가 push_alarm 도 발사 (a 경로) + mark_ai_recent 도 호출. AI 가 단일
+결정자가 아닌 환경에선 fastapi 가 AI 알람만 직접 push 했고, DRF 측 룰 알람과
+race 가능. D2 로 fastapi 가 매트릭스 단일 결정자가 되어 (a) 경로 자연 사라짐.
 """
 
-import asyncio
 import logging
 import os
 
 from prometheus_client import Counter
 
-from core.constants import AI_TO_RULE_LEVEL
-from services.ai_mute import mark_ai_recent
 from services.drf_client import post_to_drf
-from websocket.services.alarm_queue import push_alarm
 
 logger = logging.getLogger(__name__)
 
@@ -54,62 +50,30 @@ ALARM_PATH = "/alerts/api/anomaly-alarm-records/"
 FORWARD_TIMEOUT_SEC = 2.0
 
 
-async def _safe_push(push_payload: dict) -> None:
-    """push_alarm fire-and-forget wrapper — silent fail + observable.
-
-    asyncio.create_task 안 exception 이 외부로 안 나가므로 별도 wrap.
-    Redis 일시 hang / 장애 시 fastapi 워커 안 묶음.
-    """
-    try:
-        await push_alarm(push_payload)
-    except Exception:
-        logger.exception("[anomaly_forward] push_alarm failed")
-        anomaly_forward_failures.labels(stage="push").inc()
-
-
 async def forward_inference_e2e(
     ml_payload: dict,
-    alarm_payload: dict,
-    push_payload: dict,
-    should_fire: bool,
+    alarm_payload: dict | None = None,
 ) -> None:
-    """추론 매번 ML forward + 발화 시 push 독립 + AlarmRecord forward (sequential).
+    """T4 D2 — ML forward (매번) + AlarmRecord forward (alarm_payload 있을 때).
 
     Flow:
-      1. push_alarm 즉시 별도 task (ML 의존성 없음 — C12 효과 유지).
-      2. ML forward (await, ml_id 추출).
-      3. AlarmRecord forward (await, ml_id 포함).
+      1. ML forward (await, ml_id 추출).
+      2. alarm_payload 있으면 AlarmRecord forward (await, ml_id 포함).
 
     모든 외부 호출 silent fail + Prometheus counter + logger.exception.
-    `FORWARD_ANOMALY_TO_DRF=false` 시 early return (kill switch, push 까지 비활성).
+    `FORWARD_ANOMALY_TO_DRF=false` 시 early return (kill switch).
 
     Args:
         ml_payload: POST /api/ml/anomaly-results/ body (추론 매번).
-        alarm_payload: POST /alerts/api/anomaly-alarm-records/ body. helper 가
-            ml_anomaly_result_id 를 추가 주입.
-        push_payload: Redis 큐로 보낼 dict. brower WS broadcast 용.
-        should_fire: 발화 여부 (rate limit + combined_risk in FIRE_LEVELS).
-            False 면 push/alarm 모두 skip, ML forward 만 (운영 추적).
+        alarm_payload: POST /alerts/api/anomaly-alarm-records/ body. None 이면
+            ML forward 만. decide_alarm 결과 source=ai 일 때만 호출자가 전달.
 
-    호출자 예시:
-        asyncio.create_task(forward_inference_e2e(ml_p, alarm_p, push_p, fire))
+    호출자 (D2 후 — power_service.process_anomaly_inference):
+        asyncio.create_task(forward_inference_e2e(ml_p, alarm_p))
+        # push_alarm 은 호출자가 직접. mark_ai_state/recent 도 호출자.
     """
     if not FORWARD_ENABLED:
         return
-
-    # push 는 ML 의존성 없음 → 독립 task 즉시 발사. C12 효과(ML latency 에 push 가
-    # 묶이지 않음) 보존. push 실패는 _safe_push 안에서 silent + counter.
-    if should_fire:
-        # [Step 3] AI 발화 마킹 — DRF power_alarm 의 룰 fire 를 60s suppress.
-        # push 와 같은 시점에 fire-and-forget. 마킹 실패는 silent (mark_ai_recent
-        # 내부) — 마킹 실패 시 룰 가드 작동 안 해 중복 1건 노출되는 정도.
-        meta = push_payload.get("anomaly_meta") or {}
-        combined_risk = meta.get("combined_risk", "normal")
-        rule_level = AI_TO_RULE_LEVEL.get(combined_risk, combined_risk)
-        asyncio.create_task(
-            mark_ai_recent(meta.get("device_id"), meta.get("channel"), rule_level)
-        )
-        asyncio.create_task(_safe_push(push_payload))
 
     # ML forward → ml_id 추출. silent fail (response None / status != 201).
     ml_id: int | None = None
@@ -127,7 +91,7 @@ async def forward_inference_e2e(
         logger.exception("[anomaly_forward] ML forward failed")
         anomaly_forward_failures.labels(stage="ml").inc()
 
-    if not should_fire:
+    if alarm_payload is None:
         return
 
     # AlarmRecord forward — ml_id 없을 수도 있음 (ML forward 실패 시 None).

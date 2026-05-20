@@ -128,6 +128,17 @@ AI_INFERENCE_FAILED_TOTAL = Counter(
     ["model_type", "reason"],
 )
 
+# ── T4 D2 — AI 알람 broadcast latency (a 경로 제거 후 실측용) ──────────────────
+# plan §10 위험 — (a) push_alarm 직접 호출 제거 후 broadcast latency 변화 추적.
+# ingress_ts(IoT 수신 시각) → push_alarm 직전 시각 차이를 .observe(). E2E 메트릭과
+# 다른 차원 (E2E 는 DRF Celery 경로 포함, 본 메트릭은 fastapi 안 단일 결정자 경로).
+# >500ms 면 plan §10 의 "옵션 B 2단계 업그레이드" 검토 신호.
+AI_BROADCAST_LATENCY = Histogram(
+    "ai_broadcast_latency_seconds",
+    "Time from IoT ingress to AI alarm push (T4 D2 single-decision path)",
+    buckets=[0.05, 0.1, 0.2, 0.5, 1.0, 2.0],
+)
+
 # ── 전력 AI 모니터링 메트릭 (정휘훈 작업) ────────────────────────────────────
 # 전력 AI 추론 흐름의 각 구간을 메트릭으로 관찰한다.
 # "AI가 왜 안 움직이냐"는 질문이 왔을 때 Grafana만 보고 원인 구간을 특정하는 것이 목표.

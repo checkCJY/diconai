@@ -18,6 +18,19 @@ DRF Threshold 운영자 변경 시 본 모듈 hardcode 동기 수정 필요 (가
 from __future__ import annotations
 
 from power.services.channel_meta_cache import get_channel_entry
+from power.services.threshold_sync import get_threshold_meta
+
+# T4 D2 — fastapi data_type → DRF Threshold.measurement_item 매핑.
+_DRF_ITEM_BY_DATA_TYPE = {
+    "watt": "power_w",
+    "current": "current",
+    "voltage": "voltage",
+}
+_RATED_KEY_BY_DATA_TYPE = {
+    "watt": "rated_w",
+    "current": "rated_a",
+    "voltage": "rated_v",
+}
 
 # 단방향 (W, A)
 WATT_WARNING_PCT = 80.0
@@ -102,3 +115,93 @@ def calculate_power_risk(
             VOLTAGE_DANGER_MAX_PCT,
         )
     raise ValueError(f"Unknown data_type: {data_type!r}")
+
+
+def evaluate_static_risk_from_cache(
+    value: float | None,
+    data_type: str,
+    device_id: str | None,
+    channel: int,
+) -> str:
+    """T4 D2 — DRF threshold-meta sync 캐시 기반 정적 평가.
+
+    `calculate_power_risk` 와 같은 % 환산 로직이지만, 임계치 출처가 DRF sync 캐시
+    (D1b `threshold_sync.get_threshold_meta`). decide_alarm 매트릭스 (T4 plan §5)
+    의 "정적 fired/not fired" 입력 단일 진실 공급원.
+
+    `calculate_power_risk` 는 hardcoded 상수 (80%/100%) — combine_risk_5axis 의
+    축 입력. 본 함수는 별개 — admin 임계치 수정 반영. 두 함수의 결과가 다를 수
+    있음 (5분 sync lag 동안 / admin 이 80% 외 값으로 수정 시) — plan §10 위험.
+
+    fail-safe — 캐시 미존재 / 정격 미지정 / 임계치 None / data_type 미인식 →
+    모두 'normal' 반환. AI 정상 + 정적 정상 = 알람 없음 (안전 측 보수적 분기).
+    """
+    if value is None:
+        return "normal"
+    item = _DRF_ITEM_BY_DATA_TYPE.get(data_type)
+    if item is None:
+        return "normal"
+    meta = get_threshold_meta(item)
+    if not meta:
+        return "normal"
+    entry = get_channel_entry(device_id, channel)
+    rated = entry.get(_RATED_KEY_BY_DATA_TYPE[data_type])
+    if not rated:
+        return "normal"
+    pct = float(value) / float(rated) * 100.0
+    if data_type == "voltage":
+        # 양방향 — 4 임계 중 하나라도 None 이면 +/- inf 로 fail-safe (그 방향 fire 안 됨).
+        return _evaluate_bidirectional(
+            pct,
+            meta.get("warning_min")
+            if meta.get("warning_min") is not None
+            else float("-inf"),
+            meta.get("warning_max")
+            if meta.get("warning_max") is not None
+            else float("inf"),
+            meta.get("danger_min")
+            if meta.get("danger_min") is not None
+            else float("-inf"),
+            meta.get("danger_max")
+            if meta.get("danger_max") is not None
+            else float("inf"),
+        )
+    # 단방향 (watt/current) — warning_max/danger_max 만 사용.
+    warning_max = meta.get("warning_max")
+    danger_max = meta.get("danger_max")
+    if warning_max is None or danger_max is None:
+        return "normal"
+    return _evaluate_unidirectional(pct, float(warning_max), float(danger_max))
+
+
+def get_static_threshold_abs(
+    risk: str,
+    data_type: str,
+    device_id: str | None,
+    channel: int,
+) -> float | None:
+    """T2+T6 — risk level 의 임계치 절대값 환산 (모달 thrEl 컨텍스트용).
+
+    `evaluate_static_risk_from_cache` 가 fire 결정한 risk level (warning/danger) 의
+    정격 × % 절대값. 예: rated_w=7500, warning_max=80% → 6000W. 모달이 "위험 기준
+    6000 초과 (측정 X)" 표시. normal / 캐시 미존재 / 정격 미설정 → None.
+
+    voltage 양방향 — warning_max 기준 (상한). 향후 양방향 정확 표시 필요 시 별도
+    helper (warning_min/max 둘 다 반환) 도입 검토.
+    """
+    if risk == "normal":
+        return None
+    item = _DRF_ITEM_BY_DATA_TYPE.get(data_type)
+    if item is None:
+        return None
+    meta = get_threshold_meta(item)
+    if not meta:
+        return None
+    entry = get_channel_entry(device_id, channel)
+    rated = entry.get(_RATED_KEY_BY_DATA_TYPE[data_type])
+    if not rated:
+        return None
+    pct = meta.get(f"{risk}_max")  # warning_max | danger_max
+    if pct is None:
+        return None
+    return round(float(rated) * float(pct) / 100.0, 1)

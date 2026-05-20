@@ -114,10 +114,13 @@
 .alarm-popup-type-label {
   font-size: 11px; color: var(--text2); letter-spacing: .5px;
 }
-/* 행동 메시지 */
+/* 행동 메시지 — T2+T6 (2026-05-20) — 도메인별 긴 문구 가독성. 기존 18px·bold·center
+   유지 + line-height 1.45 (긴 문구 줄바꿈 자연) + word-break: keep-all (한글 단어
+   중간 깨짐 방지). 한 줄 짧은 워딩 ("즉시 대피하세요!") 도 시각 변화 X. */
 .alarm-popup-action {
   text-align: center; font-size: 18px; font-weight: 700;
   margin: 0 0 12px; color: var(--danger);
+  line-height: 1.45; word-break: keep-all;
 }
 .alarm-popup-action.caution-text { color: var(--caution); }
 .alarm-popup-action.safe-text    { color: var(--safe); }
@@ -154,6 +157,14 @@
   font-size: 12px; font-weight: 600;
   color: var(--text);
   letter-spacing: 0.2px;
+}
+/* T3 ack 시그널 — "(N 확인 중)" 작은 텍스트로 다중 관리자 코디네이션 시그널 */
+.alarm-popup-desc .msg-ack-signal {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px; font-weight: 500;
+  color: var(--text2);
+  font-style: italic;
 }
 /* 하단 버튼 행 */
 .alarm-popup-btn-row {
@@ -275,4 +286,79 @@
 }
 .alarm-toast-stack-msg {
   color: var(--text2, #8b949e); line-height: 1.4; word-break: keep-all;
+}
+/* T3 ack 시그널 — 토스트 본문 아래 "(N 확인 중)" 작은 italic 텍스트.
+   다중 관리자 환경에서 다른 운영자가 처리 중임을 인지 (dedup 과 별개 시그널). */
+.alarm-toast-stack-ack {
+  margin-top: 4px;
+  font-size: 11px; font-weight: 500;
+  color: var(--text2, #8b949e);
+  font-style: italic;
+}
+
+/* ==========================================================
+   T4 — source=static_cover_* 보완 알람 시각 톤
+   ==========================================================
+   AI 가 단일 결정자로 발화한 알람 (source=ai) 은 기존 빨강·노랑 그대로.
+   AI 미탐 의심 / 워밍업 / 추론 실패 / 비활성 채널은 "보완" 의미로 톤 약화 +
+   배지 라벨로 운영자가 "주역 vs 보조" 즉시 구분. plan §5.1 매트릭스 §6 D4.
+   ========================================================== */
+
+/* 모달 — danger 빨간 펄스 / warning 노란 펄스 모두 진정. cover 톤 source 는 어떤
+   risk_level (warning/danger) 이어도 시각은 "보조" — 노랑 단색·정적. specificity
+   강화 — id 1 + class 2 (.alarm-popup-static-cover.level-*) > level-* 단독 rule. */
+#alarm-popup.alarm-popup-static-cover,
+#alarm-popup.alarm-popup-static-cover.level-danger,
+#alarm-popup.alarm-popup-static-cover.level-warning {
+  border-color: var(--caution);
+  animation: none;
+  box-shadow: 0 6px 24px rgba(0,0,0,.5), 0 0 12px rgba(227,179,65,.25);
+}
+
+/* 토스트 — 노랑 좌측 보더, 펄스 제거. cover-badge 가 사유 라벨 노출. */
+.alarm-toast-stack-item.alarm-popup-static-cover,
+.alarm-toast-stack-item.danger.alarm-popup-static-cover,
+.alarm-toast-stack-item.warning.alarm-popup-static-cover {
+  border-left-color: var(--caution);
+  animation: none;
+}
+
+/* cover-badge — 모달 메시지 행 / 토스트 본문 아래 작은 노랑 칩.
+   reason 문구와 짝 — 배지 = 짧은 라벨, reason = 상세 사유. block 으로 강제해
+   다음 reason 행과 자연 줄바꿈 (이전 inline 인접 렌더 버그 fix). */
+.cover-badge {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(227,179,65,.18);
+  border: 1px solid var(--caution);
+  color: var(--caution);
+  font-size: 11px; font-weight: 600;
+}
+
+/* 모달 — 배지·reason 영역. 부모 flex/inline 영향 받아도 줄바꿈 보장 위해 div 사용
+   (alarm-popup.js 가 element 생성 — 본 CSS 와 짝). */
+.msg-cover-badge {
+  display: block;       /* 이전: inline-block + margin-left → 인접 인라인 붙음 */
+  margin-top: 6px;
+}
+.msg-cover-reason {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text2, #8b949e);
+}
+
+/* 토스트 reason — 토스트 본문 아래 작은 italic 텍스트 (ack 시그널 옆 패턴). */
+.alarm-toast-stack-cover-badge {
+  display: block;
+  margin-top: 6px;
+}
+.alarm-toast-stack-cover-reason {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--text2, #8b949e);
+  font-style: italic;
 }

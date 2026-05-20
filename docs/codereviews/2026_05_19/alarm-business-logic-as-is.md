@@ -191,10 +191,11 @@ event_service.create_alarm_and_event (services/event_service.py:20-150)
 
 ## §5. 의도 vs 실제 차이가 짚일 만한 잠재 갭 (사용자 확인 필요)
 
-본 문서의 **핵심 영역** — 매핑하면서 발견한 잠재 의도 불일치 후보. 두 카테고리로 분리:
+본 문서의 **핵심 영역** — 매핑하면서 발견한 잠재 의도 불일치 후보. 세 카테고리로 분리:
 
 - **§5A 백엔드 동작·정책 갭** (10건) — 발화 조건·우선순위·중복 방지 정책 자체
 - **§5B JS ↔ 백엔드 인터페이스 미스매치** (11건) — 백엔드가 보낸 것을 JS 가 다르게 해석·미사용
+- **§5C 알람 팝업 텍스트 구성 문제** (8건) — 운영자가 보는 텍스트의 일관성·포맷·정보 노출
 
 사용자가 짚는 항목에 따라 §6 plan 우선순위 결정.
 
@@ -514,15 +515,148 @@ event_service.create_alarm_and_event (services/event_service.py:20-150)
 
 ---
 
+### §5C 알람 팝업 텍스트 구성 문제 (8건)
+
+**§5A 가 정책, §5B 가 코드 인터페이스** 라면, **§5C 는 운영자가 실제로 보는 텍스트 자체의 일관성·포맷·정보 노출 문제**. 5B 와 일부 영역이 겹치지만 관점이 다름 — 5B 는 "어느 필드를 어떻게 매핑하는가", 5C 는 "결과 텍스트가 운영자에게 어떻게 보이는가".
+
+#### 5C.1 ML 기술용어가 운영자 팝업에 그대로 노출
+
+**현재 동작**:
+- 백엔드 (`power_service.py:393-396`):
+  ```python
+  summary = (
+      f"[{algo_label} 이상 감지] {label} {data_type}={value} "
+      f"(score {score:.4f}, combined={combined})"
+  )
+  ```
+- 결과 예: **`[IF 이상 감지] 송풍기A watt=7925.8 (score 0.0292, combined=warning)`**
+- JS (`alarm-popup.js:465`, `event-panel.js:268`) — `data.message || data.summary` 그대로 표시
+
+**증상**: `score 0.0292` (IF decision_function 값) 와 `combined=warning` (내부 enum) 같은 ML 내부 상태가 팝업·이벤트 패널에 노출. 운영자가 의미 모름.
+
+**짚을 만한 후보**:
+- (a) summary 에서 `(score ..., combined=...)` 제거 — 단순화
+- (b) ML 메타는 `anomaly_meta` 에만 보존, summary 는 운영자 문장만
+- (c) 현 상태 유지 (운영자가 ML 학습 기회)
+
+#### 5C.2 message vs summary 필드 이원화 — 같은 알람의 두 가지 텍스트
+
+**현재 동작**:
+- **WS push summary**: `[IF 이상 감지] 송풍기A watt=7925.8 (score 0.0292, combined=warning)` (기술적)
+- **DB short_message** (`alarm_record.py:148-189` `get_short_message()`): `송풍기A AI 이상 감지 (7925.8 W)` (운영자 친화)
+- JS 매핑 (`alarm-mapper.js:22`): `message: src.message || src.summary` — message 가 채워졌으면 message, 아니면 summary fallback
+
+**증상**: WS 토스트 = summary (기술적) vs 알람 이력 페이지 (API 호출) = short_message (친화적). **같은 알람이 위치에 따라 다른 텍스트**.
+
+**짚을 만한 후보**:
+- (a) push_payload 의 summary 도 short_message 와 동일 포맷으로 통일
+- (b) 둘 다 push 에 동봉 — 토스트는 short_message, ML 모달은 summary
+- (c) DB 와 push 의 명확한 분리 (각자 의도 다름) + JS 매핑 명시화
+
+#### 5C.3 토스트 / 모달 / 이벤트 패널 표시 텍스트 불일치
+
+**현재 동작**:
+- 토스트 (`alarm-popup.js:198`): `data.message || data.summary`
+- 모달 (`alarm-popup.js:465`): `data.message || data.summary`
+- 이벤트 패널 (`event-panel.js:268`): `data.message || data.alarm_type` ← `alarm_type` fallback ("power_anomaly_ai" 영문 코드)
+
+**증상**: message 가 없는 알람이 이벤트 패널에 떴을 때 **`power_anomaly_ai` 같은 영문 코드가 노출**. 운영자에게 의미 없음.
+
+**짚을 만한 후보**:
+- (a) 이벤트 패널 fallback 을 `alarm_type` 대신 사람 친화 라벨 (`AlarmType` choices label) 로 변경
+- (b) 모든 위치 fallback 통일 (`message || short_message || summary || "AI 이상 감지"`)
+- (c) 현 상태 유지
+
+#### 5C.4 도메인별 메시지 형식 불일치 (전력 vs 가스)
+
+**현재 동작**:
+- 전력 summary (`power_service.py:393`): `[IF 이상 감지] 송풍기A watt=7925.8 (...)` (영문 prefix + 영문 단위)
+- 가스 summary (`tasks.py:140`): `[긴급] CO 위험 수준 초과` (한국어 prefix + 한국어 자연어)
+- AlarmRecord.get_short_message: `송풍기A AI 이상 감지 (7925.8 W)` (한국어 + W)
+
+**증상**: 운영자가 알람을 받았을 때 도메인별로 메시지 패턴이 다름. **`[IF 이상 감지]` vs `[긴급]` vs `[주의]`** — 같은 시스템 알람인데 prefix 양식 다름.
+
+**짚을 만한 후보**:
+- (a) 통일 포맷 — `[위험도/출처] 발생원 현상 (측정값 단위)` 예: `[위험·IF] 송풍기A 이상 (7,925 W)` / `[위험·임계] CO 누출 (52 ppm)`
+- (b) 도메인별 자유 형식 (현 상태) + 컨벤션 가이드만
+- (c) 단순화 — prefix 제거하고 `algorithm_source` 칩으로 시각 분리
+
+#### 5C.5 정상화 메시지 (위험 해소) 형식 불통일
+
+**현재 동작**:
+- 백엔드 — 가스/전력 fire_clear_*_task 측 형식 불일치
+- AlarmRecord.get_short_message — `"정상 복귀"`
+- JS (`alarm-popup.js:533`) — `message: '위험 해소'` (하드코딩)
+
+**증상**: 동일 사건의 정상화가 어디서는 "정상 복귀", 어디서는 "위험 해소". 운영자가 혼동 가능.
+
+**짚을 만한 후보**:
+- (a) 백엔드가 정상화 메시지 단일 source 로 push — JS 하드코딩 제거
+- (b) 운영자 친화 통일 — "위험 해소 — {발생원} {현상} 정상 복귀"
+- (c) 현 상태 유지
+
+#### 5C.6 숫자·단위 포맷 — 천단위 구분·단위 접미사 통일성
+
+**현재 동작**:
+- 전력 (`power_service.py:394`): `watt=7925.8` (단위 없음, 천단위 구분 없음)
+- 가스 (`tasks.py:163`): `(2.5 ppm)` (단위 있음, 천단위 무관)
+- short_message (`alarm_record.py:180`): `(7925.8 W)` (단위 있음, 천단위 구분 없음)
+
+**증상**: 큰 숫자 (예: `12345.67 W`) 가 한 줄로 노출되면 가독성 ↓. `12,345 W` 형식이 운영자 친화.
+
+**짚을 만한 후보**:
+- (a) 통일 포맷터 신설 (백엔드 또는 JS 측) — `format_value(value, unit, decimals=1)` 으로 모든 메시지 통과
+- (b) JS 만 포맷팅 (현재 raw 값 push)
+- (c) 현 상태 유지
+
+#### 5C.7 시간 표시 — TimeFormat 의존성·시간대 명시
+
+**현재 동작**:
+- 백엔드 — `created_at` UTC ISO-8601 (`tasks.py:71`)
+- JS — `TimeFormat.abs(ts)` (있으면) / `toLocaleTimeString()` (fallback)
+- TimeFormat 모듈 로드 실패 시 raw ISO 또는 부분 시간만
+
+**증상**:
+- TimeFormat 미로드 환경에서 절대시각·"방금 전" 같은 친화 표시 안 됨
+- KST / UTC 시간대 명시 부재 — 운영자가 헷갈릴 수 있음
+
+**짚을 만한 후보**:
+- (a) TimeFormat 을 코어 의존성으로 명시·로드 보장
+- (b) 백엔드가 KST 변환된 사람 친화 시각도 같이 push (`"display_time": "2026-05-19 15:34 KST"`)
+- (c) 현 상태 유지
+
+#### 5C.8 algorithm_source 라벨이 텍스트의 어디에도 별도 칩으로 안 보임
+
+**현재 동작**:
+- summary 안에 `[IF 이상 감지]` prefix 로만 들어가 있음 — text 안에 묻힘
+- `anomaly_meta.algorithm_source` 는 push 되지만 JS 가 미사용 (5B.2 참조)
+- 토스트·모달·이벤트 패널 어디에도 IF / Z-score / 급변 / ARIMA / 야간 가동 **시각적 배지 없음**
+
+**증상**: 본 sprint §F 의 의도 — "운영자가 어떤 축이 발화했는지 즉시 인지" — 가 텍스트 묻힘으로 약화. summary 끝까지 안 읽으면 출처 모름.
+
+**짚을 만한 후보**:
+- (a) 토스트·이벤트 패널에 `algorithm_source` 별 색상·아이콘 칩 추가 (5B.2·5B.4 와 결합)
+- (b) summary 의 prefix 제거 → 칩으로 대체
+- (c) 현 상태 유지 (prefix 텍스트로 충분)
+
+### 좋은 점 (현 시스템의 강점)
+
+| # | 강점 | 의의 |
+|---|---|---|
+| 1 | `algorithm_source` 를 `anomaly_meta` 별도 구조로 보존 (`power_service.py:446`) | UI 통합 시 칩 표시 위한 기반 마련됨 |
+| 2 | dedup 컨벤션 토스트·이벤트 패널 일관 (`alarm-popup.js:54-106` + `event-panel.js:82-92`) | 한 알람이 두 곳에 중복 표시 방지 일관성 |
+
+---
+
 ## §6. 다음 단계 — 사용자 인터뷰 → plan
 
-본 문서를 읽고 §5A 10건 + §5B 11건 (총 21개 후보) 중 **의도와 다른 것 / 재수정 필요한 것** 을 짚어주시면:
+본 문서를 읽고 §5A 10건 + §5B 11건 + §5C 8건 (총 29개 후보) 중 **의도와 다른 것 / 재수정 필요한 것** 을 짚어주시면:
 
 1. **Step 2 — 의도 차이 정리**: 짚인 항목별로 (a)/(b)/(c) 중 어느 방향 + 구체적 의도 인터뷰
 2. **Step 3 — 재설계 plan**: 시연 리허설 (D-7, 2026-06-07) 전까지 Phase 분리. 우선순위 매트릭스 ↔ 일정.
 3. **Step 4 — 적용 + 검증**: 단위·모듈·e2e + 라이브 시나리오
 
-§5A·§5B 외에도 본 문서를 보면서 새로 인지된 갭이 있으면 그것도 짚기.
+§5A·§5B·§5C 외에도 본 문서를 보면서 새로 인지된 갭이 있으면 그것도 짚기.
 
 ---
 
@@ -550,4 +684,4 @@ event_service.create_alarm_and_event (services/event_service.py:20-150)
 ---
 
 > **이 문서의 핵심 메시지**:
-> 알람 비즈니스 로직은 (1) AI 추론 → 5축 결합 → AlarmRecord 생성, (2) Redis dedup + WebSocket broadcast, (3) 클라 dedup + 토스트/모달 + 배지 + EventAck 세 레이어로 구성. 본 문서 §2 가 전 흐름 다이어그램, §3 가 컴포넌트별 책임, §4 가 페이로드 구조. **§5A 백엔드 동작·정책 갭 10건 + §5B JS-백엔드 인터페이스 미스매치 11건 = 총 21개 후보** 중 사용자가 짚는 항목에 따라 다음 단계 (재설계 plan) 우선순위 결정.
+> 알람 비즈니스 로직은 (1) AI 추론 → 5축 결합 → AlarmRecord 생성, (2) Redis dedup + WebSocket broadcast, (3) 클라 dedup + 토스트/모달 + 배지 + EventAck 세 레이어로 구성. 본 문서 §2 가 전 흐름 다이어그램, §3 가 컴포넌트별 책임, §4 가 페이로드 구조. **§5A 백엔드 동작·정책 갭 10건 + §5B JS-백엔드 인터페이스 미스매치 11건 + §5C 알람 팝업 텍스트 구성 문제 8건 = 총 29개 후보** 중 사용자가 짚는 항목에 따라 다음 단계 (재설계 plan) 우선순위 결정.

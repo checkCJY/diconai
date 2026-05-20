@@ -65,6 +65,61 @@ class PowerThresholdView(APIView):
         )
 
 
+class PowerThresholdMetaView(APIView):
+    """
+    GET /api/monitoring/power/threshold-meta/
+
+    fastapi-server 가 5분 주기로 sync 해 단일 결정자로서 정적 임계치 평가에 사용
+    (T4 sub-plan §3.1). PowerThresholdView 는 frontend 차트용 W 절대값 (단일 항목)
+    만 반환 — 본 view 는 fastapi 알람 판정에 필요한 `power_facility_default` 그룹의
+    정격 % 임계치 3종을 한 응답으로 묶어 반환한다.
+
+    [응답 형식]
+        {
+            "power_w":  {"warning_min": null, "warning_max": 80.0,
+                          "danger_min":  null, "danger_max":  100.0, "unit": "%"},
+            "current":  {...},
+            "voltage":  {"warning_min": 95.0, "warning_max": 105.0,
+                          "danger_min":  90.0, "danger_max":  110.0, "unit": "%"},
+        }
+
+    [단일 진실 공급원]
+    Threshold(group_code="power_facility_default", measurement_item in {"power_w",
+    "current", "voltage"}). 어드민 변경 시 다음 fastapi sync 주기에 반영
+    (최대 5분 lag). 운영자가 admin 에서 % 수정 → DRF Redis 캐시 invalidate
+    (post_save signal) → 다음 fastapi sync 응답이 신규 값을 read.
+
+    공개 데이터 — Threshold/ChannelMeta 와 동일 정책 (AllowAny).
+    """
+
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=["Monitoring (Public)"],
+        summary="전력 임계치 메타 조회 (정격 % — fastapi sync 용)",
+        description=(
+            "power_facility_default 그룹의 정격 % 임계치 3종 (power_w/current/voltage). "
+            "fastapi-server 가 5분 주기로 sync 해 알람 판정에 사용."
+        ),
+        responses={200: OpenApiResponse(description="항목명 → 임계치 dict")},
+    )
+    def get(self, request):
+        items = ("power_w", "current", "voltage")
+        payload = {}
+        for item in items:
+            threshold = get_threshold("power_facility_default", item)
+            if threshold is None:
+                continue
+            payload[item] = {
+                "warning_min": _to_float(threshold.get("warning_min")),
+                "warning_max": _to_float(threshold.get("warning_max")),
+                "danger_min": _to_float(threshold.get("danger_min")),
+                "danger_max": _to_float(threshold.get("danger_max")),
+                "unit": threshold.get("unit", "%"),
+            }
+        return Response(payload)
+
+
 class PowerChannelMetaView(APIView):
     """
     GET /api/monitoring/power/channel-meta/

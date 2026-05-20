@@ -40,3 +40,9 @@ class AnomalyAlarmRecordPayloadSerializer(serializers.Serializer):
     algorithm_source = serializers.CharField(
         required=False, allow_blank=True, max_length=30, default=""
     )
+    # T4 D2 patch — 검출 주체 (AlarmSource 6종). decide_alarm 매트릭스 결과를 fastapi
+    # 가 alarm_payload 에 동봉 → 본 serializer 가 받아 AlarmRecord.source 에 저장.
+    # 본 view 경유 알람은 source=ai 가 일반적. 옛 fastapi 가 미전송 시 "" 저장.
+    source = serializers.CharField(
+        required=False, allow_blank=True, max_length=30, default=""
+    )

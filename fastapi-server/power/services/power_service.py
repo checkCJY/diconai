@@ -22,24 +22,32 @@ from ai.router import (
     _get_or_load,
     _get_or_load_arima,
 )
+from core.constants import AI_TO_RULE_LEVEL
+from core.metrics import (
+    AI_BROADCAST_LATENCY,
+    AI_INFERENCE_DURATION,
+    AI_INFERENCE_FAILED_TOTAL,
+    POWER_AI_ALARM_FIRED_TOTAL,
+    POWER_AI_AXIS_FIRED_TOTAL,
+    POWER_AI_COMBINED_TOTAL,
+    POWER_AI_INFERENCE_TOTAL,
+    POWER_AI_QUALITY_SKIP_TOTAL,
+    POWER_AI_RATE_LIMITED_TOTAL,
+)
 from core.power_thresholds import POWER_THRESHOLDS
 from power.services.change_point_service import detect_change_point
 from power.services.channel_meta_cache import get_channel_entry
+from power.services.decide_alarm import AlarmDecision, decide_alarm
 from power.services.quality_guard import classify_sensor_status, is_inference_stuck
-from power.services.threshold_eval import calculate_power_risk
-from core.metrics import (
-    AI_INFERENCE_DURATION,
-    AI_INFERENCE_FAILED_TOTAL,
-    # 정휘훈 작업 — 전력 AI 흐름별 모니터링 메트릭
-    POWER_AI_QUALITY_SKIP_TOTAL,
-    POWER_AI_RATE_LIMITED_TOTAL,
-    POWER_AI_AXIS_FIRED_TOTAL,
-    POWER_AI_INFERENCE_TOTAL,
-    POWER_AI_COMBINED_TOTAL,
-    POWER_AI_ALARM_FIRED_TOTAL,
+from power.services.threshold_eval import (
+    calculate_power_risk,
+    evaluate_static_risk_from_cache,
+    get_static_threshold_abs,
 )
+from services.ai_mute import AIInferenceState, mark_ai_recent, mark_ai_state
 from services.anomaly_alarm import forward_inference_e2e
 from services.drf_client import post_to_drf
+from websocket.services.alarm_queue import push_alarm
 from websocket.state import power_latest
 
 logger = logging.getLogger(__name__)
@@ -66,15 +74,29 @@ _FIRE_LEVELS = {"caution", "predict_warn", "danger"}
 # 다른 채널은 학습 분포 안 맞아 false positive ↑ → §3 multi-channel sprint 까지 비활성.
 _INFERENCE_ENABLED_CHANNELS: set[tuple[int, str]] = {(1, "watt")}
 
-# 알람 발화 rate limit — 같은 sensor_identifier 60초당 1회.
-# 폭주 방지 (overload HOLD 60틱 동안 매 추론 push_alarm → 브라우저 폭주 차단).
-# rate limit 은 push_alarm 에만 적용. MLAnomalyResult forward 는 매번 (운영 추적 유지).
+# 알람 발화 rate limit — 같은 sensor_identifier 60초당 1회 (operator UX).
+# 의도: 같은 센서에서 같은 위험이 60s 안 재발생 시 알람 push skip
+#       (브라우저·운영자 폭주 회피). MLAnomalyResult forward 는 매번 (운영 추적 유지).
+# 단위: sensor_identifier (예: power:device_1:ch1:watt).
+# T3 (2026-05-19): 30s 하향 검토 후 60s 유지 결정 — "폭주 회피 > 시연 가시성".
 # severity escalation bypass (caution → danger 격상 시 즉시 발화) 는 planB followups.
 _last_fired_at: dict[str, float] = {}
 RATE_LIMIT_SEC = 60
 
 DRF_POWER_EVENT_PATH = "/api/monitoring/power/event/"
 DRF_POWER_DATA_PATH = "/api/monitoring/power/data/"
+
+# T1+T6 (2026-05-19) — algorithm_source 코드 → 운영자 친화 워딩. 칩·아이콘 없이
+# 텍스트만으로 알고리즘 본질 구분 (drf-server constants.py ALGORITHM_SOURCE_PHRASE
+# 와 단일 동기). 본 dict 에 없는 algorithm_source 는 "AI 이상 탐지" fallback.
+_ALGORITHM_SOURCE_PHRASE = {
+    "isolation_forest": "이상 수치 탐지",
+    "arima": "이상 패턴 탐지",
+    "combined": "이상 수치·패턴 동시 탐지",
+    "zscore": "통계 이상 수치",
+    "change_point": "패턴 변화 탐지",
+    "night_abnormal": "야간 이상 가동",
+}
 
 # W3.2 — night_abnormal 시각 분기 (dummy 는 시각 무관 데이터 생성, 추론 측이 판정).
 # measured_at 의 KST hour 가 야간(22~05) + watt 가 야간 baseline 초과 시
@@ -87,19 +109,6 @@ _NIGHT_ESCALATION = {
     "normal": "caution",
     "caution": "warning",
     "predict_warn": "warning",
-}
-
-# W4.a — algorithm_source 코드 → 운영자 친화 라벨 (drf-server constants.py 와 동기).
-# fastapi 측 summary 메시지 / 로그 prefix 에 사용. 알람 토스트가 받는 summary 가
-# 이 라벨을 포함 → 운영자가 "IF" / "ARIMA" / "IF+ARIMA" / "야간 가동" 구분 가능.
-_ALGORITHM_SOURCE_LABEL = {
-    "isolation_forest": "IF",
-    "arima": "ARIMA",
-    "combined": "IF+ARIMA",
-    "night_abnormal": "야간 가동",
-    # §F — 5축 정책 엔진 도입 시 추가 (plan §F + STEP 5 키워드 직접 노출).
-    "zscore": "Z-score",
-    "change_point": "급변",
 }
 
 
@@ -148,6 +157,47 @@ def _is_night_kst_iso(measured_at_iso: str) -> bool:
     return kst_hour >= start or kst_hour < end
 
 
+def _build_static_push_payload(
+    decision: AlarmDecision,
+    label: str,
+    value: float,
+    ingress_ts: float | None,
+    threshold_value: float | None = None,
+) -> dict:
+    """T4 D2 — source=static_* 알람 push payload 조립.
+
+    anomaly_meta 없음 (AI 추론 결과 부재 또는 미반영). summary 는 [t4-source-
+    message-spec.md §4](skill/alarm/t4-source-message-spec.md) 의 source 별 패턴.
+    AI source 알람은 별 helper (`_build_ai_push_payload` — process 안 inline) 사용.
+
+    T2+T6 (2026-05-20) — message 의 "정적" 기술 용어 제거 (가스 톤 통일).
+    threshold_value 인자 추가 — 모달 thrEl ("위험/주의 기준 X 초과 (측정 Y)") 컨텍스트.
+    """
+    prefix = "[긴급]" if decision.risk_level == "danger" else "[주의]"
+    tail = (
+        f" — {decision.reason}"
+        if decision.reason
+        else " — 즉시 확인하고 관리자에게 보고하세요."
+    )
+    summary = f"{prefix} {label} 전력 과부하 ({value:,.1f}W){tail}"
+    message = f"{label} 임계치 초과 ({value:,.1f} W)"
+    payload = {
+        "alarm_type": decision.alarm_type,
+        "risk_level": decision.risk_level,
+        "source": decision.source,
+        "reason": decision.reason,
+        "source_label": label,
+        "summary": summary,
+        "message": message,
+        "is_new_event": True,
+        "measured_value": value,
+        "ingress_ts": ingress_ts,
+    }
+    if threshold_value is not None:
+        payload["threshold_value"] = threshold_value
+    return payload
+
+
 # 페이로드 표시용 정격 % 임계치 (DRF facilities.Threshold "power_facility_default"와 동일)
 # 실제 알람 트리거는 DRF가 단일 진실 공급원. 본 모듈은 대시보드 색상 표시만 담당.
 _PCT_THRESHOLDS = {
@@ -179,6 +229,32 @@ async def post_power_to_drf(path: str, payload: dict) -> None:
     await post_to_drf(path, payload, raise_on_error=False, log_category="power_service")
 
 
+async def _push_static_decision(
+    decision: AlarmDecision,
+    label: str,
+    value: float,
+    ingress_ts: float | None,
+    threshold_value: float | None = None,
+) -> None:
+    """T4 D2 — decide_alarm 결정 (source=static_*) 의 push 실행.
+
+    DISABLED / WARMING_UP / INFERRED_FAILED 분기에서 공통 호출. AlarmRecord forward
+    는 본 commit 비범위 (시연 후 활성화 결정 시 별 commit). AI_BROADCAST_LATENCY
+    는 source=ai 만 측정 — 정적 분기는 측정 대상 아님.
+
+    T2+T6 (2026-05-20) — threshold_value 전달 → 모달 thrEl 표시 (가스 톤 통일).
+    """
+    payload = _build_static_push_payload(
+        decision, label, value, ingress_ts, threshold_value
+    )
+    try:
+        await push_alarm(payload)
+    except Exception:
+        logger.exception(
+            "[anomaly_inference] static push failed source=%s", decision.source
+        )
+
+
 async def process_anomaly_inference(
     device_id: str | None,
     channel_values: dict,
@@ -186,21 +262,33 @@ async def process_anomaly_inference(
     measured_at: str,
     ingress_ts: float | None = None,
 ) -> None:
-    """[트랙 1 v2] IF 추론 + combine_risk + push_alarm + DRF MLAnomalyResult forward.
+    """T4 D2 — fastapi 단일 정책 결정 (AI + 정적 동기 평가).
 
-    ch1·watt 등 _INFERENCE_ENABLED_CHANNELS 에 포함된 (channel, data_type) 만 추론.
-    윈도우 누적 < _INFERENCE_WINDOW 면 skip. push_alarm 은 발화 levels 일 때만,
-    MLAnomalyResult forward 는 추론 매번 (운영 추적용). 모든 외부 호출 silent fail —
-    DRF 저장 흐름과 fastapi 응답 시간에 영향 없음.
+    모든 채널 16개에 대해:
+      1. quality_guard skip (sensor_status / stuck) — AI 평가 자체 skip
+      2. AI 비활성 채널 → DISABLED 마킹 + 정적 평가 + decide_alarm
+      3. AI 활성 채널 + 윈도우 빌드 중 → WARMING_UP 마킹 + 정적 평가 + decide_alarm
+      4. AI 활성 채널 + 윈도우 빌드 완료:
+         - IF/ARIMA/Z/CP/threshold_5axis 추론 (기존 로직)
+         - 성공 + combined ∈ FIRE_LEVELS → FIRED 마킹 + mark_ai_recent (DRF 호환)
+         - 성공 + combined == normal → INFERRED_NORMAL 마킹
+         - 추론 예외 → INFERRED_FAILED 마킹 + 정적 폴백 분기
+      5. decide_alarm 6 매트릭스 → source 결정 → push (단일)
 
-    ingress_ts — 핸들러 진입 시각. AI 알람 push_payload 에 실어 alarm_flush_loop 의
-    E2E latency 측정에 사용 (룰 기반 알람과 동일 경로). None 이면 측정 skip.
+    [push 정책]
+      - source=ai: AI broadcast latency observe + push_alarm 직접 호출 + ML/Alarm forward
+      - source=static_*: push_alarm 직접 호출만 (AlarmRecord 영속화는 본 commit 비범위)
+
+    [관측성]
+      - AI_BROADCAST_LATENCY (source=ai only) — (a) 경로 제거 후 latency 변화 측정
+      - mark_ai_state 5 state — D1a 인계 포인트 그대로
+
+    ingress_ts — 핸들러 진입 시각. push_payload 에 실어 alarm_flush_loop 의 E2E
+    latency 측정에 사용. AI_BROADCAST_LATENCY 는 IoT→push 직전 차이 별도 측정.
     """
     for channel, value in channel_values.items():
-        if (channel, data_type) not in _INFERENCE_ENABLED_CHANNELS:
-            continue
-        # W0 quality_guard — 통신 단절/센서 오버플로우 값은 IF 윈도우 적재 skip
-        # (학습 데이터 오염 + IF false negative 폭증 방지). raw 데이터 저장 흐름 영향 없음.
+        # 1. quality_guard — sensor 통신 단절/오버플로우 → AI 평가 skip, state 마킹 안 함.
+        # 다른 채널 평가는 continue 후 그대로 진행.
         status = classify_sensor_status(value, data_type)
         if status is not None:
             logger.info(
@@ -215,11 +303,54 @@ async def process_anomaly_inference(
             # 이 값이 올라가면 센서 불량으로 AI가 조용히 멈춰있는 상태.
             POWER_AI_QUALITY_SKIP_TOTAL.labels(status).inc()
             continue
+
+        # 정적 평가 (모든 채널 공통 — DRF threshold-meta sync 캐시 read).
+        static_risk = evaluate_static_risk_from_cache(
+            value, data_type, device_id, channel
+        )
+        # T2+T6 — 모달 thrEl ("위험 기준 X 초과") 컨텍스트 절대값. normal 시 None.
+        static_threshold_abs = get_static_threshold_abs(
+            static_risk, data_type, device_id, channel
+        )
+        entry_meta = get_channel_entry(device_id, channel)
+        label = entry_meta.get("name") or f"CH{channel}"
+
+        # 2. AI 비활성 채널 (예: ch2~16 / current / voltage) → DISABLED 분기.
+        if (channel, data_type) not in _INFERENCE_ENABLED_CHANNELS:
+            await mark_ai_state(
+                device_id, channel, data_type, AIInferenceState.DISABLED
+            )
+            decision = decide_alarm(
+                AIInferenceState.DISABLED,
+                ai_combined_risk="normal",
+                static_risk=static_risk,
+            )
+            if decision is not None:
+                await _push_static_decision(
+                    decision, label, float(value), ingress_ts, static_threshold_abs
+                )
+            continue
+
+        # 3. 윈도우 누적
         win = _power_windows[(channel, data_type)]
         win.append(float(value))
         if len(win) < _INFERENCE_WINDOW:
+            await mark_ai_state(
+                device_id, channel, data_type, AIInferenceState.WARMING_UP
+            )
+            decision = decide_alarm(
+                AIInferenceState.WARMING_UP,
+                ai_combined_risk="normal",
+                static_risk=static_risk,
+            )
+            if decision is not None:
+                await _push_static_decision(
+                    decision, label, float(value), ingress_ts, static_threshold_abs
+                )
             continue
-        # W0 stuck — 윈도우 가득 + 모든 값 동일 (분산 0) → 센서 고정 고장 추정 → 추론 skip
+
+        # W0 stuck — 윈도우 가득 + 모든 값 동일 → 센서 고정 고장. AI 평가 skip
+        # (state 마킹 안 함 — 직전 state 유지. quality_guard 동등 취급).
         if is_inference_stuck(win):
             logger.info(
                 "[anomaly_inference] skip device=%s ch=%s %s status=sensor_fault_stuck",
@@ -231,6 +362,7 @@ async def process_anomaly_inference(
             POWER_AI_QUALITY_SKIP_TOTAL.labels("sensor_fault_stuck").inc()
             continue
 
+        # 4. AI 활성 채널 + 윈도우 빌드 완료 → IF/ARIMA/Z/CP/threshold 추론.
         try:
             sensor_identifier = f"power:device_{device_id}:ch{channel}:{data_type}"
 
@@ -394,11 +526,22 @@ async def process_anomaly_inference(
                 f"{arima_result['ci_upper']:.1f}" if arima_result else "n/a",
             )
 
-            # should_fire = (발화 레벨) AND (rate limit 통과). False 면 helper 가
-            # push/alarm forward skip, ML forward 만 진행 (운영 추적 유지).
-            # 정휘훈 작업 — 5축 발화 카운터.
-            # combined이 발화 레벨일 때 어느 축이 기여했는지 기록.
-            # 특정 axis만 과도하게 높으면 해당 임계값 조정 필요 신호.
+            # ML forward payload — 항상 보냄 (운영 추적, decide_alarm 결과 무관).
+            ml_payload = {
+                "ml_model": None,
+                "model_version_snapshot": entry.version,
+                "sensor_type": "power",
+                "sensor_identifier": sensor_identifier,
+                "measured_at": measured_at,
+                "anomaly_score": score,
+                "prediction": prediction,
+                "risk_classified": combined,
+                "feature_snapshot_json": features,
+            }
+
+            # 정휘훈 작업 — 5축 발화 카운터. combined 이 발화 레벨일 때 어느 축이
+            # 기여했는지 기록 (rate limit 통과 여부와 무관 — 추론 분포 자체 추적).
+            # 특정 axis 만 과도하게 높으면 해당 임계값 조정 필요 신호.
             if combined in _FIRE_LEVELS:
                 if prediction == "anomaly":
                     POWER_AI_AXIS_FIRED_TOTAL.labels("if").inc()
@@ -411,8 +554,9 @@ async def process_anomaly_inference(
                 if night_escalated:
                     POWER_AI_AXIS_FIRED_TOTAL.labels("night").inc()
 
-            should_fire = combined in _FIRE_LEVELS
-            if should_fire:
+            # AI 결과로 state 마킹 + rate limit.
+            # rate limit 통과 못 함 → push/matrix skip, ML forward 만 (TTL 보존).
+            if combined in _FIRE_LEVELS:
                 now_ts = time.time()
                 last_ts = _last_fired_at.get(sensor_identifier, 0.0)
                 if now_ts - last_ts < RATE_LIMIT_SEC:
@@ -426,97 +570,105 @@ async def process_anomaly_inference(
                     # 정휘훈 작업 — rate limit 억제 카운터.
                     # 이 값이 높으면 이상이 지속되는데 운영자에게 안 전달되는 상태.
                     POWER_AI_RATE_LIMITED_TOTAL.inc()
-                    should_fire = False
-                else:
-                    _last_fired_at[sensor_identifier] = now_ts
-                    # 정휘훈 작업 — rate limit 통과 실제 발화 카운터.
-                    # combined danger 횟수 대비 이 값이 낮으면 rate limit 또는 Redis/WS 문제.
-                    POWER_AI_ALARM_FIRED_TOTAL.labels(algorithm_source).inc()
-
-            label = entry_meta.get("name") or f"CH{channel}"
-            # W4.a — algorithm_source 라벨을 summary 에 prefix. 토스트가 즉시
-            # "IF" / "ARIMA" / "IF+ARIMA" / "야간 가동" 출처 구분 표시.
-            algo_label = _ALGORITHM_SOURCE_LABEL.get(algorithm_source, "AI")
-            summary = (
-                f"[{algo_label} 이상 감지] {label} {data_type}={value} "
-                f"(score {score:.4f}, combined={combined})"
-            )
-            risk_level = _COMBINED_TO_RISK_LEVEL[combined]
-
-            # ML forward + push + AlarmRecord forward 를 helper 단일 호출로 캡슐화.
-            # helper 안에서 push 는 독립 task (C12 효과 보존), ML→alarm 은 sequential.
-            # 모든 외부 호출 silent fail + Prometheus counter (anomaly_alarm.py).
-            asyncio.create_task(
-                forward_inference_e2e(
-                    ml_payload={
-                        "ml_model": None,
-                        "model_version_snapshot": entry.version,
-                        "sensor_type": "power",
-                        "sensor_identifier": sensor_identifier,
-                        "measured_at": measured_at,
-                        "anomaly_score": score,
-                        "prediction": prediction,
-                        "risk_classified": combined,
-                        "feature_snapshot_json": features,
-                    },
-                    alarm_payload={
-                        "alarm_type": "power_anomaly_ai",
-                        "risk_level": risk_level,
-                        "source_device_id": str(device_id),
-                        "measured_value": value,
-                        "summary": summary,
-                        "detected_at": measured_at,
-                        "source_label": label,
-                        # AlarmRecord.channel 에 저장 → get_short_message 가 channel_meta
-                        # 로 라벨 ("송풍기A AI 이상 패턴 감지 (7925.8 W)") 생성.
-                        "channel": channel,
-                        # W4.a — AlarmRecord.algorithm_source 저장용 (plan §8).
-                        "algorithm_source": algorithm_source,
-                    },
-                    push_payload={
-                        "alarm_type": "power_anomaly_ai",
-                        "risk_level": risk_level,
-                        "source_label": label,
-                        "summary": summary,
-                        "is_new_event": True,
-                        "measured_value": value,
-                        # 룰 기반 알람과 동일 키. alarm_flush_loop 이 E2E latency 측정.
-                        "ingress_ts": ingress_ts,
-                        "anomaly_meta": {
-                            "combined_risk": combined,
-                            "anomaly_score": score,
-                            "device_id": device_id,
-                            "channel": channel,
-                            "data_type": data_type,
-                            # W4.a — UI 알람 토스트/이벤트 패널이 algorithm 출처 칩
-                            # 표시 (DB AlarmRecord.algorithm_source 와 동일 값).
-                            "algorithm_source": algorithm_source,
-                            # arima_result 가 있으면 forecast / CI 도 동행 — UI 가
-                            # "예측 1091 ± 신뢰구간 [645, 1538]" 같은 디테일 표시 가능.
-                            "arima_forecast": (
-                                arima_result["forecast"] if arima_result else None
-                            ),
-                            "arima_ci": (
-                                [arima_result["ci_lower"], arima_result["ci_upper"]]
-                                if arima_result
-                                else None
-                            ),
-                            # §F — 5축 정책 엔진 입력 4·5축 동행. UI 가 출처 칩
-                            # 외에 어떤 축이 발화했는지 디테일 표시 가능 (예:
-                            # "급변 감지 mean_shift=4.2 std_ratio=1.1").
-                            "z_score_anomaly": z_score_anomaly,
-                            "change_point": change_point,
-                            "cp_mean_shift": (
-                                cp_meta.get("mean_shift") if change_point else None
-                            ),
-                            "cp_std_ratio": (
-                                cp_meta.get("std_ratio") if change_point else None
-                            ),
-                        },
-                    },
-                    should_fire=should_fire,
+                    asyncio.create_task(forward_inference_e2e(ml_payload, None))
+                    continue
+                _last_fired_at[sensor_identifier] = now_ts
+                # 정휘훈 작업 — rate limit 통과 실제 발화 카운터.
+                # combined danger 횟수 대비 이 값이 낮으면 rate limit 또는 Redis/WS 문제.
+                POWER_AI_ALARM_FIRED_TOTAL.labels(algorithm_source).inc()
+                # FIRED 마킹 + DRF AI mute 호환 (mark_ai_recent — 기존 ai_fired:* 키).
+                await mark_ai_state(
+                    device_id, channel, data_type, AIInferenceState.FIRED
                 )
-            )
+                rule_level = AI_TO_RULE_LEVEL.get(combined, combined)
+                asyncio.create_task(mark_ai_recent(device_id, channel, rule_level))
+                ai_state = AIInferenceState.FIRED
+                ai_combined = combined
+            else:
+                await mark_ai_state(
+                    device_id, channel, data_type, AIInferenceState.INFERRED_NORMAL
+                )
+                ai_state = AIInferenceState.INFERRED_NORMAL
+                ai_combined = "normal"
+
+            # decide_alarm 매트릭스 — AI + 정적 동기 평가 결과 단일 source 결정.
+            decision = decide_alarm(ai_state, ai_combined, static_risk)
+            if decision is None:
+                # 알람 없음 — ML forward 만 (정상 — 가장 흔한 케이스).
+                asyncio.create_task(forward_inference_e2e(ml_payload, None))
+                continue
+
+            # AI source (decision.source == "ai") 와 정적 cover source 분기.
+            if decision.source == "ai":
+                phrase = _ALGORITHM_SOURCE_PHRASE.get(algorithm_source, "AI 이상 탐지")
+                summary = f"{label} {phrase} ({value:,.1f} W)"
+                push_payload = {
+                    "alarm_type": "power_anomaly_ai",
+                    "risk_level": decision.risk_level,
+                    "source": decision.source,
+                    "reason": decision.reason,
+                    "source_label": label,
+                    "summary": summary,
+                    "message": summary,
+                    "is_new_event": True,
+                    "measured_value": value,
+                    "ingress_ts": ingress_ts,
+                    "anomaly_meta": {
+                        "combined_risk": combined,
+                        "anomaly_score": score,
+                        "device_id": device_id,
+                        "channel": channel,
+                        "data_type": data_type,
+                        "algorithm_source": algorithm_source,
+                        "arima_forecast": (
+                            arima_result["forecast"] if arima_result else None
+                        ),
+                        "arima_ci": (
+                            [arima_result["ci_lower"], arima_result["ci_upper"]]
+                            if arima_result
+                            else None
+                        ),
+                        "z_score_anomaly": z_score_anomaly,
+                        "change_point": change_point,
+                        "cp_mean_shift": (
+                            cp_meta.get("mean_shift") if change_point else None
+                        ),
+                        "cp_std_ratio": (
+                            cp_meta.get("std_ratio") if change_point else None
+                        ),
+                    },
+                }
+                alarm_payload = {
+                    "alarm_type": "power_anomaly_ai",
+                    "risk_level": decision.risk_level,
+                    "source_device_id": str(device_id),
+                    "measured_value": value,
+                    "summary": summary,
+                    "detected_at": measured_at,
+                    "source_label": label,
+                    "channel": channel,
+                    "algorithm_source": algorithm_source,
+                    "source": decision.source,
+                }
+                # AI broadcast latency observe (plan §10 — (a) 제거 후 측정).
+                if ingress_ts is not None:
+                    AI_BROADCAST_LATENCY.observe(time.time() - ingress_ts)
+            else:
+                # static_cover_miss — AI 활성 채널에서 AI 정상 + 정적 발화.
+                # AlarmRecord 영속화는 본 D2 비범위 (alarm_payload=None).
+                push_payload = _build_static_push_payload(
+                    decision, label, float(value), ingress_ts, static_threshold_abs
+                )
+                alarm_payload = None
+
+            try:
+                await push_alarm(push_payload)
+            except Exception:
+                logger.exception(
+                    "[anomaly_inference] push failed source=%s", decision.source
+                )
+
+            asyncio.create_task(forward_inference_e2e(ml_payload, alarm_payload))
         except Exception as exc:
             AI_INFERENCE_FAILED_TOTAL.labels("power_if", "inference_error").inc()
             logger.warning(
@@ -526,6 +678,27 @@ async def process_anomaly_inference(
                 data_type,
                 exc,
             )
+            # INFERRED_FAILED 마킹 + 정적 폴백 분기. mark_ai_state 자체가 silent fail
+            # 이라 재예외 가능성 낮지만, push 실패 가능 → 2차 try.
+            try:
+                await mark_ai_state(
+                    device_id, channel, data_type, AIInferenceState.INFERRED_FAILED
+                )
+                decision = decide_alarm(
+                    AIInferenceState.INFERRED_FAILED,
+                    ai_combined_risk="normal",
+                    static_risk=static_risk,
+                )
+                if decision is not None:
+                    await _push_static_decision(
+                        decision, label, float(value), ingress_ts, static_threshold_abs
+                    )
+            except Exception:
+                logger.exception(
+                    "[anomaly_inference] inference-failed fallback failed device=%s ch=%s",
+                    device_id,
+                    channel,
+                )
 
 
 def to_channel_list(

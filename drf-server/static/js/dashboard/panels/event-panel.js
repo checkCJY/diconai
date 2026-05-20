@@ -40,6 +40,26 @@ const EventPanel = {
     storage_overdue:      'package-x',
   },
 
+  // T1+T6 — alarm_type 코드 → 한국어 라벨 fallback (드물게 sensor_name/source_label
+  // 누락 시 운영자가 영문 코드 보지 않도록). drf-server/apps/core/constants.py 의
+  // AlarmType.choices 와 동기 유지. 본 dict 에 없으면 '알 수 없음'.
+  LABEL_BY_TYPE: {
+    gas_threshold:        '가스 경보',
+    gas_clear:            '가스 정상 복귀',
+    power_overload:       '전력 이상',
+    power_anomaly_ai:     '전력 AI 이상 감지',
+    power_clear:          '전력 정상 복귀',
+    geofence_intrusion:   '위험구역 진입',
+    sensor_fault:         '센서 이상',
+    ppe_violation:        'PPE 미착용',
+    vr_training_not_done: 'VR 교육 미이수',
+    safety_check_pending: '작업 안전 체크리스트 미완료',
+    inspection_scheduled: '점검 예정',
+    batch_failed:         '배치 실패',
+    storage_overdue:      '보관 주기 실패',
+    gas_anomaly_ai:       '가스 AI 이상 감지',
+  },
+
   // 같은 패널 안에 동일 항목이 중복 추가되지 않도록 추적.
   // WS dispatch (실시간) 와 loadEventList (페이지 로드), 그리고 백엔드 dedup TTL
   // 만료 후 재푸시가 같은 항목을 다시 보내도 시각적으로 1번만 노출.
@@ -123,10 +143,12 @@ const EventPanel = {
   // 추가하고, 같은 분의 다음 정상화는 첫 항목에 "외 N건" 카운터 + sources 누적.
   _addToClearGroup(data, listEl, emptyEl) {
     const groupKey = this._clearGroupKey(data);
+    // T1+T6 — main fallback chain 과 동일. alarm_type 한글 라벨까지 fallback.
     const source =
       data.source_label ||
       data.sensor_name ||
       data.power_device_name ||
+      this.LABEL_BY_TYPE[data.alarm_type] ||
       '알 수 없음';
 
     const existing = this._clearGroups.get(groupKey);
@@ -230,12 +252,15 @@ const EventPanel = {
     // [P0-1] label fallback 확장 — power_device_name / geofence_name / source_label 추가.
     //   WS payload (alarm-mapper.fromSensorsAlarm) 는 source_label 만, API 응답
     //   (AlarmRecordSerializer) 은 발생원별 4 필드 → 양쪽 모두 커버.
+    // [P0-1] label fallback chain. T1+T6 — 최후 fallback 으로 alarm_type 한글 라벨
+    // (constants.AlarmType.choices 동기, '알 수 없음' 영문 코드 노출 방지).
     const label =
       data.sensor_name ||
       data.power_device_name ||
       data.worker_name ||
       data.geofence_name ||
       data.source_label ||
+      this.LABEL_BY_TYPE[data.alarm_type] ||
       '알 수 없음';
     const time = data.created_at
       ? (typeof TimeFormat !== 'undefined' ? TimeFormat.short(data.created_at) : new Date(data.created_at).toLocaleTimeString())
@@ -247,6 +272,10 @@ const EventPanel = {
 
     const item = document.createElement('div');
     item.className = 'event-item event-item--source-group';
+    // T4 — source 가 cover 면 행 톤도 노랑 (CSS .alarm-popup-static-cover 재사용 —
+    // 모달·토스트·이벤트 패널 3 곳이 같은 톤 사전).
+    const tone = (typeof AlarmMapper !== 'undefined') ? AlarmMapper.sourceTone(data.alarm_source) : 'risk';
+    if (tone === 'cover') item.classList.add('alarm-popup-static-cover');
     item.style.opacity = isResolved ? '0.5' : '1';
     // dataset.dedupKey = groupKey (LRU 제거 시 _sourceGroups 정리 매칭).
     item.dataset.dedupKey = groupKey;
@@ -259,6 +288,9 @@ const EventPanel = {
         window.location.href = `/dashboard/monitoring/events/${eventId}/`;
       });
     }
+    // T4 — cover 배지 한 줄 (사유 라벨 — "AI 미탐 의심" 등). 빈 문자열이면 미렌더.
+    const coverLabel = (typeof AlarmMapper !== 'undefined') ? AlarmMapper.sourceBadge(data.alarm_source) : '';
+    const coverHtml = coverLabel ? `<span class="cover-badge event-cover-badge">${coverLabel}</span>` : '';
     item.innerHTML = `
       <div class="event-head">
         <span><i data-lucide="${icon}" class="event-icon"></i>${label}</span>
@@ -266,6 +298,7 @@ const EventPanel = {
       </div>
       <div class="${colorClass} event-desc">
         <span>${data.message || data.alarm_type || ''}</span>
+        ${coverHtml}
         <span class="event-source-more" hidden> · 외 <span class="event-source-more-count">0</span>건<span class="event-source-other-types"></span></span>
       </div>
       <ul class="event-source-items" hidden></ul>

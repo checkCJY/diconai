@@ -92,6 +92,19 @@ def _payload_fingerprint(payload: dict) -> str | None:
             return None
         return f"clear:{alarm_type}:{source_label}"
 
+    # T4 D2 patch — power_overload + T4 source 분기 (static_cover_* / static_no_ai_available).
+    # process_anomaly_inference 가 모든 채널 매 sample 평가 → 같은 (source, channel)
+    # 조합이 매초 push 됐던 폭주 차단. event_id 분기보다 후행이라 룰 알람 (event_id
+    # 있음) 영향 없음. fingerprint key 에 source_label 포함 — 같은 채널 의 같은 risk
+    # 가 30s 안 1회만 통과. AI source (decision.source=='ai') 는 위 anomaly_meta
+    # 분기 (ai:*) 우선이라 본 분기 미진입.
+    if alarm_type == "power_overload":
+        source = payload.get("source")
+        source_label = payload.get("source_label", "")
+        if not source or not source_label:
+            return None  # 옛 발신자 / 정보 부족 — dedup 미적용 (백워드 호환)
+        return f"cover:{source}:{source_label}:{risk_level}"
+
     return None
 
 
