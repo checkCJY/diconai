@@ -29,6 +29,7 @@ from internal.routers.scenario_router import router as internal_scenario_router
 from positioning.routers.position_router import router as positioning_router
 from power.routers.power_router import router as power_router
 from power.services.channel_meta_cache import channel_meta_refresh_loop
+from power.services.threshold_sync import threshold_sync_loop
 from websocket.routers.ws_router import (
     alarm_flush_loop,
     broadcast_loop,
@@ -53,12 +54,15 @@ async def lifespan(app: FastAPI):
     task3 = asyncio.create_task(
         channel_meta_refresh_loop()
     )  # PowerDevice.channel_meta 5분 주기 동기화
+    # T4 D1b — DRF power_facility_default threshold 5분 sync (단일 결정자 진입).
+    task4 = asyncio.create_task(threshold_sync_loop())
     try:
         yield
     finally:
         task1.cancel()
         task2.cancel()
         task3.cancel()
+        task4.cancel()
         await close_redis()  # Phase 1 C4 — Redis 연결 풀 정리
         logger.info("[app] action=shutdown")
 

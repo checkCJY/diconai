@@ -3,6 +3,7 @@ from .power_data import (
     PowerChannelMetaView,
     PowerDataBulkIngestView,
     PowerEventIngestView,
+    PowerThresholdMetaView,
     PowerThresholdView,
 )
 
@@ -11,5 +12,6 @@ __all__ = [
     "PowerEventIngestView",
     "PowerDataBulkIngestView",
     "PowerThresholdView",
+    "PowerThresholdMetaView",
     "PowerChannelMetaView",
 ]
