@@ -11,7 +11,11 @@
 // Phase 3 의 서버 측 ack 분기 (옵션 B) 가 들어오면 이 Set 은 보강재로 유지.
 const _ACK_STORE_KEY = 'diconai:alarm:acked_event_ids';
 const _LAST_SEEN_KEY = 'diconai:alarm:last_seen_ts';
-const _ACK_TTL_MS    = 24 * 60 * 60 * 1000;  // 24h — localStorage 무한 증가 차단
+// T5 (2026-05-20) — 24h → 60s 단축. 24h 영구 차단 가설 (진단 문서 §3.1) 이 시연
+// 중 모달 클릭 한 번이 24시간 침묵을 만들 위험. 60s 면 RESOLVED 안 눌러도 다음
+// repopup cooldown (settings.ALARM_REPOPUP_COOLDOWN_SEC=60s) 직후 자연 회복.
+// RESOLVED 즉시 해제는 _handleResolved 안 _AckStore.remove(eventId) 가 처리.
+const _ACK_TTL_MS    = 60_000;  // 60s — 진단 문서 §7 옵션 (a)
 
 const _AckStore = {
   _map: null,  // Map<event_id, ack_ts_ms>
@@ -39,6 +43,14 @@ const _AckStore = {
     if (eventId == null) return;
     this._load().set(eventId, Date.now());
     this._persist();
+  },
+
+  // T5 — RESOLVED 시 동기 삭제 (_handleResolved 호출). 운영자가 "조치 완료" 누른
+  // 시점에 본인 ack 도 같이 해제 — 멘탈 모델 정합 (진단 문서 §7 옵션 b).
+  remove(eventId) {
+    if (eventId == null) return;
+    const map = this._load();
+    if (map.delete(eventId)) this._persist();
   },
 
   _persist() {
@@ -320,7 +332,9 @@ const _POPUP_CFG = {
 };
 
 // 위험도별 자동닫힘 (ms) — danger는 운영자 확인 시간 충분 확보 (P2-2).
-const _AUTO_CLOSE_MS = { danger: 15000, warning: 10000 };
+// T5 (2026-05-20) — warning 10s → 30s. 10s 는 운영자가 메시지 읽기 전 사라짐.
+// 30s 면 텍스트 확인 + 확인 완료 클릭 충분. danger 는 15s 유지 (격상 펄스 → 모달).
+const _AUTO_CLOSE_MS = { danger: 15000, warning: 30000 };
 const _PULSE_COUNT_THRESHOLD = 10;  // 그룹 카운트 ≥ 이 값이면 펄스 애니메이션
 
 // 위험도별 비프음 — Web Audio API로 합성 (외부 mp3 의존 없음).
@@ -610,6 +624,10 @@ const AlarmPopup = {
     }
     // 큐에 같은 event_id 가 남아있어도 자연 닫힘
     this.queue = this.queue.filter(d => (d.event_id || d.id) !== eventId);
+    // T5 — 운영자가 "조치 완료" 누른 시점에 본인 _AckStore 도 동기 삭제. 같은
+    // source 다음 신규 Event 가 (다른 event_id) 도착하면 _AckStore 통과 → 모달
+    // 정상 등장. 진단 문서 §7 옵션 (b) — 멘탈 모델 정합.
+    _AckStore.remove(eventId);
     // 우하단 토스트로 "위험 해소" 안내 (AlarmToast 재사용)
     if (typeof AlarmToast !== 'undefined') {
       AlarmToast.show({
