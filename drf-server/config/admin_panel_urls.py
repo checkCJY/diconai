@@ -67,6 +67,20 @@ class OrganizationsAdminPageView(TemplateView):
         return ctx
 
 
+class DataRetentionPolicyAdminPageView(TemplateView):
+    """
+    데이터 보관 정책 관리 페이지.
+    실제 데이터는 JS가 /api/admin/retention-policies/ 를 fetch해서 렌더링한다.
+    """
+
+    template_name = "admin_panel/data/retention_policy.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["active_nav"] = "retention_policy"
+        return ctx
+
+
 class PowerDataAdminPageView(TemplateView):
     """
     스마트 전력 시스템 데이터 관리 페이지.
@@ -270,6 +284,11 @@ urlpatterns = [
         "data/power/",
         PowerDataAdminPageView.as_view(),
         name="admin-power-data",
+    ),
+    path(
+        "data/retention-policy/",
+        DataRetentionPolicyAdminPageView.as_view(),
+        name="admin-retention-policy",
     ),
     path(
         "safety/checklist/",
