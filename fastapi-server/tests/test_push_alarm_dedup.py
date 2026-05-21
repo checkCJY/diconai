@@ -247,3 +247,161 @@ def test_payload_fingerprint_clear_alarm():
         }
     )
     assert fp_power == "clear:power_clear:송풍기-A"
+
+
+# ──────────────────────────────────────────────────────────────────────
+# T4 D2 patch — 정적 cover push 폭주 dedup
+#
+# [배경] D2 의 process_anomaly_inference 가 모든 채널 매 sample 평가 → 같은
+# (source, source_label, risk_level) 조합이 1초당 push 됐던 폭주. fingerprint
+# 분기에 power_overload + source 추가로 30s 1회 통과.
+# ──────────────────────────────────────────────────────────────────────
+
+
+def test_payload_fingerprint_cover_alarm():
+    """T4 cover 알람 fingerprint — cover:{source}:{source_label}:{risk_level}."""
+    fp = alarm_queue._payload_fingerprint(
+        {
+            "alarm_type": "power_overload",
+            "risk_level": "warning",
+            "source": "static_cover_warmup",
+            "source_label": "공조설비",
+        }
+    )
+    assert fp == "cover:static_cover_warmup:공조설비:warning"
+
+
+def test_payload_fingerprint_cover_distinct_sources_get_distinct_fp():
+    """같은 채널이라도 source 가 다르면 fingerprint 다름 → 둘 다 push."""
+    fp_warmup = alarm_queue._payload_fingerprint(
+        {
+            "alarm_type": "power_overload",
+            "risk_level": "danger",
+            "source": "static_cover_warmup",
+            "source_label": "송풍기",
+        }
+    )
+    fp_miss = alarm_queue._payload_fingerprint(
+        {
+            "alarm_type": "power_overload",
+            "risk_level": "danger",
+            "source": "static_cover_miss",
+            "source_label": "송풍기",
+        }
+    )
+    assert fp_warmup != fp_miss
+
+
+def test_payload_fingerprint_cover_missing_source_returns_none():
+    """source 누락 — fingerprint 불가 → None (옛 발신자 백워드 호환)."""
+    fp = alarm_queue._payload_fingerprint(
+        {
+            "alarm_type": "power_overload",
+            "risk_level": "warning",
+            "source_label": "송풍기",
+        }
+    )
+    assert fp is None
+
+
+@pytest.mark.asyncio
+async def test_push_alarm_dedupes_cover_same_source_label_channel():
+    """T4 — 같은 (source, source_label, risk) 조합 두 번 push → 1번만 LPUSH."""
+    redis_mock = AsyncMock()
+    redis_mock.set = AsyncMock(side_effect=[True, False])  # 첫 통과, 두 번째 dedup hit
+
+    payload = {
+        "alarm_type": "power_overload",
+        "risk_level": "warning",
+        "source": "static_no_ai_available",
+        "source_label": "보조 모터 1",
+    }
+
+    with patch("websocket.services.alarm_queue.get_redis", return_value=redis_mock):
+        await alarm_queue.push_alarm(payload)
+        await alarm_queue.push_alarm(payload)
+
+    # SET NX 두 번 시도, LPUSH 는 첫 통과 시 1회만.
+    assert redis_mock.set.await_count == 2
+    assert redis_mock.lpush.await_count == 1
+
+
+# ──────────────────────────────────────────────────────────────────────
+# 2026-05-15 알람 재설계 — RESOLVED 신호 fingerprint 분리
+#
+# [배경] update_status PATCH RESOLVED → drf _push_to_ws → 본 모듈 push_alarm.
+# payload 에 event_resolved_at 박힘 + 같은 (event_id, risk_level). 기본 fingerprint
+# 로는 원래 알람과 동일해서 30s TTL 안에 dedup hit 으로 차단됐던 운영 버그 가드.
+# ──────────────────────────────────────────────────────────────────────
+
+
+def test_payload_fingerprint_resolved_signal_distinct_from_original():
+    """RESOLVED 신호 (event_resolved_at 박힘) 는 원래 알람과 별도 fingerprint."""
+    original = alarm_queue._payload_fingerprint(
+        {"event_id": 42, "risk_level": "danger", "alarm_type": "gas_threshold"}
+    )
+    resolved = alarm_queue._payload_fingerprint(
+        {
+            "event_id": 42,
+            "risk_level": "danger",
+            "alarm_type": "gas_threshold",
+            "event_resolved_at": "2026-05-15T05:13:53+00:00",
+        }
+    )
+    assert original == "event:42:danger"
+    assert resolved == "event:42:resolved"
+    assert original != resolved
+
+
+@pytest.mark.asyncio
+async def test_resolved_signal_pushes_even_when_original_in_dedup_window():
+    """원래 위험 알람이 30s dedup TTL 안에 있어도 RESOLVED 신호는 별개 fingerprint 라 통과.
+
+    실제 운영 시나리오 (사용자 보고 2026-05-15): 위험 알람 broadcast 직후 30s 안에
+    운영자 RESOLVED 처리 → 같은 event_id 라 같은 fingerprint 였으면 dedup 차단 → 클라
+    팝업 자동 닫힘 실패. 별도 fingerprint 분리 후 통과 검증.
+    """
+    redis = _make_redis_mock(set_returns=[True, True])
+    original = {
+        "event_id": 42,
+        "risk_level": "danger",
+        "alarm_type": "gas_threshold",
+        "is_new_event": True,
+    }
+    resolved = {
+        "event_id": 42,
+        "risk_level": "danger",
+        "alarm_type": "gas_threshold",
+        "is_new_event": False,
+        "event_resolved_at": "2026-05-15T05:13:53+00:00",
+    }
+
+    with patch("websocket.services.alarm_queue.get_redis", return_value=redis):
+        await alarm_queue.push_alarm(original)
+        await alarm_queue.push_alarm(resolved)
+
+    # 둘 다 LPUSH — 별도 fingerprint
+    assert redis.lpush.await_count == 2
+    assert redis.set.await_count == 2
+    # 두 set 키의 suffix 가 다름 — "danger" vs "resolved"
+    fp1 = redis.set.call_args_list[0].args[0]
+    fp2 = redis.set.call_args_list[1].args[0]
+    assert fp1.endswith(":danger")
+    assert fp2.endswith(":resolved")
+
+
+@pytest.mark.asyncio
+async def test_resolved_signal_retry_still_deduped():
+    """RESOLVED 신호 자체의 retry 중복은 여전히 dedup 차단 — idempotency 유지."""
+    redis = _make_redis_mock(set_returns=[True, False])
+    resolved = {
+        "event_id": 42,
+        "risk_level": "danger",
+        "event_resolved_at": "2026-05-15T05:13:53+00:00",
+    }
+
+    with patch("websocket.services.alarm_queue.get_redis", return_value=redis):
+        await alarm_queue.push_alarm(resolved)
+        await alarm_queue.push_alarm(resolved)  # retry
+
+    assert redis.lpush.await_count == 1  # 첫 도착자만 LPUSH

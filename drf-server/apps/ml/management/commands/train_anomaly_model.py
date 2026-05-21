@@ -33,6 +33,7 @@ from django.db import transaction
 from django.utils.dateparse import parse_datetime
 from sklearn.ensemble import IsolationForest
 
+from apps.facilities.models import PowerDevice
 from apps.ml.models import MLModel
 from apps.ml.services.dataset_service import (
     TimeSeries,
@@ -249,16 +250,48 @@ class Command(BaseCommand):
             "gas_name": opts["gas_name"],
         }
 
-        self.stdout.write(f"[5/5] MLModel row 생성 — version v{version}")
+        # W1.2 — sensor_identifier 자동 생성 (단일 시계열 단위 매칭).
+        # 기존 sensor_identifier="" row 들과는 매칭 단위가 분리됨 →
+        # 새 train 의 activate 가 기존 sensor_identifier="" 활성 모델을 비활성화하지 않음.
+        # fastapi 측 W2 _get_or_load 가 sensor_identifier 기반 우선 매칭, 없으면 ""
+        # fallback 으로 정리.
+        if sensor_type == "power":
+            # PK → raw mac 변환. 추론 측 (fastapi power_service) sensor_identifier
+            # 와 일관성 보장: "power:device_{mac}:ch{n}:{type}". PK 그대로 사용 시
+            # 추론에서 매칭 실패 → silent fallback 으로 IF 미동작.
+            try:
+                device_obj = PowerDevice.objects.get(pk=opts["device_id"])
+            except PowerDevice.DoesNotExist as exc:
+                raise CommandError(f"PowerDevice PK={opts['device_id']} 없음") from exc
+            sensor_identifier = (
+                f"power:device_{device_obj.device_id}"
+                f":ch{opts['channel']}:{opts['data_type']}"
+            )
+        elif sensor_type == "gas":
+            gas_label = opts["gas_name"].replace(",", "_")
+            sensor_identifier = f"gas:sensor_{opts['sensor_id']}:{gas_label}"
+        else:
+            sensor_identifier = ""
+
+        self.stdout.write(
+            f"[5/5] MLModel row 생성 — version v{version} "
+            f"sensor_identifier={sensor_identifier!r}"
+        )
         with transaction.atomic():
             if options["activate"]:
-                MLModel.objects.filter(sensor_type=sensor_type, is_active=True).update(
-                    is_active=False
-                )
+                # 같은 매칭 단위 (sensor_type, algorithm, sensor_identifier) 안의
+                # 기존 활성 모델만 비활성화 — 다른 sensor_identifier 의 활성 모델은 보존.
+                MLModel.objects.filter(
+                    sensor_type=sensor_type,
+                    algorithm=MLModel.Algorithm.ISOLATION_FOREST,
+                    sensor_identifier=sensor_identifier,
+                    is_active=True,
+                ).update(is_active=False)
             row = MLModel.objects.create(
                 version=version,
                 sensor_type=sensor_type,
-                model_type=MLModel.ModelType.ISOLATION_FOREST,
+                algorithm=MLModel.Algorithm.ISOLATION_FOREST,
+                sensor_identifier=sensor_identifier,
                 file_path=file_name,
                 training_data_range_from=since,
                 training_data_range_to=until,

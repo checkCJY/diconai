@@ -67,6 +67,20 @@ DB_SAVE_TOTAL = Counter(
     ["model", "result", "error_type"],
 )
 
+# DB 저장 latency Histogram.
+# DB_SAVE_TOTAL(성공/실패 여부)과 함께 쓰면 "저장은 되는데 느린가"를 구분할 수 있다.
+# PG 전환 전후 동일 메트릭으로 비교하면 전환 효과를 수치로 증명할 수 있다.
+# (SQLite p95 ≥ 50ms / PG p95 ≥ 20ms 이면 각각 이상 신호)
+#
+# 레이블:
+#   model : "gas" | "power"
+DB_SAVE_DURATION = Histogram(
+    "db_save_duration_seconds",
+    "DB save latency for GasData and PowerData (ORM create / bulk_create)",
+    ["model"],
+    buckets=[0.005, 0.01, 0.025, 0.05, 0.1, 0.5, 1.0, 5.0],
+)
+
 # ── Celery 큐 길이 메트릭 ────────────────────────────────────────────────────
 # Redis의 Celery 큐를 LLEN 명령으로 읽어 대기 중인 태스크 수를 기록한다.
 # Celery Beat(queue_metrics_task)이 30초마다 갱신한다.
@@ -117,6 +131,41 @@ GEOFENCE_CHECK_DURATION = Histogram(
 )
 
 
+# ── SQLite DB 파일 크기 메트릭 ───────────────────────────────────────────────
+# Beat 태스크(db_health_task)가 60초마다 os.path.getsize()로 읽어 갱신한다.
+# 어제(2026-05-14) 12GB 비대화 사고의 재발 방지용 — 5GB 경고 / 10GB 경보 기준.
+# PG 전환 후에는 이 메트릭이 자연히 0으로 수렴한다.
+SQLITE_DB_SIZE = Gauge(
+    "sqlite_db_size_bytes",
+    "SQLite database file size in bytes",
+    multiprocess_mode="max",
+)
+
+# ── Celery 태스크 실행시간 / 대기시간 메트릭 ─────────────────────────────────
+# C1: 태스크가 실제로 실행된 시간 (task_prerun → task_postrun).
+# C2: 태스크가 큐에 들어간 시점부터 워커가 꺼낼 때까지 대기한 시간.
+#
+# 두 메트릭을 분리하는 이유:
+#   - C1이 높으면 "태스크 로직 자체가 느린 것" (DB 락, 외부 API 지연 등)
+#   - C2가 높으면 "worker가 태스크를 소화 못 하는 것" (worker 증설 필요)
+#   - celery_queue_length가 짧아도 C1이 높으면 알람이 지연될 수 있다.
+#
+# 레이블:
+#   task_name : 태스크 모듈 경로 (예: apps.alerts.tasks.fire_gas_alarm_task)
+CELERY_TASK_DURATION = Histogram(
+    "celery_task_duration_seconds",
+    "Celery task execution time from task_prerun to task_postrun",
+    ["task_name"],
+    buckets=[0.01, 0.05, 0.1, 0.5, 1.0, 5.0, 30.0],
+)
+
+CELERY_TASK_QUEUED = Histogram(
+    "celery_task_queued_seconds",
+    "Celery task wait time from enqueue to worker pickup",
+    ["task_name"],
+    buckets=[0.01, 0.05, 0.1, 0.5, 1.0, 5.0, 30.0],
+)
+
 # ── AI 우선순위 mute 메트릭 ───────────────────────────────────────────────────
 # Step 3 — AI 발화 시 같은 채널의 룰 알람을 60s 동안 mute 한다. 룰 fire 가 가드로
 # skip 되는 횟수를 추적해 운영 중 "왜 룰이 안 떴나?" 디버깅 자료로 쓰고, AI 의 오탐
@@ -130,4 +179,41 @@ RULE_FIRE_SUPPRESSED_BY_AI_TOTAL = Counter(
     "rule_fire_suppressed_by_ai_total",
     "Rule alarm fire skipped because an AI alarm fired on the same channel recently",
     ["device_id", "channel", "level"],
+)
+
+# T4 D3 — STATIC_THRESHOLD_AT_FASTAPI=True 시 DRF 정적 fire skip 카운터.
+# 활성화 모드의 동작 확인 + 시연 후 mismatch 분석 자료. 비활성화 모드에선 inc 0.
+STATIC_FIRE_SUPPRESSED_BY_FASTAPI_TOTAL = Counter(
+    "static_fire_suppressed_by_fastapi_total",
+    "DRF static fire skipped because fastapi is the single decision-maker (T4)",
+    ["device_id", "channel", "level"],
+)
+
+# T4 D3 — shadow_audit mismatch 카운터. DRF 정적 평가는 fire 해야 함이라 판단했는데
+# fastapi 가 실제 알람 안 만든 케이스 누적. 1~2주 운영 후 0/낮음이면 활성화 안전.
+STATIC_AUDIT_MISMATCH_TOTAL = Counter(
+    "static_audit_mismatch_total",
+    "Shadow audit: DRF would-fire but fastapi produced no AlarmRecord in window",
+    ["device_id", "channel", "would_fire"],
+)
+
+# ── Celery 태스크 실패 / 재시도 메트릭 (P2 전) ───────────────────────────────
+# task_postrun은 성공/실패 무관하게 호출되므로 실패 여부를 구분할 수 없다.
+# task_failure / task_retry 시그널로 각각 카운트한다.
+#
+# 실패 카운터가 올라가면 알람 미발송 원인 추적 시작점이 된다.
+# 재시도 카운터가 꾸준히 올라가면 FastAPI 불안정 또는 DB 락 신호.
+#
+# 레이블:
+#   task_name : 태스크 모듈 경로 (예: apps.alerts.tasks.fire_gas_alarm_task)
+CELERY_TASK_FAILED_TOTAL = Counter(
+    "celery_task_failed_total",
+    "Celery task failures (exception raised, not retried)",
+    ["task_name"],
+)
+
+CELERY_TASK_RETRIED_TOTAL = Counter(
+    "celery_task_retried_total",
+    "Celery task retry count (re-enqueued after failure)",
+    ["task_name"],
 )

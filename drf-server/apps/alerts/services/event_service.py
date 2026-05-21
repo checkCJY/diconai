@@ -1,23 +1,19 @@
 # alerts/services/event_service.py
 
+from datetime import timedelta
+
+from django.conf import settings
 from django.db import transaction
-from apps.alerts.models import Event, AlarmRecord, EventLog
-from apps.core.constants import EventStatus, RiskLevel
 from django.utils import timezone
 
-from datetime import timedelta
+from apps.alerts.models import AlarmRecord, Event, EventLog
+from apps.core.constants import EventStatus, RiskLevel
 
 RISK_LEVELS = ["normal", "warning", "danger"]
 
-# 같은 활성 Event 안에서 새 AlarmRecord 가 들어왔을 때 재푸시 (last_notified_at
-# 갱신 + WS broadcast) 사이의 최소 간격.
-#
-# [5번 문서 §9 정렬] "동일 작업자+센서+구역+위험단계 1분 내 1회" 패턴.
-# 산업 안전 도메인에서 위험 지속은 미대응 신호 — 1분 cadence 가 운영자 escalation
-# 트리거. monitoring._CACHE_TTL (가스/전력 try_transition) 과 동기. 추후 위험
-# 단계별 차등 (Critical 1m / Warning 3m 등) 필요 시 dict/함수로 리팩토링 가능,
-# 단 운영 데이터 누적 전까진 YAGNI.
-RENOTIFY_COOLDOWN_MINUTES = 1
+# 재푸시 cooldown 은 settings.ALARM_REPOPUP_COOLDOWN_SEC 에서 주입 (2026-05-15 알람 재설계).
+# 기존 RENOTIFY_COOLDOWN_MINUTES=1 상수에서 env 변수화 — 운영 60s / 시연 15s 로 분기 가능.
+# 가스/전력 dedup TTL (monitoring._CACHE_TTL) 과의 일관성은 운영 측에서 env 정렬로 유지.
 
 
 # 알람발생 시, Event 생성/병합 플로우
@@ -36,6 +32,9 @@ def create_alarm_and_event(
     source_label: str = "",
     summary: str = "",
     detected_at=None,
+    channel: int = None,
+    algorithm_source: str = "",
+    source: str = "",
 ):
     """
     AlarmRecord + Event 생성/병합 핵심 로직
@@ -96,6 +95,9 @@ def create_alarm_and_event(
                 measured_value=measured_value,
                 threshold_value=threshold_value,
                 risk_level=risk_level,
+                channel=channel,
+                algorithm_source=algorithm_source,
+                source=source,
             )
             active_event.last_detected_at = detected_at
             # 위험도 상승 시 Event risk_level 업데이트
@@ -105,7 +107,7 @@ def create_alarm_and_event(
                 active_event.risk_level = risk_level
 
             # 쿨다운 초과 시 재알림: last_notified_at 갱신 후 alarm 반환
-            cooldown = timedelta(minutes=RENOTIFY_COOLDOWN_MINUTES)
+            cooldown = timedelta(seconds=settings.ALARM_REPOPUP_COOLDOWN_SEC)
             needs_renotify = (
                 active_event.last_notified_at is None
                 or (timezone.now() - active_event.last_notified_at) >= cooldown
@@ -161,6 +163,9 @@ def create_alarm_and_event(
             measured_value=measured_value,
             threshold_value=threshold_value,
             risk_level=risk_level,
+            channel=channel,
+            algorithm_source=algorithm_source,
+            source=source,
         )
         EventLog.objects.create(
             event=event,

@@ -27,6 +27,7 @@ import logging
 import httpx
 
 from core.config import settings
+from core.metrics import DRF_CALL_FAILED_TOTAL
 
 logger = logging.getLogger(__name__)
 
@@ -105,16 +106,19 @@ async def post_to_drf(
             res = await client.post(url, json=json, headers=_auth_headers())
     except httpx.ConnectError as exc:
         logger.error(f"[{log_category}] action=connect_failed url={url} error={exc}")
+        DRF_CALL_FAILED_TOTAL.labels(error_type="connect_error").inc()
         if raise_on_error:
             raise DrfClientError(None, "DRF 서버에 연결할 수 없습니다.") from exc
         return None
     except httpx.TimeoutException as exc:
         logger.error(f"[{log_category}] action=timeout url={url} error={exc}")
+        DRF_CALL_FAILED_TOTAL.labels(error_type="timeout").inc()
         if raise_on_error:
             raise DrfClientError(None, "DRF 서버 응답 시간 초과.") from exc
         return None
     except httpx.HTTPError as exc:
         logger.error(f"[{log_category}] action=http_error url={url} error={exc}")
+        DRF_CALL_FAILED_TOTAL.labels(error_type="http_error").inc()
         if raise_on_error:
             raise DrfClientError(None, f"DRF 통신 오류: {exc}") from exc
         return None
@@ -124,6 +128,8 @@ async def post_to_drf(
         logger.warning(
             f"[{log_category}] action=non_success status={res.status_code} body={body_preview!r}"
         )
+        error_type = "http_5xx" if res.status_code >= 500 else "http_4xx"
+        DRF_CALL_FAILED_TOTAL.labels(error_type=error_type).inc()
         if raise_on_error:
             raise DrfClientError(res.status_code, body_preview or "DRF 응답 오류")
 

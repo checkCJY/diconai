@@ -18,7 +18,12 @@
 #
 # 채널 라벨: PowerDevice.channel_meta[str(ch)]["name"] 우선, 미지정 시 "CH{n}".
 
+import logging
+from datetime import timedelta
+
+from django.conf import settings
 from django.core.cache import cache
+from django.utils import timezone
 
 from apps.alerts.services.alarm_dedupe import (
     clear_state,
@@ -33,15 +38,26 @@ from apps.alerts.tasks import (
     fire_power_warning_task,
 )
 from apps.core.constants import RiskLevel
-from apps.core.metrics import RULE_FIRE_SUPPRESSED_BY_AI_TOTAL
+from apps.core.metrics import (
+    RULE_FIRE_SUPPRESSED_BY_AI_TOTAL,
+    STATIC_AUDIT_MISMATCH_TOTAL,
+    STATIC_FIRE_SUPPRESSED_BY_FASTAPI_TOTAL,
+)
 from apps.facilities.services.threshold_service import (
     evaluate_current_risk,
     evaluate_power_risk,
     evaluate_voltage_risk,
 )
 
+logger = logging.getLogger(__name__)
+
+# T4 D3 — shadow_audit 비교 window. fastapi 결정 도착까지 round-trip + Celery
+# worker queue + AlarmRecord 생성 여유. 너무 짧으면 false mismatch, 너무 길면
+# 누락 감지 둔감. 5s 기본값 — 시연 후 실측으로 튜닝.
+_AUDIT_WINDOW_SEC = 5
+
 # state_key 캐시 유지 시간. [Step 4 — 1시간 → 1분 단축, 5번 문서 §9 정렬]
-# RENOTIFY_COOLDOWN_MINUTES=1 와 일치시켜 try_transition / Event cooldown 두 dedup
+# settings.ALARM_REPOPUP_COOLDOWN_SEC (기본 60s) 와 일치시켜 try_transition / Event cooldown 두 dedup
 # 계층 시간 정렬. 가스 측 동일 변경과 짝. 위험 지속 시 1분 cadence 는 escalation
 # 트리거 역할 — 운영자가 1분째 대응 안 하면 같은 알람 재푸시로 인지 유도.
 # 추후 1~2주 운영 데이터 후 재평가.
@@ -90,9 +106,13 @@ def _revoke(task_id: str) -> None:
 
 
 def _channel_label(device, channel: int) -> str:
-    """PowerDevice.channel_meta[str(ch)]["name"] → 미지정 시 "CH{n}"."""
-    meta = (device.channel_meta or {}).get(str(channel)) or {}
-    return meta.get("name") or f"CH{channel}"
+    """PowerDevice.get_channel_label 의 thin wrapper (2026-05-17 통합).
+
+    기존엔 본 모듈에 채널 라벨 로직이 직접 있었음. AlarmRecord.get_short_message
+    가 같은 라벨을 만들려고 보니 중복 — PowerDevice 모델 메서드로 단일화.
+    호출자(power_alarm 흐름)는 시그니처 변경 없이 그대로 사용.
+    """
+    return device.get_channel_label(channel)
 
 
 def _max_risk(levels: list[str]) -> str:
@@ -112,7 +132,43 @@ def _aggregate_risk(device_id: int, channel: int, axis: str, this_risk: str) -> 
     return _max_risk(levels)
 
 
-def trigger_power_alarms(objs: list, device) -> None:
+def _shadow_audit(device_id: int, channel: int, would_fire_level: str) -> None:
+    """T4 D3 — DRF 정적 평가 결과를 fastapi 결정과 비교 (활성화 모드 전용).
+
+    비활성화 모드 (STATIC_THRESHOLD_AT_FASTAPI=False) 에선 호출 안 됨. 활성화 후
+    DRF 가 fire 했을 알람과 fastapi 가 실제 만든 AlarmRecord 의 정합성 모니터링
+    — 직전 _AUDIT_WINDOW_SEC 안 같은 채널 AlarmRecord 가 없으면 mismatch (fastapi
+    누락 의심).
+
+    1~2주 운영 후 mismatch counter 가 0/낮음이면 정식 제거 (환경변수·shadow_audit
+    삭제). plan §6.1.
+    """
+    if not would_fire_level or would_fire_level == RiskLevel.NORMAL:
+        return  # 정적 평가가 발화 안 했으면 비교 불요
+
+    from apps.alerts.models import AlarmRecord
+
+    cutoff = timezone.now() - timedelta(seconds=_AUDIT_WINDOW_SEC)
+    recent = AlarmRecord.objects.filter(
+        power_device_id=device_id,
+        channel=channel,
+        created_at__gte=cutoff,
+    ).exists()
+    if not recent:
+        STATIC_AUDIT_MISMATCH_TOTAL.labels(
+            device_id=str(device_id),
+            channel=str(channel),
+            would_fire=would_fire_level,
+        ).inc()
+        logger.warning(
+            "[shadow_audit] mismatch device=%s ch=%s would_fire=%s",
+            device_id,
+            channel,
+            would_fire_level,
+        )
+
+
+def trigger_power_alarms(objs: list, device, ingress_ts: float | None = None) -> None:
     """
     PowerData 일괄 저장 후 채널별 종합 위험도(W·A·V max)로 알람 라우팅한다.
 
@@ -143,6 +199,17 @@ def trigger_power_alarms(objs: list, device) -> None:
         this_risk = eval_fn(value, channel=channel, device_id=device_id)
         aggregate = _aggregate_risk(device_id, channel, axis_name, this_risk)
 
+        # T4 D3 — 활성화 모드: fastapi 가 단일 결정자라 DRF 정적 fire 전부 skip.
+        # shadow_audit 으로 정합성 모니터링만 수행. 기본값 False → 분기 미진입.
+        if settings.STATIC_THRESHOLD_AT_FASTAPI:
+            STATIC_FIRE_SUPPRESSED_BY_FASTAPI_TOTAL.labels(
+                device_id=str(device_id),
+                channel=str(channel),
+                level=aggregate,
+            ).inc()
+            _shadow_audit(device_id, channel, aggregate)
+            continue
+
         state_key = _state_key(device_id, channel)
         task_key = _task_key(device_id, channel)
         label = _channel_label(device, channel)
@@ -170,7 +237,7 @@ def trigger_power_alarms(objs: list, device) -> None:
             # 원자 천이 — 직전 상태가 danger 아닐 때만 1회 fire (race-safe)
             if try_transition(state_key, RiskLevel.DANGER, _CACHE_TTL):
                 fire_power_danger_task.delay(
-                    device_id, channel, value, facility_id, label
+                    device_id, channel, value, facility_id, label, ingress_ts=ingress_ts
                 )
 
         elif aggregate == RiskLevel.WARNING:
@@ -195,6 +262,7 @@ def trigger_power_alarms(objs: list, device) -> None:
                 continue
             task = fire_power_warning_task.apply_async(
                 args=[device_id, channel, value, facility_id, label],
+                kwargs={"ingress_ts": ingress_ts},
                 countdown=WARNING_DURATION_SEC,
             )
             cache.set(task_key, task.id, _TASK_KEY_TTL)

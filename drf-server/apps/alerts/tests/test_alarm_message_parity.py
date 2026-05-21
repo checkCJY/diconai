@@ -38,15 +38,69 @@ from apps.alerts.serializers import AlarmRecordSerializer
                 "power_device_id": 1,
                 "measured_value": 15.8,
             },
-            "전력 임계치 초과 (15.8 W)",
+            "정적 임계치 초과 (15.8 W)",
         ),
         (
             {
                 "alarm_type": "power_anomaly_ai",
                 "power_device_id": 1,
                 "measured_value": 7768.8,
+                "algorithm_source": "isolation_forest",
             },
-            "AI 이상 패턴 감지 (7768.8 W)",
+            "이상 수치 탐지 (7,768.8 W)",
+        ),
+        (
+            {
+                "alarm_type": "power_anomaly_ai",
+                "power_device_id": 1,
+                "measured_value": 820.5,
+                "algorithm_source": "arima",
+            },
+            "이상 패턴 탐지 (820.5 W)",
+        ),
+        (
+            {
+                "alarm_type": "power_anomaly_ai",
+                "power_device_id": 1,
+                "measured_value": 12500.0,
+                "algorithm_source": "combined",
+            },
+            "이상 수치·패턴 동시 탐지 (12,500.0 W)",
+        ),
+        (
+            {
+                "alarm_type": "power_anomaly_ai",
+                "power_device_id": 1,
+                "measured_value": 3611.3,
+                "algorithm_source": "zscore",
+            },
+            "통계 이상 수치 (3,611.3 W)",
+        ),
+        (
+            {
+                "alarm_type": "power_anomaly_ai",
+                "power_device_id": 1,
+                "measured_value": 500.0,
+                "algorithm_source": "change_point",
+            },
+            "패턴 변화 탐지 (500.0 W)",
+        ),
+        (
+            {
+                "alarm_type": "power_anomaly_ai",
+                "power_device_id": 1,
+                "measured_value": 350.2,
+                "algorithm_source": "night_abnormal",
+            },
+            "야간 이상 가동 (350.2 W)",
+        ),
+        (
+            {
+                "alarm_type": "power_anomaly_ai",
+                "power_device_id": 1,
+                "measured_value": 100.0,
+            },
+            "AI 이상 탐지 (100.0 W)",
         ),
         ({"alarm_type": "geofence_intrusion", "geofence_id": 1}, "위험구역 진입"),
         ({"alarm_type": "sensor_fault"}, "센서 통신 이상"),

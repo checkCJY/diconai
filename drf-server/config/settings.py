@@ -219,6 +219,9 @@ FASTAPI_INTERNAL_URL = env("FASTAPI_INTERNAL_URL", default="http://127.0.0.1:800
 # 빈 문자열이면 인증 비활성 (기존 동작 유지). 운영에서는 양 서비스에 동일 값 설정.
 INTERNAL_SERVICE_TOKEN = env("INTERNAL_SERVICE_TOKEN", default="")
 
+# T4 D3 — True 시 DRF 정적 fire skip (fastapi 단일 결정자). False = 레거시.
+STATIC_THRESHOLD_AT_FASTAPI = env.bool("STATIC_THRESHOLD_AT_FASTAPI", default=False)
+
 # ── 프론트엔드 노출용 URL (config.js로 주입) ───────────────
 # 브라우저가 fastapi-server에 접속할 때 사용하는 공개 주소.
 # 운영 환경에서는 도메인/HTTPS로 교체.
@@ -349,6 +352,13 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.operations.tasks.queue_metrics_task.record_celery_queue_length",
         "schedule": timedelta(seconds=30),
     },
+    # SQLite DB 파일 크기를 60초마다 읽어 SQLITE_DB_SIZE Gauge에 기록한다.
+    # 5GB 경고 / 10GB 경보 기준 — 어제(2026-05-14) 12GB 비대화 사고 재발 방지.
+    # PG 전환 후 db_health_task 내부에서 SQLite가 아닌 경우 자동 스킵.
+    "db_health_metrics": {
+        "task": "apps.operations.tasks.db_health_task.record_db_health",
+        "schedule": timedelta(seconds=60),
+    },
 }
 
 # ── Cache (Redis) ─────────────────────────────────────────────
@@ -360,3 +370,16 @@ CACHES = {
         "LOCATION": REDIS_URL,
     }
 }
+
+# ── Alarm 재팝업 쿨다운 ────────────────────────────────────────
+# 같은 활성 Event 에 새 AlarmRecord 가 들어왔을 때 broadcast 재발송 최소 간격.
+# event_service.create_alarm_and_event 에서 last_notified_at 비교에 사용.
+#
+# [의미]
+# 산업 안전 도메인 — 위험 지속은 미대응 신호. 이 cadence 가 운영자 escalation 트리거.
+# user-scoped ack (EventAcknowledgement) 와는 별개의 글로벌 결정. drf 측은 이 값만 비교,
+# user 단위 분기는 fastapi broadcast 시점에 EventAcknowledgement 조회로 처리.
+#
+# [환경별 권장]
+# 운영: 60s (기본). 시연: 15s (D-30 시연에서 재팝업 동작을 짧은 시간 안에 보여주기 위함).
+ALARM_REPOPUP_COOLDOWN_SEC = env.int("ALARM_REPOPUP_COOLDOWN_SEC", default=60)

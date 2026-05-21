@@ -64,7 +64,7 @@ def test_create_anomaly_result_invalid_prediction_enum(api_client, valid_payload
 
 @pytest.mark.django_db
 def test_create_anomaly_result_invalid_risk_classified(api_client, valid_payload):
-    valid_payload["risk_classified"] = "warning"  # RiskClassified 에 없는 값
+    valid_payload["risk_classified"] = "bogus"  # RiskClassified 에 없는 값
     response = api_client.post("/api/ml/anomaly-results/", valid_payload, format="json")
     assert response.status_code == 400
     assert "risk_classified" in response.json()["error"]["details"]

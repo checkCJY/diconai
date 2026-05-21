@@ -1,0 +1,43 @@
+{% load static %}
+{% comment %}
+==========================================================
+alarm_stack.html — 알람 인프라 공통 partial (Phase 2, 2026-05-15 알람 재설계)
+
+[용도]
+대시보드 외 페이지에서 알람 팝업·토스트·WS 수신을 일괄 활성화하는 한 줄 include
+(타 템플릿에서 components/alarm_stack.html 을 include 하는 형태로 사용).
+페이지별로 DOM include + 수많은 JS script 태그를 반복하던 패턴을 단일 진입점으로 통합.
+
+[포함]
+- alarm_popup.html (중앙 팝업 + 우하단 토스트 DOM)
+- 알람 처리에 필요한 JS bundle (auth, ws-client, alarm-popup, alarm-mapper,
+  level-mapper, time-format, alarm-ws, worker-ws)
+
+[경계]
+- dashboard/main.html 은 dashboard/websocket.js 가 sensors WS 의 가스/전력/알람을
+  통합 처리 — alarm-ws.js 와 onMessage 핸들러가 중복 등록되어 같은 알람을 두 번
+  처리하게 됨. 따라서 dashboard 메인은 이 partial 을 **사용하지 않음** (기존 직접
+  include 패턴 유지).
+- 다른 페이지 (monitoring_realtime, admin-panel 등) 는 dashboard/websocket.js 가
+  없으므로 본 partial 의 alarm-ws.js 가 sensors WS 의 alarms[] 만 분리 처리.
+
+[인증 경계 — partial 가드 미적용]
+diconai 는 JWT 기반 인증이라 Django template context 의 user.is_authenticated 가
+session 기반으로 항상 False (JWT 검증은 API 요청 시점, template 렌더 시점엔 무관).
+인증 경계는 페이지 view 단 (로그인 redirect) 이 담당하므로 partial 의 추가 가드는
+redundant. JS 가 비인증 환경에 실행되어도 Auth.apiFetch 의 401 은 silent catch,
+WS 연결은 401 close 후 자동 포기. 시연 후 cookie 기반 JWT context_processor 도입
+시 정교한 가드 추가 검토.
+==========================================================
+{% endcomment %}
+<link rel="stylesheet" href="{% static 'css/alarm-popup.css' %}">
+{% include 'components/alarm_popup.html' %}
+<script src="{% static 'js/shared/auth.js' %}"></script>
+<script src="{% static 'js/shared/ws-client.js' %}"></script>
+<script src="{% static 'js/shared/level-mapper.js' %}"></script>
+<script src="{% static 'js/shared/time-format.js' %}"></script>
+<script src="{% static 'js/shared/alarm-mapper.js' %}"></script>
+<script src="{% static 'js/shared/alarm-popup.js' %}"></script>
+<script src="{% static 'js/shared/alarm-badge.js' %}"></script>
+<script src="{% static 'js/shared/alarm-ws.js' %}"></script>
+<script src="{% static 'js/shared/worker-ws.js' %}"></script>

@@ -35,8 +35,8 @@ GAS_FIELDS = ["co", "h2s", "co2", "o2", "no2", "so2", "o3", "nh3", "voc"]
 # [Step 4 — 1시간 → 1분 단축, 5번 문서 §9 정렬]
 # 기존 3600s 는 한 번 danger 천이 후 1시간 동안 같은 (sensor, gas) 의 동일 상태
 # 천이를 모두 skip → 운영에서 "한 번 뜨고 그 뒤 1시간 안 뜸" 누락의 직접 원인.
-# RENOTIFY_COOLDOWN_MINUTES=1 (event_service) 와 일치시켜 두 dedup 계층 (try_
-# transition / Event 쿨다운) 시간이 합치되도록 정렬. 산업 안전 도메인에서 위험
+# settings.ALARM_REPOPUP_COOLDOWN_SEC (event_service, 기본 60s) 와 일치시켜 두 dedup
+# 계층 (try_transition / Event 쿨다운) 시간이 합치되도록 정렬. 산업 안전 도메인에서 위험
 # 지속 시 1분 cadence 는 escalation 트리거 역할도 함 (5번 문서 §9 의 "동일 작업자
 # +센서+구역+위험단계 1분 내 1회"). 추후 1~2주 운영 데이터 보고 재평가.
 _CACHE_TTL = 60
@@ -66,7 +66,7 @@ def _revoke(task_id: str) -> None:
     celery_app.control.revoke(task_id, terminate=True)
 
 
-def trigger_gas_alarms(gas_data) -> list[dict]:
+def trigger_gas_alarms(gas_data, ingress_ts: float | None = None) -> list[dict]:
     """
     가스 데이터 수신 시 위험도별 알람 라우팅.
 
@@ -97,7 +97,7 @@ def trigger_gas_alarms(gas_data) -> list[dict]:
             # 원자 천이 — 직전 상태가 danger 아닐 때만 1회 fire (race-safe)
             if try_transition(state_key, "danger", _CACHE_TTL):
                 fire_danger_alarm_task.delay(
-                    sensor_id, gas, value, facility_id, source_label
+                    sensor_id, gas, value, facility_id, source_label, ingress_ts=ingress_ts
                 )
 
         elif risk == "warning":
@@ -111,6 +111,7 @@ def trigger_gas_alarms(gas_data) -> list[dict]:
                 continue
             task = fire_warning_alarm_task.apply_async(
                 args=[sensor_id, gas, value, facility_id, source_label],
+                kwargs={"ingress_ts": ingress_ts},
                 countdown=WARNING_DURATION_SEC,
             )
             cache.set(task_key, task.id, _TASK_KEY_TTL)

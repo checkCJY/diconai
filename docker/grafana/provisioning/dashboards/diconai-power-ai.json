@@ -1,0 +1,445 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "title": "AI 추론 소요시간 p95 (gas_if / power_if, 5m)",
+      "description": "Isolation Forest 추론 실행 시간. E2E latency 급등 시 Celery·DB·Redis가 정상이면 여기를 확인.",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.95, rate(ai_inference_duration_seconds_bucket{job=\"fastapi\"}[5m])) by (model_type)",
+          "legendFormat": "{{model_type}} p95",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "AI 추론 실패 횟수 (model_type / reason, 5m)",
+      "description": "추론 실패 시 서비스는 유지되지만 AI 없이 룰 기반으로만 알람 발생. 카운터가 올라가면 AI가 꺼진 상태.",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "rate(ai_inference_failed_total{job=\"fastapi\"}[5m])",
+          "legendFormat": "{{model_type}} / {{reason}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "전력 AI — quality_guard skip 횟수 (reason별, 5m)",
+      "description": "센서 불량으로 AI 윈도우 적재가 skip된 횟수. 이 값이 올라가면 데이터는 들어오는데 AI가 조용히 멈춰있는 상태. reason으로 어떤 종류의 불량인지 구분해 센서 점검 방향을 잡는다.",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (reason) (rate(power_ai_quality_skip_total{job=\"fastapi\"}[5m]))",
+          "legendFormat": "{{reason}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "전력 AI — 5축 발화 횟수 (axis별, 5m)",
+      "description": "IF / ARIMA / Z-score / Change Point / 야간 가동 중 어느 축이 이상 판정에 기여했는지. 특정 axis만 비정상적으로 높으면 그 임계값을 조정해야 하는 신호 (오탐 원인 특정용).",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (axis) (rate(power_ai_axis_fired_total{job=\"fastapi\"}[5m]))",
+          "legendFormat": "{{axis}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "전력 AI — 추론 실행 횟수 (5m)",
+      "description": "quality_guard·윈도우 warmup을 통과해 실제로 추론이 실행된 횟수. 센서 수신(sensor_last_received) 대비 이 값이 낮으면 skip이 많다는 신호. 갑자기 0이 되면 FastAPI 재시작으로 윈도우가 초기화된 것.",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "rate(power_ai_inference_total{job=\"fastapi\"}[5m])",
+          "legendFormat": "추론 실행",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "전력 AI — 최종 판정 분포 (combined별, 5m)",
+      "description": "5축 종합 후 나온 판정(normal / caution / predict_warn / danger) 비율. danger 비율이 90% 이상이면 AI가 너무 예민한 것, normal이 99% 이상이면 너무 둔한 것. 일주일 추이로 모델 재학습 시점 판단 가능.",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (combined) (rate(power_ai_combined_total{job=\"fastapi\"}[5m]))",
+          "legendFormat": "{{combined}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "전력 AI — 실제 알람 발화 횟수 (algorithm_source별, 5m)",
+      "description": "rate limit을 통과해서 실제로 Redis 큐까지 전달된 알람. combined danger 횟수(패널 ③③) 대비 이 값이 낮으면 rate limit이 타이트하거나 전달 문제. 갑자기 0이 되면 추론은 되는데 브라우저에 안 닿는 상태 — Redis/WS 확인 필요.",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (algorithm_source) (rate(power_ai_alarm_fired_total{job=\"fastapi\"}[5m]))",
+          "legendFormat": "{{algorithm_source}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "전력 AI — rate limit 억제 횟수 (5m)",
+      "description": "같은 채널에서 60초 이내 재발화가 억제된 횟수. 이 값이 높으면 이상이 지속되는데 운영자에게 전달이 안 되는 상태. '알람이 1번만 왔다'는 신고가 왔을 때 즉시 원인 확인 가능.",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "rate(power_ai_rate_limited_total{job=\"fastapi\"}[5m])",
+          "legendFormat": "rate limit 억제",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": [
+    "diconai"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "diconai — 전력 AI",
+  "uid": "diconai-power-ai",
+  "version": 1,
+  "weekStart": ""
+}

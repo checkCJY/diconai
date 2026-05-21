@@ -15,9 +15,17 @@ RedisCache 의 pickle 직렬화·KEY_PREFIX 영향 없음 (try_transition 패턴
 mark_ai_recent 는 발화 level '이하' 키만 set (warning 발화 → normal/warning 만,
 danger 키 부재). DRF 측 가드는 룰이 발화하려는 level 키만 보므로 격상 케이스
 (AI=warning, 룰=danger) 는 자연 통과.
+
+[T4 — 5-state inference machine]
+mark_ai_state / get_ai_state — AI 추론 결과의 5 state (FIRED/INFERRED_NORMAL/
+INFERRED_FAILED/WARMING_UP/DISABLED) 를 (device_id, channel, data_type) 단위 키에
+마킹·조회. T4 sub-plan §4 명세. decide_alarm 매트릭스 분기 (D2 commit) 의 입력.
+기존 mark_ai_recent / ai_fired:* 키 공간과 별도 (ai_state:*) — D2 통합 전까지
+양쪽 키 공간 공존. DRF AI mute 가드는 옛 ai_fired:* 키만 read (호환 유지).
 """
 
 import logging
+from enum import Enum
 
 from core.redis_client import get_redis
 
@@ -32,6 +40,28 @@ _LEVELS_AT_OR_BELOW: dict[str, list[str]] = {
     "warning": ["normal", "warning"],
     "danger": ["normal", "warning", "danger"],
 }
+
+
+class AIInferenceState(str, Enum):
+    """T4 — AI 추론 결과의 5 state.
+
+    decide_alarm 매트릭스 (plan §5) 의 분기 키. 각 state 가 (정적 fired 여부) 와
+    조합되어 source 5종 (ai / static_cover_miss / static_cover_inference_fail /
+    static_cover_warmup / static_no_ai_available) 중 하나를 결정.
+
+    str mixin — Redis 에 value.value 그대로 SET, GET 후 Enum 복원 시 문자열 비교 OK.
+    """
+
+    FIRED = "fired"  # AI 추론 성공 + 발화 (combined_risk in FIRE_LEVELS)
+    INFERRED_NORMAL = "inferred_normal"  # AI 추론 성공 + 정상 — 정적 발화 시 미탐 의심
+    INFERRED_FAILED = "inferred_failed"  # AI 추론 예외 — 정적 폴백 발화 근거
+    WARMING_UP = "warming_up"  # 윈도우 _INFERENCE_WINDOW 미빌드 — 정적 보완
+    DISABLED = "disabled"  # _INFERENCE_ENABLED_CHANNELS 외 채널 — 정적이 주 신호
+
+
+# T4 state machine 키 — (device_id, channel, data_type) scoped. _power_windows 와
+# 동일 차원 — 미래 current/voltage 채널 활성화 시 키 차원 변경 없이 확장 가능.
+_AI_STATE_KEY_TEMPLATE = "ai_state:{device_id}:{channel}:{data_type}"
 
 
 async def mark_ai_recent(
@@ -71,3 +101,106 @@ async def mark_ai_recent(
             channel,
             rule_level,
         )
+
+
+async def mark_ai_state(
+    device_id: str | int | None,
+    channel: int | None,
+    data_type: str | None,
+    state: AIInferenceState,
+    ttl_sec: int = AI_MUTE_TTL_SEC,
+) -> None:
+    """T4 — AI 추론 5 state 를 Redis 에 마킹.
+
+    decide_alarm 매트릭스 (plan §5) 의 입력. (device_id, channel, data_type)
+    스코프 키 1개에 state value 를 SET (mark_ai_recent 의 level 별 다중 키와 다름
+    — state machine 은 단일 차원).
+
+    silent fail — Redis 장애가 알람 흐름을 막지 않도록 예외는 logger.warning 으로
+    swallow. 마킹 실패 시 get_ai_state 가 None 반환 → decide_alarm 이 fail-safe
+    분기 처리 ([[runtime_docker_environment]]).
+
+    Args:
+        device_id: PowerDevice 식별자 (raw IoT id, fastapi 측 일관성). None 이면 skip.
+        channel: PowerData.channel (1~16). None 이면 skip.
+        data_type: 'watt' | 'current' | 'voltage'. None 이면 skip.
+        state: AIInferenceState — 5 state 중 하나. 잘못된 타입은 silent skip.
+        ttl_sec: state 유지 시간 (기본 60s, 테스트에서 짧게 인자화).
+    """
+    if device_id is None or channel is None or data_type is None:
+        return
+    if not isinstance(state, AIInferenceState):
+        logger.warning("[ai_mute] mark_ai_state invalid state=%r — skip", state)
+        return
+
+    key = _AI_STATE_KEY_TEMPLATE.format(
+        device_id=device_id, channel=channel, data_type=data_type
+    )
+    try:
+        r = get_redis()
+        await r.set(key, state.value, ex=ttl_sec)
+    except Exception:
+        logger.warning(
+            "[ai_mute] mark_ai_state failed device=%s ch=%s dt=%s state=%s — silent fail",
+            device_id,
+            channel,
+            data_type,
+            state.value,
+        )
+
+
+async def get_ai_state(
+    device_id: str | int | None,
+    channel: int | None,
+    data_type: str | None,
+) -> AIInferenceState | None:
+    """T4 — Redis 에 마킹된 AI 추론 state 를 조회. 없거나 만료면 None.
+
+    decide_alarm 매트릭스 (plan §5) 가 본 함수 결과 + 정적 평가 결과로 source 5종
+    결정. None 반환 시 decide_alarm 은 "AI 상태 미지" → fail-safe 로 정적 결과 따름
+    (DISABLED 와 동등 취급 — 안전한 보수적 분기).
+
+    fail-open — Redis 장애 시 None 반환 (예외 swallow). 키에 저장된 값이 Enum 멤버
+    가 아닌 경우 (옛 형식·손상) 도 None + WARN 로깅.
+
+    Args:
+        device_id: PowerDevice 식별자. None 이면 None 반환.
+        channel: PowerData.channel. None 이면 None 반환.
+        data_type: 'watt' | 'current' | 'voltage'. None 이면 None 반환.
+
+    Returns:
+        AIInferenceState | None — 마킹된 state 또는 None (미설정/만료/장애).
+    """
+    if device_id is None or channel is None or data_type is None:
+        return None
+
+    key = _AI_STATE_KEY_TEMPLATE.format(
+        device_id=device_id, channel=channel, data_type=data_type
+    )
+    try:
+        r = get_redis()
+        raw = await r.get(key)
+    except Exception:
+        logger.warning(
+            "[ai_mute] get_ai_state failed device=%s ch=%s dt=%s — fail-open None",
+            device_id,
+            channel,
+            data_type,
+        )
+        return None
+
+    if raw is None:
+        return None
+    # redis-py 가 bytes 로 반환할 수도 있음 — decode 후 Enum 복원.
+    value = raw.decode() if isinstance(raw, (bytes, bytearray)) else str(raw)
+    try:
+        return AIInferenceState(value)
+    except ValueError:
+        logger.warning(
+            "[ai_mute] get_ai_state unknown value device=%s ch=%s dt=%s value=%r",
+            device_id,
+            channel,
+            data_type,
+            value,
+        )
+        return None

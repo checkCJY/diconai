@@ -1,5 +1,5 @@
 from collections import defaultdict
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone as py_timezone
 
 from django.db.models import Count, Q
 from django.utils import timezone
@@ -271,6 +271,7 @@ class AlarmRecordViewSet(viewsets.ReadOnlyModelViewSet):
                     "last_24h_danger": serializers.IntegerField(),
                     "last_24h_warning": serializers.IntegerField(),
                     "unacknowledged_event_count": serializers.IntegerField(),
+                    "user_unread_event_count": serializers.IntegerField(),
                 },
             ),
         },
@@ -284,9 +285,15 @@ class AlarmRecordViewSet(viewsets.ReadOnlyModelViewSet):
         "지금 운영자가 처리해야 할 사건 수". Event.status ∈ {active, acknowledged,
         in_progress} 가 미확인. resolved 는 처리 완료라 제외.
 
-        이벤트 현황 패널의 '미확인 N건' 강조 박스 + 향후 D 옵션의 헤더 배지에서 사용.
+        [2026-05-17 D 옵션 — user-scoped unread]
+        user_unread_event_count — 본인이 아직 ack 안 한 활성 이벤트 수 (Phase 1
+        EventAcknowledgement 활용). 헤더 미확인 배지의 초기값으로 사용. 글로벌
+        unacknowledged 와 달리 본 사람만 줄어드는 카운트.
         """
         from apps.alerts.models import Event
+        from apps.alerts.selectors.event_ack_selector import (
+            get_user_unread_event_count,
+        )
         from apps.core.constants import EventStatus
 
         last_24h = timezone.now() - timedelta(hours=24)
@@ -306,11 +313,86 @@ class AlarmRecordViewSet(viewsets.ReadOnlyModelViewSet):
             ],
         ).count()
 
+        user_unread = get_user_unread_event_count(request.user.id)
+
         return Response(
             {
                 "last_24h_total": data["total"],
                 "last_24h_danger": data["danger"],
                 "last_24h_warning": data["warning"],
                 "unacknowledged_event_count": unack_count,
+                "user_unread_event_count": user_unread,
+            }
+        )
+
+    @extend_schema(
+        tags=["Alerts"],
+        summary="WS 재연결 catch-up — since 이후 24h 내 미수신 알람",
+        description=(
+            "클라이언트가 WS 끊김 후 재연결할 때 localStorage 의 last_seen_ts 를 "
+            "since 로 전달해 미수신 알람을 보충 (2026-05-15 알람 재설계). "
+            "fastapi 거치지 않고 클라가 drf 직접 호출 — simplicity. "
+            "응답 모양은 fastapi broadcast payload 와 동일해 클라 측 mapper 공용 처리 가능. "
+            "since=24h 이상 과거면 24h 까지로 클램프. 최대 100건 응답."
+        ),
+        parameters=[
+            OpenApiParameter(
+                name="since",
+                type=float,
+                required=True,
+                description="unix timestamp (초 단위). 누락/잘못된 값이면 빈 list 반환.",
+            ),
+        ],
+        responses={
+            200: inline_serializer(
+                name="AlarmCatchUpResponse",
+                fields={
+                    "alarms": serializers.ListField(child=serializers.DictField()),
+                },
+            ),
+            401: OpenApiResponse(description="인증 필요"),
+        },
+    )
+    @action(detail=False, methods=["get"], url_path="catch-up")
+    def catch_up(self, request):
+        """since 이후 24h 내 AlarmRecord 를 broadcast payload 모양으로 반환.
+
+        [상한] 24h 클램프 + 최대 100건 — race 패킷 폭주 방지.
+        [응답 키] fastapi alarm_router 의 AlarmPayload 와 동일 필드명. 누락 시 빈 list.
+        """
+        since_str = request.query_params.get("since")
+        if not since_str:
+            return Response({"alarms": []})
+        try:
+            since_dt = datetime.fromtimestamp(float(since_str), tz=py_timezone.utc)
+        except (ValueError, TypeError):
+            return Response({"alarms": []})
+
+        floor = timezone.now() - timedelta(hours=24)
+        if since_dt < floor:
+            since_dt = floor
+
+        alarms = (
+            AlarmRecord.objects.filter(created_at__gte=since_dt)
+            # power_device prefetch — get_short_message 가 channel_meta 조회 시 N+1 회피.
+            .select_related("event", "power_device")
+            .order_by("created_at")[:100]
+        )
+
+        return Response(
+            {
+                "alarms": [
+                    {
+                        "event_id": a.event_id,
+                        "alarm_type": a.alarm_type,
+                        "risk_level": a.risk_level,
+                        "source_label": a.event.source_label if a.event_id else "",
+                        "summary": a.event.summary if a.event_id else "",
+                        "message": a.get_short_message(),
+                        "is_new_event": False,
+                        "created_at": a.created_at.isoformat(),
+                    }
+                    for a in alarms
+                ]
             }
         )

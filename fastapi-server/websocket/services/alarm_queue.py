@@ -17,9 +17,11 @@
 
 import json
 import logging
+import time
 
 from prometheus_client import Counter
 
+from core.metrics import ALARM_QUEUE_LENGTH, REDIS_COMMAND_DURATION
 from core.redis_client import get_redis
 
 ALARM_QUEUE_KEY = "diconai:ws:alarms"
@@ -64,6 +66,11 @@ def _payload_fingerprint(payload: dict) -> str | None:
 
     event_id = payload.get("event_id")
     if event_id is not None:
+        # 2026-05-15 알람 재설계: RESOLVED 신호는 원래 알람과 같은 (event_id, risk_level)
+        # 조합이라 기본 fingerprint 로는 dedup 차단됨 (운영 버그). 별도 suffix 로 분리해
+        # RESOLVED 신호 자체의 retry 중복은 막되 원래 알람과는 독립 trackin.
+        if payload.get("event_resolved_at"):
+            return f"event:{event_id}:resolved"
         return f"event:{event_id}:{risk_level}"
 
     alarm_type = payload.get("alarm_type", "")
@@ -84,6 +91,19 @@ def _payload_fingerprint(payload: dict) -> str | None:
         if not source_label:
             return None
         return f"clear:{alarm_type}:{source_label}"
+
+    # T4 D2 patch — power_overload + T4 source 분기 (static_cover_* / static_no_ai_available).
+    # process_anomaly_inference 가 모든 채널 매 sample 평가 → 같은 (source, channel)
+    # 조합이 매초 push 됐던 폭주 차단. event_id 분기보다 후행이라 룰 알람 (event_id
+    # 있음) 영향 없음. fingerprint key 에 source_label 포함 — 같은 채널 의 같은 risk
+    # 가 30s 안 1회만 통과. AI source (decision.source=='ai') 는 위 anomaly_meta
+    # 분기 (ai:*) 우선이라 본 분기 미진입.
+    if alarm_type == "power_overload":
+        source = payload.get("source")
+        source_label = payload.get("source_label", "")
+        if not source or not source_label:
+            return None  # 옛 발신자 / 정보 부족 — dedup 미적용 (백워드 호환)
+        return f"cover:{source}:{source_label}:{risk_level}"
 
     return None
 
@@ -115,8 +135,12 @@ async def push_alarm(payload: dict, *, dedup_ttl: int = PUSH_DEDUP_TTL_SEC) -> N
             push_alarm_dedup_hits.inc()
             logger.info("[push_alarm] dedup hit fp=%s", fp)
             return
+    # P1 — LPUSH 실행시간 측정. E2E latency 급등 시 Redis 병목 여부 판단 근거.
+    _t = time.perf_counter()
     await r.lpush(ALARM_QUEUE_KEY, json.dumps(payload, ensure_ascii=False))
+    REDIS_COMMAND_DURATION.labels("lpush").observe(time.perf_counter() - _t)
     await r.ltrim(ALARM_QUEUE_KEY, 0, MAX_QUEUE_LEN - 1)
+    ALARM_QUEUE_LENGTH.set(await queue_len())
 
 
 async def pop_alarm_blocking(timeout: int = 0) -> dict | None:
@@ -127,6 +151,9 @@ async def pop_alarm_blocking(timeout: int = 0) -> dict | None:
     """
     r = get_redis()
     try:
+        # timeout=0 은 무한 대기라 측정값에 알람 도착 대기 시간이 전부 포함된다.
+        # histogram 버킷(최대 0.5s)을 대부분 초과해 +Inf에 쌓이므로 측정하지 않는다.
+        # Redis 병목 진단은 LPUSH 측정값(push_alarm 함수)으로 충분하다.
         result = await r.brpop(ALARM_QUEUE_KEY, timeout=timeout)
     except Exception as exc:
         logger.warning(f"[alarm_queue] action=brpop_error error={exc!r}")
@@ -134,6 +161,7 @@ async def pop_alarm_blocking(timeout: int = 0) -> dict | None:
     if result is None:
         return None
     _, raw = result
+    ALARM_QUEUE_LENGTH.set(await queue_len())
     try:
         return json.loads(raw)
     except json.JSONDecodeError as exc:

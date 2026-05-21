@@ -20,6 +20,11 @@ from fastapi import HTTPException
 from core.gas_thresholds import calculate_individual_risks
 from gas.schemas.gas import GasDataPayload
 from services.drf_client import DrfClientError, post_to_drf
+from core.metrics import (
+    AI_INFERENCE_DURATION,
+    AI_INFERENCE_FAILED_TOTAL,
+    SENSOR_LAST_RECEIVED,
+)
 from websocket.state import gas_latest, latest_gas_snapshot
 from collections import (
     deque,
@@ -67,6 +72,9 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
 
     DRF 통신 실패는 센서 장비에 적절한 HTTP 응답을 돌려주기 위해 예외로 전파한다.
     """
+    # P1 — 센서 마지막 수신 시각 갱신. 5분 이상 갱신 없으면 통신 이상으로 판단.
+    SENSOR_LAST_RECEIVED.labels("gas", payload.device_id).set(time.time())
+
     gas_values = {
         "o2": payload.o2,
         "co": payload.co,
@@ -88,6 +96,11 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
     if len(_co_window) >= 30:
         try:
             entry = await _get_or_load("gas")
+            if entry is None:
+                # 모델 미등록 — AI 없이 룰 기반으로만 처리. DRF 저장은 아래 로직으로 계속 진행.
+                AI_INFERENCE_FAILED_TOTAL.labels("gas_if", "model_not_loaded").inc()
+            # P2 전 — IF 추론 실행 시간 측정
+            _infer_start = time.time()
             row = _build_multi_feature_row(
                 {
                     "co": list(_co_window),
@@ -99,6 +112,7 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
             )
             pred = int(entry.model.predict(row)[0])
             score = float(entry.model.decision_function(row)[0])
+            AI_INFERENCE_DURATION.labels("gas_if").observe(time.time() - _infer_start)
 
             if pred == -1:  # AI가 이상 패턴으로 판단했을 때만 실행 (-1=이상, 1=정상)
                 # 이성현 수정 — should_fire=True 하드코딩 제거, 60초 rate limit 적용
@@ -149,6 +163,9 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
                             "risk_level": "danger",  # 위험도
                             "source_label": "가스센서 AI 이상탐지",  # 화면 표시용 출처 이름
                             "summary": f"가스 이상 감지 (AI) | CO:{payload.co} H2S:{payload.h2s} CO2:{payload.co2}",  # 팝업에 보여줄 요약
+                            # T1+T6: message 단일 진실 공급원 필드 (drf-side tasks.py 패턴).
+                            # 가스 텍스트 내용 변경 X — 인프라 일관성만 (가스 담당자 PR 영역 보호).
+                            "message": f"가스 이상 감지 (AI) | CO:{payload.co} H2S:{payload.h2s} CO2:{payload.co2}",
                             "is_new_event": True,  # 새 이벤트 여부
                             "gas_type": "co",  # 대표 가스 종류
                             "measured_value": payload.co,  # 대표 측정값
@@ -157,11 +174,13 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
                     )
                 )
         except Exception as e:
+            AI_INFERENCE_FAILED_TOTAL.labels("gas_if", "inference_error").inc()
             logger.error(f"[AI 추론 실패] {e}")
 
     drf_payload = {
         "device_id": payload.device_id,
         "measured_at": payload.timestamp.isoformat(),
+        "ingress_ts": time.time(),
         "co": payload.co,
         "h2s": payload.h2s,
         "co2": payload.co2,

@@ -25,9 +25,16 @@ class PowerData(models.Model):
     class AnomalyType(models.TextChoices):
         OVERLOAD = "overload", "과부하"
         VOLTAGE_DROP = "voltage_drop", "저전압"
-        SPIKE = "spike", "스파이크"
+        SPIKE = (
+            "spike",
+            "스파이크",
+        )  # W0 에서 dummy 측 시나리오 제거됨 — DB 옛 row 호환용 잔존
         PHASE_LOSS = "phase_loss", "결상"
         DEGRADATION = "degradation", "열화"
+        # W0 신규 (un-downgrade plan §3) — dummy 측 SCENARIO_PATTERNS 와 동기화.
+        # 누락 시 monitoring.PowerData serializer validation_failed 폭주 (W0 초기 누락 사항).
+        NIGHT_ABNORMAL = "night_abnormal", "야간 가동"
+        MOTOR_STUCK = "motor_stuck", "모터 정지"
 
     power_device = models.ForeignKey(
         "facilities.PowerDevice", on_delete=models.PROTECT, related_name="power_data"

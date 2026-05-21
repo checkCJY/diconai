@@ -20,20 +20,44 @@
 // ──────────────────────────────────────────────────────────
 const EventPanel = {
 
-  // alarm_type → 발생원 아이콘 (원안 디자인 — 작업자/가스/전력/구역).
-  // 이모지 사용 — 시연 단순 구현. 디자인 시스템 확정 후 SVG 교체 가능.
+  // alarm_type → Lucide 아이콘 이름 (lucide.dev). 이모지 → 단색 SVG 로 전환 (2026-05-17).
+  // CDN 은 main.html 에서 로드. 동적 추가된 element 는 addItem/addToClearGroup 끝에서
+  // lucide.createIcons() 로 [data-lucide] 속성 element 를 SVG 로 replace. 색은 currentColor
+  // 라 텍스트 색 (위험도) 자동 적용. 디자이너 SVG 받으면 본 매핑 그대로 갈아끼우면 됨.
   ICON_BY_TYPE: {
-    gas_threshold:        '🌫️',
-    power_overload:       '⚡',
-    power_anomaly_ai:     '🤖',
-    geofence_intrusion:   '🚸',
-    sensor_fault:         '⚠️',
-    ppe_violation:        '🦺',
-    vr_training_not_done: '📚',
-    safety_check_pending: '📋',
-    inspection_scheduled: '🔧',
-    batch_failed:         '🛑',
-    storage_overdue:      '📦',
+    gas_threshold:        'flame',
+    gas_clear:            'circle-check',
+    power_overload:       'zap',
+    power_anomaly_ai:     'brain-circuit',
+    power_clear:          'circle-check',
+    geofence_intrusion:   'map-pin',
+    sensor_fault:         'shield-alert',
+    ppe_violation:        'hard-hat',
+    vr_training_not_done: 'graduation-cap',
+    safety_check_pending: 'clipboard-check',
+    inspection_scheduled: 'wrench',
+    batch_failed:         'circle-x',
+    storage_overdue:      'package-x',
+  },
+
+  // T1+T6 — alarm_type 코드 → 한국어 라벨 fallback (드물게 sensor_name/source_label
+  // 누락 시 운영자가 영문 코드 보지 않도록). drf-server/apps/core/constants.py 의
+  // AlarmType.choices 와 동기 유지. 본 dict 에 없으면 '알 수 없음'.
+  LABEL_BY_TYPE: {
+    gas_threshold:        '가스 경보',
+    gas_clear:            '가스 정상 복귀',
+    power_overload:       '전력 이상',
+    power_anomaly_ai:     '전력 AI 이상 감지',
+    power_clear:          '전력 정상 복귀',
+    geofence_intrusion:   '위험구역 진입',
+    sensor_fault:         '센서 이상',
+    ppe_violation:        'PPE 미착용',
+    vr_training_not_done: 'VR 교육 미이수',
+    safety_check_pending: '작업 안전 체크리스트 미완료',
+    inspection_scheduled: '점검 예정',
+    batch_failed:         '배치 실패',
+    storage_overdue:      '보관 주기 실패',
+    gas_anomaly_ai:       '가스 AI 이상 감지',
   },
 
   // 같은 패널 안에 동일 항목이 중복 추가되지 않도록 추적.
@@ -56,6 +80,23 @@ const EventPanel = {
     const ts = data.created_at || data.timestamp;
     const minuteBucket = ts ? Math.floor(new Date(ts).getTime() / 60_000) : 0;
     return `clear:${data.alarm_type}:${minuteBucket}`;
+  },
+
+  // source 단위 그룹 (2026-05-17) — 같은 가스 센서/전력 장비/지오펜스에서 30분 윈도우
+  // 내 발생한 일반 알람을 1줄 + "외 N건" 으로 묶음. 정상화는 _clearGroups 로 별도.
+  // 헤더 = 첫 발생 알람 (메시지·시간 고정 — 사용자 결정: 이상 추적 출발점).
+  // 위험도 색상만 그룹 안 최고로 갱신. 펼치면 첫 알람 제외 추가 알람 list (최신 위).
+  // value={ itemEl, items: [data], moreEl, moreCountEl, otherTypesEl, itemsEl, descEl,
+  //         firstAlarmType, maxLevel, maxLevelColorClass }.
+  _sourceGroups: new Map(),
+
+  _sourceGroupKey(data) {
+    const ts = data.created_at || data.timestamp;
+    // 30분 bucket = floor(ts ms / 1_800_000). 같은 운영 세션 의미 단위.
+    const bucket = ts ? Math.floor(new Date(ts).getTime() / 1_800_000) : 0;
+    const source =
+      data.source_label || data.sensor_name || data.power_device_name || 'unknown';
+    return `source:${source}:${bucket}`;
   },
 
   // [Step 2-3] data 에서 dedup 키 1개 생성. event_id 가 진리값이라 우선.
@@ -84,64 +125,16 @@ const EventPanel = {
       return;
     }
 
+    // event_id 기준 dedup (백엔드 dedup TTL 만료 후 재푸시 차단 — 같은 event 두 번 X).
     const dedupKey = this._dedupKey(data);
-    // dedup — 이미 같은 키가 표시 중이면 시각 갱신 없이 skip.
     if (this._seenKeys.has(dedupKey)) return;
     this._seenKeys.add(dedupKey);
 
-    const eventId = data.event ?? data.event_id ?? null;
-
-    if (emptyEl) emptyEl.remove();
-
-    const colorClass = LevelMapper.toTextClass(data.alarm_level);
-    // [P0-1] label fallback 확장 — power_device_name / geofence_name / source_label 추가.
-    //   이전: sensor_name || worker_name → power 알람이 "알 수 없음" 표시되던 버그.
-    //   WS payload (alarm-mapper.fromSensorsAlarm) 는 source_label 만, API 응답
-    //   (AlarmRecordSerializer) 은 발생원별 4 필드 → 양쪽 모두 커버.
-    const label =
-      data.sensor_name ||
-      data.power_device_name ||
-      data.worker_name ||
-      data.geofence_name ||
-      data.source_label ||
-      '알 수 없음';
-    const time = data.created_at
-      ? (typeof TimeFormat !== 'undefined' ? TimeFormat.short(data.created_at) : new Date(data.created_at).toLocaleTimeString())
-      : (data.timestamp
-          ? (typeof TimeFormat !== 'undefined' ? TimeFormat.short(data.timestamp) : new Date(data.timestamp).toLocaleTimeString())
-          : '');
-    const isResolved = data.status === 'resolved';
-    const icon       = this.ICON_BY_TYPE[data.alarm_type] || '🔔';
-
-    const item = document.createElement('div');
-    item.className       = 'event-item';
-    item.style.opacity   = isResolved ? '0.5' : '1';
-    // dedup key 를 dataset 에 보관 — LRU 제거 시 _seenKeys 에서 같이 정리.
-    item.dataset.dedupKey = dedupKey;
-    if (eventId !== null) {
-      // [P2-2] 클릭 시 이벤트 상세 페이지로 이동.
-      item.style.cursor    = 'pointer';
-      item.dataset.eventId = String(eventId);
-      item.addEventListener('click', () => {
-        window.location.href = `/dashboard/monitoring/events/${eventId}/`;
-      });
-    }
-    item.innerHTML = `
-      <div class="event-head">
-        <span><span class="event-icon">${icon}</span>${label}</span>
-        <span class="sub">${time}</span>
-      </div>
-      <div class="${colorClass} event-desc">${data.message || data.alarm_type || ''}</div>
-    `;
-    listEl.insertBefore(item, listEl.firstChild);
-
-    // [P2-1] 새 항목 3초간 강조 (CSS 애니메이션 — event-item--new).
-    // resolved 항목은 강조 안 함 (이미 옅게 표시되는 항목 = 옛 상태).
-    if (!isResolved) {
-      item.classList.add('event-item--new');
-      setTimeout(() => item.classList.remove('event-item--new'), 3000);
-    }
-
+    // source 단위 그룹화로 위임 (2026-05-17 결정):
+    //   첫 도착 → 일반 줄 외형 + 그룹 데이터 등록 ("외 N건"·펼침 hidden 상태)
+    //   두 번째 도착부터 → "외 N건" 보이게 + 위험도 색 갱신 + 펼침 list 채움
+    // 헤더 = 첫 발생 알람 (메시지·시간 고정 — 이상 추적 출발점).
+    this._addToSourceGroup(data, listEl, emptyEl);
     this._trimList(listEl);
   },
 
@@ -150,10 +143,12 @@ const EventPanel = {
   // 추가하고, 같은 분의 다음 정상화는 첫 항목에 "외 N건" 카운터 + sources 누적.
   _addToClearGroup(data, listEl, emptyEl) {
     const groupKey = this._clearGroupKey(data);
+    // T1+T6 — main fallback chain 과 동일. alarm_type 한글 라벨까지 fallback.
     const source =
       data.source_label ||
       data.sensor_name ||
       data.power_device_name ||
+      this.LABEL_BY_TYPE[data.alarm_type] ||
       '알 수 없음';
 
     const existing = this._clearGroups.get(groupKey);
@@ -172,7 +167,7 @@ const EventPanel = {
       ? (typeof TimeFormat !== 'undefined' ? TimeFormat.short(data.created_at) : new Date(data.created_at).toLocaleTimeString())
       : '';
     const colorClass = LevelMapper.toTextClass(data.alarm_level);
-    const icon       = this.ICON_BY_TYPE[data.alarm_type] || '🔔';
+    const icon       = this.ICON_BY_TYPE[data.alarm_type] || 'bell';
     const message    = data.message || '정상 복귀';
 
     const item = document.createElement('div');
@@ -180,7 +175,7 @@ const EventPanel = {
     item.dataset.dedupKey = groupKey;
     item.innerHTML = `
       <div class="event-head">
-        <span><span class="event-icon">${icon}</span><span class="event-clear-label">${source}</span></span>
+        <span><i data-lucide="${icon}" class="event-icon"></i><span class="event-clear-label">${source}</span></span>
         <span class="sub">${time}</span>
       </div>
       <div class="${colorClass} event-desc">
@@ -190,6 +185,8 @@ const EventPanel = {
       <ul class="event-clear-sources" hidden></ul>
     `;
     listEl.insertBefore(item, listEl.firstChild);
+    // [data-lucide] 속성 element 를 SVG 로 replace (idempotent).
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 
     const moreEl = item.querySelector('.event-clear-more');
     const moreCountEl = item.querySelector('.event-clear-more-count');
@@ -231,6 +228,179 @@ const EventPanel = {
     }
   },
 
+  // ── source 단위 그룹 추가/갱신 (2026-05-17) ─────────────
+  // 같은 가스 센서/전력 장비/지오펜스의 일반 알람을 30분 윈도우로 묶음.
+  // 첫 도착은 일반 알람 줄과 외형 동일 ("외 N건"·펼침 hidden).
+  // 두 번째부터 "외 N건" 보이게 + 다른 alarm_type 있으면 "+다른 유형 N건".
+  _addToSourceGroup(data, listEl, emptyEl) {
+    const groupKey = this._sourceGroupKey(data);
+    const existing = this._sourceGroups.get(groupKey);
+
+    if (existing) {
+      // 두 번째 이상 도착 — 그룹 데이터 누적 + 헤더 카운트·색·펼침 list 갱신.
+      // 헤더 메시지·시간은 첫 발생 고정 (사용자 결정 — 이상 추적 출발점).
+      existing.items.push(data);
+      this._refreshSourceGroup(existing, data);
+      return;
+    }
+
+    if (emptyEl) emptyEl.remove();
+
+    // 첫 도착 — 일반 알람 줄 외형으로 그룹 줄 생성.
+    const eventId = data.event ?? data.event_id ?? null;
+    const colorClass = LevelMapper.toTextClass(data.alarm_level);
+    // [P0-1] label fallback 확장 — power_device_name / geofence_name / source_label 추가.
+    //   WS payload (alarm-mapper.fromSensorsAlarm) 는 source_label 만, API 응답
+    //   (AlarmRecordSerializer) 은 발생원별 4 필드 → 양쪽 모두 커버.
+    // [P0-1] label fallback chain. T1+T6 — 최후 fallback 으로 alarm_type 한글 라벨
+    // (constants.AlarmType.choices 동기, '알 수 없음' 영문 코드 노출 방지).
+    const label =
+      data.sensor_name ||
+      data.power_device_name ||
+      data.worker_name ||
+      data.geofence_name ||
+      data.source_label ||
+      this.LABEL_BY_TYPE[data.alarm_type] ||
+      '알 수 없음';
+    const time = data.created_at
+      ? (typeof TimeFormat !== 'undefined' ? TimeFormat.short(data.created_at) : new Date(data.created_at).toLocaleTimeString())
+      : (data.timestamp
+          ? (typeof TimeFormat !== 'undefined' ? TimeFormat.short(data.timestamp) : new Date(data.timestamp).toLocaleTimeString())
+          : '');
+    const isResolved = data.status === 'resolved';
+    const icon = this.ICON_BY_TYPE[data.alarm_type] || 'bell';
+
+    const item = document.createElement('div');
+    item.className = 'event-item event-item--source-group';
+    // T4 — source 가 cover 면 행 톤도 노랑 (CSS .alarm-popup-static-cover 재사용 —
+    // 모달·토스트·이벤트 패널 3 곳이 같은 톤 사전).
+    const tone = (typeof AlarmMapper !== 'undefined') ? AlarmMapper.sourceTone(data.alarm_source) : 'risk';
+    if (tone === 'cover') item.classList.add('alarm-popup-static-cover');
+    item.style.opacity = isResolved ? '0.5' : '1';
+    // dataset.dedupKey = groupKey (LRU 제거 시 _sourceGroups 정리 매칭).
+    item.dataset.dedupKey = groupKey;
+    if (eventId !== null) {
+      // 헤더 클릭 = 첫 발생 event 상세 (이상 추적 출발점).
+      // "외 N건" 배지 / 펼침 list li 는 stopPropagation 으로 본 클릭 차단.
+      item.style.cursor = 'pointer';
+      item.dataset.eventId = String(eventId);
+      item.addEventListener('click', () => {
+        window.location.href = `/dashboard/monitoring/events/${eventId}/`;
+      });
+    }
+    // T4 — cover 배지 한 줄 (사유 라벨 — "AI 미탐 의심" 등). 빈 문자열이면 미렌더.
+    const coverLabel = (typeof AlarmMapper !== 'undefined') ? AlarmMapper.sourceBadge(data.alarm_source) : '';
+    const coverHtml = coverLabel ? `<span class="cover-badge event-cover-badge">${coverLabel}</span>` : '';
+    item.innerHTML = `
+      <div class="event-head">
+        <span><i data-lucide="${icon}" class="event-icon"></i>${label}</span>
+        <span class="sub">${time}</span>
+      </div>
+      <div class="${colorClass} event-desc">
+        <span>${data.message || data.alarm_type || ''}</span>
+        ${coverHtml}
+        <span class="event-source-more" hidden> · 외 <span class="event-source-more-count">0</span>건<span class="event-source-other-types"></span></span>
+      </div>
+      <ul class="event-source-items" hidden></ul>
+    `;
+    listEl.insertBefore(item, listEl.firstChild);
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+
+    const moreEl = item.querySelector('.event-source-more');
+    const moreCountEl = item.querySelector('.event-source-more-count');
+    const otherTypesEl = item.querySelector('.event-source-other-types');
+    const itemsEl = item.querySelector('.event-source-items');
+    const descEl = item.querySelector('.event-desc');
+
+    // "외 N건" 클릭 → 펼침/접힘 토글. stopPropagation 으로 헤더 event 상세 이동 차단.
+    if (moreEl && itemsEl) {
+      moreEl.style.cursor = 'pointer';
+      moreEl.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        itemsEl.hidden = !itemsEl.hidden;
+      });
+    }
+
+    this._sourceGroups.set(groupKey, {
+      itemEl: item,
+      items: [data],
+      moreEl,
+      moreCountEl,
+      otherTypesEl,
+      itemsEl,
+      descEl,
+      firstAlarmType: data.alarm_type,
+      maxLevel: data.alarm_level || 'normal',
+      maxLevelColorClass: colorClass,
+    });
+
+    if (!isResolved) {
+      item.classList.add('event-item--new');
+      setTimeout(() => item.classList.remove('event-item--new'), 3000);
+    }
+  },
+
+  // 그룹 두 번째 이상 알람 도착 시 헤더 카운트·다른 유형·위험도 색·펼침 list 갱신.
+  // 헤더 메시지·시간은 갱신 안 함 (첫 발생 고정).
+  _refreshSourceGroup(group, newData) {
+    // 첫 발생 제외 추가 건수 = items.length - 1.
+    const extra = group.items.length - 1;
+    group.moreEl.hidden = extra <= 0;
+    group.moreCountEl.textContent = String(extra);
+
+    // 다른 alarm_type 카운트 — 첫 발생 type 과 다른 type 의 unique 개수.
+    const otherTypes = new Set();
+    for (const d of group.items) {
+      if (d.alarm_type && d.alarm_type !== group.firstAlarmType) {
+        otherTypes.add(d.alarm_type);
+      }
+    }
+    group.otherTypesEl.textContent =
+      otherTypes.size > 0 ? ` (+다른 유형 ${otherTypes.size}건)` : '';
+
+    // 위험도 색 갱신 — 그룹 안 최고 위험도 (메시지·시간은 첫 발생 고정).
+    const levelOrder = { normal: 0, warning: 1, danger: 2 };
+    const newRank = levelOrder[newData.alarm_level] ?? 0;
+    const curRank = levelOrder[group.maxLevel] ?? 0;
+    if (newRank > curRank) {
+      const newColorClass = LevelMapper.toTextClass(newData.alarm_level);
+      if (group.maxLevelColorClass) {
+        group.descEl.classList.remove(group.maxLevelColorClass);
+      }
+      group.descEl.classList.add(newColorClass);
+      group.maxLevel = newData.alarm_level;
+      group.maxLevelColorClass = newColorClass;
+    }
+
+    // 펼침 list — 첫 발생 제외, 시간 내림차순 (최신 위 — 사용자 mockup).
+    group.itemsEl.innerHTML = '';
+    const additional = group.items.slice(1).slice().sort((a, b) => {
+      const tsA = new Date(a.created_at || a.timestamp || 0).getTime();
+      const tsB = new Date(b.created_at || b.timestamp || 0).getTime();
+      return tsB - tsA;
+    });
+    for (const d of additional) {
+      const li = document.createElement('li');
+      const iconName = this.ICON_BY_TYPE[d.alarm_type] || 'bell';
+      const liTime = d.created_at
+        ? (typeof TimeFormat !== 'undefined' ? TimeFormat.short(d.created_at) : new Date(d.created_at).toLocaleTimeString())
+        : '';
+      const liMsg = d.message || d.alarm_type || '';
+      const liEventId = d.event ?? d.event_id ?? null;
+      const liColorClass = LevelMapper.toTextClass(d.alarm_level);
+      li.innerHTML = `<i data-lucide="${iconName}" class="event-source-li-icon"></i><span class="${liColorClass}">${liMsg}</span><span class="event-source-li-time">${liTime}</span>`;
+      if (liEventId !== null) {
+        li.style.cursor = 'pointer';
+        li.addEventListener('click', (ev) => {
+          ev.stopPropagation();  // 헤더 클릭 (첫 event 상세) 차단
+          window.location.href = `/dashboard/monitoring/events/${liEventId}/`;
+        });
+      }
+      group.itemsEl.appendChild(li);
+    }
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  },
+
   // ── LRU 정리 — 최대 20개 유지, 제거 시 dedup set/그룹 정리 ──
   _trimList(listEl) {
     while (listEl.children.length > 20) {
@@ -239,6 +409,16 @@ const EventPanel = {
       if (removedKey) {
         this._seenKeys.delete(removedKey);
         this._clearGroups.delete(removedKey);
+        // source 그룹 제거 시 그룹 안 모든 event_id 의 _seenKeys 도 같이 정리
+        // (같은 알람이 후에 다시 들어오면 다시 표시 가능하도록).
+        const sourceGroup = this._sourceGroups.get(removedKey);
+        if (sourceGroup) {
+          for (const d of sourceGroup.items) {
+            const eid = d.event ?? d.event_id ?? null;
+            if (eid !== null) this._seenKeys.delete(`event:${eid}`);
+          }
+          this._sourceGroups.delete(removedKey);
+        }
       }
       listEl.removeChild(removed);
     }

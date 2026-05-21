@@ -12,6 +12,29 @@
 'use strict';
 
 const AlarmMapper = (function () {
+  // T4 — source 별 시각 톤 (drf constants.py ALARM_SOURCE_TONE 사본).
+  // 'risk' = 기존 danger/warning 분기 그대로, 'cover' = 노랑 + cover-badge.
+  // 미지정 source (옛 데이터) 는 'risk' fallback — 옛 행동 유지.
+  const SOURCE_TONE = {
+    ai: 'risk',
+    static_cover_miss: 'cover',
+    static_cover_inference_fail: 'cover',
+    static_cover_warmup: 'cover',
+    static_no_ai_available: 'risk',
+    static_legacy: 'risk',
+  };
+
+  // T4 — source 별 배지 라벨 (drf constants.py ALARM_SOURCE_BADGE 사본).
+  // 빈 문자열은 배지 미렌더 — falsy 체크로 분기.
+  const SOURCE_BADGE = {
+    ai: '',
+    static_cover_miss: 'AI 미탐 의심',
+    static_cover_inference_fail: 'AI 추론 실패 보완',
+    static_cover_warmup: 'AI 준비 중 보완',
+    static_no_ai_available: '',
+    static_legacy: '',
+  };
+
   function _common(src) {
     return {
       alarm_level:    src.risk_level,
@@ -28,6 +51,16 @@ const AlarmMapper = (function () {
       measured_value: src.measured_value,
       threshold_value: src.threshold_value,
       alarm_type:     src.alarm_type,
+      // 2026-05-15 알람 재설계: RESOLVED 신호 (update_status PATCH 시 박힘).
+      // AlarmPopup._handleResolved 가 이 필드를 받으면 같은 event_id 팝업 close + 토스트.
+      event_resolved_at: src.event_resolved_at || null,
+      // T3 (2026-05-19) — 다중 관리자 환경에서 EventAck 한 사용자명 list.
+      // 토스트·모달 본문에 "(N 확인 중)" 시그널 표시. dedup 과 분리 유지 (안전망).
+      event_ack_users: Array.isArray(src.event_ack_users) ? src.event_ack_users : [],
+      // T4 — 검출 주체 (AI vs 정적 cover). 옛 발신자는 'ai' fallback (옛 행동 유지).
+      alarm_source: src.source || 'ai',
+      // T4 — source 별 보조 사유 텍스트 (모달·토스트 부가 표시).
+      alarm_reason: src.reason || null,
     };
   }
 
@@ -42,6 +75,17 @@ const AlarmMapper = (function () {
     // /ws/worker/{id}/ 채널의 worker_alert 메시지용
     fromWorkerAlert(serverData) {
       return _common(serverData);
+    },
+
+    // T4 — source → 시각 톤 ('risk' | 'cover'). 호출자 (alarm-popup/event-panel) 가
+    // CSS 클래스 분기에 사용. 미정의 source 는 'risk' fallback.
+    sourceTone(source) {
+      return SOURCE_TONE[source] || 'risk';
+    },
+
+    // T4 — source → 배지 라벨 문자열. truthy 시 cover-badge 렌더, falsy 시 미렌더.
+    sourceBadge(source) {
+      return SOURCE_BADGE[source] || '';
     },
   };
 })();
