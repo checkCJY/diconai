@@ -1,6 +1,13 @@
 from django.urls import path
 
-from apps.operations.views.admin import AppLogAdminListView, IntegrationLogAdminListView
+from apps.operations.views.admin import (
+    AppLogAdminListView,
+    IntegrationLogAdminListView,
+    DataRetentionPolicyListView,
+    DataRetentionPolicyDetailView,
+    DataRetentionPolicyPreviewView,
+    DataRetentionPolicyRunView,
+)
 from apps.operations.views.internal.integration_log import (
     IntegrationLogInternalCreateView,
 )
@@ -23,4 +30,27 @@ urlpatterns = [
     # 여기서 "admin/"을 붙이면 최종 URL은 /api/admin/...이 된다.
     path("admin/system-logs/", AppLogAdminListView.as_view(), name="admin-system-logs"),
     path("admin/integration-logs/", IntegrationLogAdminListView.as_view(), name="admin-integration-logs"),
+
+    # ── 데이터 보관 정책 ────────────────────────────────────────────────────
+    path(
+        "admin/retention-policies/",
+        DataRetentionPolicyListView.as_view(),
+        name="admin-retention-policy-list",
+    ),
+    path(
+        "admin/retention-policies/<int:pk>/",
+        DataRetentionPolicyDetailView.as_view(),
+        name="admin-retention-policy-detail",
+    ),
+    path(
+        "admin/retention-policies/<int:pk>/preview/",
+        DataRetentionPolicyPreviewView.as_view(),
+        name="admin-retention-policy-preview",
+    ),
+    # POST /api/admin/retention-policies/run/  — 배치 즉시 실행 (dry_run 지원)
+    path(
+        "admin/retention-policies/run/",
+        DataRetentionPolicyRunView.as_view(),
+        name="admin-retention-policy-run",
+    ),
 ]
