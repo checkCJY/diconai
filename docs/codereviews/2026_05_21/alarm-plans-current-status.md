@@ -283,6 +283,103 @@ flag=True         — DRF 평가 skip (아키텍처 원칙대로 동작) + shado
 
 ---
 
-## 10. 변경 이력
+## 10. 추가 진단 (같은 날, T4 flag 실험)
+
+### 10.1 실험 경과
+
+`STATIC_THRESHOLD_AT_FASTAPI=true` 가 `.env.docker:63` 에 이미 켜져있었음을 발견 → 6 시간 운영 데이터로 검증 시도.
+
+- **회귀 테스트** (`test_power_alarm_neutralize.py`) 5/5 PASSED — 분기 로직 자체 정상
+- **shadow_audit Prometheus counter** — 예상치 못한 결과 발견
+
+### 10.2 결정타 데이터
+
+```
+ch7 device_id=1 최근 24h AlarmRecord = 0건 (danger=0 / warning=0)
+ch7 device_id=1 24h static_audit_mismatch_total = 11,484 건 (전부 danger)
+```
+
+ch1/9/14/15 외 12 개 채널 모두 24h AlarmRecord = 0. **AI 비추론 채널 정적 알람 통째 누락.**
+
+### 10.3 근본 원인
+
+`channel_meta_cache.get_channel_entry()` 가 모든 device_id 키 (`'63200c3afd12'`, `1`, `'1'`, `None`) 로 빈 dict 반환:
+
+```
+device_id='63200c3afd12' ch=7 → {}
+device_id=1              ch=7 → {}
+```
+
+[fastapi-server/power/services/threshold_eval.py:148-150](../../../fastapi-server/power/services/threshold_eval.py#L148):
+```python
+entry = get_channel_entry(device_id, channel)
+rated = entry.get(_RATED_KEY_BY_DATA_TYPE[data_type])
+if not rated:
+    return "normal"   ← 모든 비추론 채널이 여기서 normal 강제
+```
+
+→ `decide_alarm(DISABLED, ai='normal', static='normal')` → return None → push 없음 → AlarmRecord 0.
+
+`threshold_meta` 캐시 (% 임계치) · `threshold_sync_loop` · DRF endpoint 200 OK 는 모두 정상. **`channel_meta_cache` 가 단일 블로커.**
+
+### 10.4 즉시 조치
+
+`STATIC_THRESHOLD_AT_FASTAPI=False` 로 롤백 + `docker compose up -d --force-recreate --no-deps drf` 적용 완료. DRF 가 16ch 정적 fire 정상 복귀.
+
+### 10.5 의미
+
+| 항목 | 현재 상태 (flag=False) |
+|---|---|
+| AI 알람 (ch1/9/14/15) | ✅ fastapi 정상 fire |
+| 정적 알람 (16ch 전부) | ✅ DRF 정상 fire |
+| 시연 영향 | 0 |
+| 잠재 위험 | flag=True 재활성화 시 12ch 정적 누락 — **시연까지 절대 켜지 말 것** |
+
+---
+
+## 11. 한계 (시연 제출 기술문서 §10 인용 자료)
+
+### 11.1 현재 알람 책임 분담 — 임시 절충
+
+| 알람 종류 | 결정자 | 비고 |
+|---|---|---|
+| AI 추론 알람 | **fastapi** | IF + ARIMA + Z-score + CP, ch1/9/14/15 활성 |
+| 정적 임계 알람 | **DRF** | 16ch 전부, evaluate_power_risk / trigger_power_alarms |
+
+**아키텍처 원칙 (CLAUDE.md):**
+```
+IoT → fastapi (수신·검증) → DRF (저장) / WebSocket (브라우저)
+```
+원칙대로면 정적 알람도 fastapi 가 결정해야 함 — 현재 분담은 fastapi 도입 전 레거시 코드(DRF `trigger_power_alarms`) 가 정리되지 못한 임시 상태.
+
+### 11.2 통합 시도와 발견된 한계
+
+T4 (AI vs 정적 위계 명시) sub-plan 으로 fastapi 단일 결정자 모드를 구현 (`STATIC_THRESHOLD_AT_FASTAPI` flag, D1a~D4 sub-step):
+- 코드 작성: D1a~D4 모두 완료 (5-state AI inference state machine + DRF threshold sync + decide_alarm 6분기 매트릭스 + DRF neutralize + 프론트 시각 분기)
+- 단위 회귀: 5/5 통과
+- **운영 활성화 시 발견된 블로커**: `channel_meta_cache` 가 빈 dict 반환 → 비추론 12 채널 정적 알람 누락
+
+### 11.3 시간적 제약
+
+- 시연 D-day 2026-06-14, 발견 시점 2026-05-21 → **시연 우선으로 진단만 완료, fix 는 시연 후 sprint**
+- channel_meta_cache 동기화 fix 추정 작업량: 6~10h (1인)
+  - B1.1 운영 fastapi 프로세스에서 캐시 채워졌나 직접 확인 (30 분)
+  - B1.2 미동기화 원인 진단 (channel_meta_refresh_loop / DRF endpoint / 키 정합성, 1~2h)
+  - B2 원인별 fix (2~4h)
+  - B3 회귀 (단위 + 통합, 2~3h)
+  - B4 flag 재활성화 + shadow_audit 1~2주 관찰
+
+### 11.4 향후 작업 (시연 후 sprint)
+
+1. **B 작업 완료** → flag=True 안정화 → DRF 정적 fire 코드 영구 삭제 (`trigger_power_alarms`, `evaluate_power_risk`)
+2. **가스 도메인 동일 패턴 정리** — `gas_alarm.trigger_gas_alarms` + `evaluate_gas_risk` 도 fastapi 로 이관 (현재는 [[power_ai_architecture_decision_2026_05_18]] "가스 격하 유지" 결정으로 보류)
+3. **지오펜스 도메인 정리** — `evaluate_worker_risk_level` 도 동일 — 작업자 디바이스 결정 후 (Phase 3)
+4. **shadow_audit 정식 제거** — 1~2주 mismatch=0 확인 후 환경변수·`_shadow_audit` 함수 삭제 (T4 plan §6.1)
+
+---
+
+## 12. 변경 이력
 
 - 2026-05-21 작성 — 알람 plan 진행 현황 점검 결과 (트리거 → 라운드 1~3 → T4 검증 → flag 의미 → 아키텍처 위반 surface)
+- 2026-05-21 §10 추가 — T4 flag 실험 결과 + channel_meta_cache 블로커 진단
+- 2026-05-21 §11 추가 — 시연 기술문서 §한계 인용 자료 (책임 분담·시간 제약·향후 작업)
