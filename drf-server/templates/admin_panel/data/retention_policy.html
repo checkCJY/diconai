@@ -1,0 +1,142 @@
+{% extends 'admin_panel/base.html' %}
+{% load static %}
+
+{% block title %}데이터 보관 정책 관리{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/admin/retention_policy.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="breadcrumb">데이터 관리 &gt; 데이터 보관 정책</div>
+    <h1 class="page-title">데이터 보관 정책 관리</h1>
+    <p class="page-desc">데이터 카테고리별 보관 기간과 삭제 주기를 설정합니다. 보관 기간을 줄이면 다음 배치 실행 시 데이터가 삭제됩니다.</p>
+  </div>
+</div>
+
+<!-- 정책 목록 테이블 -->
+<div class="table-card">
+  <div class="table-toolbar">
+    <div class="toolbar-left">
+      <span class="total-count">총 <strong id="totalCount">0</strong>건</span>
+    </div>
+  </div>
+
+  <div class="table-wrapper">
+    <table id="policyTable">
+      <thead>
+        <tr>
+          <th>장비 유형</th>
+          <th>데이터 분류</th>
+          <th>원천 보관 기간</th>
+          <th>이력 보관 기간</th>
+          <th>삭제 주기</th>
+          <th>상태</th>
+          <th>최근 수정일</th>
+          <th>관리</th>
+        </tr>
+      </thead>
+      <tbody id="policyTableBody">
+        <tr><td colspan="8" class="empty-msg">불러오는 중...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+
+<!-- 편집 모달 -->
+<div class="rp-modal-overlay" id="editModal" style="display:none;">
+  <div class="rp-modal">
+    <div class="rp-modal-header">
+      <div>
+        <h3 id="modalTitle">보관 정책 수정</h3>
+        <p class="rp-modal-desc" id="modalDesc"></p>
+      </div>
+      <button class="rp-modal-close" id="btnModalClose" aria-label="닫기">✕</button>
+    </div>
+
+    <div class="rp-modal-body">
+
+      <!-- 현재 삭제 예정 행 수 -->
+      <div class="rp-info-box" id="currentCountBox">
+        <span class="rp-info-label">현재 삭제 예정 행 수</span>
+        <span class="rp-info-value" id="currentCount">불러오는 중...</span>
+      </div>
+
+      <!-- 경고 배너 (기간 줄일 때 표시) -->
+      <div class="rp-warning-banner" id="warningBanner" style="display:none;">
+        <span class="rp-warning-icon">⚠</span>
+        <span id="warningText"></span>
+      </div>
+
+      <div class="rp-form-grid">
+
+        <!-- 원천 보관 기간 -->
+        <div class="rp-form-row">
+          <label for="inputRawDays">원천 보관 기간 (일) <span class="required">*</span></label>
+          <div class="rp-days-input">
+            <input type="number" id="inputRawDays" min="1" max="3650" placeholder="예: 90">
+            <span class="rp-days-unit">일</span>
+          </div>
+          <span class="rp-form-error" id="errRawDays"></span>
+        </div>
+
+        <!-- 이력 보관 기간 -->
+        <div class="rp-form-row">
+          <label for="inputHistoryDays">이력 보관 기간 (일) <span class="required">*</span></label>
+          <div class="rp-days-input">
+            <input type="number" id="inputHistoryDays" min="1" max="3650" placeholder="예: 365">
+            <span class="rp-days-unit">일</span>
+          </div>
+          <span class="rp-form-hint">이력 보관 기간은 원천 보관 기간 이상이어야 합니다.</span>
+          <span class="rp-form-error" id="errHistoryDays"></span>
+        </div>
+
+        <!-- 삭제 주기 -->
+        <div class="rp-form-row">
+          <label for="inputDeleteCycle">삭제 주기</label>
+          <select id="inputDeleteCycle">
+            <option value="daily">매일</option>
+            <option value="monthly_1">매월 1일</option>
+            <option value="monthly_15">매월 15일</option>
+            <option value="monthly_last">매월 말일</option>
+            <option value="quarterly">분기 말</option>
+          </select>
+        </div>
+
+        <!-- 활성 여부 -->
+        <div class="rp-form-row">
+          <label>정책 활성 여부</label>
+          <label class="rp-toggle">
+            <input type="checkbox" id="inputIsActive">
+            <span class="rp-toggle-slider"></span>
+            <span class="rp-toggle-label" id="toggleLabel">활성</span>
+          </label>
+          <span class="rp-form-hint">비활성화하면 배치 실행 시 해당 정책이 건너뜁니다.</span>
+        </div>
+
+        <!-- 메모 -->
+        <div class="rp-form-row rp-form-row-full">
+          <label for="inputMemo">메모</label>
+          <textarea id="inputMemo" rows="2" placeholder="운영 참고사항 (선택)"></textarea>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="rp-modal-footer">
+      <span class="rp-form-error-global" id="errGlobal"></span>
+      <div class="rp-footer-actions">
+        <button class="btn-outline" id="btnCancel">취소</button>
+        <button class="btn-dark" id="btnSave">저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/admin/data/retention_policy.js' %}"></script>
+{% endblock %}
