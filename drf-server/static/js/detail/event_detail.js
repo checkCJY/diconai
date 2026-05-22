@@ -146,7 +146,7 @@ function renderDetail(ev) {
 
   // T2+T6 — alarm_type × level 권고 조치 분기. 기존 가스 디폴트 4 단계 (template
   // 정적 HTML) → JS 가 RECOMMENDED_ACTIONS dict lookup 후 동적 렌더.
-  renderRecommendation(ev.event_type, ev.risk_level);
+  renderRecommendation(ev);
 
   // T2+T6 — 연관 대상 정보 alarm_type 별 분기. 기존 "유해가스 센서" 하드코딩 →
   // SOURCE_TYPE_LABEL dict 의 도메인별 라벨 + 작업자 표시 여부.
@@ -170,24 +170,31 @@ function renderDetail(ev) {
     `연관 작업자 : ${ev.worker_name ?? '-'} / 마지막 연결 정상`;
 }
 
-// T2+T6 — alarm_type × level 권고 조치 렌더. dict 구조 두 가지 — alarm_type 별
-// {danger: [], warning: []} (level 분기) 또는 [...] (level 무관, ppe/sensor_fault 등).
-function renderRecommendation(alarmType, level) {
+// API 응답 (AlertPolicy.recommended_actions) 우선. 빈 배열 또는 부재 시
+// alarm_type × level 매트릭스 fallback (정책 미연결 이벤트 보호).
+function renderRecommendation(ev) {
   const el = document.getElementById('detail-recommendation');
   if (!el) return;
-  const entry = RECOMMENDED_ACTIONS[alarmType];
-  let steps;
-  if (Array.isArray(entry)) {
-    // level 무관 (ppe_violation / sensor_fault 등)
-    steps = entry;
-  } else if (entry && entry[level]) {
-    steps = entry[level];
-  } else {
-    steps = RECOMMENDED_DEFAULT;
+
+  let steps = ev.recommended_actions;
+  if (!Array.isArray(steps) || steps.length === 0) {
+    const entry = RECOMMENDED_ACTIONS[ev.event_type];
+    if (Array.isArray(entry)) {
+      steps = entry;
+    } else if (entry && entry[ev.risk_level]) {
+      steps = entry[ev.risk_level];
+    } else {
+      steps = RECOMMENDED_DEFAULT;
+    }
   }
-  // 1. ... <br> 2. ... 형식. innerHTML 사용 — 본 dict 의 값은 정적 (사용자 입력 X)
-  // 이라 XSS 위험 없음. event_detail.js 의 기존 innerHTML 패턴과 통일.
-  el.innerHTML = steps.map((s, i) => `${i + 1}. ${s}`).join('<br>');
+
+  // DB 권고 조치는 운영자 편집 대상 — XSS 방어 위해 textContent 로 분리 렌더.
+  el.replaceChildren(
+    ...steps.flatMap((s, i) => {
+      const text = document.createTextNode(`${i + 1}. ${s}`);
+      return i < steps.length - 1 ? [text, document.createElement('br')] : [text];
+    })
+  );
 }
 
 function updateStatusButtons(currentStatus) {
