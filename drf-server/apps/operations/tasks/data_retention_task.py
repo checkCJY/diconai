@@ -260,7 +260,12 @@ def _delete_for_policy(policy, dry_run: bool = False) -> int:
         )
         return count
 
-    deleted, _ = qs.delete()
+    # app_log / integration_log는 QuerySet.delete()가 차단되어 있다 (APPEND-ONLY 보호).
+    # 보관 정책 배치만 _retention_delete()로 우회 삭제한다.
+    if category in ("app_log", "integration_log"):
+        deleted, _ = qs._retention_delete()
+    else:
+        deleted, _ = qs.delete()
     logger.info(
         "[retention] action=deleted policy_id=%s category=%s deleted=%s",
         policy.id,
@@ -270,8 +275,8 @@ def _delete_for_policy(policy, dry_run: bool = False) -> int:
     return deleted
 
 
-@shared_task
-def run_data_retention(dry_run: bool = False) -> dict:
+@shared_task(bind=True, max_retries=3, default_retry_delay=300)
+def run_data_retention(self, dry_run: bool = False) -> dict:
     """
     Celery 진입점 — 활성 DataRetentionPolicy 모두 순회.
 
@@ -299,6 +304,9 @@ def run_data_retention(dry_run: bool = False) -> dict:
                 policy.id,
                 exc,
             )
+            # 새벽 배치가 DB 일시 잠금 등 일시적 오류로 실패하면 5분 후 재시도.
+            # 삭제는 멱등(이미 없는 row 재삭제 = 0건) — 재시도 시 중복 실행 안전.
+            raise self.retry(exc=exc)
 
     logger.info(
         "[retention] action=run_complete dry_run=%s policies_run=%s",

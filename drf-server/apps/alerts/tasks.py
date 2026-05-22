@@ -152,6 +152,10 @@ def fire_danger_alarm_task(
     from apps.core.constants import AlarmType
     from apps.monitoring.utils.gas_thresholds import GAS_UNITS, get_threshold_value
 
+    # [H-5 수정] DB 쓰기(create_alarm_and_event)와 WS 푸시를 별도 try 블록으로 분리.
+    # 이유: _push_to_ws 실패 시 retry 되면 create_alarm_and_event 가 재실행돼
+    # AlarmRecord 가 중복 생성된다. DB 쓰기 성공 후 WS 푸시가 실패하면
+    # retry 없이 경고 로그만 남긴다 — alarm 은 DB에 보존되므로 유실 없음.
     try:
         gas_name = _GAS_NAME.get(gas_type, gas_type.upper())
         unit = GAS_UNITS.get(gas_type, "")
@@ -173,11 +177,15 @@ def fire_danger_alarm_task(
             summary=summary,
             detected_at=timezone.now(),
         )
+    except Exception as exc:
+        logger.error("DANGER 알람 DB 저장 실패: %s", exc)
+        raise self.retry(exc=exc)
 
-        if event is not None and alarm is not None:
-            ALARM_FIRED_TOTAL.labels(
-                alarm_type="gas_threshold", risk_level="danger"
-            ).inc()
+    if event is not None and alarm is not None:
+        ALARM_FIRED_TOTAL.labels(
+            alarm_type="gas_threshold", risk_level="danger"
+        ).inc()
+        try:
             _push_to_ws(
                 {
                     "event_id": event.id,
@@ -200,17 +208,19 @@ def fire_danger_alarm_task(
                     "reason": None,
                 }
             )
-            logger.info(
-                "DANGER 알람 푸시 | sensor=%s gas=%s value=%s new_event=%s",
-                sensor_id,
-                gas_type,
-                value,
-                alarm is not None,
-            )
-
-    except Exception as exc:
-        logger.error("DANGER 알람 생성 실패: %s", exc)
-        raise self.retry(exc=exc)
+        except Exception as exc:
+            # DB 저장 완료 후 WS 푸시 실패 — retry 하면 AlarmRecord 중복 생성됨.
+            # fingerprint dedup(alarm_queue.py)이 동일 event_id 재전송을 30s 안에 차단하므로
+            # 재발화 필요 시 직접 push 재시도보다 다음 Celery tick 을 기다리는 게 안전.
+            logger.warning("DANGER 알람 WS 푸시 실패 (DB 저장은 완료): %s", exc)
+            return
+        logger.info(
+            "DANGER 알람 푸시 | sensor=%s gas=%s value=%s new_event=%s",
+            sensor_id,
+            gas_type,
+            value,
+            alarm is not None,
+        )
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=5)
@@ -232,6 +242,7 @@ def fire_warning_alarm_task(
     from apps.core.constants import AlarmType
     from apps.monitoring.utils.gas_thresholds import GAS_UNITS, get_threshold_value
 
+    # [H-5 수정] DB 쓰기와 WS 푸시를 별도 try 블록으로 분리 (fire_danger_alarm_task 참고).
     try:
         gas_name = _GAS_NAME.get(gas_type, gas_type.upper())
         unit = GAS_UNITS.get(gas_type, "")
@@ -253,11 +264,15 @@ def fire_warning_alarm_task(
             summary=summary,
             detected_at=timezone.now(),
         )
+    except Exception as exc:
+        logger.error("WARNING 알람 DB 저장 실패: %s", exc)
+        raise self.retry(exc=exc)
 
-        if event is not None and alarm is not None:
-            ALARM_FIRED_TOTAL.labels(
-                alarm_type="gas_threshold", risk_level="warning"
-            ).inc()
+    if event is not None and alarm is not None:
+        ALARM_FIRED_TOTAL.labels(
+            alarm_type="gas_threshold", risk_level="warning"
+        ).inc()
+        try:
             _push_to_ws(
                 {
                     "event_id": event.id,
@@ -280,6 +295,9 @@ def fire_warning_alarm_task(
                     "reason": None,
                 }
             )
+        except Exception as exc:
+            logger.warning("WARNING 알람 WS 푸시 실패 (DB 저장은 완료): %s", exc)
+        else:
             logger.info(
                 "WARNING 알람 푸시 | sensor=%s gas=%s value=%s new_event=%s",
                 sensor_id,
@@ -288,16 +306,12 @@ def fire_warning_alarm_task(
                 alarm is not None,
             )
 
-        # [Step 5] 정상 종료 시 task_key 즉시 정리.
-        # normal 처리 (gas_alarm.py) 의 cache.delete 에 의존하지 않고 task 가 직접
-        # 책임 — normal 천이가 안 들어와도 잔류 키로 다음 WARNING 이 막히지 않게.
-        # retry 경로는 아래 except 에서 raise 후 finally 없이 종료 → 잔류 허용
-        # (_TASK_KEY_TTL=35s 로 자연 정리).
-        cache.delete(f"alarm:task:{sensor_id}:{gas_type}")
-
-    except Exception as exc:
-        logger.error("WARNING 알람 생성 실패: %s", exc)
-        raise self.retry(exc=exc)
+    # [Step 5] 정상 종료 시 task_key 즉시 정리.
+    # normal 처리 (gas_alarm.py) 의 cache.delete 에 의존하지 않고 task 가 직접
+    # 책임 — normal 천이가 안 들어와도 잔류 키로 다음 WARNING 이 막히지 않게.
+    # retry 경로는 위 except(DB 실패)에서 raise 후 여기까지 미도달 → 잔류 허용
+    # (_TASK_KEY_TTL=35s 로 자연 정리).
+    cache.delete(f"alarm:task:{sensor_id}:{gas_type}")
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=5)
@@ -369,15 +383,16 @@ def fire_clear_notification_task(
     self,
     sensor_id: int,
     source_label: str,
-    gas_type: str,
+    gas_types: list[str],
 ):
-    """정상화 알림 — 가스 농도 복귀 시 WS 알림만 발송. 이벤트 상태는 운영자가 직접 변경."""
+    """정상화 알림 — 복귀한 가스 목록을 1개 메시지로 묶어 발송. 9개 팝업 방지."""
     from apps.alerts.models import AlarmRecord
 
     try:
-        gas_name = _GAS_NAME.get(gas_type, gas_type.upper())
+        # 정상화된 가스 이름 목록을 콤마로 연결 (예: "CO, H₂S")
+        gas_names = ", ".join(_GAS_NAME.get(g, g.upper()) for g in gas_types)
         summary = (
-            f"[안전] {source_label} — {gas_name} 농도가 정상 범위로 복귀했습니다."
+            f"[안전] {source_label} — {gas_names} 농도가 정상 범위로 복귀했습니다."
             " 관리자 확인 후 작업을 재개하세요."
         )
         # AlarmRecord 객체는 생성 안 함 (정상화는 record 안 남김). 모델 메서드를
@@ -388,7 +403,7 @@ def fire_clear_notification_task(
         _push_to_ws(
             {
                 "alarm_type": "gas_clear",
-                "gas_type": gas_type,
+                "gas_type": ",".join(gas_types),
                 "risk_level": "normal",
                 "source_label": source_label,
                 "summary": summary,
@@ -397,7 +412,7 @@ def fire_clear_notification_task(
             },
             raise_on_failure=False,
         )
-        logger.info("정상화 알림 발송 | sensor=%s gas=%s", sensor_id, gas_type)
+        logger.info("정상화 알림 발송 | sensor=%s gases=%s", sensor_id, gas_types)
 
     except Exception as exc:
         logger.error("정상화 알림 실패: %s", exc)
@@ -419,6 +434,7 @@ def fire_power_danger_task(
     from apps.core.constants import AlarmType
     from apps.facilities.services.threshold_service import get_threshold
 
+    # [H-5 수정] DB 쓰기와 WS 푸시를 별도 try 블록으로 분리 (gas alarm 과 동일 패턴).
     try:
         power_threshold = get_threshold("power_default", "power_w") or {}
         danger_max = power_threshold.get("danger_max")
@@ -439,10 +455,15 @@ def fire_power_danger_task(
             detected_at=timezone.now(),
             channel=channel,
         )
-        if event is not None and alarm is not None:
-            ALARM_FIRED_TOTAL.labels(
-                alarm_type="power_overload", risk_level="danger"
-            ).inc()
+    except Exception as exc:
+        logger.error("전력 DANGER 알람 DB 저장 실패: %s", exc)
+        raise self.retry(exc=exc)
+
+    if event is not None and alarm is not None:
+        ALARM_FIRED_TOTAL.labels(
+            alarm_type="power_overload", risk_level="danger"
+        ).inc()
+        try:
             _push_to_ws(
                 {
                     "event_id": event.id,
@@ -465,16 +486,16 @@ def fire_power_danger_task(
                     "reason": None,
                 }
             )
-            logger.info(
-                "전력 DANGER 알람 | device=%s ch=%s value=%sW new_event=%s",
-                device_id,
-                channel,
-                value,
-                alarm is not None,
-            )
-    except Exception as exc:
-        logger.error("전력 DANGER 알람 생성 실패: %s", exc)
-        raise self.retry(exc=exc)
+        except Exception as exc:
+            logger.warning("전력 DANGER 알람 WS 푸시 실패 (DB 저장은 완료): %s", exc)
+            return
+        logger.info(
+            "전력 DANGER 알람 | device=%s ch=%s value=%sW new_event=%s",
+            device_id,
+            channel,
+            value,
+            alarm is not None,
+        )
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=5)
@@ -492,6 +513,7 @@ def fire_power_warning_task(
     from apps.core.constants import AlarmType
     from apps.facilities.services.threshold_service import get_threshold
 
+    # [H-5 수정] DB 쓰기와 WS 푸시를 별도 try 블록으로 분리 (gas alarm 과 동일 패턴).
     try:
         power_threshold = get_threshold("power_default", "power_w") or {}
         warning_max = power_threshold.get("warning_max")
@@ -512,10 +534,15 @@ def fire_power_warning_task(
             detected_at=timezone.now(),
             channel=channel,
         )
-        if event is not None and alarm is not None:
-            ALARM_FIRED_TOTAL.labels(
-                alarm_type="power_overload", risk_level="warning"
-            ).inc()
+    except Exception as exc:
+        logger.error("전력 WARNING 알람 DB 저장 실패: %s", exc)
+        raise self.retry(exc=exc)
+
+    if event is not None and alarm is not None:
+        ALARM_FIRED_TOTAL.labels(
+            alarm_type="power_overload", risk_level="warning"
+        ).inc()
+        try:
             _push_to_ws(
                 {
                     "event_id": event.id,
@@ -538,6 +565,9 @@ def fire_power_warning_task(
                     "reason": None,
                 }
             )
+        except Exception as exc:
+            logger.warning("전력 WARNING 알람 WS 푸시 실패 (DB 저장은 완료): %s", exc)
+        else:
             logger.info(
                 "전력 WARNING 알람 | device=%s ch=%s value=%sW new_event=%s",
                 device_id,
@@ -546,12 +576,9 @@ def fire_power_warning_task(
                 alarm is not None,
             )
 
-        # [Step 5] 정상 종료 시 task_key 즉시 정리 (가스 task 와 동일 패턴).
-        cache.delete(f"alarm:power:task:{device_id}:{channel}")
-
-    except Exception as exc:
-        logger.error("전력 WARNING 알람 생성 실패: %s", exc)
-        raise self.retry(exc=exc)
+    # [Step 5] 정상 종료 시 task_key 즉시 정리 (가스 task 와 동일 패턴).
+    # retry 경로는 DB 실패 except 에서 raise → 여기 미도달 (잔류 허용, TTL 자연 만료).
+    cache.delete(f"alarm:power:task:{device_id}:{channel}")
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=5)

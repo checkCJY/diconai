@@ -29,6 +29,8 @@ import requests
 
 from core.config import settings
 from dummies._scenario import get_scenario_mode
+# [L-6] SLAVE_KEYS 는 power/schemas/power.py 가 단일 공급원 — 여기서 import 해 중복 제거.
+from power.schemas.power import SLAVE_KEYS
 from dummies._state_machine import (
     ChannelState,
     enter_scenario,
@@ -50,24 +52,8 @@ FASTAPI_POWER_WATT_URL = f"{FASTAPI_BASE_URL}/api/power/watt"
 
 DEVICE_ID = "63200c3afd12"
 
-POWER_CHANNELS = [
-    "slave01",
-    "slave02",
-    "slave11",
-    "slave12",
-    "slave21",
-    "slave22",
-    "slave31",
-    "slave32",
-    "slave41",
-    "slave42",
-    "slave51",
-    "slave52",
-    "slave61",
-    "slave62",
-    "slave71",
-    "slave72",
-]
+# [L-6] power/schemas/power.py 의 SLAVE_KEYS 가 단일 공급원이므로 별도 정의 제거.
+POWER_CHANNELS = SLAVE_KEYS
 
 # ---------------------------------------------------------------------------
 # 채널 정격 — drf-server/apps/facilities/migrations/0017_seed_power_channel_meta.py 와 동일.

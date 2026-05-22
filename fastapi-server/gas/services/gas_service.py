@@ -74,8 +74,10 @@ _h2s_window: deque = deque(maxlen=30)
 _co2_window: deque = deque(maxlen=30)
 
 # 이성현 추가 — 같은 센서 60초당 1회만 알람 발화 (전력 서비스와 동일 rate limit 패턴)
+# [M-3] 하드코딩 제거 — settings.GAS_AI_RATE_LIMIT_SEC 로 환경별 조정 가능.
+# DRF 의 ALARM_REPOPUP_COOLDOWN_SEC 과 값을 맞추려면 .env 에서 함께 변경할 것.
 _gas_last_fired_at: dict[str, float] = {}
-GAS_RATE_LIMIT_SEC = 30
+GAS_RATE_LIMIT_SEC = settings.GAS_AI_RATE_LIMIT_SEC
 
 DRF_GAS_PATH = "/api/monitoring/gas/"
 
@@ -170,7 +172,9 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
                         )
                     # 이성현 수정 — forward_inference_e2e 시그니처에 맞게 수정 (push_payload/should_fire 제거)
                     # ML결과 저장은 매번, alarm_payload는 should_fire=True일 때만 전달
-                    asyncio.create_task(
+                    # [M-2 수정] create_task 미처리 예외가 "Task exception was never retrieved"
+                    # 경고로 조용히 사라지지 않도록 done callback 으로 error 로그 기록.
+                    _t = asyncio.create_task(
                         forward_inference_e2e(
                             ml_payload={
                                 "ml_model": None,
@@ -201,9 +205,14 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
                             else None,
                         )
                     )
+                    _t.add_done_callback(
+                        lambda t: logger.error("[forward_inference_e2e] bg task failed: %s", t.exception())
+                        if not t.cancelled() and t.exception() is not None
+                        else None
+                    )
                     # 이성현 추가 — 브라우저 실시간 알람 push (should_fire=True일 때만)
                     if should_fire:
-                        asyncio.create_task(
+                        _p = asyncio.create_task(
                             push_alarm(
                                 {
                                     "alarm_type": "gas_anomaly_ai",
@@ -216,6 +225,11 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
                                     "measured_value": payload.co,
                                 }
                             )
+                        )
+                        _p.add_done_callback(
+                            lambda t: logger.error("[push_alarm] bg task failed: %s", t.exception())
+                            if not t.cancelled() and t.exception() is not None
+                            else None
                         )
             except Exception as e:
                 AI_INFERENCE_FAILED_TOTAL.labels("gas_if", "inference_error").inc()

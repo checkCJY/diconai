@@ -206,8 +206,18 @@ SIMPLE_JWT = {
     "BLACKLIST_AFTER_ROTATION": True,
     # Phase 5 WS 인증: fastapi가 같은 키로 검증할 수 있도록 명시.
     # 기본값 SECRET_KEY는 SimpleJWT 기본 동작과 동일 (호환 유지).
+    # [L-1] JWT_SIGNING_KEY 미설정 시 SECRET_KEY 로 폴백 — 운영에서는 별도 키 필수.
+    # SECRET_KEY 유출 시 JWT 위조 가능. 아래 경고 로그가 기동 시 출력된다.
     "SIGNING_KEY": env("JWT_SIGNING_KEY", default=SECRET_KEY),
 }
+
+# [L-1] JWT_SIGNING_KEY 미설정 경고 — 운영 배포 전 반드시 env 에 독립된 값 주입 필요.
+import logging as _logging
+if not env("JWT_SIGNING_KEY", default=""):
+    _logging.getLogger(__name__).warning(
+        "[security] JWT_SIGNING_KEY 미설정 — DJANGO_SECRET_KEY 로 폴백 중. "
+        "운영 환경에서는 독립된 JWT_SIGNING_KEY 를 env 에 반드시 설정하세요."
+    )
 
 # ── 백오피스 URL (관리자 메뉴 이동) ───────────────────────
 ADMIN_BACKOFFICE_URL = env(
