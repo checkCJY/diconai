@@ -104,14 +104,26 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-# DATABASE_URL이 없으면 로컬 개발용 sqlite로 폴백.
-# 운영: postgres://user:pass@host:5432/dbname 형식
-DATABASES = {
-    "default": env.db(
-        "DATABASE_URL",
-        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
-    )
-}
+# POSTGRES_HOST 가 있으면 PostgreSQL, 없으면 로컬 SQLite 폴백.
+# 비밀번호를 URL 에 박지 않고 분리 환경변수로 받기 위해 dj-database-url 대신 직접 dict 구성.
+if env("POSTGRES_HOST", default=""):
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": env("POSTGRES_DB"),
+            "USER": env("POSTGRES_USER"),
+            "PASSWORD": env("POSTGRES_PASSWORD"),
+            "HOST": env("POSTGRES_HOST"),
+            "PORT": env("POSTGRES_PORT", default="5432"),
+        }
+    }
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": str(BASE_DIR / "db.sqlite3"),
+        }
+    }
 
 # SQLite 락 완화 (2026-05-14) — 더미 3종 동시 송출 + Celery worker 다중 writer 환경 대응.
 #   - timeout=30: Django 연결 timeout (기본 5초 → 30초)

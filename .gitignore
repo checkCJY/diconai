@@ -42,6 +42,10 @@ drf-server/_eval_*.py
 *.env
 .env.docker
 
+# DB backups & dumps (PG 전환 + 일상 백업)
+backup/
+*.sql
+
 # IDE
 .vscode/
 .idea/

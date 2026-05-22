@@ -106,6 +106,11 @@
 
 **의사결정 이유:** ARIMA 도입 시점에 다중 writer/시계열 인덱싱 본격 필요. 시연 전 안정화 마치는 게 시연 후보다 risk 낮음 (시연 후엔 ARIMA 작업과 직렬 충돌).
 
+<<<<<<< Updated upstream
+=======
+> ⚠️ 본 단계 진입 시 [postgres-migration-code-review.md](postgres-migration-code-review.md) 동반 참조 — 사전 검증 SQL 10건 + 코드 레벨 위험 카탈로그 18건 + Runbook 포함.
+
+>>>>>>> Stashed changes
 ### 작업
 
 1. **docker-compose.yml에 postgres 서비스 추가**
