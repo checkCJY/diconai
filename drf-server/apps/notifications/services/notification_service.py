@@ -78,7 +78,7 @@ def resolve_channels(risk_level: str) -> list[str]:
 
 def dispatch_notification(notif: Notification):
     """채널별 발송기 호출"""
-    from notifications.services.delivery import popup_delivery
+    from apps.notifications.services.delivery import popup_delivery
 
     try:
         if notif.channel == Notification.Channel.POPUP:
