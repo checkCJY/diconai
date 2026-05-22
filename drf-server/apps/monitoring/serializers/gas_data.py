@@ -1,6 +1,6 @@
 import time
 
-from django.db import IntegrityError, OperationalError
+from django.db import IntegrityError, OperationalError, transaction
 
 from rest_framework import serializers
 
@@ -94,9 +94,16 @@ class GasDataCreateSerializer(serializers.ModelSerializer):
 
         DB_SAVE_TOTAL.labels(model="gas", result="ok", error_type="").inc()
 
-        gas_data.gas_sensor.last_reading = gas_data.measured_at
-        gas_data.gas_sensor.save(update_fields=["last_reading", "updated_at"])
+        # [H-3 수정] GasData 저장과 센서 last_reading 업데이트를 하나의 트랜잭션으로 묶는다.
+        # 이유: sensor.save() 실패 시 GasData는 저장됐는데 알람 트리거가 건너뛰어지는
+        # 상황을 방지. 둘 다 성공해야 커밋되고, 실패 시 둘 다 롤백된다.
+        with transaction.atomic():
+            gas_data.gas_sensor.last_reading = gas_data.measured_at
+            gas_data.gas_sensor.save(update_fields=["last_reading", "updated_at"])
 
+        # 알람 트리거는 atomic 블록 밖에서 실행 — 저장이 완전히 커밋된 후 Celery 태스크 발행.
+        # atomic 블록 안에서 .delay() 하면 트랜잭션 롤백 시 태스크가 존재하지 않는
+        # GasData를 참조하는 문제가 생긴다.
         from apps.monitoring.services.gas_alarm import trigger_gas_alarms
 
         gas_data._alarms = trigger_gas_alarms(gas_data, ingress_ts=ingress_ts)
