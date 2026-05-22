@@ -1,4 +1,6 @@
 from django.urls import path
+from apps.accounts.views.internal_views import InternalWorkerListView
+
 
 from apps.operations.views.admin import (
     AppLogAdminListView,
@@ -21,7 +23,12 @@ urlpatterns = [
         IntegrationLogInternalCreateView.as_view(),
         name="internal-integration-log-create",
     ),
-
+    # 이성현 추가 — worker 목록 내부 조회 API
+    path(
+        "internal/workers/",
+        InternalWorkerListView.as_view(),
+        name="internal-worker-list",
+    ),
     # ── 관리자 조회 ─────────────────────────────────────────────────────────
     # GET /api/admin/system-logs/     — AppLog 조회
     # GET /api/admin/integration-logs/ — IntegrationLog 조회
@@ -29,8 +36,11 @@ urlpatterns = [
     # config/urls.py에서 "api/" 아래에 이 파일을 include하므로
     # 여기서 "admin/"을 붙이면 최종 URL은 /api/admin/...이 된다.
     path("admin/system-logs/", AppLogAdminListView.as_view(), name="admin-system-logs"),
-    path("admin/integration-logs/", IntegrationLogAdminListView.as_view(), name="admin-integration-logs"),
-
+    path(
+        "admin/integration-logs/",
+        IntegrationLogAdminListView.as_view(),
+        name="admin-integration-logs",
+    ),
     # ── 데이터 보관 정책 ────────────────────────────────────────────────────
     path(
         "admin/retention-policies/",
