@@ -13,6 +13,36 @@ services:
       retries: 5
     restart: unless-stopped
 
+  postgres:
+    image: postgres:16-alpine
+    shm_size: 256mb
+    env_file: ./.env.docker
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - effective_cache_size=1GB
+      - -c
+      - work_mem=16MB
+      - -c
+      - maintenance_work_mem=128MB
+      - -c
+      - statement_timeout=60s
+      - -c
+      - idle_in_transaction_session_timeout=30s
+      - -c
+      - max_connections=50
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-diconai}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
   # drf: Django REST API + 어드민/대시보드 HTML 렌더링 서버 (포트 8000).
   # 현재 compose는 개발용으로 구성됨 — 핫리로드 3단 결합:
   #   1) 소스 볼륨 마운트(./drf-server:/app)로 호스트 변경이 즉시 컨테이너에 노출
@@ -30,7 +60,6 @@ services:
     user: "${UID:-1000}:${GID:-1000}"
     env_file: ./.env.docker
     environment:
-      DATABASE_URL: sqlite:////app/db.sqlite3
       REDIS_URL: redis://redis:6379/0
       FASTAPI_INTERNAL_URL: http://fastapi:8001
       DJANGO_DEBUG: "True"      # 개발: 템플릿/정적 핫리로드 활성 (운영에선 False)
@@ -65,6 +94,8 @@ services:
       - --config=/app/gunicorn.conf.py
     depends_on:
       redis:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     ports:
       - "8000:8000"
@@ -101,7 +132,6 @@ services:
     command: ["celery", "-A", "config", "worker", "-l", "info", "--concurrency=2"]
     env_file: ./.env.docker
     environment:
-      DATABASE_URL: sqlite:////app/db.sqlite3
       REDIS_URL: redis://redis:6379/0
       FASTAPI_INTERNAL_URL: http://fastapi:8001
       RUN_MIGRATIONS: "0"
@@ -120,6 +150,8 @@ services:
         condition: service_healthy
       fastapi:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
 
   celery-beat:
@@ -128,7 +160,6 @@ services:
     command: ["celery", "-A", "config", "beat", "-l", "info"]
     env_file: ./.env.docker
     environment:
-      DATABASE_URL: sqlite:////app/db.sqlite3
       REDIS_URL: redis://redis:6379/0
       RUN_MIGRATIONS: "0"
       COLLECT_STATIC: "0"
@@ -136,6 +167,8 @@ services:
       - ./drf-server:/app          # 소스코드 실시간 반영
     depends_on:
       drf:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     restart: unless-stopped
 
@@ -175,3 +208,4 @@ volumes:
   drf_static:
   prom_data:
   grafana_data:
+  postgres_data:
