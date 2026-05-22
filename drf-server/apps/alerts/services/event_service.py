@@ -116,10 +116,21 @@ def create_alarm_and_event(
             )
             active_event.last_detected_at = detected_at
             # 위험도 상승 시 Event risk_level 업데이트
+            # [M-12] 위험도 상승 이력을 EventLog 에 기록한다.
+            # 이유: WARNING → DANGER 천이는 중요한 상태 변화지만 기존 코드에서
+            # EventLog 가 남지 않아 사고 소급 분석 시 이 구간이 공백이었다.
             if RISK_LEVELS.index(risk_level) > RISK_LEVELS.index(
                 active_event.risk_level
             ):
+                prev_risk = active_event.risk_level
                 active_event.risk_level = risk_level
+                EventLog.objects.create(
+                    event=active_event,
+                    action=EventLog.Action.STATUS_CHANGED,
+                    previous_status=active_event.status,
+                    new_status=active_event.status,
+                    note=f"위험도 상승: {prev_risk} → {risk_level}",
+                )
 
             # 쿨다운 초과 시 재알림: last_notified_at 갱신 후 alarm 반환
             cooldown = timedelta(seconds=settings.ALARM_REPOPUP_COOLDOWN_SEC)

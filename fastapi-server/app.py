@@ -29,7 +29,7 @@ from internal.routers.scenario_router import router as internal_scenario_router
 from positioning.routers.position_router import router as positioning_router
 from power.routers.power_router import router as power_router
 from power.services.channel_meta_cache import channel_meta_refresh_loop
-from power.services.threshold_sync import threshold_sync_loop
+from power.services.threshold_sync import refresh_threshold_meta, threshold_sync_loop
 from websocket.routers.ws_router import (
     alarm_flush_loop,
     broadcast_loop,
@@ -47,6 +47,10 @@ async def lifespan(app: FastAPI):
         f"[app] action=startup log_level={settings.LOG_LEVEL} "
         f"broadcast_interval={settings.BROADCAST_INTERVAL_SEC}s"
     )
+    # [M-8] 요청 수락 전에 전력 임계치를 1회 즉시 로드한다.
+    # threshold_sync_loop 만 띄우면 create_task→yield 사이 첫 요청이 빈 캐시로
+    # 처리될 수 있다. 실패해도 loop 가 backoff 재시도하므로 startup 을 막지 않는다.
+    await refresh_threshold_meta()
     task1 = asyncio.create_task(
         broadcast_loop()
     )  # 센서 통합 페이로드 주기 브로드캐스트
