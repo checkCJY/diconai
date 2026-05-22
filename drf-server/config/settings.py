@@ -359,6 +359,13 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.operations.tasks.db_health_task.record_db_health",
         "schedule": timedelta(seconds=60),
     },
+    # 만료된 Django 세션 정리 — 매주 일요일 새벽 3시.
+    # 로그인마다 django_session 행이 생성되고 만료돼도 자동 삭제되지 않음.
+    # clearsessions는 expire_date < now() 인 행만 삭제 — 활성 세션 건드리지 않음.
+    "clear_expired_sessions": {
+        "task": "apps.operations.tasks.clear_sessions_task.clear_expired_sessions",
+        "schedule": crontab(hour=3, minute=0, day_of_week=0),  # 일요일 03:00
+    },
 }
 
 # ── Cache (Redis) ─────────────────────────────────────────────
