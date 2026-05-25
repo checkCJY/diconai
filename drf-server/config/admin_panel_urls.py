@@ -229,6 +229,26 @@ class MapEditLogPageView(TemplateView):
         return ctx
 
 
+class AlertPolicyAdminPageView(TemplateView):
+    """알림 정책 관리 페이지.
+
+    필터 드롭다운용 AlarmType choices 를 context 로 전달. 실제 정책 데이터는 JS 가
+    /api/admin/alerts/policies/ 를 fetch.
+    """
+
+    template_name = "admin_panel/alerts/policies_main.html"
+
+    def get_context_data(self, **kwargs):
+        from apps.core.constants import AlarmType
+
+        ctx = super().get_context_data(**kwargs)
+        ctx["active_nav"] = "alert_policy"
+        ctx["alarm_types"] = [
+            {"value": value, "label": label} for value, label in AlarmType.choices
+        ]
+        return ctx
+
+
 urlpatterns = [
     path("logs/system/", SystemLogPageView.as_view(), name="admin-log-system"),
     path("logs/activity/", ActivityLogPageView.as_view(), name="admin-log-activity"),
@@ -299,5 +319,10 @@ urlpatterns = [
         "safety/vr-training/",
         VRTrainingAdminPageView.as_view(),
         name="admin-vr-training-page",
+    ),
+    path(
+        "alerts/policies/",
+        AlertPolicyAdminPageView.as_view(),
+        name="admin-alert-policies-page",
     ),
 ]
