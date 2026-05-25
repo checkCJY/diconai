@@ -93,6 +93,12 @@
         <div class="pagination" id="pagination"></div>
     </div>
 </section>
+
+{% include 'admin_panel/alerts/_modal_form.html' %}
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/admin/alert_policy.css' %}">
 {% endblock %}
 
 {% block extra_js %}
@@ -102,5 +108,6 @@
     {% for at in alarm_types %}'{{ at.value }}': '{{ at.label }}'{% if not forloop.last %},{% endif %}{% endfor %}
   };
 </script>
+<script src="{% static 'js/admin/alerts/policy_modal.js' %}"></script>
 <script src="{% static 'js/admin/alerts/policies.js' %}"></script>
 {% endblock %}

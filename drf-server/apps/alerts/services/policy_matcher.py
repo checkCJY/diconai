@@ -123,17 +123,25 @@ def _score_match(
     return facility_score + asset_score
 
 
-def compute_condition_summary(policy: AlertPolicy) -> str:
-    """
-    AlertPolicy의 조건을 한 줄 문자열로 요약 — 목록 화면 캐시용.
+_CHANNEL_LABELS = {
+    "popup": "관제 실시간 알림",
+    "push": "앱 푸시",
+    "sms": "SMS",
+    "email": "이메일",
+}
 
-    형식: "<event_type 라벨> | <facility 라벨> | <자산 요약> | <채널>"
+
+def compute_condition_summary(policy: AlertPolicy) -> str:
+    """AlertPolicy 조건을 운영자 친화 한글 1줄로 요약 — 목록 화면 캐시용.
+
+    형식: "<범위> / <이벤트> / <채널>"
+    예:
+        "전사 / 가스 경보 / 관제 실시간 알림"
+        "공장 A 송풍기 1개 / 가스 경보 / 관제 실시간 알림·SMS"
     """
     event_label = dict(AlarmType.choices).get(policy.event_type, policy.event_type)
-    facility_label = (
-        policy.target_facility.name if policy.target_facility_id else "전사"
-    )
 
+    scope = policy.target_facility.name if policy.target_facility_id else "전사"
     asset_parts = []
     if policy.target_sensor_ids:
         asset_parts.append(f"센서 {len(policy.target_sensor_ids)}개")
@@ -141,11 +149,13 @@ def compute_condition_summary(policy: AlertPolicy) -> str:
         asset_parts.append(f"전력장치 {len(policy.target_device_ids)}개")
     if policy.target_geofence_ids:
         asset_parts.append(f"위험구역 {len(policy.target_geofence_ids)}개")
-    asset_label = ", ".join(asset_parts) if asset_parts else "자산 무관"
+    if asset_parts:
+        scope = f"{scope} {', '.join(asset_parts)}"
 
-    channel_label = ", ".join(policy.channels) if policy.channels else "채널 미지정"
+    channels = [_CHANNEL_LABELS.get(c, c) for c in (policy.channels or [])]
+    channel_text = "·".join(channels) if channels else "발송 채널 미지정"
 
-    return f"{event_label} | {facility_label} | {asset_label} | {channel_label}"
+    return f"{scope} / {event_label} / {channel_text}"
 
 
 def save_policy(policy: AlertPolicy) -> AlertPolicy:

@@ -65,10 +65,9 @@ const AlertPolicyAdmin = {
     });
 
     document.getElementById('btnDelete').addEventListener('click', () => this._deleteSelected());
-    document.getElementById('btnAddPolicy').addEventListener('click', () => {
-      // 2c 단계 모달은 별도 모듈. 임시 안내.
-      alert('등록 모달은 다음 단계에서 추가됩니다.');
-    });
+    document.getElementById('btnAddPolicy').addEventListener('click', () => this._openCreateModal());
+
+    PolicyModal.init(() => this.fetchList());
   },
 
   _readFilters() {
@@ -113,24 +112,51 @@ const AlertPolicyAdmin = {
     }
 
     tbody.innerHTML = items.map(p => `
-      <tr>
+      <tr data-id="${p.id}">
         <td><input type="checkbox" class="row-check" data-id="${p.id}" ${this.selected.has(p.id) ? 'checked' : ''}></td>
         <td>${this._escape(p.name)}</td>
         <td>${this._escape(p.event_type_display || p.event_type)}</td>
         <td>${this._formatChannels(p.channels)}</td>
         <td>${this._formatRecipients(p.target_user_types)}</td>
-        <td><span class="badge ${p.is_active ? 'badge-green' : 'badge-gray'}">${p.is_active ? '사용' : '미사용'}</span></td>
-        <td>${this._escape(p.condition_summary) || '<span class="muted">조건 미설정</span>'}</td>
+        <td><span class="ap-badge ${p.is_active ? 'ap-badge-green' : 'ap-badge-gray'}">${p.is_active ? '사용' : '미사용'}</span></td>
+        <td>${this._escape(p.condition_summary) || '<span class="ap-muted">조건 미설정</span>'}</td>
       </tr>
     `).join('');
 
     tbody.querySelectorAll('.row-check').forEach(cb => {
       cb.addEventListener('change', (e) => {
+        e.stopPropagation();
         const id = parseInt(e.target.dataset.id);
         e.target.checked ? this.selected.add(id) : this.selected.delete(id);
         this._updateBulkButtons();
       });
+      // 체크박스 클릭이 행 클릭으로 전파되지 않도록.
+      cb.addEventListener('click', (e) => e.stopPropagation());
     });
+
+    // 행 클릭 → 수정 모달.
+    tbody.querySelectorAll('tr[data-id]').forEach(tr => {
+      tr.addEventListener('click', () => {
+        const id = parseInt(tr.dataset.id);
+        this._openEditModal(id);
+      });
+    });
+  },
+
+  async _openCreateModal() {
+    PolicyModal.open('create');
+  },
+
+  async _openEditModal(id) {
+    try {
+      const res = await Auth.apiFetch(`/api/admin/alerts/policies/${id}/`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const policy = await res.json();
+      PolicyModal.open('edit', policy);
+    } catch (e) {
+      console.error('[AlertPolicyAdmin] 정책 상세 로드 실패:', e);
+      alert('정책 정보를 불러올 수 없습니다.');
+    }
   },
 
   _renderPagination() {
