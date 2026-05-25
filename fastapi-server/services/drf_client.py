@@ -68,6 +68,7 @@ async def _record_integration_log(
                     "result": result,
                     "description": description,
                 },
+                headers=_auth_headers(),  # 이성현 추가 — 토큰 헤더 추가
             )
     except Exception:
         # silent fail — 본 흐름 비차단. AppLog에 기록하면 또 재귀 위험.

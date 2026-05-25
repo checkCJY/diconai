@@ -78,6 +78,7 @@ def trigger_gas_alarms(gas_data, ingress_ts: float | None = None) -> list[dict]:
     facility_id = sensor.facility_id
     source_label = sensor.device_name
 
+    cleared_gases: list[str] = []
     for gas in GAS_FIELDS:
         risk = getattr(gas_data, f"{gas}_risk", None)
         value = getattr(gas_data, gas, None)
@@ -124,10 +125,14 @@ def trigger_gas_alarms(gas_data, ingress_ts: float | None = None) -> list[dict]:
                 _revoke(pending_task_id)
                 cache.delete(task_key)
 
-            # 이전에 경보 상태였으면 정상화 알림 발송
+            # 이전에 경보 상태였으면 정상화 대상으로 수집 (루프 후 1회 배치 발송)
             if get_state(state_key) in ("warning", "danger"):
-                fire_clear_notification_task.delay(sensor_id, source_label, gas)
+                cleared_gases.append(gas)
                 clear_state(state_key)
+
+    # 정상화된 가스가 있으면 1개 메시지로 묶어 발송 — 가스별 9개 팝업 방지
+    if cleared_gases:
+        fire_clear_notification_task.delay(sensor_id, source_label, cleared_gases)
 
     # WS 알람은 Celery 태스크가 직접 FastAPI에 푸시하므로 빈 리스트 반환
     return []
