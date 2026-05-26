@@ -70,14 +70,12 @@ def metrics_view(_request):
 
         base = os.path.dirname(os.environ["PROMETHEUS_MULTIPROC_DIR"])
 
-        # drf/celery 컨테이너는 각자 PID 1부터 시작해 같은 파일명이 생성된다.
-        # (예: 양쪽 모두 gauge_max_1.db)
-        # 두 MultiProcessCollector를 같은 registry에 등록하면 동일 메트릭이 중복 출력돼
-        # Prometheus가 첫번째 값만 취하는 버그가 발생한다.
-        # → 임시 디렉토리에 서브디렉토리별 PID 오프셋을 적용해 복사 후 단일 컬렉터로 합산.
-        #   drf: 오프셋 0 (파일명 그대로), celery: 오프셋 100000
-        #   컨테이너 PID는 65535 이하이므로 충돌 없음.
-        pid_offsets = {"drf": 0, "celery": 100_000}
+        # 이성현 수정 — Celery 큐 분리에 따라 합산 경로 업데이트
+        # celery 단일 워커 → celery-alarm / celery-metric 두 워커로 분리됨
+        # 각 워커의 메트릭 파일이 다른 서브디렉토리에 저장되므로 두 경로 모두 합산 필요
+        # PID 오프셋: drf=0, celery-alarm=100000, celery-metric=200000
+        # 컨테이너 PID는 65535 이하이므로 오프셋 100000 간격으로 충돌 없음
+        pid_offsets = {"drf": 0, "celery-alarm": 100_000, "celery-metric": 200_000}
         with tempfile.TemporaryDirectory() as tmpdir:
             for subdir, offset in pid_offsets.items():
                 subpath = os.path.join(base, subdir)
@@ -89,10 +87,18 @@ def metrics_view(_request):
                     # 파일명 끝 숫자(PID)에 오프셋을 더해 충돌 방지.
                     # 형식: {type}_{pid}.db 또는 {type}_{mode}_{pid}.db
                     stem, pid_str = fname[:-3].rsplit("_", 1)
-                    new_name = f"{stem}_{int(pid_str) + offset}.db" if pid_str.isdigit() else fname
-                    shutil.copy2(os.path.join(subpath, fname), os.path.join(tmpdir, new_name))
+                    new_name = (
+                        f"{stem}_{int(pid_str) + offset}.db"
+                        if pid_str.isdigit()
+                        else fname
+                    )
+                    shutil.copy2(
+                        os.path.join(subpath, fname), os.path.join(tmpdir, new_name)
+                    )
 
             registry = CollectorRegistry()
             MultiProcessCollector(registry, path=tmpdir)
-            return HttpResponse(generate_latest(registry), content_type=CONTENT_TYPE_LATEST)
+            return HttpResponse(
+                generate_latest(registry), content_type=CONTENT_TYPE_LATEST
+            )
     return HttpResponse(generate_latest(), content_type=CONTENT_TYPE_LATEST)
