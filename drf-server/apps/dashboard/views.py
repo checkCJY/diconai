@@ -623,16 +623,26 @@ class WorkerListAPIView(APIView):
             .order_by("name")
         )
 
-        worker_list = [
-            {
+        # CustomUser.department 프로퍼티는 내부에서 .filter()를 새로 호출하기 때문에
+        # 위에서 prefetch_related("dept_memberships__department")로 미리 가져온 데이터를
+        # 무시하고 작업자마다 DB 쿼리를 추가로 날린다 (N+1 문제).
+        # _primary_dept()는 prefetch 캐시(.all())를 직접 순회해 쿼리 없이 부서를 반환한다.
+        def _primary_dept(worker):
+            for m in worker.dept_memberships.all():
+                if m.is_primary:
+                    return m.department
+            return None
+
+        worker_list = []
+        for w in workers:
+            dept = _primary_dept(w)
+            worker_list.append({
                 "id": w.id,
                 "name": w.name or w.username,
-                "department": w.department.name if w.department else "-",
-                "department_id": w.department_id,
+                "department": dept.name if dept else "-",
+                "department_id": dept.id if dept else None,
                 "is_present": w.is_present,
-            }
-            for w in workers
-        ]
+            })
 
         # 부서 드롭다운용
         if request.user.user_type == "facility_admin":
