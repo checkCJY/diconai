@@ -350,7 +350,10 @@ LOGGING = {
         },
     },
     "root": {
-        "handlers": ["console", "applog_db", "file_error", "file_app"],
+        # file_app은 root에서 의도적으로 제외 — 모든 INFO가 잡히면 라이브러리 노이즈 폭증.
+        # app.log는 아래 화이트리스트 logger(매트릭스 §5)에만 명시 연결.
+        # file_error는 root 유지 — ERROR는 빈도 낮고 모르는 곳에서 터져도 흔적 남아야 안전.
+        "handlers": ["console", "applog_db", "file_error"],
         "level": LOG_LEVEL,
     },
     "loggers": {
@@ -358,6 +361,19 @@ LOGGING = {
         "django.request": {  # 4xx/5xx 응답 시 Django가 traceback을 남김
             "handlers": ["console", "file_error"],
             "level": "WARNING",
+            "propagate": False,
+        },
+        # ── app.log 화이트리스트 (매트릭스 §5) ──
+        # 외부 알림 발송 실패 + 알람 흐름 (apps.alerts.tasks 외).
+        "apps.alerts": {
+            "handlers": ["console", "file_app", "file_error"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        # Celery beat 트리거 (retention, ML 추론 스케줄 등).
+        "apps.operations.tasks": {
+            "handlers": ["console", "file_app", "file_error"],
+            "level": "INFO",
             "propagate": False,
         },
     },

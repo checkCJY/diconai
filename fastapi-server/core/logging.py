@@ -61,7 +61,10 @@ def build_logging_config(level: str = "INFO") -> dict:
             },
         },
         "root": {
-            "handlers": ["console", "file_error", "file_app"],
+            # file_app은 root에서 의도적으로 제외 — 모든 INFO가 잡히면 라이브러리 노이즈 폭증.
+            # app.log는 아래 화이트리스트 logger(매트릭스 §5)에만 명시 연결.
+            # file_error는 root 유지 — ERROR는 모르는 곳에서 터져도 흔적 남아야 안전.
+            "handlers": ["console", "file_error"],
             "level": level,
         },
         "loggers": {
@@ -77,6 +80,25 @@ def build_logging_config(level: str = "INFO") -> dict:
             "uvicorn.access": {
                 "handlers": ["console"],
                 "level": level,
+                "propagate": False,
+            },
+            # ── app.log 화이트리스트 (매트릭스 §5) ──
+            # Redis BRPOP timeout, WebSocket broadcast 실패, 알람 큐 처리.
+            "websocket": {
+                "handlers": ["console", "file_app", "file_error"],
+                "level": "INFO",
+                "propagate": False,
+            },
+            # IoT 가스 페이로드 파싱·검증 (gas.services.gas_service 등).
+            "gas.services": {
+                "handlers": ["console", "file_app", "file_error"],
+                "level": "INFO",
+                "propagate": False,
+            },
+            # IoT 전력 페이로드 파싱·AI 추론 (power.services.anomaly_inference 등).
+            "power.services": {
+                "handlers": ["console", "file_app", "file_error"],
+                "level": "INFO",
                 "propagate": False,
             },
         },
