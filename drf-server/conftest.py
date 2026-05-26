@@ -17,15 +17,31 @@ def use_dummy_cache(settings):
     }
 
 
-# 이성현 추가 — PG 시퀀스 리셋 (마이그레이션 시드 후 중복 키 충돌 방지)
-# 마이그레이션이 id=1로 데이터를 심으면 PG 시퀀스가 갱신되지 않아
-# 첫 테스트에서 id=1을 또 만들려다 충돌남. 시퀀스를 max(id)로 맞춰줌.
-@pytest.fixture(scope="session")
-def django_db_setup(django_db_setup, django_db_blocker):
+# 이성현 수정 — sqlsequencereset 커맨드 → conn.ops.sequence_reset_sql() 직접 호출로 교체
+# sqlsequencereset 커맨드는 output_transaction=True 설정으로 BEGIN;/COMMIT; 을 출력에 포함시킴.
+# split(";\n")으로 나눠서 실행하면 COMMIT 이 테스트 프레임워크의 트랜잭션을 깨뜨려
+# 전체 세션 오류로 이어짐. ops.sequence_reset_sql()은 SELECT setval(...)만 반환 — 안전함.
+@pytest.fixture(scope="session", autouse=True)
+def reset_sequences(django_db_setup, django_db_blocker):
     with django_db_blocker.unblock():
-        from django.core.management import call_command
+        from django.apps import apps as django_apps
+        from django.core.management.color import no_style
+        from django.db import connections
 
-        call_command("reset_pg_sequences")
+        conn = connections["default"]
+        stmts = []
+        for app_config in django_apps.get_app_configs():
+            stmts.extend(
+                conn.ops.sequence_reset_sql(no_style(), list(app_config.get_models()))
+            )
+
+        if stmts:
+            with conn.cursor() as cursor:
+                for stmt in stmts:
+                    try:
+                        cursor.execute(stmt)
+                    except Exception:
+                        pass
 
 
 @pytest.fixture
@@ -87,15 +103,3 @@ def worker_user(db):
         user_type="worker",
         name="회귀 작업자",
     )
-
-
-# 이성현 추가 — 테스트 중 Redis 의존 제거
-# CI 환경에서 Redis 없이도 테스트가 실행되도록 더미 캐시로 교체.
-# cache.clear() / cache.get() / cache.set() 호출은 모두 아무것도 안 하는 상태로 동작.
-@pytest.fixture(autouse=True)
-def use_dummy_cache(settings):
-    settings.CACHES = {
-        "default": {
-            "BACKEND": "django.core.cache.backends.dummy.DummyCache",
-        }
-    }
