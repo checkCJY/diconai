@@ -126,22 +126,20 @@ services:
       - "8001:8001"
     restart: unless-stopped
 
-  celery-worker:
+    # 이성현 수정 — Celery 큐 분리: alarm 전용 워커
+  # alarm 큐만 바라봄 (-Q alarm), 알람 태스크 지연 방지
+  celery-worker-alarm:
     image: diconai/drf:dev
-    user: "${UID:-1000}:${GID:-1000}"  # host UID 매핑 — drf 와 동일 이유
-    command: ["celery", "-A", "config", "worker", "-l", "info", "--concurrency=2"]
+    user: "${UID:-1000}:${GID:-1000}"
+    command: ["celery", "-A", "config", "worker", "-Q", "alarm", "-l", "info", "--concurrency=2"]
     env_file: ./.env.docker
     environment:
       REDIS_URL: redis://redis:6379/0
       FASTAPI_INTERNAL_URL: http://fastapi:8001
       RUN_MIGRATIONS: "0"
       COLLECT_STATIC: "0"
-      # drf 서비스와 별도 서브디렉토리 사용 — PID 충돌·상호 파일 삭제 방지 (→ drf 주석 참고).
-      # drf의 /metrics가 /app/prometheus_multiproc/drf + /app/prometheus_multiproc/celery 두 경로를 합산.
-      PROMETHEUS_MULTIPROC_DIR: /app/prometheus_multiproc/celery
+      PROMETHEUS_MULTIPROC_DIR: /app/prometheus_multiproc/celery-alarm
     volumes:
-      # 소스 핫리로드 — drf 서비스와 동일하게 호스트 코드를 마운트해야
-      # tasks.py 등 worker 코드 변경이 별도 빌드 없이 restart만으로 반영된다.
       - ./drf-server:/app
       - ./drf-server/db.sqlite3:/app/db.sqlite3
       - ./drf-server/media:/app/media
@@ -152,7 +150,52 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+            # 이성현 추가 — Celery 전용 healthcheck
+    # Dockerfile 기본값(HTTP 8000 포트)은 웹서버용이라 Celery에 적합하지 않음
+    # celery inspect ping 으로 워커 프로세스가 살아있는지 직접 확인
+    healthcheck:
+      test: ["CMD", "celery", "-A", "config", "inspect", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     restart: unless-stopped
+
+  # 이성현 수정 — Celery 큐 분리: metric 전용 워커
+  # metric 큐만 바라봄 (-Q metric), 주기적 메트릭 수집 담당
+  celery-worker-metric:
+    image: diconai/drf:dev
+    user: "${UID:-1000}:${GID:-1000}"
+    command: ["celery", "-A", "config", "worker", "-Q", "metric", "-l", "info", "--concurrency=1"]
+    env_file: ./.env.docker
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      FASTAPI_INTERNAL_URL: http://fastapi:8001
+      RUN_MIGRATIONS: "0"
+      COLLECT_STATIC: "0"
+      PROMETHEUS_MULTIPROC_DIR: /app/prometheus_multiproc/celery-metric
+    volumes:
+      - ./drf-server:/app
+      - ./drf-server/db.sqlite3:/app/db.sqlite3
+      - ./drf-server/media:/app/media
+    depends_on:
+      drf:
+        condition: service_healthy
+      fastapi:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+            # 이성현 추가 — Celery 전용 healthcheck
+    # Dockerfile 기본값(HTTP 8000 포트)은 웹서버용이라 Celery에 적합하지 않음
+    # celery inspect ping 으로 워커 프로세스가 살아있는지 직접 확인
+    healthcheck:
+      test: ["CMD", "celery", "-A", "config", "inspect", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
 
   celery-beat:
     image: diconai/drf:dev
@@ -170,6 +213,15 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+            # 이성현 추가 — Celery 전용 healthcheck
+    # Dockerfile 기본값(HTTP 8000 포트)은 웹서버용이라 Celery에 적합하지 않음
+    # celery inspect ping 으로 워커 프로세스가 살아있는지 직접 확인
+    healthcheck:
+      test: ["CMD", "celery", "-A", "config", "inspect", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     restart: unless-stopped
 
   prometheus:
