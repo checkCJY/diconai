@@ -19,7 +19,6 @@ from datetime import datetime, timedelta
 from django.db.models import Q
 from django.utils import timezone
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
-from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.core.models.system_log import SystemLog
@@ -47,6 +46,7 @@ def _parse_date(value: str):
 # ────────────────────────────────────────────
 # 1. 사용자 활동 로그 조회
 # ────────────────────────────────────────────
+
 
 class SystemLogAdminListView(APIView):
     """
@@ -94,8 +94,12 @@ class SystemLogAdminListView(APIView):
                 required=False,
                 description="description 검색 (부분 일치)",
             ),
-            OpenApiParameter(name="date_from", type=str, required=False, description="YYYY-MM-DD"),
-            OpenApiParameter(name="date_to", type=str, required=False, description="YYYY-MM-DD"),
+            OpenApiParameter(
+                name="date_from", type=str, required=False, description="YYYY-MM-DD"
+            ),
+            OpenApiParameter(
+                name="date_to", type=str, required=False, description="YYYY-MM-DD"
+            ),
             OpenApiParameter(name="page", type=int, required=False),
             OpenApiParameter(name="page_size", type=int, required=False),
         ],
@@ -171,6 +175,7 @@ class SystemLogAdminListView(APIView):
 # 2. 지도 편집 로그 조회
 # ────────────────────────────────────────────
 
+
 class MapEditLogAdminListView(APIView):
     """
     GET /api/admin/map-edit-logs/
@@ -186,8 +191,7 @@ class MapEditLogAdminListView(APIView):
 
     # MAP_ action_type 유효값 목록 — 필터 검증에 사용
     _MAP_ACTION_TYPES = [
-        a.value for a in SystemLog.ActionType
-        if a.value.startswith(_MAP_PREFIX)
+        a.value for a in SystemLog.ActionType if a.value.startswith(_MAP_PREFIX)
     ]
 
     @extend_schema(
@@ -220,8 +224,12 @@ class MapEditLogAdminListView(APIView):
                 required=False,
                 description="target_name 또는 description 검색 (부분 일치)",
             ),
-            OpenApiParameter(name="date_from", type=str, required=False, description="YYYY-MM-DD"),
-            OpenApiParameter(name="date_to", type=str, required=False, description="YYYY-MM-DD"),
+            OpenApiParameter(
+                name="date_from", type=str, required=False, description="YYYY-MM-DD"
+            ),
+            OpenApiParameter(
+                name="date_to", type=str, required=False, description="YYYY-MM-DD"
+            ),
             OpenApiParameter(name="page", type=int, required=False),
             OpenApiParameter(name="page_size", type=int, required=False),
         ],
