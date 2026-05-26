@@ -59,8 +59,12 @@ Thumbs.db
 .mypy_cache/
 .ruff_cache/
 
-# Logs
-*.log
+# Logs (RotatingFileHandler 회전 백업 + logs/ 디렉토리 통째로)
+# *.log* 패턴으로 error.log / error.log.1 / app.log.10 모두 차단.
+# 디렉토리도 명시해 "왜 추적 안 되는지" .gitignore만 보고 이해 가능.
+*.log*
+drf-server/logs/
+fastapi-server/logs/
 
 # Prometheus multiprocess metric files (런타임 생성 파일, 커밋 불필요)
 drf-server/prometheus_multiproc/
