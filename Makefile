@@ -26,8 +26,10 @@ RESET  := \033[0m
         health metrics targets clean prune \
         logs-drf logs-fastapi logs-celery logs-beat logs-all \
         logs-locks logs-timeouts logs-errors logs-ai logs-retention \
+        logs-err logs-err-fastapi logs-err-all logs-app logs-app-fastapi logs-stat \
         dummies-start dummies-stop dummies-list dummies-restart \
-        db-size db-pragma db-counts
+        db-size db-pragma db-counts \
+        scenario scenario-set scenario-reset scenario-clean demo-prep demo-check
 
 help:  ## 전체 명령어 + 자주 쓰는 시나리오 보기
 	@printf "\n  $(BOLD)📦 diconai Docker 단축 명령어$(RESET)\n"
@@ -45,8 +47,9 @@ help:  ## 전체 명령어 + 자주 쓰는 시나리오 보기
 	@printf "      make rebuild s=drf && make up        $(DIM)# Python 코드/requirements 바뀐 경우$(RESET)\n"
 	@printf "      make restart s=drf                   $(DIM)# 환경변수만 바뀐 경우$(RESET)\n\n"
 	@printf "    $(GREEN)로그 모니터링$(RESET)\n"
-	@printf "      make logs                            $(DIM)# 7개 서비스 전체$(RESET)\n"
-	@printf "      make logs s=fastapi                  $(DIM)# 한 서비스만$(RESET)\n\n"
+	@printf "      make logs                            $(DIM)# 7개 서비스 전체 (stdout, 휘발성)$(RESET)\n"
+	@printf "      make logs s=fastapi                  $(DIM)# 한 서비스만$(RESET)\n"
+	@printf "      make logs-err-all                    $(DIM)# 양 서버 ERROR 영속 파일 실시간 (시연·사고 추적 1순위)$(RESET)\n\n"
 	@printf "    $(GREEN)컨테이너 안에서 디버깅$(RESET)\n"
 	@printf "      make sh s=drf                        $(DIM)# /bin/sh 진입$(RESET)\n"
 	@printf "      make shell-drf                       $(DIM)# Django shell (ORM 조작 가능)$(RESET)\n"
@@ -112,6 +115,31 @@ logs-beat:    ## celery-beat 단독 (retention 등 주기 태스크 스케줄링
 
 logs-all:     ## drf + fastapi + celery 4개 통합 (요청→저장→알람 흐름 한 화면)
 	docker compose logs -f --tail=50 drf fastapi celery-worker celery-beat
+
+
+##@ 📁 파일 로그 (RotatingFileHandler — 영속·시연용)
+
+# 배경·결정 근거: skill/study/2026-05-26_파일_로깅_도입_배경.md
+# stdout(make logs)은 컨테이너 재시작 시 휘발. 영속 로그는 */logs/*.log 파일에서 본다.
+# error.log = ERROR 전용 (100MB × 10), app.log = INFO+ (50MB × 5). 자동 회전.
+
+logs-err:     ## drf-server/logs/error.log 실시간 (ERROR 전용)
+	tail -f drf-server/logs/error.log
+
+logs-err-fastapi: ## fastapi-server/logs/error.log 실시간
+	tail -f fastapi-server/logs/error.log
+
+logs-err-all: ## 양 서버 error.log 합쳐 보기 (시연·사고 추적 1순위)
+	tail -f drf-server/logs/error.log fastapi-server/logs/error.log
+
+logs-app:     ## drf-server/logs/app.log 실시간 (INFO+; retention·AI·임계치 변경)
+	tail -f drf-server/logs/app.log
+
+logs-app-fastapi: ## fastapi-server/logs/app.log 실시간 (IoT 페이로드 파싱 등)
+	tail -f fastapi-server/logs/app.log
+
+logs-stat:    ## 로그 파일 크기·회전 백업 현황 (운영 점검)
+	@ls -lh drf-server/logs/*.log* fastapi-server/logs/*.log* 2>/dev/null || echo "  (로그 파일 아직 없음 — 서버 기동 후 다시 확인)"
 
 
 ##@ 🔍 로그 필터 (이슈 추적·트러블슈팅)
@@ -314,6 +342,45 @@ db-pragma:        ## PRAGMA 설정 (busy_timeout/journal_mode 검증)
 
 db-counts:        ## 주요 테이블 row count + 시간 범위 (raw 비대화 추적)
 	@docker exec diconai-drf-1 python -c "$$_DB_COUNTS_PY"
+
+
+##@ 🎬 시연 시나리오 (가스 co_leak / 전력 overload 데모용)
+
+scenario:        ## 현재 시나리오 모드 조회
+	@curl -s http://localhost:8001/internal/scenario/mode | python3 -m json.tool
+
+scenario-set:    ## 시나리오 모드 변경. mode=co_leak|overload|normal|mixed 등
+	@if [ -z "$(mode)" ]; then \
+	  echo "❌ mode 인자 필요. 예: make scenario-set mode=co_leak"; exit 1; \
+	fi
+	@curl -s -X POST http://localhost:8001/internal/scenario/mode \
+	  -H 'Content-Type: application/json' -d '{"mode":"$(mode)"}' | python3 -m json.tool
+
+scenario-reset:  ## 시나리오 모드를 normal 로 복귀 (시연 안전 상태)
+	@$(MAKE) -s scenario-set mode=normal
+
+scenario-clean:  ## 알람 큐 + dedup/상태 키 일괄 정리 (리허설 사이 초기화)
+	@docker compose exec redis redis-cli DEL diconai:ws:alarms > /dev/null
+	@for pat in 'alarm:state:*' 'alarm:power:*' 'ai_fired:*' 'alarm:push:dedup:*'; do \
+	  docker compose exec redis redis-cli --scan --pattern "$$pat" | \
+	    xargs -r -I {} docker compose exec redis redis-cli DEL {} > /dev/null; \
+	done
+	@echo "✅ Redis 알람 관련 키 모두 정리됨"
+
+demo-prep:       ## 시연 직전 일괄 셋업 (mode=normal + Redis 키 정리)
+	@echo "🎬 시연 준비..."
+	@$(MAKE) -s scenario-set mode=normal
+	@$(MAKE) -s scenario-clean
+	@echo "✅ 시연 준비 완료 — 시연 트리거 예: make scenario-set mode=co_leak"
+
+demo-check:      ## 시연 환경 한방 점검 (현재 모드 + env + 큐 길이)
+	@echo "📊 현재 시연 환경:"
+	@printf "  • 모드: "
+	@$(MAKE) -s scenario
+	@printf "  • env: "
+	@docker compose exec fastapi printenv DUMMY_SEND_INTERVAL_SEC DUMMY_SCENARIO_MODE 2>&1 | tr '\n' ' '; echo
+	@printf "  • 알람 큐 길이: "
+	@docker compose exec redis redis-cli LLEN diconai:ws:alarms
 
 
 ##@ 🧹 정리
