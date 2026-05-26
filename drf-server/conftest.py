@@ -1,14 +1,31 @@
 """
 pytest 공통 fixture (Phase 1~4 회귀 테스트용).
-
-[scope 정책]
-- 마이그 시드 데이터(Threshold, RiskLevelStandard, HazardType, Menu, RoleProfile)는
-  마이그 적용 시점에 자동 시드되어 DB에 존재. 별도 fixture 불필요.
-- facility / gas_sensor / worker / power_device 등 도메인 인스턴스는 함수 단위 fixture.
-- pytest.mark.django_db는 각 테스트 함수가 명시.
 """
 
 import pytest
+
+
+# 이성현 수정 — DummyCache → LocMemCache로 교체
+# DummyCache는 완전한 가짜라 _cache 속성이 없어 test_ai_mute_guard.py 에서 오류 발생.
+# LocMemCache는 메모리 기반 실제 캐시 — Redis 없이도 get/set/delete 전부 동작.
+@pytest.fixture(autouse=True)
+def use_dummy_cache(settings):
+    settings.CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        }
+    }
+
+
+# 이성현 추가 — PG 시퀀스 리셋 (마이그레이션 시드 후 중복 키 충돌 방지)
+# 마이그레이션이 id=1로 데이터를 심으면 PG 시퀀스가 갱신되지 않아
+# 첫 테스트에서 id=1을 또 만들려다 충돌남. 시퀀스를 max(id)로 맞춰줌.
+@pytest.fixture(scope="session")
+def django_db_setup(django_db_setup, django_db_blocker):
+    with django_db_blocker.unblock():
+        from django.core.management import call_command
+
+        call_command("reset_pg_sequences")
 
 
 @pytest.fixture
