@@ -87,3 +87,15 @@ def worker_user(db):
         user_type="worker",
         name="회귀 작업자",
     )
+
+
+# 이성현 추가 — 테스트 중 Redis 의존 제거
+# CI 환경에서 Redis 없이도 테스트가 실행되도록 더미 캐시로 교체.
+# cache.clear() / cache.get() / cache.set() 호출은 모두 아무것도 안 하는 상태로 동작.
+@pytest.fixture(autouse=True)
+def use_dummy_cache(settings):
+    settings.CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.dummy.DummyCache",
+        }
+    }
