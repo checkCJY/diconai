@@ -152,11 +152,21 @@ class Event(BaseModel):
             models.Index(
                 fields=["facility", "-created_at"], name="idx_event_facility_time"
             ),
-            # 발생원별 활성 이벤트 조회 (병합 로직)
+            # 발생원별 활성 이벤트 조회 (병합 로직) — 3종 발생원 각각 인덱스
             models.Index(
                 fields=["source_sensor", "status"],
                 name="idx_event_source_sensor_status",
                 condition=models.Q(source_sensor__isnull=False),
+            ),
+            models.Index(
+                fields=["source_power_device", "status"],
+                name="idx_event_source_power_status",
+                condition=models.Q(source_power_device__isnull=False),
+            ),
+            models.Index(
+                fields=["source_geofence", "status"],
+                name="idx_event_source_geofence_status",
+                condition=models.Q(source_geofence__isnull=False),
             ),
         ]
 
