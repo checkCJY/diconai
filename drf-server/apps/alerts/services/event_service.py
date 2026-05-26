@@ -11,6 +11,21 @@ from apps.core.constants import EventStatus, RiskLevel
 
 RISK_LEVELS = ["normal", "warning", "danger"]
 
+
+def _notify_safe(event) -> None:
+    """notify_event_created를 안전하게 호출하는 래퍼.
+
+    on_commit 콜백으로 사용되므로 예외가 발생해도 알람 트랜잭션에 영향을 주지 않는다.
+    Notification 생성 실패는 알람 저장보다 중요도가 낮으므로 에러 로그만 남기고 계속 진행한다.
+    """
+    import logging
+    from apps.notifications.services.notification_service import notify_event_created
+    logger = logging.getLogger(__name__)
+    try:
+        notify_event_created(event)
+    except Exception as exc:
+        logger.error(f"[notify_event_created] event_id={event.id} 알림 생성 실패: {exc}")
+
 # 재푸시 cooldown 은 settings.ALARM_REPOPUP_COOLDOWN_SEC 에서 주입 (2026-05-15 알람 재설계).
 # 기존 RENOTIFY_COOLDOWN_MINUTES=1 상수에서 env 변수화 — 운영 60s / 시연 15s 로 분기 가능.
 # 가스/전력 dedup TTL (monitoring._CACHE_TTL) 과의 일관성은 운영 측에서 env 정렬로 유지.
@@ -101,10 +116,21 @@ def create_alarm_and_event(
             )
             active_event.last_detected_at = detected_at
             # 위험도 상승 시 Event risk_level 업데이트
+            # [M-12] 위험도 상승 이력을 EventLog 에 기록한다.
+            # 이유: WARNING → DANGER 천이는 중요한 상태 변화지만 기존 코드에서
+            # EventLog 가 남지 않아 사고 소급 분석 시 이 구간이 공백이었다.
             if RISK_LEVELS.index(risk_level) > RISK_LEVELS.index(
                 active_event.risk_level
             ):
+                prev_risk = active_event.risk_level
                 active_event.risk_level = risk_level
+                EventLog.objects.create(
+                    event=active_event,
+                    action=EventLog.Action.STATUS_CHANGED,
+                    previous_status=active_event.status,
+                    new_status=active_event.status,
+                    note=f"위험도 상승: {prev_risk} → {risk_level}",
+                )
 
             # 쿨다운 초과 시 재알림: last_notified_at 갱신 후 alarm 반환
             cooldown = timedelta(seconds=settings.ALARM_REPOPUP_COOLDOWN_SEC)
@@ -117,6 +143,11 @@ def create_alarm_and_event(
                 active_event.save(
                     update_fields=["last_detected_at", "risk_level", "last_notified_at"]
                 )
+                # [H-1 수정] 재알림 발송 시 Notification 생성.
+                # on_commit 사용 이유: 트랜잭션이 완전히 커밋된 후에 호출해야
+                # Notification이 아직 롤백될 수 있는 Event를 참조하는 상황을 막는다.
+                _event_ref = active_event
+                transaction.on_commit(lambda: _notify_safe(_event_ref))
                 return active_event, alarm  # 재알림 발송
 
             active_event.save(update_fields=["last_detected_at", "risk_level"])
@@ -172,6 +203,11 @@ def create_alarm_and_event(
             action=EventLog.Action.CREATED,
             new_status=EventStatus.ACTIVE,
         )
+        # [H-1 수정] 신규 Event 생성 시 Notification 생성.
+        # on_commit 사용 이유: 트랜잭션이 완전히 커밋된 후에 호출해야
+        # Notification이 아직 롤백될 수 있는 Event를 참조하는 상황을 막는다.
+        _event_ref = event
+        transaction.on_commit(lambda: _notify_safe(_event_ref))
         return event, alarm  # 새 Event는 Notification 발송
 
 

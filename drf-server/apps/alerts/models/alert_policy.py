@@ -74,6 +74,15 @@ class AlertPolicy(BaseModel):
         verbose_name="알림 메시지 템플릿",
         help_text="Django Template 문법. 빈 값이면 Event.summary 사용",
     )
+    recommended_actions = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="권고 조치",
+        help_text=(
+            "risk_level별 단계 리스트. "
+            '예: {"danger": [...], "warning": [...]} 또는 {"default": [...]}'
+        ),
+    )
     is_active = models.BooleanField(default=True)
     description = models.TextField(blank=True, default="")
 

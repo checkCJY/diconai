@@ -52,20 +52,24 @@ async def alarm_flush_loop():
     is_new_event 필터로 정상화 알림이 silent drop되었다. BRPOP은 큐에 원소가
     들어오는 순간 깨어나며 pop과 소비가 한 연산이라 race가 구조적으로 제거된다.
     페이로드 형식은 호환 모드 — `{"alarms": [payload], ...}` shape 유지로 프론트 무수정.
+
+    [M-1 수정] 클라이언트가 없는 상태에서 BRPOP으로 pop하면 알람이 영구 소실된다.
+    pop 전에 sensor_clients를 먼저 확인하고, 없으면 1초 대기 후 재시도한다.
+    timeout=1로 제한해 클라이언트 연결 직후 즉시 소비가 재개되도록 한다.
     """
     while True:
-        payload = await pop_alarm_blocking(timeout=0)
-        if payload is None:
-            # Redis 일시 장애 — 짧게 대기 후 재시도 (busy-loop 방지)
+        # [M-1] 클라이언트 없으면 pop 중단 — 큐에 알람을 보존한 채 대기
+        if not sensor_clients:
             await asyncio.sleep(1)
+            continue
+        payload = await pop_alarm_blocking(timeout=1)
+        if payload is None:
+            # timeout 만료(클라이언트 연결 상태 재확인) 또는 Redis 일시 장애
             continue
         ingress_ts = payload.pop("ingress_ts", None)
         if ingress_ts is not None:
             risk_level = payload.get("risk_level", "unknown")
             E2E_ALARM_LATENCY.labels(risk_level=risk_level).observe(time.time() - ingress_ts)
-        if not sensor_clients:
-            # 큐에서 pop했으나 연결된 클라 없음 → drop (의도, 큐에 다시 넣지 않음)
-            continue
         base = build_broadcast_payload(include_alarms=False)
         base["alarms"] = [payload]
         await _send_to_all(base)

@@ -40,7 +40,11 @@ class EventViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         qs = Event.objects.select_related(
-            "source_sensor", "source_power_device", "source_geofence", "worker"
+            "source_sensor",
+            "source_power_device",
+            "source_geofence",
+            "worker",
+            "policy",
         ).prefetch_related("alarms")
 
         # ?status=pending → active+acknowledged / in_progress / resolved

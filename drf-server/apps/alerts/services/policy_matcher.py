@@ -17,8 +17,32 @@ AlertPolicy를 찾아 Event.policy / Notification.policy FK를 채운다.
 목록 화면 캐시 컬럼. AlertPolicy 생성/수정 시 service 레이어에서 호출.
 """
 
+from django.core.cache import cache
+
 from apps.alerts.models import AlertPolicy
 from apps.core.constants import AlarmType
+
+# [H-6 수정] AlertPolicy는 관리자가 수동 변경하지 않는 한 항상 같은 값이다.
+# 알람이 발화될 때마다 DB를 조회하면 SQLite lock 경합이 심해지므로 5분간 캐시한다.
+# save_policy() 호출 시 캐시를 무효화해 즉시 반영되도록 한다.
+_POLICY_CACHE_TTL = 300  # 5분
+_POLICY_CACHE_KEY = "alert_policies:{event_type}"
+
+
+def _get_cached_policies(event_type: str) -> list[AlertPolicy]:
+    """event_type 기준 활성 AlertPolicy 목록을 캐시에서 읽고, 없으면 DB 조회 후 저장."""
+    cache_key = _POLICY_CACHE_KEY.format(event_type=event_type)
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+    policies = list(AlertPolicy.objects.filter(event_type=event_type, is_active=True))
+    cache.set(cache_key, policies, _POLICY_CACHE_TTL)
+    return policies
+
+
+def _invalidate_policy_cache(event_type: str) -> None:
+    """AlertPolicy 변경 시 해당 event_type 캐시를 즉시 무효화한다."""
+    cache.delete(_POLICY_CACHE_KEY.format(event_type=event_type))
 
 
 def match_policy(
@@ -33,9 +57,7 @@ def match_policy(
 
     가장 구체적 매칭(facility + 자산) 우선. 없으면 전사 정책 fallback.
     """
-    qs = AlertPolicy.objects.filter(event_type=event_type, is_active=True)
-
-    candidates = list(qs)
+    candidates = _get_cached_policies(event_type)
     if not candidates:
         return None
 
@@ -101,17 +123,25 @@ def _score_match(
     return facility_score + asset_score
 
 
-def compute_condition_summary(policy: AlertPolicy) -> str:
-    """
-    AlertPolicy의 조건을 한 줄 문자열로 요약 — 목록 화면 캐시용.
+_CHANNEL_LABELS = {
+    "popup": "관제 실시간 알림",
+    "push": "앱 푸시",
+    "sms": "SMS",
+    "email": "이메일",
+}
 
-    형식: "<event_type 라벨> | <facility 라벨> | <자산 요약> | <채널>"
+
+def compute_condition_summary(policy: AlertPolicy) -> str:
+    """AlertPolicy 조건을 운영자 친화 한글 1줄로 요약 — 목록 화면 캐시용.
+
+    형식: "<범위> / <이벤트> / <채널>"
+    예:
+        "전사 / 가스 경보 / 관제 실시간 알림"
+        "공장 A 송풍기 1개 / 가스 경보 / 관제 실시간 알림·SMS"
     """
     event_label = dict(AlarmType.choices).get(policy.event_type, policy.event_type)
-    facility_label = (
-        policy.target_facility.name if policy.target_facility_id else "전사"
-    )
 
+    scope = policy.target_facility.name if policy.target_facility_id else "전사"
     asset_parts = []
     if policy.target_sensor_ids:
         asset_parts.append(f"센서 {len(policy.target_sensor_ids)}개")
@@ -119,11 +149,13 @@ def compute_condition_summary(policy: AlertPolicy) -> str:
         asset_parts.append(f"전력장치 {len(policy.target_device_ids)}개")
     if policy.target_geofence_ids:
         asset_parts.append(f"위험구역 {len(policy.target_geofence_ids)}개")
-    asset_label = ", ".join(asset_parts) if asset_parts else "자산 무관"
+    if asset_parts:
+        scope = f"{scope} {', '.join(asset_parts)}"
 
-    channel_label = ", ".join(policy.channels) if policy.channels else "채널 미지정"
+    channels = [_CHANNEL_LABELS.get(c, c) for c in (policy.channels or [])]
+    channel_text = "·".join(channels) if channels else "발송 채널 미지정"
 
-    return f"{event_label} | {facility_label} | {asset_label} | {channel_label}"
+    return f"{scope} / {event_label} / {channel_text}"
 
 
 def save_policy(policy: AlertPolicy) -> AlertPolicy:
@@ -131,7 +163,9 @@ def save_policy(policy: AlertPolicy) -> AlertPolicy:
     AlertPolicy 저장 + condition_summary 자동 갱신 (service 진입점).
 
     view에서 model.save() 직접 호출 대신 본 함수 사용 권장 — condition_summary 동기화 보장.
+    저장 후 해당 event_type 캐시를 무효화해 다음 알람부터 변경사항이 즉시 반영된다.
     """
     policy.condition_summary = compute_condition_summary(policy)
     policy.save()
+    _invalidate_policy_cache(policy.event_type)
     return policy

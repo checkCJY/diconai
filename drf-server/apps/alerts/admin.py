@@ -48,6 +48,19 @@ class AlertPolicyAdmin(admin.ModelAdmin):
     search_fields = ("name", "description", "condition_summary")
     list_select_related = ("target_facility",)
 
+    def save_model(self, request, obj, form, change):
+        # admin 직접 저장 시에도 condition_summary 갱신 + 캐시 무효화를 보장하기 위해
+        # model.save() 대신 save_policy()를 사용한다.
+        from apps.alerts.services.policy_matcher import save_policy
+        save_policy(obj)
+
+    def delete_model(self, request, obj):
+        # 삭제 전 event_type을 저장해두고 삭제 후 캐시를 무효화한다.
+        from apps.alerts.services.policy_matcher import _invalidate_policy_cache
+        event_type = obj.event_type
+        super().delete_model(request, obj)
+        _invalidate_policy_cache(event_type)
+
 
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):

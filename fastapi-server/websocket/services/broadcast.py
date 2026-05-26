@@ -25,8 +25,8 @@ _prev_total_kw: float | None = None
 
 # 가스 페이로드 키 — stale 시 null 로 채워 프론트가 key 부재로 깨지지 않게 한다.
 # gas/services/gas_service.py 의 gas_snapshot 빌더와 키 목록이 1:1 로 일치해야 한다.
-# 가스 필드 추가/제거 시 두 곳 동시 업데이트.
-_GAS_VALUE_KEYS = ("co", "h2s", "co2", "o2", "no2", "so2", "o3", "nh3", "voc")
+# [M-4] 필드 추가·제거 시 gas/constants.py 한 곳만 수정하면 된다.
+from gas.constants import GAS_FIELDS as _GAS_VALUE_KEYS  # noqa: E402
 _GAS_RISK_KEYS = tuple(f"{g}_risk" for g in _GAS_VALUE_KEYS)
 _GAS_NULL_PAYLOAD = {k: None for k in _GAS_VALUE_KEYS + _GAS_RISK_KEYS}
 

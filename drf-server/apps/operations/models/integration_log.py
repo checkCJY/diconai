@@ -1,12 +1,24 @@
 from django.db import models
 
 
+class _IntegrationLogQuerySet(models.QuerySet):
+    def delete(self, *args, **kwargs):
+        # QuerySet.delete()는 model.delete()를 우회하므로 별도로 차단한다.
+        # 보관 정책 배치(data_retention_task)는 _retention_delete()를 사용.
+        raise ValueError("IntegrationLog는 삭제할 수 없습니다. 보관 정책은 DataRetentionPolicy를 사용하세요.")
+
+    def _retention_delete(self):
+        """데이터 보관 정책 배치 전용 삭제 메서드. 일반 코드에서 직접 호출 금지."""
+        return super().delete()
+
+
 class IntegrationLog(models.Model):
     """
     연동 로그 — 시스템 간 호출 영속화 (FastAPI ↔ DRF, 외부 SMS/이메일 API 등)
 
     [APPEND-ONLY]
     SystemLog/AppLog와 동일 패턴.
+    QuerySet.delete()도 차단 — _IntegrationLogQuerySet 참고.
 
     [Phase 2 시점]
     fire-and-forget 시작. raise_on_error=False로 본 흐름 비차단.
@@ -40,6 +52,8 @@ class IntegrationLog(models.Model):
     description = models.TextField(blank=True, default="")
     extra = models.JSONField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = _IntegrationLogQuerySet.as_manager()
 
     def save(self, *args, **kwargs):
         if self.pk is not None:

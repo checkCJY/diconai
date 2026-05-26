@@ -138,8 +138,16 @@ def _delete_for_policy(policy, dry_run: bool = False) -> int:
         qs = PowerData.objects.filter(measured_at__lt=raw_cutoff)
 
     elif category == "power_agg":
-        # 집계/이력 목적으로 더 오래 보관하는 전력 데이터. history_cutoff 기준.
-        qs = PowerData.objects.filter(measured_at__lt=history_cutoff)
+        # [H-4 수정] power_agg는 전력 집계 전용 모델(PowerDataAgg)이 신설되면 적용 예정.
+        # 기존 코드는 power_raw와 동일한 PowerData 테이블을 history_cutoff로 삭제해서
+        # power_raw가 지워야 할 데이터를 power_agg가 다시 건드리는 구조였음.
+        # gas_hourly/power_hourly와 동일하게 모델 준비 전까지 skip 처리.
+        logger.info(
+            "[retention] action=skip_no_model policy_id=%s category=%s",
+            policy.id,
+            category,
+        )
+        return 0
 
     elif category == "position_hist":
         # 작업자 위치 이력. 탈퇴 작업자 행도 worker=NULL 상태로 존재할 수 있음 —
@@ -252,7 +260,12 @@ def _delete_for_policy(policy, dry_run: bool = False) -> int:
         )
         return count
 
-    deleted, _ = qs.delete()
+    # app_log / integration_log는 QuerySet.delete()가 차단되어 있다 (APPEND-ONLY 보호).
+    # 보관 정책 배치만 _retention_delete()로 우회 삭제한다.
+    if category in ("app_log", "integration_log"):
+        deleted, _ = qs._retention_delete()
+    else:
+        deleted, _ = qs.delete()
     logger.info(
         "[retention] action=deleted policy_id=%s category=%s deleted=%s",
         policy.id,
@@ -262,8 +275,8 @@ def _delete_for_policy(policy, dry_run: bool = False) -> int:
     return deleted
 
 
-@shared_task
-def run_data_retention(dry_run: bool = False) -> dict:
+@shared_task(bind=True, max_retries=3, default_retry_delay=300)
+def run_data_retention(self, dry_run: bool = False) -> dict:
     """
     Celery 진입점 — 활성 DataRetentionPolicy 모두 순회.
 
@@ -291,6 +304,9 @@ def run_data_retention(dry_run: bool = False) -> dict:
                 policy.id,
                 exc,
             )
+            # 새벽 배치가 DB 일시 잠금 등 일시적 오류로 실패하면 5분 후 재시도.
+            # 삭제는 멱등(이미 없는 row 재삭제 = 0건) — 재시도 시 중복 실행 안전.
+            raise self.retry(exc=exc)
 
     logger.info(
         "[retention] action=run_complete dry_run=%s policies_run=%s",

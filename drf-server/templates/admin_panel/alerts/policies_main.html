@@ -1,0 +1,113 @@
+{% extends 'admin_panel/base.html' %}
+{% load static %}
+
+{% block title %}알림 정책 관리{% endblock %}
+
+{% block content %}
+<!-- 페이지 헤더 -->
+<section class="page-header">
+    <div class="header-titles">
+        <div class="breadcrumb">알림/이벤트 관리 &gt; 알림 정책 관리</div>
+        <h2 class="page-title">알림 정책 관리</h2>
+        <p class="page-desc">알림 정책의 발송 조건과 수신 대상을 관리합니다.</p>
+    </div>
+    <button class="btn-primary" id="btnAddPolicy">정책 등록</button>
+</section>
+
+<!-- 검색 필터 -->
+<section class="filter-card">
+    <div class="filter-inputs">
+        <div class="input-group">
+            <label>정책명</label>
+            <input type="text" id="filterName" placeholder="정책명 검색">
+        </div>
+        <div class="input-group">
+            <label>이벤트 상세</label>
+            <select id="filterEventType">
+                <option value="">전체</option>
+                {% for at in alarm_types %}
+                <option value="{{ at.value }}">{{ at.label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="input-group">
+            <label>사용 여부</label>
+            <select id="filterActive">
+                <option value="">전체</option>
+                <option value="true">사용</option>
+                <option value="false">미사용</option>
+            </select>
+        </div>
+    </div>
+    <div class="filter-actions">
+        <button class="btn-outline" id="btnReset">초기화</button>
+        <button class="btn-dark" id="btnSearch">검색</button>
+    </div>
+</section>
+
+<!-- 정책 목록 테이블 -->
+<section class="table-card">
+    <div class="table-toolbar">
+        <div class="toolbar-left">
+            <span class="total-count">전체 <strong id="totalCount">0</strong>건</span>
+            <span class="toolbar-desc">이벤트 상세 기준으로 등록된 알림 정책을 조회할 수 있습니다.</span>
+            <button class="btn-danger" id="btnDelete" disabled>삭제</button>
+        </div>
+        <div class="toolbar-right">
+            <select class="sort-select" id="sortSelect">
+                <option value="updated_desc">최근 수정일 최신순</option>
+                <option value="updated_asc">최근 수정일 오래된순</option>
+                <option value="name_asc">정책명 가나다순</option>
+                <option value="name_desc">정책명 역순</option>
+                <option value="event_asc">이벤트 상세 가나다순</option>
+                <option value="event_desc">이벤트 상세 역순</option>
+                <option value="active_first">사용 여부 사용 우선</option>
+                <option value="inactive_first">사용 여부 미사용 우선</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th><input type="checkbox" id="checkAll"></th>
+                    <th>정책명</th>
+                    <th>이벤트 상세</th>
+                    <th>발송 채널</th>
+                    <th>수신 대상</th>
+                    <th>사용 여부</th>
+                    <th>적용 조건 요약</th>
+                </tr>
+            </thead>
+            <tbody id="policiesTableBody">
+                <tr>
+                    <td colspan="7" class="empty-state">데이터를 불러오는 중...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="table-footer">
+        <span class="page-info" id="pageInfo">0 - 0 / 0</span>
+        <div class="pagination" id="pagination"></div>
+    </div>
+</section>
+
+{% include 'admin_panel/alerts/_modal_form.html' %}
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/admin/alert_policy.css' %}">
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // alarm_type → 한글 라벨 매핑. JS 가 모달의 권고 조치 탭 분기에 사용.
+  window.ALARM_TYPE_LABELS = {
+    {% for at in alarm_types %}'{{ at.value }}': '{{ at.label }}'{% if not forloop.last %},{% endif %}{% endfor %}
+  };
+</script>
+<script src="{% static 'js/admin/alerts/policy_modal.js' %}"></script>
+<script src="{% static 'js/admin/alerts/policies.js' %}"></script>
+{% endblock %}
