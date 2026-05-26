@@ -92,6 +92,19 @@ services:
       - --reload
       - --access-logfile=-
       - --config=/app/gunicorn.conf.py
+    # healthcheck 를 추가하는 이유:
+    # fastapi 와 celery-worker 가 `condition: service_healthy` 로 drf 에 의존한다.
+    # healthcheck 가 없으면 Docker 는 컨테이너가 시작됐을 때 즉시 healthy 로 간주하지 않고
+    # "no healthcheck" 상태로 두어 의존 서비스 시작 순서가 불안정해진다.
+    # /health/ 엔드포인트(config/urls.py)가 200 을 반환하면 DB 연결까지 완료된 것이므로
+    # 이 시점 이후 fastapi/celery 가 drf API 를 안전하게 호출할 수 있다.
+    # start_period: 30s — 마이그레이션 + gunicorn 기동 시간 확보.
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     depends_on:
       redis:
         condition: service_healthy
@@ -117,6 +130,18 @@ services:
       # IF 모델 .pkl 공유 (read-only) — drf 가 학습 → fastapi 가 추론.
       # host: ./drf-server/ml_models/  →  fastapi: /app/ml_models/ (Settings.ML_MODELS_DIR)
       - ./drf-server/ml_models:/app/ml_models:ro
+    # healthcheck 를 추가하는 이유:
+    # celery-worker 가 `condition: service_healthy` 로 fastapi 에 의존한다.
+    # fastapi 가 완전히 뜨기 전에 celery-worker 가 /internal/alarms/push/ 를 호출하면
+    # 연결 실패 → 알람 미전달이 발생할 수 있다.
+    # /health/ 엔드포인트(app.py)가 200 을 반환하면 라우터·Redis 연결이 완료된 상태.
+    # start_period: 30s — ML 모델 로드(joblib) 시간 확보.
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     depends_on:
       drf:
         condition: service_healthy
@@ -222,6 +247,17 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+    restart: unless-stopped
+
+  redis_exporter:
+    image: oliver006/redis_exporter:v1.62.0-alpine
+    environment:
+      REDIS_ADDR: redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "9121:9121"
     restart: unless-stopped
 
   prometheus:
