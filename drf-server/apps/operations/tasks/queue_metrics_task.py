@@ -43,7 +43,9 @@ def record_celery_queue_length():
         # 모니터링 대상 큐 목록.
         # 현재는 기본 큐("celery") 하나만 사용 중.
         # 도메인별 전용 큐를 만들면 여기에 추가한다 (예: "alarm", "position").
-        queues = ["celery"]
+
+        # 이성현 수정 — Celery 큐 분리에 따라 모니터링 대상 큐 업데이트
+        queues = ["alarm", "metric"]
 
         for queue_name in queues:
             length = r.llen(queue_name)

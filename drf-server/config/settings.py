@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import logging as _logging
 import environ
 from datetime import timedelta
 from pathlib import Path
@@ -212,8 +213,6 @@ SIMPLE_JWT = {
 }
 
 # [L-1] JWT_SIGNING_KEY 미설정 경고 — 운영 배포 전 반드시 env 에 독립된 값 주입 필요.
-import logging as _logging  # noqa: E402
-
 if not env("JWT_SIGNING_KEY", default=""):
     _logging.getLogger(__name__).warning(
         "[security] JWT_SIGNING_KEY 미설정 — DJANGO_SECRET_KEY 로 폴백 중. "
@@ -397,6 +396,15 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_TRACK_STARTED = True
+
+# 이성현 추가 — Celery 큐 분리: alarm(알람) / metric(메트릭 수집)
+# alerts 태스크는 실시간 알람 발송이라 지연 불가 → alarm 전용 큐
+# operations 태스크는 주기적 수집이라 느려도 무방 → metric 전용 큐
+CELERY_TASK_ROUTES = {
+    "apps.alerts.tasks.*": {"queue": "alarm"},
+    "apps.operations.tasks.*": {"queue": "metric"},
+}
+
 
 # Phase 4-g: DataRetentionPolicy 보관 배치 — 매일 새벽 3시 실행
 # is_cycle_due()가 정책별 delete_cycle 판정 (DAILY/MONTHLY_*/QUARTERLY)
