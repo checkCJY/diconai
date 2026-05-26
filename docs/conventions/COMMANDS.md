@@ -80,35 +80,107 @@ docker compose exec drf python manage.py shell    # Django shell
 
 ## ⚡ Makefile 단축
 
-`make help`로 전체 타깃 자동 노출. 서비스명 인자: `make logs s=drf`.
+`make help`로 전체 타깃 + 자주 쓰는 시나리오 자동 노출. 서비스명 인자: `make logs s=drf`.
+
+### 🐳 빌드 / 기동
 
 | 타깃 | 동작 | 인자 |
 |---|---|---|
-| `make help` | 전체 타깃 출력 | — |
+| `make help` | 전체 타깃 + 시나리오 출력 | — |
 | `make up` | 7-서비스 전체 기동 (백그라운드) | — |
 | `make down` | 컨테이너 제거 (볼륨 유지) | — |
 | `make start` | 정지된 컨테이너 재기동 | `s=` |
 | `make stop` | 컨테이너 정지 | `s=` |
-| `make restart` | 재기동 (전체 또는 한 개) | `s=` |
+| `make restart` | 재기동 | `s=` |
 | `make ps` | 서비스 상태 | — |
 | `make build` | 이미지 빌드 (캐시 사용) | `s=` |
 | `make rebuild` | 이미지 빌드 (캐시 무시) | `s=` |
-| `make logs` | 로그 실시간 (전체 또는 한 개) | `s=` |
+
+### 📋 서비스별 로그 (stdout — 휘발성)
+
+| 타깃 | 동작 | 인자 |
+|---|---|---|
+| `make logs` | 전체 또는 한 서비스 stdout | `s=` |
+| `make logs-drf` | drf 단독 (gunicorn + Django) | — |
+| `make logs-fastapi` | fastapi 단독 (uvicorn + IoT + WS) | — |
+| `make logs-celery` | celery-worker 단독 | — |
+| `make logs-beat` | celery-beat 단독 | — |
+| `make logs-all` | drf + fastapi + celery 4개 통합 | — |
+
+### 📁 파일 로그 (영속 — RotatingFileHandler)
+
+> 배경·결정 근거: [skill/study/2026-05-26_파일_로깅_도입_배경.md](../../skill/study/2026-05-26_파일_로깅_도입_배경.md)
+
+| 타깃 | 동작 | 인자 |
+|---|---|---|
+| `make logs-err` | drf error.log 실시간 (ERROR 전용) | — |
+| `make logs-err-fastapi` | fastapi error.log 실시간 | — |
+| `make logs-err-all` | **양 서버 error.log 합쳐 보기 — 시연·사고 추적 1순위** | — |
+| `make logs-app` | drf app.log 실시간 (INFO+; retention·AI·임계치 변경) | — |
+| `make logs-app-fastapi` | fastapi app.log 실시간 (IoT 페이로드 파싱 등) | — |
+| `make logs-stat` | 파일 크기·회전 백업 현황 (운영 점검) | — |
+
+### 🔍 로그 필터 (이슈 추적·트러블슈팅)
+
+| 타깃 | 동작 | 인자 |
+|---|---|---|
+| `make logs-locks` | celery `database is locked` 감시 | — |
+| `make logs-timeouts` | fastapi `action=timeout` 감시 | — |
+| `make logs-errors` | DRF 4xx/5xx + ERROR + Forbidden 감시 | — |
+| `make logs-ai` | AI 추론 로그 (`anomaly_inference`) 감시 | — |
+| `make logs-retention` | retention task 발사·실행 로그 | — |
+
+### 🐚 컨테이너 안 실행
+
+| 타깃 | 동작 | 인자 |
+|---|---|---|
 | `make sh` | 컨테이너 쉘 진입 | `s=` 필수 |
 | `make exec` | 임의 명령 실행 | `s= cmd="..."` |
-| `make test` | drf + fastapi 테스트 일괄 | — |
+| `make test` | drf + fastapi pytest 일괄 | — |
 | `make test-drf` | drf만 | — |
 | `make test-fastapi` | fastapi만 | — |
+| `make shell-drf` | Django shell 진입 | — |
+
+### 🗄 Django DB 작업
+
+| 타깃 | 동작 | 인자 |
+|---|---|---|
 | `make migrate` | `manage.py migrate` | — |
+| `make showmigrations` | 마이그레이션 적용 상태 | — |
 | `make super` | 슈퍼유저 생성 (대화형) | — |
 | `make seed` | 더미 데이터 시드 | — |
-| `make showmigrations` | 마이그레이션 적용 상태 | — |
-| `make shell-drf` | Django shell 진입 | — |
-| `make health` | 양 서버 헬스체크 (curl) | — |
-| `make metrics` | /metrics 샘플 5줄씩 | — |
+
+### ✅ 정상 동작 검증
+
+| 타깃 | 동작 | 인자 |
+|---|---|---|
+| `make health` | 양 서버 `/health/` 호출 | — |
+| `make metrics` | `/metrics` 샘플 5줄씩 | — |
 | `make targets` | Prometheus targets 상태 | — |
-| `make clean` | `down -v` (데이터 삭제 주의) | — |
-| `make prune` | 댕글링 이미지/볼륨 정리 (전역, 주의) | — |
+
+### 🎭 더미 송출 (개발·시연 부하)
+
+| 타깃 | 동작 | 인자 |
+|---|---|---|
+| `make dummies-start` | 더미 시작 (미지정 시 gas/power/position 3종 전체) | `s=gas\|power\|position` |
+| `make dummies-stop` | 더미 정상 종료 (SIGINT) | `s=` |
+| `make dummies-list` | 실행 중 더미 프로세스 확인 | — |
+| `make dummies-restart` | 더미 재기동 (stop → 2초 → start) | `s=` |
+
+### 💾 DB 상태 진단
+
+| 타깃 | 동작 | 인자 |
+|---|---|---|
+| `make db-size` | DB 파일 + WAL/SHM 크기 (12GB 비대화 감지) | — |
+| `make db-pragma` | PRAGMA 설정 (`busy_timeout`/`journal_mode`) | — |
+| `make db-counts` | 주요 테이블 row count + 시간 범위 | — |
+
+### 🧹 정리
+
+| 타깃 | 동작 | 인자 |
+|---|---|---|
+| `make clean` | `down -v` ⚠️ Redis/Prometheus/Grafana 데이터 삭제 | — |
+| `make prune` | 댕글링 이미지/볼륨 정리 ⚠️ 전역 | — |
 
 ---
 
@@ -142,6 +214,24 @@ for i in {1..50}; do
   sleep 0.2
 done
 ```
+
+---
+
+## 📁 파일 로그 보기 (RotatingFileHandler)
+
+`make logs`(stdout)는 컨테이너 재시작 시 휘발. 영속 로그는 `*/logs/*.log` 파일에서 본다.
+
+| 시나리오 | 명령 |
+|---|---|
+| **시연 중 에러 즉시 확인 (1순위)** | `make logs-err-all` |
+| 특정 알람만 추적 | `tail -f drf-server/logs/error.log \| grep alarm` |
+| IoT 페이로드 파싱 실패 원본 | `tail -f fastapi-server/logs/app.log \| grep parse_fail` |
+| Celery beat 09:30 retention 동작 여부 | `grep "retention" drf-server/logs/app.log \| tail` |
+| 로그 회전 동작 확인 | `make logs-stat` |
+| 시연 직전 로그 초기화 | `: > drf-server/logs/error.log && : > fastapi-server/logs/error.log` |
+
+> **정책**: `error.log` = ERROR 전용 (100MB × 10 = 1GB 캡), `app.log` = INFO+ (50MB × 5 = 250MB 캡). 두 파일 모두 자동 회전.
+> 배경·결정 근거: [skill/study/2026-05-26_파일_로깅_도입_배경.md](../../skill/study/2026-05-26_파일_로깅_도입_배경.md)
 
 ---
 
