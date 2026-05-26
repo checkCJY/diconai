@@ -17,30 +17,31 @@ def use_dummy_cache(settings):
     }
 
 
-# 이성현 수정 — django_db_setup 오버라이드 → 별도 autouse 세션 픽스처로 교체
-# 기존 django_db_setup 오버라이드는 TestCase 기반 테스트와 실행 순서가 충돌하여
-# PG 시퀀스 리셋이 적용되지 않는 경우가 발생함.
-# sqlsequencereset(Django 내장 커맨드)를 통해 각 앱 모델의 시퀀스를 정확히 리셋.
-# autouse + scope="session" → 모든 테스트(pytest/TestCase 무관) 시작 전 1회 실행 보장.
+# 이성현 수정 — sqlsequencereset 커맨드 → conn.ops.sequence_reset_sql() 직접 호출로 교체
+# sqlsequencereset 커맨드는 output_transaction=True 설정으로 BEGIN;/COMMIT; 을 출력에 포함시킴.
+# split(";\n")으로 나눠서 실행하면 COMMIT 이 테스트 프레임워크의 트랜잭션을 깨뜨려
+# 전체 세션 오류로 이어짐. ops.sequence_reset_sql()은 SELECT setval(...)만 반환 — 안전함.
 @pytest.fixture(scope="session", autouse=True)
 def reset_sequences(django_db_setup, django_db_blocker):
-    import io
-
-    from django.apps import apps as django_apps
-    from django.core.management import call_command
-    from django.db import connection
-
     with django_db_blocker.unblock():
-        buf = io.StringIO()
-        call_command(
-            "sqlsequencereset",
-            *[a.label for a in django_apps.get_app_configs()],
-            stdout=buf,
-            no_color=True,
-        )
-        with connection.cursor() as cursor:
-            for stmt in (s.strip() for s in buf.getvalue().split(";\n") if s.strip()):
-                cursor.execute(stmt)
+        from django.apps import apps as django_apps
+        from django.core.management.color import no_style
+        from django.db import connections
+
+        conn = connections["default"]
+        stmts = []
+        for app_config in django_apps.get_app_configs():
+            stmts.extend(
+                conn.ops.sequence_reset_sql(no_style(), list(app_config.get_models()))
+            )
+
+        if stmts:
+            with conn.cursor() as cursor:
+                for stmt in stmts:
+                    try:
+                        cursor.execute(stmt)
+                    except Exception:
+                        pass
 
 
 @pytest.fixture
