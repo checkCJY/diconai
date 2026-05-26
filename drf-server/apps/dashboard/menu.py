@@ -17,6 +17,8 @@ Menu / RoleMenuVisibility post_save / post_delete signal에서 모든 role 캐�
 
 from django.core.cache import cache
 
+from apps.core.metrics import CACHE_HIT_TOTAL, CACHE_MISS_TOTAL
+
 _CACHE_PREFIX = "menu_tree"
 _CACHE_TTL = 300  # 5분
 
@@ -41,8 +43,9 @@ def get_menu_tree(role: str) -> list:
     """
     cached = cache.get(_cache_key(role))
     if cached is not None:
+        CACHE_HIT_TOTAL.labels(prefix="menu_tree").inc()
         return cached
-
+    CACHE_MISS_TOTAL.labels(prefix="menu_tree").inc()
     tree = _build_menu_tree(role)
     cache.set(_cache_key(role), tree, _CACHE_TTL)
     return tree

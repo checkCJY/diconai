@@ -172,6 +172,17 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  redis_exporter:
+    image: oliver006/redis_exporter:v1.62.0-alpine
+    environment:
+      REDIS_ADDR: redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "9121:9121"
+    restart: unless-stopped
+
   prometheus:
     image: prom/prometheus:v2.55.1
     command:

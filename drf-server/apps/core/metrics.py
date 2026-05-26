@@ -217,3 +217,23 @@ CELERY_TASK_RETRIED_TOTAL = Counter(
     "Celery task retry count (re-enqueued after failure)",
     ["task_name"],
 )
+
+# ── 캐시 hit/miss 메트릭 ──────────────────────────────────────────────────────
+# cache.get() 결과가 None(miss)인지 아닌지(hit)를 prefix 라벨로 구분해 카운트한다.
+# hit / (hit + miss) 로 캐시 효율을 Grafana에서 정량적으로 확인한다.
+#
+# 레이블:
+#   prefix : 캐시 키 그룹 이름
+#             "alert_policies" — AlertPolicy 조회 (알람 발화마다 호출)
+#             "menu_tree"      — 대시보드 메뉴 트리 (페이지 로드마다 호출)
+CACHE_HIT_TOTAL = Counter(
+    "cache_hit_total",
+    "Cache hits by key prefix",
+    ["prefix"],
+)
+
+CACHE_MISS_TOTAL = Counter(
+    "cache_miss_total",
+    "Cache misses by key prefix",
+    ["prefix"],
+)

@@ -21,6 +21,7 @@ from django.core.cache import cache
 
 from apps.alerts.models import AlertPolicy
 from apps.core.constants import AlarmType
+from apps.core.metrics import CACHE_HIT_TOTAL, CACHE_MISS_TOTAL
 
 # [H-6 수정] AlertPolicy는 관리자가 수동 변경하지 않는 한 항상 같은 값이다.
 # 알람이 발화될 때마다 DB를 조회하면 SQLite lock 경합이 심해지므로 5분간 캐시한다.
@@ -34,7 +35,9 @@ def _get_cached_policies(event_type: str) -> list[AlertPolicy]:
     cache_key = _POLICY_CACHE_KEY.format(event_type=event_type)
     cached = cache.get(cache_key)
     if cached is not None:
+        CACHE_HIT_TOTAL.labels(prefix="alert_policies").inc()
         return cached
+    CACHE_MISS_TOTAL.labels(prefix="alert_policies").inc()
     policies = list(AlertPolicy.objects.filter(event_type=event_type, is_active=True))
     cache.set(cache_key, policies, _POLICY_CACHE_TTL)
     return policies
