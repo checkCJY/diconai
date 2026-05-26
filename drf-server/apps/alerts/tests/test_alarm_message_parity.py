@@ -38,7 +38,7 @@ from apps.alerts.serializers import AlarmRecordSerializer
                 "power_device_id": 1,
                 "measured_value": 15.8,
             },
-            "정적 임계치 초과 (15.8 W)",
+            "임계치 초과 (15.8 W)",
         ),
         (
             {

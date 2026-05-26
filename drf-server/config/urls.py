@@ -30,6 +30,7 @@ urlpatterns = [
     path("alerts/", include("apps.alerts.urls")),
     path("api/", include("apps.geofence.urls")),
     path("api/admin/", include("apps.accounts.admin_urls")),
+    path("api/admin/alerts/", include("apps.alerts.admin_urls")),
     path("api/admin/", include("apps.monitoring.admin_urls")),
     path("api/admin/safety/", include("apps.safety.admin_urls")),
     path("api/admin/training/", include("apps.training.admin_urls")),

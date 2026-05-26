@@ -1,0 +1,106 @@
+{# 알림 정책 등록/수정 공용 모달. JS 가 mode (create/edit) 따라 prefill·제목 전환. #}
+<div id="policyFormModal" class="ap-modal-overlay" style="display:none;">
+    <div class="ap-modal">
+        <div class="ap-modal-header">
+            <div>
+                <h3 id="policyModalTitle">알림 정책 등록</h3>
+                <p class="ap-modal-desc">이벤트 상세 기준으로 알림 정책을 등록합니다.</p>
+            </div>
+            <button class="ap-modal-close" id="btnPolicyClose">✕</button>
+        </div>
+
+        <!-- 탭 헤더 -->
+        <div class="ap-tabs">
+            <button class="ap-tab active" data-tab="basic">기본 정보</button>
+            <button class="ap-tab" data-tab="actions">권고 조치</button>
+        </div>
+
+        <div class="ap-modal-body">
+            <!-- 기본 정보 탭 -->
+            <section class="ap-tab-panel active" data-tab-panel="basic">
+                <div class="ap-form-grid">
+                    <div class="ap-form-field ap-col-span-2">
+                        <label>정책명 <span class="ap-required">*</span></label>
+                        <input type="text" id="policyName" maxlength="100" placeholder="예: 가스 임계치 전사 알림">
+                        <span class="field-error" id="errPolicyName"></span>
+                    </div>
+                    <div class="ap-form-field">
+                        <label>이벤트 상세 <span class="ap-required">*</span></label>
+                        <select id="policyEventType">
+                            <option value="">선택하세요</option>
+                            {% for at in alarm_types %}
+                            <option value="{{ at.value }}">{{ at.label }}</option>
+                            {% endfor %}
+                        </select>
+                        <span class="field-error" id="errPolicyEventType"></span>
+                    </div>
+                    <div class="ap-form-field">
+                        <label>사용 여부 <span class="ap-required">*</span></label>
+                        <div class="ap-chip-group" id="policyActiveChips">
+                            <button type="button" class="ap-chip" data-value="true">사용</button>
+                            <button type="button" class="ap-chip" data-value="false">미사용</button>
+                        </div>
+                    </div>
+                    <div class="ap-form-field ap-col-span-2">
+                        <label>발송 채널 <span class="ap-required">*</span></label>
+                        <div class="ap-chip-group" id="policyChannelChips">
+                            <button type="button" class="ap-chip" data-value="popup">관제 실시간 알림</button>
+                            <button type="button" class="ap-chip" data-value="push">앱 푸시</button>
+                            <button type="button" class="ap-chip" data-value="sms">SMS</button>
+                            <button type="button" class="ap-chip" data-value="email">이메일</button>
+                        </div>
+                        <span class="field-error" id="errPolicyChannels"></span>
+                    </div>
+                    <div class="ap-form-field ap-col-span-2">
+                        <label>수신 대상 <span class="ap-required">*</span></label>
+                        <div class="ap-chip-group" id="policyRecipientChips">
+                            <button type="button" class="ap-chip" data-value="super_admin">슈퍼관리자</button>
+                            <button type="button" class="ap-chip" data-value="facility_admin">관리자</button>
+                            <button type="button" class="ap-chip" data-value="worker">작업자</button>
+                            <button type="button" class="ap-chip" data-value="viewer">열람자</button>
+                        </div>
+                        <span class="field-error" id="errPolicyRecipients"></span>
+                    </div>
+                    <div class="ap-form-field ap-col-span-2">
+                        <label>알림 내용</label>
+                        <div class="ap-var-chips">
+                            <button type="button" class="ap-var-chip" data-token="[발생원]">+ 발생원</button>
+                            <button type="button" class="ap-var-chip" data-token="[요약]">+ 요약</button>
+                            <span class="ap-muted">버튼을 누르면 변수가 커서 위치에 추가됩니다.</span>
+                        </div>
+                        <textarea id="policyMessageTemplate" rows="3" placeholder="예: [발생원] 가스 위험 — [요약]"></textarea>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 권고 조치 탭 -->
+            <section class="ap-tab-panel" data-tab-panel="actions">
+                <p class="ap-tab-hint" id="actionsHint">이벤트 상세를 먼저 선택하면 위험도 분기 영역이 표시됩니다.</p>
+
+                <!-- 위험/주의 분기 영역 (level-aware 인 경우) -->
+                <div class="ap-action-section" data-level="danger" style="display:none;">
+                    <div class="ap-action-header"><span class="ap-badge ap-badge-red">위험</span> 권고 조치</div>
+                    <div class="ap-action-list" id="actionListDanger"></div>
+                    <button type="button" class="ap-action-add" data-level="danger">+ 단계 추가</button>
+                </div>
+                <div class="ap-action-section" data-level="warning" style="display:none;">
+                    <div class="ap-action-header"><span class="ap-badge ap-badge-orange">주의</span> 권고 조치</div>
+                    <div class="ap-action-list" id="actionListWarning"></div>
+                    <button type="button" class="ap-action-add" data-level="warning">+ 단계 추가</button>
+                </div>
+
+                <!-- 단일 영역 (level-agnostic 인 경우) -->
+                <div class="ap-action-section" data-level="default" style="display:none;">
+                    <div class="ap-action-header">권고 조치</div>
+                    <div class="ap-action-list" id="actionListDefault"></div>
+                    <button type="button" class="ap-action-add" data-level="default">+ 단계 추가</button>
+                </div>
+            </section>
+        </div>
+
+        <div class="ap-modal-footer">
+            <button class="btn-outline" id="btnPolicyCancel">취소</button>
+            <button class="btn-primary" id="btnPolicySubmit">저장</button>
+        </div>
+    </div>
+</div>
