@@ -213,8 +213,6 @@ SIMPLE_JWT = {
 }
 
 # [L-1] JWT_SIGNING_KEY 미설정 경고 — 운영 배포 전 반드시 env 에 독립된 값 주입 필요.
-
-
 if not env("JWT_SIGNING_KEY", default=""):
     _logging.getLogger(__name__).warning(
         "[security] JWT_SIGNING_KEY 미설정 — DJANGO_SECRET_KEY 로 폴백 중. "
@@ -300,6 +298,11 @@ USE_TZ = True
 #   - 레벨: DEBUG(상세) / INFO(정상완료) / WARNING(주의·재시도) / ERROR(실패)
 LOG_LEVEL = env("DJANGO_LOG_LEVEL", default="INFO")
 
+# 파일 로깅용 디렉토리 — settings 로드 시 자동 생성 (로컬·컨테이너 모두 보장).
+# Docker volume 마운트 시점에 디렉토리가 없어도 RotatingFileHandler가 실패하지 않게 보호.
+LOGS_DIR = BASE_DIR / "logs"
+LOGS_DIR.mkdir(parents=True, exist_ok=True)
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -323,15 +326,53 @@ LOGGING = {
             "level": "ERROR",
             "formatter": "diconai",
         },
+        # 파일 로깅 — PoC 단계 디버깅·사고 추적용.
+        # 배경·결정 근거: skill/study/2026-05-26_파일_로깅_도입_배경.md
+        # Docker 재시작 후에도 직전 ERROR 흔적 보존. Loki 도입 전 가교 역할.
+        "file_error": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": str(LOGS_DIR / "error.log"),
+            "maxBytes": 100 * 1024 * 1024,  # 100MB × 10 = 1GB 캡
+            "backupCount": 10,
+            "level": "ERROR",
+            "formatter": "diconai",
+            "encoding": "utf-8",
+        },
+        "file_app": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": str(LOGS_DIR / "app.log"),
+            "maxBytes": 50 * 1024 * 1024,  # 50MB × 5 = 250MB 캡
+            "backupCount": 5,
+            "level": "INFO",
+            "formatter": "diconai",
+            "encoding": "utf-8",
+        },
     },
     "root": {
-        "handlers": ["console", "applog_db"],
+        # file_app은 root에서 의도적으로 제외 — 모든 INFO가 잡히면 라이브러리 노이즈 폭증.
+        # app.log는 아래 화이트리스트 logger(매트릭스 §5)에만 명시 연결.
+        # file_error는 root 유지 — ERROR는 빈도 낮고 모르는 곳에서 터져도 흔적 남아야 안전.
+        "handlers": ["console", "applog_db", "file_error"],
         "level": LOG_LEVEL,
     },
     "loggers": {
+        # propagate=False라서 root 핸들러로 안 흘러감 → file_error 명시 추가.
         "django.request": {  # 4xx/5xx 응답 시 Django가 traceback을 남김
-            "handlers": ["console"],
+            "handlers": ["console", "file_error"],
             "level": "WARNING",
+            "propagate": False,
+        },
+        # ── app.log 화이트리스트 (매트릭스 §5) ──
+        # 외부 알림 발송 실패 + 알람 흐름 (apps.alerts.tasks 외).
+        "apps.alerts": {
+            "handlers": ["console", "file_app", "file_error"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        # Celery beat 트리거 (retention, ML 추론 스케줄 등).
+        "apps.operations.tasks": {
+            "handlers": ["console", "file_app", "file_error"],
+            "level": "INFO",
             "propagate": False,
         },
     },

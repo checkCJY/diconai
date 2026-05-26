@@ -239,9 +239,14 @@ docker compose exec fastapi pytest -q
 # 한 서비스만 재기동 (코드 수정 후)
 docker compose build drf && docker compose up -d drf
 
-# 로그 모니터링
+# 로그 모니터링 (stdout — 휘발성)
 docker compose logs -f celery-worker
 docker compose logs -f --tail=50 fastapi
+
+# 영속 파일 로그 (RotatingFileHandler) — 시연·사고 추적용
+make logs-err-all                # 양 서버 ERROR 실시간 (1순위)
+make logs-stat                   # 파일 크기·회전 백업 확인
+# 상세: docs/conventions/COMMANDS.md "📁 파일 로그 보기" 절
 
 # 정리
 docker compose down              # 컨테이너만 제거 (볼륨 유지)
