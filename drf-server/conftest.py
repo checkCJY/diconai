@@ -17,15 +17,30 @@ def use_dummy_cache(settings):
     }
 
 
-# 이성현 추가 — PG 시퀀스 리셋 (마이그레이션 시드 후 중복 키 충돌 방지)
-# 마이그레이션이 id=1로 데이터를 심으면 PG 시퀀스가 갱신되지 않아
-# 첫 테스트에서 id=1을 또 만들려다 충돌남. 시퀀스를 max(id)로 맞춰줌.
-@pytest.fixture(scope="session")
-def django_db_setup(django_db_setup, django_db_blocker):
-    with django_db_blocker.unblock():
-        from django.core.management import call_command
+# 이성현 수정 — django_db_setup 오버라이드 → 별도 autouse 세션 픽스처로 교체
+# 기존 django_db_setup 오버라이드는 TestCase 기반 테스트와 실행 순서가 충돌하여
+# PG 시퀀스 리셋이 적용되지 않는 경우가 발생함.
+# sqlsequencereset(Django 내장 커맨드)를 통해 각 앱 모델의 시퀀스를 정확히 리셋.
+# autouse + scope="session" → 모든 테스트(pytest/TestCase 무관) 시작 전 1회 실행 보장.
+@pytest.fixture(scope="session", autouse=True)
+def reset_sequences(django_db_setup, django_db_blocker):
+    import io
 
-        call_command("reset_pg_sequences")
+    from django.apps import apps as django_apps
+    from django.core.management import call_command
+    from django.db import connection
+
+    with django_db_blocker.unblock():
+        buf = io.StringIO()
+        call_command(
+            "sqlsequencereset",
+            *[a.label for a in django_apps.get_app_configs()],
+            stdout=buf,
+            no_color=True,
+        )
+        with connection.cursor() as cursor:
+            for stmt in (s.strip() for s in buf.getvalue().split(";\n") if s.strip()):
+                cursor.execute(stmt)
 
 
 @pytest.fixture

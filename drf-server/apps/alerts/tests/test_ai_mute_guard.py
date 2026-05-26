@@ -30,8 +30,23 @@ from apps.core.constants import RiskLevel
 from apps.core.metrics import RULE_FIRE_SUPPRESSED_BY_AI_TOTAL
 
 
+# 이성현 추가 — conftest use_dummy_cache(LocMemCache) 이후 Redis로 복원
+# alarm_dedupe._redis()가 cache._cache.get_client()를 호출하는데,
+# LocMemCache._cache는 OrderedDict라 get_client()가 없어 AttributeError 발생.
+# 이 픽스처가 conftest autouse보다 나중에 실행되어 설정을 Redis로 덮어씀.
+# CI에 Redis 서비스(redis:7-alpine, 6379포트)가 있어야 동작함.
 @pytest.fixture(autouse=True)
-def clear_cache():
+def use_redis_cache(settings):
+    settings.CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": "redis://localhost:6379/0",
+        }
+    }
+
+
+@pytest.fixture(autouse=True)
+def clear_cache(use_redis_cache):
     """각 테스트 전후 Redis 캐시 비우기 — ai_fired 키 잔류 방지."""
     cache.clear()
     yield

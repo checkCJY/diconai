@@ -28,6 +28,20 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+      # 이성현 추가 — 테스트용 Redis 서버
+      # test_ai_mute_guard.py의 alarm_dedupe._redis()가 raw Redis 클라이언트 사용.
+      # LocMemCache(Django 메모리 캐시)는 get_client() 메서드가 없어 AttributeError 발생 →
+      # 실제 Redis가 필요함.
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     env:
       POSTGRES_HOST: localhost
       POSTGRES_DB: diconai_test
