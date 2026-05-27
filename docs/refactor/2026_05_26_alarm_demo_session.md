@@ -7,7 +7,7 @@
 
 ## 한 줄 요약
 
-시연 리허설에서 알람 4문제(연결실패 / 알람폭주 / 갱상미지원 / 중복) 발견 → 4개 패치로 분해 → 3개 완료, 가스 도메인은 mute 가드 + decide_alarm 매트릭스 (**옵션 B**) 적용 예정.
+시연 리허설 알람 4문제 (연결실패 / 알람폭주 / 격상미지원 / 중복) 발견 → 4개 패치 진행 중 **#2 격상 검증에서 진짜 root cause (event_service cooldown 차단) 발견** → 5개 패치 + Makefile demo target 9종 + 문서 모두 완료. 가스 AI mute 가드 옵션 B 적용. 시연 안정성 확보. 시연 후 sprint 거리: C-full 매트릭스 / 지오펜스 84% 보강 / 메모리 정정 / 더미 정비.
 
 ---
 
@@ -128,9 +128,57 @@ push(data) {
 
 → **#3 패치 = `auto_resolve_active_events` 신규 함수 + `fire_clear_*_task` 호출**
 
+### Step 7 — 격상 모달 작동 안 함 → **진짜 root cause 발견** 🔥
+
+#2 alarm-popup.js 격상 처리 패치 적용 + brower 하드 새로고침 → **그래도 모달 격상 안 뜸**.
+
+사용자 스크린샷:
+- 알람 팝업: "주의 (60.0 ppm)"
+- 측면 패널: CO 297 ppm (위험 단계)
+- 이벤트 현황: 위험 표시
+- → 데이터가 완전히 분리됨
+
+진단 명령 결과:
+- ✅ Celery 로그: `fire_danger_alarm_task` 5건 succeeded
+- ✅ DB AlarmRecord: DANGER 4건 (event_id 872/873)
+- ❌ 브라우저 콘솔 `[알람 수신] ['danger(new=true)']` **0건**
+- ❌ 메트릭 `alarm_fired_total{risk_level="danger"}` 라벨 자체 **없음**
+
+→ Celery task 실행은 됐는데 `_push_to_ws` 까지 못 감 → `create_alarm_and_event` 가 `alarm=None` 반환 의심.
+
+[event_service.py:154](../../drf-server/apps/alerts/services/event_service.py#L154) 발견:
+```python
+return active_event, None  # 쿨다운 이내 — 재발송 안 함
+```
+
+**진짜 흐름**:
+1. WARNING 첫 발화 → `last_notified_at = now`
+2. 60s 안 DANGER 발화 시도 → AlarmRecord DB 생성 ✅
+3. **cooldown 검사 실패** → `needs_renotify = False` → `alarm = None`
+4. `fire_danger_alarm_task` 의 `if event is not None and alarm is not None:` 통과 못 함
+5. `_push_to_ws` 호출 안 됨 → 브라우저 안 옴
+
+**위험도 격상 케이스를 cooldown 정책이 차단** — `alarm-popup.js` 격상 처리가 작동할 알람 자체가 안 옴. **진짜 root cause**.
+
+→ **위험도 격상 cooldown bypass 패치** = [event_service.py:122-141](../../drf-server/apps/alerts/services/event_service.py#L122) 의 `risk_escalated` 시 `needs_renotify=True`. 검증 후 `alarm_fired_total{risk_level="danger"} 2.0` 확인.
+
+### Step 8 — 격상 검증 후 14건 사이클 반복 발견
+
+cooldown bypass 적용 후 시연 재실행 → DANGER 격상 모달 정상 작동 ✅. 다만 8분 시연 동안 알람 14건 누적 + 사운드 중복.
+
+분석:
+- 시간: 11:30:45 ~ 11:38:23 (약 8분), 14건 / 8분 = ~35초 사이클
+- [_state_machine.enter_scenario](../../fastapi-server/dummies/_state_machine.py) 의 `if cs.state != NORMAL: return`
+- 시나리오 1 사이클 = RAMP_UP 5 + HOLD 30 + RAMP_DOWN 5 = 40초
+- `mode=co_leak` 유지 시 사이클 끝 → state=NORMAL → 다음 tick에 enter_scenario 통과 → 새 사이클 시작
+
+→ 진동 아니라 **사이클 자동 반복**. 시연 운영 가이드 = `mode` 유지 1 사이클 (~40초) 후 즉시 `mode=normal`. **Makefile `demo-gas` / `demo-power` / `demo-cycle` 가 이 패턴 자동화** (60s sleep + scenario-reset).
+
 ---
 
-## 3. 사용자 의도 확인 — Step 7
+## 3. 사용자 의도 확인 — Step 7 → 8 → 9 으로 번호 정정 (의식 흐름 보존)
+
+> 본 섹션의 "Step 7" 은 §2 의 Step 7/8 보다 먼저 일어난 의식의 흐름 (시간순 ≠ 진단 흐름 순). §2 의 Step 1~6 + Step 7~8 은 진단 결과의 시간순. 본 섹션은 **사용자가 회상한 원래 설계 의도** 가 등장한 시점으로 진단 흐름 중 어디든 끼울 수 있음.
 
 > "정적 룰과 AI 추론 알람 발화에 차이를 두지 않아서 문제가 생긴 것"
 
@@ -239,6 +287,8 @@ fire_*_task.delay(...)
 - `uvicorn.error` 로거명 정리
 - 알람 시스템 재설계 plan P3 (운영자 디바이스 결정 후)
 - **더미 데이터 정비** (별도 sprint 거리 — 아래 §9 참조)
+- **지오펜스 (2026-05-27 별도 분석)** — R&D §3 완성도 **84%**. ✅ 모델/CRUD/UI/위치결합/알람. ❌ 이탈 알람 (4~6h), 감사 로그 import 버그 (5분), 원형(circle) 판정 (3~4h). `position_dummy` 시연 시나리오 모드는 다른 세션 진행 예정.
+- **메모리 정정 거리** (아래 §10 참조)
 
 ---
 
@@ -490,3 +540,24 @@ return round(random.uniform(low, high), 2)
 | `make demo-cycle` | A + B 통합 시연 (~2분 30초) |
 | `make scenario-set mode=X` | 임의 모드 (시연자 수동 제어) |
 | `make scenario-clean` | Redis 알람/dedup 키 일괄 정리 |
+
+---
+
+## 10. 메모리 정정 거리 (시연 후 일괄)
+
+본 세션 진행 중 코드 vs 메모리 불일치 발견. 시연 후 일괄 정정 권장.
+
+| 메모리 | 현재 표현 | 실제 코드 | 정정 방향 |
+|---|---|---|---|
+| [power_ai_architecture_decision_2026_05_18](../../../.claude/projects/-home-cjy-diconai/memory/power_ai_architecture_decision_2026_05_18.md) | "가스 = 격하 유지" | 가스도 IF + ARIMA + Change Point 풀 적용 ([gas_service.py](../../fastapi-server/gas/services/gas_service.py)) | "가스도 풀 알고리즘. advisory 운영 정책은 유지" |
+| [redis_celery_infra_guide_2026_05_23](../../../.claude/projects/-home-cjy-diconai/memory/redis_celery_infra_guide_2026_05_23.md) | Celery worker 단일 가정 | `celery-worker-alarm` + `celery-worker-metric` 분리 운영 중 (docker compose ps 검증) | "Celery worker 2종 분리 (alarm/metric)" |
+| 동일 메모리 | redis_exporter 부재 | 이미 `oliver006/redis_exporter:v1.62.0-alpine` 운영 중 (포트 9121) | "redis_exporter 운영 중" 추가 |
+| [alarm_symptom_diagnosis_2026_05_20](../../../.claude/projects/-home-cjy-diconai/memory/alarm_symptom_diagnosis_2026_05_20.md) | "_AckStore 24h 영구 차단 가설" | 이미 60s 단축됨 ([alarm-popup.js T5](../../drf-server/static/js/shared/alarm-popup.js) 변경, 2026-05-20) | "가설 → 60s 단축으로 해소" |
+
+### 동시 정정 대상 문서
+- [docs/infra/redis-celery-guide.md](../infra/redis-celery-guide.md) — Celery worker 분리 + redis_exporter 반영
+- (선택) `MEMORY.md` 인덱스 description 정렬
+
+### 정정 일감 분리
+- 시연 전엔 손대지 않음 (시연 안정성 우선)
+- 시연 후 1~2시간 sprint 거리
