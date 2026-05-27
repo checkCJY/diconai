@@ -213,13 +213,8 @@ function renderGrid(equipList = []) {
 
   const count = equipList.length || 8;
 
-  /* 전체 중 최대 watt 기준 Y축 최대값 계산
-     - THRESHOLD.maxY 이상 보장 (임계치 라인이 항상 보이도록)
-     - 실제 최대값이 더 크면 10% 여유 추가 후 올림 */
-  const maxWatt = Math.max(...equipList.map(e => e.watt ?? 0), 0);
-  const dynamicMaxY = maxWatt > THRESHOLD.maxY
-    ? Math.ceil(maxWatt * 1.1 / 100) * 100
-    : THRESHOLD.maxY;
+  // Y축은 THRESHOLD.maxY 로 고정. 측정값이 초과해도 막대만 잘리고 축은 안 움직임 (시연 안정성)
+  const dynamicMaxY = THRESHOLD.maxY;
 
   for (let i = 0; i < count; i++) {
     const data = equipList[i] ?? null;

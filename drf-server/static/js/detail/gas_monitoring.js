@@ -71,7 +71,8 @@ function createGasChart(canvasId, gas, value, risk) {
   const cfg     = GAS_CONFIG[gas];
   const barColor = COLOR[risk] ?? COLOR.normal;
   const barValue = value ?? 0;
-  const maxY     = Math.max(cfg.maxY, barValue * 1.1);
+  // Y축은 cfg.maxY 로 고정. 측정값이 초과해도 막대만 잘리고 축은 안 움직임 (시연 안정성)
+  const maxY     = cfg.maxY;
 
   const annotations = {};
 
