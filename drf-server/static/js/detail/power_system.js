@@ -3,20 +3,82 @@
    의존: Chart.js 4.x, chartjs-plugin-annotation 3.x
    ────────────────────────────────────────────────────────── */
 
-/* ── 전력 임계치 (W) — GET /api/monitoring/power/thresholds/ 에서 로드 ── */
-let THRESHOLD = {
-  caution: 2200,
-  danger:  2860,
-  maxY:    3500,
+/* ── 전력 임계치 (채널별 W) ──────────────────────────────────────────
+   단일 진실 공급원:
+     1. % 임계치 (group="power_facility_default", item="power_w")
+        → /api/monitoring/power/threshold-meta/
+     2. 채널 정격 (PowerDevice.channel_meta[ch].rated_w)
+        → /api/monitoring/power/channel-meta/
+   환산: warning_w = rated_w × warning_max / 100  (fastapi equipment_builder 와 동일 시맨틱)
+   정격 미입력 채널은 LEGACY_FALLBACK (power_default 그룹의 절대값) 사용. */
+
+const LEGACY_FALLBACK = { caution: 2200, danger: 2860, maxY: 3500 };
+
+/* 채널별 임계치 캐시: { 1: { caution, danger, maxY, name, rated_w }, 2: ..., } */
+let CHANNEL_THRESHOLDS = {};
+
+/* 전체 사용량(kW) 임계치 — 채널 정격 합 × % */
+let TOTAL_KW_THRESHOLD = {
+  caution_kw: LEGACY_FALLBACK.caution * 16 / 1000,
+  danger_kw: LEGACY_FALLBACK.danger * 16 / 1000,
+  max_kw: LEGACY_FALLBACK.maxY * 16 / 1000,
 };
+
+function _resolveChannel(ch) {
+  return CHANNEL_THRESHOLDS[ch] || { ...LEGACY_FALLBACK, name: `CH${ch}`, rated_w: null };
+}
 
 async function loadThresholds() {
   try {
-    const res = await fetch('/api/monitoring/power/thresholds/');
-    if (!res.ok) return;
-    const data = await res.json();
-    THRESHOLD = { caution: data.caution, danger: data.danger, maxY: data.maxY };
-  } catch (_) { /* 네트워크 오류 시 기본값 유지 */ }
+    const [metaRes, chanRes] = await Promise.all([
+      fetch('/api/monitoring/power/threshold-meta/'),
+      fetch('/api/monitoring/power/channel-meta/'),
+    ]);
+    if (!metaRes.ok || !chanRes.ok) return;
+    const meta = await metaRes.json();
+    const chanMap = await chanRes.json();  // { device_id: { "1": {...}, ... } }
+
+    const wattPct = meta.power_w || {};
+    const pctWarn = Number(wattPct.warning_max) || 80;
+    const pctDanger = Number(wattPct.danger_max) || 100;
+
+    // PowerDevice 단일 가정 (현재 1개) — 첫 device 의 channel_meta 사용. 시연 후 다공장은 facility 컨텍스트로 분기.
+    const firstMeta = Object.values(chanMap)[0] || {};
+
+    const next = {};
+    let totalCautionW = 0;
+    let totalDangerW = 0;
+    for (let ch = 1; ch <= 16; ch++) {
+      const entry = firstMeta[String(ch)] || {};
+      const ratedW = Number(entry.rated_w) || 0;
+      if (ratedW > 0) {
+        const caution = Math.round(ratedW * pctWarn / 100);
+        const danger = Math.round(ratedW * pctDanger / 100);
+        // maxY 는 위 100 단위 올림 — 부동소수점 노이즈 제거 + 깔끔한 축 라벨
+        const rawMax = danger * 1.15;
+        next[ch] = {
+          caution,
+          danger,
+          maxY: Math.ceil(rawMax / 100) * 100,
+          name: entry.name || `CH${ch}`,
+          rated_w: ratedW,
+        };
+        totalCautionW += caution;
+        totalDangerW += danger;
+      } else {
+        // 정격 미입력 — power_default 그룹의 절대값 fallback
+        next[ch] = { ...LEGACY_FALLBACK, name: entry.name || `CH${ch}`, rated_w: null };
+        totalCautionW += LEGACY_FALLBACK.caution;
+        totalDangerW += LEGACY_FALLBACK.danger;
+      }
+    }
+    CHANNEL_THRESHOLDS = next;
+    TOTAL_KW_THRESHOLD = {
+      caution_kw: Math.round(totalCautionW / 100) / 10,  // 1자리 소수
+      danger_kw: Math.round(totalDangerW / 100) / 10,
+      max_kw: Math.ceil(totalDangerW * 1.15 / 1000),  // 정수 kW
+    };
+  } catch (_) { /* 네트워크 오류 시 LEGACY_FALLBACK 만으로 동작 */ }
 }
 
 /* ── 색상 팔레트 (CSS 변수와 동일) ── */
@@ -39,11 +101,11 @@ const chartInstances = {};
 /* ────────────────────────────────────────────
    유틸
 ────────────────────────────────────────────── */
-/* watt(W) 기준 상태 계산 — 서버 risk_level 없을 때만 사용 */
+/* watt(W) 기준 상태 계산 — 서버 risk_level 없을 때만 사용. 정격 모르므로 LEGACY_FALLBACK 절대값. */
 function getStatus(watt) {
   if (watt === null || watt === undefined) return 'safe';
-  if (watt >= THRESHOLD.danger)  return 'danger';
-  if (watt >= THRESHOLD.caution) return 'caution';
+  if (watt >= LEGACY_FALLBACK.danger)  return 'danger';
+  if (watt >= LEGACY_FALLBACK.caution) return 'caution';
   return 'safe';
 }
 
@@ -56,15 +118,20 @@ function getBarColor(status) {
    @param canvasId  - canvas 요소 id
    @param watt      - 전력값 (W 단위, null이면 빈 차트)
    @param status    - 'danger'|'caution'|'safe' (서버 risk_level 기반)
-   @param maxY      - Y축 최대값 (W, 미전달 시 THRESHOLD.maxY)
+   @param channel   - 채널 번호 (1~16) — CHANNEL_THRESHOLDS 룩업 키. 임계 라인·Y축이 채널 정격×% 환산값 사용.
 ────────────────────────────────────────────── */
-function createBarChart(canvasId, watt, status = 'safe', maxY = THRESHOLD.maxY) {
+function createBarChart(canvasId, watt, status = 'safe', channel) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
 
   if (chartInstances[canvasId]) {
     chartInstances[canvasId].destroy();
   }
+
+  const t = _resolveChannel(channel);
+  const cautionY = t.caution;
+  const dangerY = t.danger;
+  const maxY = t.maxY;
 
   const barColor = getBarColor(status);
   const barValue = watt ?? 0;
@@ -104,8 +171,9 @@ function createBarChart(canvasId, watt, status = 'safe', maxY = THRESHOLD.maxY) 
             title: () => '',
             label: () => {
               if (watt === null || watt === undefined) return ' 데이터 없음';
+              const pct = t.rated_w ? ((watt / t.rated_w) * 100).toFixed(1) + '%' : '-';
               return [
-                `현재 사용 전력량   ${(watt / 1000).toFixed(2)} kW`,
+                `현재 사용 전력량   ${(watt / 1000).toFixed(2)} kW (${pct})`,
               ];
             },
           },
@@ -114,22 +182,22 @@ function createBarChart(canvasId, watt, status = 'safe', maxY = THRESHOLD.maxY) 
           annotations: {
             dangerBox: {
               type:            'box',
-              yMin:            THRESHOLD.danger,
+              yMin:            dangerY,
               yMax:            maxY,
               backgroundColor: COLOR.dangerBg,
               borderWidth:     0,
             },
             cautionBox: {
               type:            'box',
-              yMin:            THRESHOLD.caution,
-              yMax:            THRESHOLD.danger,
+              yMin:            cautionY,
+              yMax:            dangerY,
               backgroundColor: COLOR.cautionBg,
               borderWidth:     0,
             },
             dangerLine: {
               type:        'line',
-              yMin:        THRESHOLD.danger,
-              yMax:        THRESHOLD.danger,
+              yMin:        dangerY,
+              yMax:        dangerY,
               borderColor: COLOR.danger,
               borderWidth: 1,
               borderDash:  [4, 3],
@@ -137,8 +205,8 @@ function createBarChart(canvasId, watt, status = 'safe', maxY = THRESHOLD.maxY) 
             },
             cautionLine: {
               type:        'line',
-              yMin:        THRESHOLD.caution,
-              yMax:        THRESHOLD.caution,
+              yMin:        cautionY,
+              yMax:        cautionY,
               borderColor: COLOR.caution,
               borderWidth: 1,
               borderDash:  [4, 3],
@@ -160,7 +228,14 @@ function createBarChart(canvasId, watt, status = 'safe', maxY = THRESHOLD.maxY) 
           ticks:  {
             color:    COLOR.tickText,
             font:     { size: 10 },
-            callback: (v) => v >= 1000 ? `${v/1000}k` : v,
+            // 1000 이상은 "k" 단위 + 1자리 소수 (트레일링 .0 제거). 부동소수점 노이즈 방지.
+            callback: (v) => {
+              if (v >= 1000) {
+                const k = (v / 1000).toFixed(1).replace(/\.0$/, '');
+                return `${k}k`;
+              }
+              return v;
+            },
           },
           border: { color: '#30363d' },
         },
@@ -211,10 +286,9 @@ function renderGrid(equipList = []) {
   const grid = document.getElementById('chart-grid');
   grid.innerHTML = '';
 
-  const count = equipList.length || 8;
-
-  // Y축은 THRESHOLD.maxY 로 고정. 측정값이 초과해도 막대만 잘리고 축은 안 움직임 (시연 안정성)
-  const dynamicMaxY = THRESHOLD.maxY;
+  // 실제 데이터 길이 우선. 미수신 시 CHANNEL_THRESHOLDS 로드 결과 (16) 또는 16 fallback.
+  // 기존 매직 넘버 8 은 8채널 가정 시절의 잔재 — channel_count=16 으로 변경됨에 따라 수정.
+  const count = equipList.length || Object.keys(CHANNEL_THRESHOLDS).length || 16;
 
   for (let i = 0; i < count; i++) {
     const data = equipList[i] ?? null;
@@ -222,10 +296,10 @@ function renderGrid(equipList = []) {
     grid.appendChild(card);
   }
 
-  /* 차트는 DOM 삽입 후 생성 */
+  /* 차트는 DOM 삽입 후 생성. channel = index+1 — CHANNEL_THRESHOLDS 의 채널 정격×% 환산 임계치 사용. */
   for (let i = 0; i < count; i++) {
     const eq = equipList[i];
-    createBarChart(`canvas-${i}`, eq?.watt ?? null, eq?.status ?? 'safe', dynamicMaxY);
+    createBarChart(`canvas-${i}`, eq?.watt ?? null, eq?.status ?? 'safe', i + 1);
   }
 }
 
