@@ -20,6 +20,6 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name='event',
-            index=models.Index(condition=models.Q(('source_geofence__isnull', False)), fields=['source_geofence', 'status'], name='idx_event_source_geofence_status'),
+            index=models.Index(condition=models.Q(('source_geofence__isnull', False)), fields=['source_geofence', 'status'], name='idx_event_src_geofence_status'),
         ),
     ]

@@ -165,7 +165,7 @@ class Event(BaseModel):
             ),
             models.Index(
                 fields=["source_geofence", "status"],
-                name="idx_event_source_geofence_status",
+                name="idx_event_src_geofence_status",
                 condition=models.Q(source_geofence__isnull=False),
             ),
         ]
