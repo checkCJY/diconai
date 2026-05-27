@@ -16,7 +16,7 @@ DEBUG = False
 
 # ALLOWED_HOSTS: 기본값 없음. 환경변수 미설정 시 서버 기동 실패 (의도된 동작)
 # docker-compose의 DJANGO_ALLOWED_HOSTS 에 실제 도메인/IP 반드시 명시
-ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS")
+ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS")  # noqa: F405
 
 # ── 정적 파일 (운영 모드) ─────────────────────────────────────
 # 해시 매니페스트 + gzip 압축으로 캐시 버스팅·CDN 친화 서빙

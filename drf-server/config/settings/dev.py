@@ -17,7 +17,7 @@ _env_file = _BASE_DIR / ".env.dev"
 if _env_file.exists():
     environ.Env.read_env(_env_file)
 
-from .base import *  # noqa: F401, F403
+from .base import *  # noqa: F401, F403, E402
 
 # ── 개발 전용 설정 ────────────────────────────────────────────
 
@@ -26,7 +26,7 @@ from .base import *  # noqa: F401, F403
 DEBUG = True
 
 # 로컬에서는 어떤 호스트로 접속해도 허용
-ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["*"])
+ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["*"])  # noqa: F405
 
 # ── 정적 파일 (개발 모드) ─────────────────────────────────────
 # DEBUG=True일 때: 파일 변경 시 collectstatic 없이 즉시 반영
