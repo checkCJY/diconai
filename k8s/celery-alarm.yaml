@@ -1,0 +1,55 @@
+apiVersion: apps/v1 # k8s API 버전 선언
+kind: Deployment # 상태 없는 워커 프로세스이므로 Deployment 사용
+metadata:
+  name: celery-alarm # Deployment 이름
+  namespace: diconai
+spec:
+  replicas: 1 # 단일 인스턴스 — 알람 중복 발송 방지
+  selector:
+    matchLabels:
+      app: celery-alarm
+  template:
+    metadata:
+      labels:
+        app: celery-alarm # selector와 일치해야 함
+    spec:
+      containers:
+        - name: celery-alarm
+          image: diconai/drf:latest # drf와 동일한 이미지 사용 — celery는 drf 코드베이스를 공유
+          command: # docker-compose와 동일한 celery 실행 명령
+            - celery
+            - -A
+            - config # celery 앱 모듈 위치 (config/celery.py)
+            - worker
+            - -Q
+            - alarm # alarm 큐만 처리 — metric 큐와 분리해 알람 지연 방지
+            - -l
+            - info # 로그 레벨
+            - --concurrency=2 # 동시 처리 워커 수
+          envFrom: # configmap.yaml과 secret.yaml의 값을 환경변수로 한꺼번에 주입
+            - configMapRef:
+                name: diconai-config
+            - secretRef:
+                name: diconai-secret
+          env: # celery 워커에만 필요한 값을 추가/덮어씀
+            - name: DJANGO_SETTINGS_MODULE
+              value: "config.settings.prod" # drf와 동일하게 운영용 settings 명시
+            - name: RUN_MIGRATIONS
+              value: "0" # 마이그레이션은 drf에서만 실행 — 중복 실행 방지
+            - name: COLLECT_STATIC
+              value: "0" # 정적 파일 수집 불필요 — 워커는 HTTP 서빙 안 함
+            - name: PROMETHEUS_MULTIPROC_DIR
+              value: "/app/prometheus_multiproc/celery-alarm" # drf와 다른 경로로 분리 — 메트릭 파일 충돌 방지
+          resources:
+            requests:
+              cpu: "100m" # 최소 보장 CPU
+              memory: "128Mi" # 최소 보장 메모리
+            limits:
+              cpu: "300m" # 최대 사용 CPU
+              memory: "256Mi" # 최대 사용 메모리
+          volumeMounts:
+            - name: prometheus-multiproc # prometheus 멀티프로세스 메트릭 디렉토리
+              mountPath: /app/prometheus_multiproc/celery-alarm # PROMETHEUS_MULTIPROC_DIR과 일치해야 함
+      volumes:
+        - name: prometheus-multiproc
+          emptyDir: {} # 파드 재시작 시 초기화되는 임시 디렉토리

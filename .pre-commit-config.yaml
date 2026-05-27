@@ -22,6 +22,7 @@ repos:
         # 마이그·정적 자산은 자동 수정 대상에서 제외 (Django 생성물 + 바이너리)
         exclude: ^(.*/migrations/|static/|.*\.pkl$)
       - id: check-yaml
-        files: \.(yml|yaml)$
+        args: ['--allow-multiple-documents']
+        files: ^k8s/.*\.(yml|yaml)$   # k8s 폴더만 여러 문서 허용
       - id: check-added-large-files
         args: ['--maxkb=500']

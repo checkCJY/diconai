@@ -1,0 +1,44 @@
+apiVersion: apps/v1 # k8s API 버전 선언
+kind: Deployment # 상태 없는 스케줄러 프로세스이므로 Deployment 사용
+metadata:
+  name: celery-beat # Deployment 이름
+  namespace: diconai
+spec:
+  replicas: 1 # 반드시 1개 — 2개 이상이면 같은 작업이 중복 스케줄링됨
+  selector:
+    matchLabels:
+      app: celery-beat
+  template:
+    metadata:
+      labels:
+        app: celery-beat # selector와 일치해야 함
+    spec:
+      containers:
+        - name: celery-beat
+          image: diconai/drf:latest # drf와 동일한 이미지 사용
+          command: # docker-compose와 동일한 celery beat 실행 명령
+            - celery
+            - -A
+            - config # celery 앱 모듈 위치 (config/celery.py)
+            - beat # worker가 아닌 beat — 주기적으로 태스크를 큐에 넣는 스케줄러
+            - -l
+            - info # 로그 레벨
+          envFrom: # configmap.yaml과 secret.yaml의 값을 환경변수로 한꺼번에 주입
+            - configMapRef:
+                name: diconai-config
+            - secretRef:
+                name: diconai-secret
+          env: # celery beat에만 필요한 값을 추가/덮어씀
+            - name: DJANGO_SETTINGS_MODULE
+              value: "config.settings.prod" # 운영용 settings 명시
+            - name: RUN_MIGRATIONS
+              value: "0" # 마이그레이션은 drf에서만 실행 — 중복 실행 방지
+            - name: COLLECT_STATIC
+              value: "0" # 정적 파일 수집 불필요
+          resources:
+            requests:
+              cpu: "50m" # 최소 보장 CPU — beat는 태스크를 실행하지 않고 큐에 넣기만 해서 가벼움
+              memory: "128Mi" # 최소 보장 메모리
+            limits:
+              cpu: "100m" # 최대 사용 CPU
+              memory: "256Mi" # 최대 사용 메모리

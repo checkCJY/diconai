@@ -1,0 +1,42 @@
+apiVersion: v1 # k8s API 버전 선언
+kind: Service # 클러스터 내부에서 redis-exporter 파드에 접근할 네트워크 엔드포인트
+metadata: # 이 Service의 메타데이터
+  name: redis-exporter # prometheus.yaml에서 이 이름으로 메트릭 수집 대상 지정
+  namespace: diconai # diconai 네임스페이스에 소속
+spec: # Service 동작 명세
+  selector: # 트래픽을 전달할 파드를 라벨로 선택
+    app: redis-exporter # 아래 Deployment의 파드 라벨과 매칭
+  ports: # 포트 매핑 설정
+    - port: 9121 # Service가 클러스터 내부에 노출하는 포트 (redis_exporter 기본 메트릭 포트)
+      targetPort: 9121 # 실제 파드 컨테이너의 포트
+---
+apiVersion: apps/v1 # apps 그룹의 v1 API
+kind: Deployment # 상태 없는 앱용 — exporter는 데이터를 저장하지 않으므로 Deployment 사용
+metadata: # 이 Deployment의 메타데이터
+  name: redis-exporter # Deployment 이름
+  namespace: diconai # diconai 네임스페이스에 소속
+spec: # Deployment 동작 명세
+  replicas: 1 # 파드 1개만 실행 — exporter는 단일 인스턴스로 충분
+  selector: # 이 Deployment가 관리할 파드를 라벨로 선택
+    matchLabels:
+      app: redis-exporter # template의 labels와 반드시 일치해야 함
+  template: # 아래부터 실제 파드 명세
+    metadata: # 파드의 메타데이터
+      labels:
+        app: redis-exporter # Service의 selector와 일치해야 트래픽이 연결됨
+    spec: # 파드 동작 명세
+      containers: # 파드 안에서 실행할 컨테이너 목록
+        - name: redis-exporter # 컨테이너 이름
+          image: oliver006/redis_exporter:v1.62.0-alpine # docker-compose와 동일한 이미지
+          env: # 환경변수 설정
+            - name: REDIS_ADDR # 모니터링할 Redis 주소를 알려주는 환경변수
+              value: "redis://redis:6379" # redis = k8s Service 이름, 클러스터 내부 DNS로 자동 연결
+          ports: # 컨테이너가 사용하는 포트
+            - containerPort: 9121 # Prometheus가 이 포트로 메트릭을 수집함
+          resources: # 리소스 사용량 제한
+            requests:
+              cpu: "50m" # 최소 보장 CPU — exporter는 가벼운 앱이라 적게 잡음
+              memory: "64Mi" # 최소 보장 메모리
+            limits:
+              cpu: "100m" # 최대 사용 CPU
+              memory: "128Mi" # 최대 사용 메모리 — 초과 시 OOM으로 파드 재시작

@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: PersistentVolumeClaim # Grafana 설정/플러그인 데이터를 파드 재시작 후에도 유지하기 위한 스토리지 요청
+metadata:
+  name: grafana-pvc
+  namespace: diconai
+spec:
+  accessModes:
+    - ReadWriteOnce # 단일 노드에서만 읽기/쓰기 허용
+  resources:
+    requests:
+      storage: 1Gi # Grafana 내부 DB(대시보드 수정 이력 등) 저장 공간
+---
+apiVersion: v1
+kind: Service # 클러스터 내부 + minikube 브라우저 접속용 네트워크 엔드포인트
+metadata:
+  name: grafana
+  namespace: diconai
+spec:
+  selector:
+    app: grafana # 아래 Deployment의 파드 라벨과 매칭
+  ports:
+    - port: 3000 # Grafana 기본 포트
+      targetPort: 3000
+  type: NodePort # minikube에서 브라우저로 직접 접속하기 위해 NodePort 사용
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: diconai
+spec:
+  replicas: 1 # 단일 인스턴스 — Grafana는 내부 SQLite DB를 파일로 저장하므로 복수 replica 불가
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana # Service의 selector와 일치해야 트래픽이 연결됨
+    spec:
+      containers:
+        - name: grafana
+          image: grafana/grafana:11.3.0 # docker-compose와 동일한 이미지
+          ports:
+            - containerPort: 3000 # Grafana 웹 UI 포트
+          env:
+            - name: GF_SECURITY_ADMIN_PASSWORD # Grafana 관리자 비밀번호
+              valueFrom:
+                secretKeyRef:
+                  name: diconai-secret # secret.yaml의 name
+                  key: GRAFANA_PASSWORD # secret.yaml의 키
+            - name: GF_USERS_ALLOW_SIGN_UP
+              value: "false" # 외부 회원가입 비활성 — 관리자만 계정 생성 가능
+          resources:
+            requests:
+              cpu: "100m" # 최소 보장 CPU
+              memory: "128Mi" # 최소 보장 메모리
+            limits:
+              cpu: "300m" # 최대 사용 CPU
+              memory: "256Mi" # 최대 사용 메모리
+          volumeMounts:
+            - name: grafana-data # Grafana 내부 데이터(SQLite DB, 세션 등) 저장
+              mountPath: /var/lib/grafana # Grafana 기본 데이터 저장 경로
+            - name: grafana-datasources # 데이터소스 설정 파일 마운트
+              mountPath: /etc/grafana/provisioning/datasources # Grafana가 자동으로 읽는 경로
+            - name: grafana-dashboards # 대시보드 설정 + JSON 파일 마운트
+              mountPath: /etc/grafana/provisioning/dashboards # Grafana가 자동으로 읽는 경로
+      volumes:
+        - name: grafana-data
+          persistentVolumeClaim:
+            claimName: grafana-pvc # 위에서 만든 PVC 참조
+        - name: grafana-datasources
+          configMap:
+            name: grafana-datasources # grafana-cm.yaml의 첫 번째 ConfigMap
+        - name: grafana-dashboards
+          configMap:
+            name: grafana-dashboards # grafana-cm.yaml의 두 번째 ConfigMap (JSON 포함)
