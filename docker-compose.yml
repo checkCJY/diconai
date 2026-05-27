@@ -62,7 +62,7 @@ services:
     environment:
       REDIS_URL: redis://redis:6379/0
       FASTAPI_INTERNAL_URL: http://fastapi:8001
-      DJANGO_DEBUG: "True"      # 개발: 템플릿/정적 핫리로드 활성 (운영에선 False)
+      DJANGO_SETTINGS_MODULE: "config.settings.prod"  # 운영 설정 고정 (DEBUG=False 강제)
       COLLECT_STATIC: "0"       # WHITENOISE_USE_FINDERS=True → collectstatic 불필요
       # prometheus_client multiprocess 모드 — drf/celery 컨테이너가 서브디렉토리별로 분리해 쓴다.
       # 같은 /app 볼륨을 공유하지만 두 컨테이너 모두 PID 1이라 동일 경로를 쓰면 histogram_1.db 충돌.
@@ -159,6 +159,7 @@ services:
     command: ["celery", "-A", "config", "worker", "-Q", "alarm", "-l", "info", "--concurrency=2"]
     env_file: ./.env.docker
     environment:
+      DJANGO_SETTINGS_MODULE: "config.settings.prod"
       REDIS_URL: redis://redis:6379/0
       FASTAPI_INTERNAL_URL: http://fastapi:8001
       RUN_MIGRATIONS: "0"
@@ -194,6 +195,7 @@ services:
     command: ["celery", "-A", "config", "worker", "-Q", "metric", "-l", "info", "--concurrency=1"]
     env_file: ./.env.docker
     environment:
+      DJANGO_SETTINGS_MODULE: "config.settings.prod"
       REDIS_URL: redis://redis:6379/0
       FASTAPI_INTERNAL_URL: http://fastapi:8001
       RUN_MIGRATIONS: "0"
@@ -228,6 +230,7 @@ services:
     command: ["celery", "-A", "config", "beat", "-l", "info"]
     env_file: ./.env.docker
     environment:
+      DJANGO_SETTINGS_MODULE: "config.settings.prod"
       REDIS_URL: redis://redis:6379/0
       RUN_MIGRATIONS: "0"
       COLLECT_STATIC: "0"
