@@ -41,6 +41,8 @@ drf-server/_eval_*.py
 .env
 *.env
 .env.docker
+.env.dev
+.env.prod
 
 # DB backups & dumps (PG 전환 + 일상 백업)
 backup/
