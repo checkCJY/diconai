@@ -14,6 +14,11 @@ import numpy as np
 import ruptures as rpt
 from pathlib import Path
 from core.config import settings
+from services.ai_mute import (
+    AIInferenceState,
+    mark_gas_ai_recent,
+    mark_gas_ai_state,
+)
 from services.anomaly_alarm import forward_inference_e2e
 from websocket.services.alarm_queue import (
     push_alarm,
@@ -170,6 +175,20 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
                         logger.warning(  # 서버 로그에 이상 감지 출력 (60초 지났을 때만)
                             f"[AI 이상탐지] co+h2s+co2 이상 감지 | device={payload.device_id} | co={payload.co} h2s={payload.h2s} co2={payload.co2}"
                         )
+                        # DRF gas_alarm 가드용 mute 마킹 — 추론 가스 3종에 한해 룰 60s 억제.
+                        # sensor_id 자리에 payload.device_id (mac) — DRF gas_alarm 측은
+                        # sensor.device_name (mac) 으로 동일 키 read.
+                        for _g in ("co", "h2s", "co2"):
+                            await mark_gas_ai_recent(
+                                sensor_id=payload.device_id,
+                                gas_type=_g,
+                                rule_level="danger",
+                            )
+                            await mark_gas_ai_state(
+                                sensor_id=payload.device_id,
+                                gas_type=_g,
+                                state=AIInferenceState.FIRED,
+                            )
                     # 이성현 수정 — forward_inference_e2e 시그니처에 맞게 수정 (push_payload/should_fire 제거)
                     # ML결과 저장은 매번, alarm_payload는 should_fire=True일 때만 전달
                     # [M-2 수정] create_task 미처리 예외가 "Task exception was never retrieved"
@@ -206,7 +225,9 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
                         )
                     )
                     _t.add_done_callback(
-                        lambda t: logger.error("[forward_inference_e2e] bg task failed: %s", t.exception())
+                        lambda t: logger.error(
+                            "[forward_inference_e2e] bg task failed: %s", t.exception()
+                        )
                         if not t.cancelled() and t.exception() is not None
                         else None
                     )
@@ -227,7 +248,9 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
                             )
                         )
                         _p.add_done_callback(
-                            lambda t: logger.error("[push_alarm] bg task failed: %s", t.exception())
+                            lambda t: logger.error(
+                                "[push_alarm] bg task failed: %s", t.exception()
+                            )
                             if not t.cancelled() and t.exception() is not None
                             else None
                         )

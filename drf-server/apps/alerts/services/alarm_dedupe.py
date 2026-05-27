@@ -129,3 +129,24 @@ def is_ai_mute_active(device_id: int | str, channel: int, rule_level: str) -> bo
         return bool(_redis().exists(key))
     except Exception:
         return False
+
+
+# ── 가스 도메인 ─────────────────────────────────────────────────────────────
+# fastapi services/ai_mute.py 의 mark_gas_ai_recent 와 동일 키 형식 — prefix
+# `ai_fired_gas:*` 로 power 와 분리. 추론 가스 3종 (co/h2s/co2) 만 적용.
+_GAS_AI_FIRED_KEY_TEMPLATE = "ai_fired_gas:{sensor_id}:{gas_type}:{rule_level}"
+
+
+def is_gas_ai_mute_active(sensor_id: int, gas_type: str, rule_level: str) -> bool:
+    """가스 룰 발화 직전 mute 가드 — AI 가 추론 가스에 발화 시 60s 정적 룰 억제.
+
+    호출자(gas_alarm.trigger_gas_alarms) 가 gas in ('co','h2s','co2') 필터링 후
+    호출하므로 본 함수는 가스 종류 제한 안 함.
+    """
+    key = _GAS_AI_FIRED_KEY_TEMPLATE.format(
+        sensor_id=sensor_id, gas_type=gas_type, rule_level=rule_level
+    )
+    try:
+        return bool(_redis().exists(key))
+    except Exception:
+        return False

@@ -29,6 +29,7 @@ import requests
 
 from core.config import settings
 from dummies._scenario import get_scenario_mode
+
 # [L-6] SLAVE_KEYS 는 power/schemas/power.py 가 단일 공급원 — 여기서 import 해 중복 제거.
 from power.schemas.power import SLAVE_KEYS
 from dummies._state_machine import (
@@ -82,6 +83,10 @@ CHANNEL_RATED: dict[int, dict[str, float]] = {
 MOTOR_CHANNELS = [1, 2, 3, 4, 5, 6, 7, 8, 12, 13, 14]
 LIGHTING_CHANNELS = [15]
 PANEL_CHANNELS = [9, 10, 11, 16]
+
+# 시연용 — single 시나리오의 random.choice 풀.
+# anomaly_inference._INFERENCE_ENABLED_CHANNELS 와 동기화 필수.
+AI_DEMO_CHANNELS = [1, 9, 14, 15]
 
 
 # ---------------------------------------------------------------------------
@@ -261,12 +266,12 @@ def _apply_mode(mode: str) -> None:
         return
 
     if mode in SCENARIO_PATTERNS:
-        # 단일 시나리오 강제 — multi 면 전 채널, 아니면 무작위 1개 모터 채널
+        # 단일 시나리오 강제 — multi 면 전 채널, 아니면 AI 학습 채널 중 1개.
         pattern = SCENARIO_PATTERNS[mode]
         targets = (
             list(range(1, 17))
             if pattern.get("multi")
-            else [random.choice(MOTOR_CHANNELS)]
+            else [random.choice(AI_DEMO_CHANNELS)]
         )
         for ch in targets:
             enter_scenario(
