@@ -272,48 +272,81 @@ curl -s http://localhost:9090/api/v1/targets | python -m json.tool | grep -E '"j
 
 ## ⚙️ 환경 변수
 
-### `drf-server/.env`
+> **설정 구조 요약**
+> - 로컬 개발: `drf-server/.env.dev` 작성 → `manage.py`가 `config.settings.dev` 자동 로드
+> - Docker 운영: `.env.docker` 작성 → `docker-compose.yml`이 컨테이너에 주입, `config.settings.prod` 고정
+> - `DEBUG` 값은 환경변수로 조정하지 않음 — `dev.py`=`True`, `prod.py`=`False` 하드코딩
+> - 실제 비밀값이 담긴 `.env*` 파일은 `.gitignore`로 git 추적 차단. git에는 `.env.example`(placeholder)만 포함.
+
+---
+
+### 로컬 개발 — `drf-server/.env.dev`
+
+```bash
+cp drf-server/.env.example drf-server/.env.dev
+```
 
 | 변수 | 예시 | 비고 |
 |---|---|---|
-| `DJANGO_SECRET_KEY` | `django-insecure-changeme-...` | **필수** — 운영 시 긴 랜덤 문자열로 교체 |
-| `DJANGO_DEBUG` | `True` | 운영 시 `False` |
-| `DJANGO_ALLOWED_HOSTS` | `127.0.0.1,localhost` | 쉼표 구분 |
+| `DJANGO_SECRET_KEY` | `django-insecure-...` | **필수** — 로컬은 임의값 가능 |
+| `DJANGO_ALLOWED_HOSTS` | `*` | 로컬은 `*` 허용 |
 | `DJANGO_LOG_LEVEL` | `INFO` | DEBUG/INFO/WARNING/ERROR |
-| `DATABASE_URL` | `postgres://user:pw@host:5432/db` | 미설정 시 SQLite (`db.sqlite3`) 폴백 |
 | `REDIS_URL` | `redis://localhost:6379/0` | Celery 브로커 + 캐시 |
-| `JWT_ACCESS_TOKEN_LIFETIME_HOURS` | `24` | JWT 액세스 토큰 만료. **Phase 5 옵트인 활성화 시 `1` 권장** |
+| `JWT_ACCESS_TOKEN_LIFETIME_HOURS` | `1` | JWT 액세스 토큰 만료 |
 | `JWT_REFRESH_TOKEN_LIFETIME_DAYS` | `30` | JWT 리프레시 토큰 만료 |
-| `JWT_SIGNING_KEY` | (빈 문자열) | **옵트인 (Phase 5)** — 빈 값 = `SECRET_KEY` 폴백. fastapi 와 동일 값 필수 |
-| `INTERNAL_SERVICE_TOKEN` | (빈 문자열) | **옵트인 (Phase 5)** — drf ingest + Celery → fastapi 인증 토큰 |
-| `ADMIN_BACKOFFICE_URL` | `/admin-panel/accounts-management/` | 어드민 백오피스 진입 URL |
+| `JWT_SIGNING_KEY` | (빈 문자열) | 빈 값 = `SECRET_KEY` 폴백 |
+| `INTERNAL_SERVICE_TOKEN` | (빈 문자열) | drf ↔ fastapi 서비스 간 인증 토큰 |
 | `FASTAPI_INTERNAL_URL` | `http://127.0.0.1:8001` | Celery → FastAPI 알람 브리지 |
-| `FRONTEND_API_BASE_URL` | (빈 문자열) | 빈 값 = same-origin. 운영 시 별도 도메인 지정 |
 | `FRONTEND_WS_BASE_URL` | `ws://127.0.0.1:8001` | 브라우저 WebSocket 접속 URL |
+| `ALARM_REPOPUP_COOLDOWN_SEC` | `15` | 시연용 — 운영은 `60` |
 
-### `fastapi-server/.env`
+---
+
+### Docker 운영 — `.env.docker`
+
+```bash
+cp .env.docker.example .env.docker
+# 아래 명령으로 각 키 값 생성 후 .env.docker에 기입
+python -c "import secrets; print(secrets.token_urlsafe(50))"  # DJANGO_SECRET_KEY
+python -c "import secrets; print(secrets.token_urlsafe(32))"  # INTERNAL_SERVICE_TOKEN, JWT_SIGNING_KEY
+```
+
+| 변수 | 예시 | 비고 |
+|---|---|---|
+| `DJANGO_SECRET_KEY` | (긴 랜덤 문자열) | **필수** — 운영은 반드시 랜덤값 |
+| `DJANGO_ALLOWED_HOSTS` | `localhost,127.0.0.1` | **필수** — 미설정 시 서버 기동 실패 |
+| `POSTGRES_DB` | `diconai` | PostgreSQL DB명 |
+| `POSTGRES_USER` | `diconai` | PostgreSQL 사용자 |
+| `POSTGRES_PASSWORD` | (랜덤값) | **필수** |
+| `POSTGRES_HOST` | `postgres` | docker-compose 서비스명 |
+| `POSTGRES_PORT` | `5432` | 기본값 |
+| `REDIS_URL` | `redis://redis:6379/0` | docker-compose 서비스명 |
+| `JWT_SIGNING_KEY` | (랜덤값) | 빈 값 = `SECRET_KEY` 폴백 (비권장) |
+| `INTERNAL_SERVICE_TOKEN` | (랜덤값) | drf ↔ fastapi 서비스 간 인증 토큰 |
+| `GRAFANA_PASSWORD` | (임의값) | Grafana admin 비밀번호 |
+| `ALARM_REPOPUP_COOLDOWN_SEC` | `60` | 운영 기본값 |
+
+---
+
+### FastAPI — `fastapi-server/.env`
+
+```bash
+cp fastapi-server/.env.example fastapi-server/.env
+```
 
 | 변수 | 예시 | 비고 |
 |---|---|---|
 | `LOG_LEVEL` | `INFO` | DEBUG/INFO/WARNING/ERROR |
-| `DRF_BASE_URL` | `http://localhost:8000` | DRF 호출용 |
-| `DRF_SERVICE_TOKEN` | (빈 문자열) | fastapi → drf 호출 시 `Authorization: Bearer` 헤더 부착. **옵트인 활성화 시 `INTERNAL_SERVICE_TOKEN` 과 동일 값 필수** |
-| `DRF_REQUEST_TIMEOUT_SEC` | `5.0` | DRF 호출 타임아웃 |
-| `INTERNAL_SERVICE_TOKEN` | (빈 문자열) | **옵트인 (Phase 5)** — drf 가 보내는 헤더 검증용. drf 와 동일 값 |
-| `JWT_SIGNING_KEY` | (빈 문자열) | **옵트인 (Phase 5)** — WS JWT 검증용. drf 와 동일 값 |
-| `JWT_ALGORITHM` | `HS256` | JWT 서명 알고리즘. 기본값 그대로 사용 권장 |
+| `DRF_BASE_URL` | `http://localhost:8000` | DRF 호출용 (Docker: `http://drf:8000`) |
+| `DRF_SERVICE_TOKEN` | (빈 문자열) | fastapi → drf 인증 토큰. `INTERNAL_SERVICE_TOKEN`과 동일 값 |
+| `INTERNAL_SERVICE_TOKEN` | (빈 문자열) | drf가 보내는 헤더 검증용. drf와 동일 값 |
+| `JWT_SIGNING_KEY` | (빈 문자열) | WS JWT 검증용. drf와 동일 값 |
 | `BROADCAST_INTERVAL_SEC` | `5.0` | 센서 WebSocket 브로드캐스트 주기 |
 | `DATA_STALE_THRESHOLD_SEC` | `8.0` | 데이터 미수신 판정 임계 |
-| `POWER_THRESHOLD_CAUTION` | `2200` | (Phase 4 이후 deprecated — DB `Threshold` 모델로 이전, fallback 폴백용으로만 유지) |
-| `POWER_THRESHOLD_DANGER` | `2860` | (위와 동일) |
 | `DUMMY_TARGET_HOST` | `127.0.0.1` | 더미 송출 대상 호스트 |
 | `DUMMY_TARGET_PORT` | `8001` | 더미 송출 대상 포트 |
 | `DUMMY_SEND_INTERVAL_SEC` | `1.0` | 더미 송출 주기 (초) |
 | `DUMMY_RISK_PROBABILITY` | `0.1` | 더미 위험 발생 확률 (0~1) |
-
-> 모든 변수는 [drf-server/.env.example](drf-server/.env.example), [fastapi-server/.env.example](fastapi-server/.env.example)에 동일한 키/기본값으로 정의되어 있습니다 — `cp .env.example .env` 후 필요한 값만 수정하세요.
->
-> **이번 브랜치 적용 가이드**: 5분 cheatsheet [docs/refactor/waves/2026_05_09/TEAM_BRIEF.md §2-bis](docs/refactor/waves/2026_05_09/TEAM_BRIEF.md), 머지·운영자용 상세 절차 [docs/refactor/waves/2026_05_09/MIGRATION_GUIDE.md](docs/refactor/waves/2026_05_09/MIGRATION_GUIDE.md). Phase 5 옵트인 활성화 매트릭스는 TEAM_BRIEF §6 참조.
 
 ---
 
