@@ -204,3 +204,106 @@ async def get_ai_state(
             value,
         )
         return None
+
+
+# ── 가스 도메인 ─────────────────────────────────────────────────────────────
+# 가스는 channel 개념이 없고 gas_type (str) 으로 식별 — 별도 함수·키 prefix 로
+# power 키 공간과 분리. 추론은 다변량 (co+h2s+co2) 이라 mute 마킹은 3가스 각각
+# 호출 (option B — 추론 가스 3종만 룰 mute).
+
+_GAS_AI_FIRED_KEY_TEMPLATE = "ai_fired_gas:{sensor_id}:{gas_type}:{rule_level}"
+_GAS_AI_STATE_KEY_TEMPLATE = "ai_state_gas:{sensor_id}:{gas_type}"
+
+
+async def mark_gas_ai_recent(
+    sensor_id: int | None,
+    gas_type: str | None,
+    rule_level: str,
+    ttl_sec: int = AI_MUTE_TTL_SEC,
+) -> None:
+    """가스 AI 발화 마킹 — DRF gas_alarm 가드가 같은 키 read.
+
+    추론 가스 3종 (co/h2s/co2) 각각에 대해 호출. 격상 케이스 처리 위해
+    rule_level '이하' 키 모두 set (mark_ai_recent 패턴 동일).
+    """
+    if sensor_id is None or gas_type is None:
+        return
+    if rule_level not in _LEVELS_AT_OR_BELOW:
+        logger.warning("[ai_mute] gas unknown rule_level=%s — skip", rule_level)
+        return
+
+    try:
+        r = get_redis()
+        for lv in _LEVELS_AT_OR_BELOW[rule_level]:
+            key = _GAS_AI_FIRED_KEY_TEMPLATE.format(
+                sensor_id=sensor_id, gas_type=gas_type, rule_level=lv
+            )
+            await r.set(key, "1", ex=ttl_sec)
+    except Exception:
+        logger.warning(
+            "[ai_mute] mark_gas_ai_recent failed sensor=%s gas=%s lv=%s — silent fail",
+            sensor_id,
+            gas_type,
+            rule_level,
+        )
+
+
+async def mark_gas_ai_state(
+    sensor_id: int | None,
+    gas_type: str | None,
+    state: AIInferenceState,
+    ttl_sec: int = AI_MUTE_TTL_SEC,
+) -> None:
+    """가스 AI 추론 5 state 마킹 — decide_gas_alarm 매트릭스 입력."""
+    if sensor_id is None or gas_type is None:
+        return
+    if not isinstance(state, AIInferenceState):
+        logger.warning("[ai_mute] mark_gas_ai_state invalid state=%r — skip", state)
+        return
+
+    key = _GAS_AI_STATE_KEY_TEMPLATE.format(sensor_id=sensor_id, gas_type=gas_type)
+    try:
+        r = get_redis()
+        await r.set(key, state.value, ex=ttl_sec)
+    except Exception:
+        logger.warning(
+            "[ai_mute] mark_gas_ai_state failed sensor=%s gas=%s state=%s — silent fail",
+            sensor_id,
+            gas_type,
+            state.value,
+        )
+
+
+async def get_gas_ai_state(
+    sensor_id: int | None,
+    gas_type: str | None,
+) -> AIInferenceState | None:
+    """가스 AI state 조회. 없거나 만료면 None — decide_gas_alarm 이 fail-safe."""
+    if sensor_id is None or gas_type is None:
+        return None
+
+    key = _GAS_AI_STATE_KEY_TEMPLATE.format(sensor_id=sensor_id, gas_type=gas_type)
+    try:
+        r = get_redis()
+        raw = await r.get(key)
+    except Exception:
+        logger.warning(
+            "[ai_mute] get_gas_ai_state failed sensor=%s gas=%s — fail-open None",
+            sensor_id,
+            gas_type,
+        )
+        return None
+
+    if raw is None:
+        return None
+    value = raw.decode() if isinstance(raw, (bytes, bytearray)) else str(raw)
+    try:
+        return AIInferenceState(value)
+    except ValueError:
+        logger.warning(
+            "[ai_mute] get_gas_ai_state unknown value sensor=%s gas=%s value=%r",
+            sensor_id,
+            gas_type,
+            value,
+        )
+        return None

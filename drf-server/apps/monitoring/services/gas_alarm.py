@@ -19,6 +19,7 @@ from django.core.cache import cache
 from apps.alerts.services.alarm_dedupe import (
     clear_state,
     get_state,
+    is_gas_ai_mute_active,
     try_transition,
 )
 from apps.alerts.tasks import (
@@ -27,6 +28,11 @@ from apps.alerts.tasks import (
     fire_danger_alarm_task,
     fire_warning_alarm_task,
 )
+
+# AI 추론 대상 가스 — fastapi gas_service co+h2s+co2 다변량 IF 와 일치.
+# 이 3종만 mute 가드 적용 (option B). 나머지 6종 (no2/so2/o3/nh3/voc/o2/lel) 은
+# AI 추론 범위 밖이라 정적 룰 단독 발화.
+_AI_GUARDED_GASES = {"co", "h2s", "co2"}
 
 GAS_FIELDS = ["co", "h2s", "co2", "o2", "no2", "so2", "o3", "nh3", "voc"]
 
@@ -95,15 +101,32 @@ def trigger_gas_alarms(gas_data, ingress_ts: float | None = None) -> list[dict]:
                 _revoke(pending_task_id)
                 cache.delete(task_key)
 
+            # AI mute 가드 (option B) — 추론 가스 3종에 한해 AI 발화 직후 60s 룰 억제.
+            # fastapi mark_gas_ai_recent 와 같은 sensor.device_name (mac) 키 사용.
+            if gas in _AI_GUARDED_GASES and is_gas_ai_mute_active(
+                sensor.device_name, gas, "danger"
+            ):
+                continue
+
             # 원자 천이 — 직전 상태가 danger 아닐 때만 1회 fire (race-safe)
             if try_transition(state_key, "danger", _CACHE_TTL):
                 fire_danger_alarm_task.delay(
-                    sensor_id, gas, value, facility_id, source_label, ingress_ts=ingress_ts
+                    sensor_id,
+                    gas,
+                    value,
+                    facility_id,
+                    source_label,
+                    ingress_ts=ingress_ts,
                 )
 
         elif risk == "warning":
             prev_state = get_state(state_key)
             if prev_state in ("warning", "danger"):
+                continue
+            # AI mute 가드 — danger 와 동일 패턴.
+            if gas in _AI_GUARDED_GASES and is_gas_ai_mute_active(
+                sensor.device_name, gas, "warning"
+            ):
                 continue
             # SETNX(cache.add)로 첫 도착자만 타이머 시작 — race 차단.
             # TTL 은 _TASK_KEY_TTL (카운트다운 + 5s) — 정상 종료 시 tasks.py 가

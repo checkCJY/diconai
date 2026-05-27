@@ -182,9 +182,7 @@ def fire_danger_alarm_task(
         raise self.retry(exc=exc)
 
     if event is not None and alarm is not None:
-        ALARM_FIRED_TOTAL.labels(
-            alarm_type="gas_threshold", risk_level="danger"
-        ).inc()
+        ALARM_FIRED_TOTAL.labels(alarm_type="gas_threshold", risk_level="danger").inc()
         try:
             _push_to_ws(
                 {
@@ -269,9 +267,7 @@ def fire_warning_alarm_task(
         raise self.retry(exc=exc)
 
     if event is not None and alarm is not None:
-        ALARM_FIRED_TOTAL.labels(
-            alarm_type="gas_threshold", risk_level="warning"
-        ).inc()
+        ALARM_FIRED_TOTAL.labels(alarm_type="gas_threshold", risk_level="warning").inc()
         try:
             _push_to_ws(
                 {
@@ -412,7 +408,18 @@ def fire_clear_notification_task(
             },
             raise_on_failure=False,
         )
-        logger.info("정상화 알림 발송 | sensor=%s gases=%s", sensor_id, gas_types)
+        # 관련 ACTIVE 가스 Event 자동 RESOLVED — 운영자 수동 클릭 없이 정리.
+        from apps.alerts.services.event_service import auto_resolve_active_events
+
+        resolved = auto_resolve_active_events(
+            event_type_prefix="gas", sensor_id=sensor_id
+        )
+        logger.info(
+            "정상화 알림 발송 | sensor=%s gases=%s resolved=%d",
+            sensor_id,
+            gas_types,
+            resolved,
+        )
 
     except Exception as exc:
         logger.error("정상화 알림 실패: %s", exc)
@@ -460,9 +467,7 @@ def fire_power_danger_task(
         raise self.retry(exc=exc)
 
     if event is not None and alarm is not None:
-        ALARM_FIRED_TOTAL.labels(
-            alarm_type="power_overload", risk_level="danger"
-        ).inc()
+        ALARM_FIRED_TOTAL.labels(alarm_type="power_overload", risk_level="danger").inc()
         try:
             _push_to_ws(
                 {
@@ -588,7 +593,7 @@ def fire_power_clear_task(
     channel: int,
     source_label: str,
 ):
-    """전력 정상화 알림 — WS 알림만 발송. 이벤트 상태는 운영자가 직접 변경."""
+    """전력 정상화 알림 — WS 알림 + 관련 ACTIVE Event 자동 RESOLVED."""
     from apps.alerts.models import AlarmRecord
 
     try:
@@ -610,7 +615,18 @@ def fire_power_clear_task(
             },
             raise_on_failure=False,
         )
-        logger.info("전력 정상화 알림 | device=%s ch=%s", device_id, channel)
+        # 관련 ACTIVE 전력 Event 자동 RESOLVED — 운영자 수동 클릭 없이 정리.
+        from apps.alerts.services.event_service import auto_resolve_active_events
+
+        resolved = auto_resolve_active_events(
+            event_type_prefix="power", power_device_id=device_id
+        )
+        logger.info(
+            "전력 정상화 알림 | device=%s ch=%s resolved=%d",
+            device_id,
+            channel,
+            resolved,
+        )
     except Exception as exc:
         logger.error("전력 정상화 알림 실패: %s", exc)
         raise self.retry(exc=exc)

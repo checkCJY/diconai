@@ -20,11 +20,15 @@ def _notify_safe(event) -> None:
     """
     import logging
     from apps.notifications.services.notification_service import notify_event_created
+
     logger = logging.getLogger(__name__)
     try:
         notify_event_created(event)
     except Exception as exc:
-        logger.error(f"[notify_event_created] event_id={event.id} 알림 생성 실패: {exc}")
+        logger.error(
+            f"[notify_event_created] event_id={event.id} 알림 생성 실패: {exc}"
+        )
+
 
 # 재푸시 cooldown 은 settings.ALARM_REPOPUP_COOLDOWN_SEC 에서 주입 (2026-05-15 알람 재설계).
 # 기존 RENOTIFY_COOLDOWN_MINUTES=1 상수에서 env 변수화 — 운영 60s / 시연 15s 로 분기 가능.
@@ -119,9 +123,10 @@ def create_alarm_and_event(
             # [M-12] 위험도 상승 이력을 EventLog 에 기록한다.
             # 이유: WARNING → DANGER 천이는 중요한 상태 변화지만 기존 코드에서
             # EventLog 가 남지 않아 사고 소급 분석 시 이 구간이 공백이었다.
-            if RISK_LEVELS.index(risk_level) > RISK_LEVELS.index(
+            risk_escalated = RISK_LEVELS.index(risk_level) > RISK_LEVELS.index(
                 active_event.risk_level
-            ):
+            )
+            if risk_escalated:
                 prev_risk = active_event.risk_level
                 active_event.risk_level = risk_level
                 EventLog.objects.create(
@@ -132,10 +137,11 @@ def create_alarm_and_event(
                     note=f"위험도 상승: {prev_risk} → {risk_level}",
                 )
 
-            # 쿨다운 초과 시 재알림: last_notified_at 갱신 후 alarm 반환
+            # 쿨다운 초과 시 재알림. 위험도 상승은 cooldown 무시 (격상 즉시 알림 — escalation).
             cooldown = timedelta(seconds=settings.ALARM_REPOPUP_COOLDOWN_SEC)
             needs_renotify = (
-                active_event.last_notified_at is None
+                risk_escalated
+                or active_event.last_notified_at is None
                 or (timezone.now() - active_event.last_notified_at) >= cooldown
             )
             if needs_renotify:
@@ -233,3 +239,49 @@ def acknowledge_event(event_id: int, actor_user_id: int, note: str = ""):
         new_status=EventStatus.ACKNOWLEDGED,
         note=note,
     )
+
+
+def auto_resolve_active_events(
+    *,
+    event_type_prefix: str,
+    sensor_id: int | None = None,
+    power_device_id: int | None = None,
+    note: str = "자동 정상화 (시나리오 NORMAL 복귀)",
+) -> int:
+    """정상 복귀 시 관련 ACTIVE Event 일괄 RESOLVED 처리.
+
+    Why: fire_clear_*_task 가 토스트만 발송하던 결함 — 시나리오 RAMP_DOWN 후
+    Event 가 ACTIVE 잔존해 시연 반복 시 누적. EventLog 로 audit trail 유지.
+
+    sensor_id/power_device_id 둘 중 정확히 하나만 지정.
+    Returns RESOLVED 처리된 Event 수.
+    """
+    qs = Event.objects.filter(
+        event_type__startswith=event_type_prefix,
+        status=EventStatus.ACTIVE,
+    )
+    if sensor_id:
+        qs = qs.filter(source_sensor_id=sensor_id)
+    elif power_device_id:
+        qs = qs.filter(source_power_device_id=power_device_id)
+    else:
+        return 0
+
+    events = list(qs)
+    if not events:
+        return 0
+
+    now = timezone.now()
+    for event in events:
+        previous = event.status
+        event.status = EventStatus.RESOLVED
+        event.resolved_at = now
+        event.save(update_fields=["status", "resolved_at"])
+        EventLog.objects.create(
+            event=event,
+            action=EventLog.Action.RESOLVED,
+            previous_status=previous,
+            new_status=EventStatus.RESOLVED,
+            note=note,
+        )
+    return len(events)
