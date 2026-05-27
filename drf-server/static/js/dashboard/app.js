@@ -15,6 +15,9 @@ async function initApp() {
   await initHeaderAndSNB();
 
   initCharts();
+  // SoT 임계치 fetch — 가스 + 전력. WS 보다 먼저 끝나야 _switchPowerChart 가
+  // 채널별 임계치를 올바르게 lookup. 실패 시 fallback 으로 동작.
+  await loadDashboardThresholds();
   await MapPanel.init();
   initWebSocket();
   AlarmPopup.init();
