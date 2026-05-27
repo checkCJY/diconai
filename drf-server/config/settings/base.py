@@ -209,6 +209,10 @@ USE_TZ = True
 # ── 로깅 ──────────────────────────────────────────────────────
 LOG_LEVEL = env("DJANGO_LOG_LEVEL", default="INFO")
 
+# 파일 로깅용 디렉토리 — settings 로드 시 자동 생성 (로컬·컨테이너 모두 보장)
+LOGS_DIR = BASE_DIR / "logs"
+LOGS_DIR.mkdir(parents=True, exist_ok=True)
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -230,15 +234,49 @@ LOGGING = {
             "level": "ERROR",
             "formatter": "diconai",
         },
+        # ERROR 로그 파일 (100MB × 10 = 1GB 캡) — Docker 재시작 후에도 흔적 보존
+        "file_error": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": str(LOGS_DIR / "error.log"),
+            "maxBytes": 100 * 1024 * 1024,
+            "backupCount": 10,
+            "level": "ERROR",
+            "formatter": "diconai",
+            "encoding": "utf-8",
+        },
+        # INFO 로그 파일 (50MB × 5 = 250MB 캡) — 알람·운영 태스크 화이트리스트만
+        "file_app": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": str(LOGS_DIR / "app.log"),
+            "maxBytes": 50 * 1024 * 1024,
+            "backupCount": 5,
+            "level": "INFO",
+            "formatter": "diconai",
+            "encoding": "utf-8",
+        },
     },
     "root": {
-        "handlers": ["console", "applog_db"],
+        # file_app은 root 제외 — 모든 INFO 잡히면 라이브러리 노이즈 폭증
+        # file_error는 root 유지 — ERROR는 어디서 터져도 흔적 남아야 안전
+        "handlers": ["console", "applog_db", "file_error"],
         "level": LOG_LEVEL,
     },
     "loggers": {
         "django.request": {
-            "handlers": ["console"],
+            "handlers": ["console", "file_error"],
             "level": "WARNING",
+            "propagate": False,
+        },
+        # 알람 흐름 — app.log 화이트리스트
+        "apps.alerts": {
+            "handlers": ["console", "file_app", "file_error"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        # Celery beat 태스크 — app.log 화이트리스트
+        "apps.operations.tasks": {
+            "handlers": ["console", "file_app", "file_error"],
+            "level": "INFO",
             "propagate": False,
         },
     },

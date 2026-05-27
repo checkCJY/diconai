@@ -21,7 +21,6 @@ from datetime import datetime
 
 from django.utils import timezone
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
-from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.core.pagination import AdminPagination
@@ -56,6 +55,7 @@ def _parse_date(value: str):
 # ────────────────────────────────────────────
 # 1. 시스템 로그 조회
 # ────────────────────────────────────────────
+
 
 class AppLogAdminListView(APIView):
     """
@@ -93,8 +93,12 @@ class AppLogAdminListView(APIView):
                 required=False,
                 description="message 또는 service_module 검색",
             ),
-            OpenApiParameter(name="date_from", type=str, required=False, description="YYYY-MM-DD"),
-            OpenApiParameter(name="date_to", type=str, required=False, description="YYYY-MM-DD"),
+            OpenApiParameter(
+                name="date_from", type=str, required=False, description="YYYY-MM-DD"
+            ),
+            OpenApiParameter(
+                name="date_to", type=str, required=False, description="YYYY-MM-DD"
+            ),
             OpenApiParameter(name="page", type=int, required=False),
             OpenApiParameter(name="page_size", type=int, required=False),
         ],
@@ -133,6 +137,7 @@ class AppLogAdminListView(APIView):
             # message나 service_module 중 하나라도 포함되면 반환
             # | 연산자: OR 조건. Q객체를 쓰는 이유는 두 필드를 동시에 검색하기 위해서
             from django.db.models import Q
+
             qs = qs.filter(
                 Q(message__icontains=keyword) | Q(service_module__icontains=keyword)
             )
@@ -146,6 +151,7 @@ class AppLogAdminListView(APIView):
             # 종료일은 해당 날짜의 끝(23:59:59)까지 포함되도록 하루를 더한 후 lt 사용
             # date_to = 2026-04-12 이면 2026-04-13 00:00:00 미만 = 2026-04-12 전체 포함
             from datetime import timedelta
+
             qs = qs.filter(created_at__lt=date_to + timedelta(days=1))
 
         # ── 정렬: 최신순 고정 ──────────────────────
@@ -162,6 +168,7 @@ class AppLogAdminListView(APIView):
 # ────────────────────────────────────────────
 # 2. 연동 로그 조회
 # ────────────────────────────────────────────
+
 
 class IntegrationLogAdminListView(APIView):
     """
@@ -197,8 +204,12 @@ class IntegrationLogAdminListView(APIView):
                 required=False,
                 description="target_system 또는 description 검색",
             ),
-            OpenApiParameter(name="date_from", type=str, required=False, description="YYYY-MM-DD"),
-            OpenApiParameter(name="date_to", type=str, required=False, description="YYYY-MM-DD"),
+            OpenApiParameter(
+                name="date_from", type=str, required=False, description="YYYY-MM-DD"
+            ),
+            OpenApiParameter(
+                name="date_to", type=str, required=False, description="YYYY-MM-DD"
+            ),
             OpenApiParameter(name="page", type=int, required=False),
             OpenApiParameter(name="page_size", type=int, required=False),
         ],
@@ -228,6 +239,7 @@ class IntegrationLogAdminListView(APIView):
         keyword = request.query_params.get("keyword", "").strip()
         if keyword:
             from django.db.models import Q
+
             qs = qs.filter(
                 Q(target_system__icontains=keyword) | Q(description__icontains=keyword)
             )
@@ -239,6 +251,7 @@ class IntegrationLogAdminListView(APIView):
         date_to = _parse_date(request.query_params.get("date_to", ""))
         if date_to:
             from datetime import timedelta
+
             qs = qs.filter(created_at__lt=date_to + timedelta(days=1))
 
         qs = qs.order_by("-created_at")
