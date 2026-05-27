@@ -67,80 +67,12 @@
       ]
     },
     {
-      "id": 3,
-      "title": "SQLite DB 크기 (B3 — 5GB 경고 / 10GB 경보)",
-      "type": "timeseries",
-      "gridPos": {
-        "x": 0,
-        "y": 8,
-        "w": 12,
-        "h": 8
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bytes",
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 10,
-            "spanNulls": false
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 5368709120
-              },
-              {
-                "color": "red",
-                "value": 10737418240
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "tooltip": {
-          "mode": "multi",
-          "sort": "none"
-        },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sqlite_db_size_bytes",
-          "legendFormat": "DB 크기",
-          "refId": "A"
-        }
-      ]
-    },
-    {
       "id": 4,
       "title": "Redis 명령 latency p95 (P1 — lpush / brpop, 5m)",
       "description": "alarm_queue LPUSH/BRPOP 명령 실행 시간. E2E latency 급등 시 Redis 병목 여부 판단용.",
       "type": "timeseries",
       "gridPos": {
-        "x": 12,
+        "x": 0,
         "y": 8,
         "w": 12,
         "h": 8
@@ -194,6 +126,166 @@
           "refId": "B"
         }
       ]
+    },
+    {
+      "id": 5,
+      "title": "Redis 연결 클라이언트 수",
+      "description": "현재 Redis에 연결된 클라이언트 수. 50 이상이면 연결 풀 점검, 100 이상이면 이상 신호.",
+      "type": "stat",
+      "gridPos": { "x": 12, "y": 8, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 100 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background"
+      },
+      "targets": [
+        {
+          "expr": "redis_connected_clients",
+          "legendFormat": "연결 수",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Redis 메모리 사용량",
+      "description": "Redis가 현재 사용 중인 메모리. 256MB 이상이면 점검, 512MB 이상이면 maxmemory 정책 확인.",
+      "type": "stat",
+      "gridPos": { "x": 18, "y": 8, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 268435456 },
+              { "color": "red", "value": 536870912 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background"
+      },
+      "targets": [
+        {
+          "expr": "redis_memory_used_bytes",
+          "legendFormat": "메모리",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Redis keyspace hit ratio (5m)",
+      "description": "Redis 키 조회 중 캐시 히트 비율. 0.8 미만이면 TTL 설정 또는 캐시 워밍 전략 점검.",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10, "spanNulls": false }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }
+      },
+      "targets": [
+        {
+          "expr": "rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m]))",
+          "legendFormat": "keyspace hit ratio",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Cache hit rate — prefix별 (5m)",
+      "description": "Django 애플리케이션 캐시(alert_policies, menu_tree)의 히트율. 알람 발화마다 alert_policies를 조회하므로 hit rate가 낮으면 DB 부하 증가.",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10, "spanNulls": false }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }
+      },
+      "targets": [
+        {
+          "expr": "sum by (prefix) (rate(cache_hit_total[5m])) / (sum by (prefix) (rate(cache_hit_total[5m])) + sum by (prefix) (rate(cache_miss_total[5m])))",
+          "legendFormat": "{{prefix}} hit rate",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Cache hit / miss 건수 — prefix별 (5m)",
+      "description": "prefix별 캐시 히트·미스 건수. miss가 급증하면 TTL 만료 또는 캐시 무효화 빈도 점검.",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cps",
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10, "spanNulls": false }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }
+      },
+      "targets": [
+        {
+          "expr": "sum by (prefix) (rate(cache_hit_total[5m]))",
+          "legendFormat": "{{prefix}} hit",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (prefix) (rate(cache_miss_total[5m]))",
+          "legendFormat": "{{prefix}} miss",
+          "refId": "B"
+        }
+      ]
     }
   ],
   "schemaVersion": 39,
@@ -211,6 +303,6 @@
   "timezone": "",
   "title": "diconai — DB & Redis",
   "uid": "diconai-db-redis",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }

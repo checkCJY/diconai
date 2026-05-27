@@ -11,7 +11,8 @@ from celery.signals import (
     worker_process_shutdown,
 )
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+# Celery 워커는 docker-compose에서 실행 → prod 설정 기본값
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.prod")
 
 app = Celery("diconai")
 
