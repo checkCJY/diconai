@@ -182,12 +182,25 @@ const AlarmToastStack = {
 
   push(data) {
     const eventId = data.event_id || data.id;
-    if (eventId != null && this._items.has(eventId)) return;
     const level = data.alarm_level;
     if (level !== 'danger' && level !== 'warning') return;
 
+    // 위험도 격상 — 같은 event 의 warning → danger 면 기존 토스트 dismiss 후 새로 띄움.
+    // 동일/하향은 기존 dedup 유지 (스팸 방지).
+    if (eventId != null && this._items.has(eventId)) {
+      const existing = this._items.get(eventId);
+      const existingLevel = existing.dataset.alarmLevel;
+      if (level === 'danger' && existingLevel === 'warning') {
+        this._dismiss(eventId, existing);
+        // fallthrough — 아래에서 새 토스트 생성
+      } else {
+        return;
+      }
+    }
+
     const container = this._ensureContainer();
     const item = this._createItem(data, level);
+    item.dataset.alarmLevel = level;     // 다음 격상 비교용
     container.appendChild(item);
     if (eventId != null) this._items.set(eventId, item);
 
@@ -424,8 +437,9 @@ const AlarmPopup = {
   isOpen:       false,
   _inited:      false,
   _currentId:   null,
+  _currentLevel: null,    // 격상 비교용 — 현재 떠있는 모달의 risk_level
   droppedCount: 0,           // 큐 풀 시 누적 (운영 가시성 — 03 R2)
-  MAX_QUEUE:    5,
+  MAX_QUEUE:    30,          // 다채널 동시 발화 폭주 시 drop 회피 (5 → 30)
   GROUP_WINDOW_MS: 5000,     // 같은 센서·동일 레벨 연속 알람 그룹핑 윈도우
 
   show(data) {
@@ -450,6 +464,21 @@ const AlarmPopup = {
     // user-scoped ack 분기 (Phase 1 옵션 A) — 본인이 이미 ack 한 event 면 팝업 skip.
     // 이벤트 패널 표시 (newAlarmEvent) 는 alarm-ws.js 가 별도로 발행하므로 영향 없음.
     const eventId = data.event_id || data.id;
+
+    // 위험도 격상 — 같은 event 가 warning → danger 로 올라온 경우 현재 모달 강제 교체.
+    // dedup/큐 우회: 운영자 시각에 격상 즉시 반영. ack 무시 (격상은 더 큰 위험).
+    if (
+      this.isOpen
+      && eventId != null
+      && eventId === this._currentId
+      && this._currentLevel === 'warning'
+      && level === 'danger'
+    ) {
+      this.queue.unshift(data);          // 큐 맨 앞에 — close 후 _process 가 즉시 픽업
+      this.close({ acknowledged: false });
+      return;
+    }
+
     if (_AckStore.has(eventId)) return;
 
     // 2026-05-17 D 옵션 — 60s 클라 dedup. 같은 알람이 60s 안 재도착하면 팝업 skip
@@ -532,6 +561,7 @@ const AlarmPopup = {
     const level = data.alarm_level;
     const cfg   = _POPUP_CFG[level] || _POPUP_CFG.danger;
     this._currentId = data.event_id || data.id || null;
+    this._currentLevel = level;
 
     const popup = document.getElementById('alarm-popup');
     if (!popup) { this.isOpen = false; return; }
@@ -654,6 +684,7 @@ const AlarmPopup = {
       this._renderDropBadge();
     }
     this._currentId = null;
+    this._currentLevel = null;
     const popup = document.getElementById('alarm-popup');
     if (popup) {
       popup.style.display = 'none';
