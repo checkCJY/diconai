@@ -1,0 +1,33 @@
+apiVersion: v1 # k8s API 버전 선언
+kind: ConfigMap # 비밀이 아닌 설정값 저장 리소스 (Secret과 짝을 이룸)
+metadata: # 이 ConfigMap의 메타데이터
+  name: diconai-config # 다른 파일에서 configMapKeyRef로 이 이름을 참조함
+  namespace: diconai # namespace.yaml에서 만든 diconai 네임스페이스에 소속
+data: # 실제 설정값 목록 (평문 저장, base64 불필요)
+  DJANGO_DEBUG: "False" # 운영 모드 (True면 에러 상세 노출 — k8s에선 항상 False)
+  DJANGO_ALLOWED_HOSTS: "drf,localhost,127.0.0.1" # Django가 요청 수락할 호스트명 목록
+  DJANGO_LOG_LEVEL: "INFO" # Django 로그 레벨
+  JWT_ALGORITHM: "HS256" # JWT 서명 알고리즘 (drf ↔ fastapi 공유)
+  JWT_ACCESS_TOKEN_LIFETIME_HOURS: "2" # 액세스 토큰 유효 시간 (시간 단위)
+  JWT_REFRESH_TOKEN_LIFETIME_DAYS: "7" # 리프레시 토큰 유효 기간 (일 단위)
+  DRF_REQUEST_TIMEOUT_SEC: "5.0" # fastapi → drf 내부 호출 타임아웃 (초)
+  ADMIN_BACKOFFICE_URL: "/admin-panel/accounts-management/" # 어드민 백오피스 접근 경로
+  FRONTEND_API_BASE_URL: "" # 빈 문자열 = same-origin (Django와 같은 도메인)
+  FRONTEND_WS_BASE_URL: "ws://localhost:8001" # 브라우저가 접속할 WebSocket 주소
+  LOG_LEVEL: "INFO" # FastAPI 로그 레벨
+  BROADCAST_INTERVAL_SEC: "5.0" # FastAPI가 센서 데이터를 WebSocket으로 브로드캐스트하는 주기 (초)
+  DATA_STALE_THRESHOLD_SEC: "8.0" # 마지막 수신 후 이 시간 초과 시 데이터 stale 처리 (초)
+  POWER_THRESHOLD_CAUTION: "2200" # 전력 주의 임계값 (W)
+  POWER_THRESHOLD_DANGER: "2860" # 전력 위험 임계값 (W)
+  DUMMY_TARGET_HOST: "fastapi" # 더미 데이터 송출 대상 호스트 (k8s Service 이름)
+  DUMMY_TARGET_PORT: "8001" # 더미 데이터 송출 대상 포트
+  DUMMY_SEND_INTERVAL_SEC: "1.0" # 더미 데이터 송출 주기 (초)
+  DUMMY_RISK_PROBABILITY: "0.1" # 더미에서 위험 이벤트 발생 확률 (10%)
+  NOTIFICATION_DELAY_THRESHOLD_MINUTES: "5" # 알림 지연 감지 임계 (분)
+  POSTGRES_DB: "diconai" # 접속할 PostgreSQL 데이터베이스 이름
+  POSTGRES_USER: "diconai" # PostgreSQL 접속 계정 (비밀번호는 Secret에서 주입)
+  POSTGRES_HOST: "postgres" # k8s Service 이름 — docker-compose 컨테이너명과 동일하게 맞춤
+  POSTGRES_PORT: "5432" # PostgreSQL 기본 포트
+  REDIS_URL: "redis://redis:6379/0" # Redis 연결 URL (redis = k8s Service 이름, /0 = DB 인덱스)
+  FASTAPI_INTERNAL_URL: "http://fastapi:8001" # drf → fastapi 내부 호출 URL
+  DRF_BASE_URL: "http://drf:8000" # fastapi → drf 내부 호출 URL
