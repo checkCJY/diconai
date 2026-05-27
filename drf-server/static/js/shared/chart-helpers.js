@@ -73,9 +73,11 @@ function _drawChip(ctx, xRight, y, text, color, opts) {
 
 /* ── thresholdZones 플러그인 ───────────────────────────────
    기존: annotation box 가 차트 면적 70% 점유 → 막대가 묻힘.
-   신규: dashed 라인 + 우측 칩 라벨로 표시. fill 제거.
+   신규: dashed 라인만 그림. chip 라벨은 카드 헤더의 HTML 영역으로 이동 (chart-chips).
 
-   options.thresholds: [{ at: number, color: 'warn'|'danger', label: string }] */
+   options.thresholds: [{ at: number, color: 'warn'|'danger', label: string }]
+   options.showChip: bool (default false) — 차트 안에 chip 도 그릴지 여부. 카드
+   헤더 chip 사용 시 false 권장. line 만 그리고 라벨은 HTML 로. */
 const thresholdZones = {
   id: 'thresholdZones',
   afterDatasetsDraw(chart, args, opts) {
@@ -100,7 +102,9 @@ const thresholdZones = {
       ctx.restore();
     });
 
-    // 칩 라벨 — 겹침 방지로 y 정렬 후 최소 간격 확보
+    // 차트 안 chip 라벨은 showChip=true 일 때만 (옵션). 기본은 카드 헤더 HTML 로 표시.
+    if (!opts.showChip) return;
+
     const chips = ths
       .map(t => ({
         y: y.getPixelForValue(t.at),
@@ -119,6 +123,26 @@ const thresholdZones = {
     });
   },
 };
+
+/* ── 카드 헤더 chip HTML 생성 헬퍼 ─────────────────────────
+   thresholdZones 와 동일한 thresholds 배열을 받아 HTML string 반환.
+   buildCard 류 함수에서 헤더 영역에 삽입. CSS class .chart-chips / .chart-chip 으로
+   스타일 (가로 정렬, 작은 chip).
+
+   사용:
+     <div class="card-title">...</div>
+     <div class="chart-chips">${renderThresholdChipsHTML(thresholds)}</div>
+*/
+function renderThresholdChipsHTML(thresholds) {
+  if (!thresholds || !thresholds.length) return '';
+  return thresholds
+    .map(t => {
+      const cls = t.color === 'danger' ? 'chart-chip danger' : 'chart-chip warn';
+      // 텍스트 escape — 라벨이 사용자 입력 아니므로 단순 처리
+      return `<span class="${cls}">${t.label}</span>`;
+    })
+    .join('');
+}
 
 /* ── safeBand 플러그인 ────────────────────────────────────
    O2 같은 양방향 임계치용 — 안전 범위만 옅은 녹색 fill 로 강조.

@@ -1,0 +1,50 @@
+/* ============================================================
+   chart-helpers.css — Chart.js 카드 임계치 chip 공통 스타일
+
+   목적: 차트 안에 그리던 임계치 chip (thresholdZones plugin) 을 카드 헤더
+         하단의 HTML 영역으로 이동. 차트는 dashed line 만 그리고, 라벨은
+         renderThresholdChipsHTML() 가 생성한 HTML chip 으로 표시.
+
+   사용처: gas detail (9가스 카드) · power detail (16설비 카드) ·
+          dashboard charts (메인 가스/전력 패널). 동일 톤 일관성.
+
+   배치 예 (페이지 buildCard 류 함수에서):
+     <div class="card-title">...</div>
+     <div class="chart-chips">${renderThresholdChipsHTML(thresholds)}</div>
+     <canvas .../>
+   ============================================================ */
+
+.chart-chips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 4px;
+  margin-bottom: 6px;
+  min-height: 18px;  /* chip 없을 때도 헤더 정렬 안정 */
+}
+
+.chart-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(18, 26, 45, 0.6);
+  border: 1px solid;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: 'Pretendard', -apple-system, system-ui, sans-serif;
+  letter-spacing: -0.01em;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.chart-chip.warn {
+  color: #FBBF24;
+  border-color: rgba(251, 191, 36, 0.55);
+}
+
+.chart-chip.danger {
+  color: #F87171;
+  border-color: rgba(248, 113, 113, 0.55);
+}

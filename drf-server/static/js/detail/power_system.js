@@ -253,6 +253,13 @@ function buildCard(index, equipData) {
     safe:    '',
   }[status];
 
+  // 카드 헤더 chip — 차트 안 라벨을 외부로 (가스 detail 과 동일 패턴). 채널 정격 × % 환산 값.
+  const t = _resolveChannel(index + 1);
+  const thresholds = [
+    { at: t.caution, color: 'warn', label: `주의 ${(t.caution / 1000).toFixed(1).replace(/\.0$/, '')}k W` },
+    { at: t.danger, color: 'danger', label: `위험 ${(t.danger / 1000).toFixed(1).replace(/\.0$/, '')}k W` },
+  ];
+
   const card = document.createElement('div');
   card.className = `chart-card ${borderClass}`;
   card.dataset.index = index;
@@ -262,6 +269,7 @@ function buildCard(index, equipData) {
       <span class="card-status-dot ${status}"></span>
       <span>${label}</span>
     </div>
+    <div class="chart-chips">${renderThresholdChipsHTML(thresholds)}</div>
     <div class="card-chart-wrap">
       <canvas id="canvas-${index}"></canvas>
     </div>
