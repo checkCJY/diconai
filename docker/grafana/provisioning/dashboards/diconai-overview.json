@@ -21,7 +21,7 @@
       },
       "id": 1,
       "title": "서비스 가동 상태 (1=정상, 0=중단)",
-      "description": "Prometheus가 각 서버의 /metrics 수집에 성공하면 1, 실패하면 0. DRF/FastAPI 둘 다 1이어야 정상 운영 상태.",
+      "description": "Prometheus가 각 서버의 /metrics 수집에 성공하면 1, 실패하면 0. DRF/FastAPI 둘 다 1이어야 정상 운영 상태. redis는 redis_up(Redis 서버 자체 상태)으로 표시.",
       "type": "stat",
       "options": {
         "reduceOptions": {
@@ -45,9 +45,14 @@
       },
       "targets": [
         {
-          "expr": "up",
+          "expr": "up{job!=\"redis\"}",
           "legendFormat": "{{job}}",
           "refId": "A"
+        },
+        {
+          "expr": "redis_up",
+          "legendFormat": "redis",
+          "refId": "B"
         }
       ]
     },
@@ -308,6 +313,6 @@
   "timezone": "",
   "title": "diconai — Overview",
   "uid": "diconai-overview",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }
