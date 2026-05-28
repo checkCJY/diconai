@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: celery-metric
-          image: diconai/drf:latest # drf와 동일한 이미지 사용 — celery는 drf 코드베이스를 공유
+          image: diconai/drf:dev # drf와 동일한 이미지 사용 — celery는 drf 코드베이스를 공유
           command: # docker-compose와 동일한 celery 실행 명령
             - celery
             - -A

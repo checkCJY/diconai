@@ -639,8 +639,12 @@ class WorkerListAPIView(APIView):
             worker_list.append({
                 "id": w.id,
                 "name": w.name or w.username,
+                "employee_id": w.username,
                 "department": dept.name if dept else "-",
                 "department_id": dept.id if dept else None,
+                "position": w.position.name if w.position else "-",
+                "email": w.email or "-",
+                "phone": w.phone or "-",
                 "is_present": w.is_present,
             })
 

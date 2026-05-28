@@ -267,6 +267,7 @@ const SafetyChecklistAdmin = {
       li.className = 'section-card' + (section.id === this.currentSectionId ? ' active' : '');
       li.dataset.sectionId = section.id;
       li.innerHTML = `
+        <span class="drag-handle" aria-hidden="true">⋮⋮</span>
         <span class="name"></span>
         <div class="section-card-actions">
           <span class="count">${section.item_count}개</span>
@@ -282,6 +283,8 @@ const SafetyChecklistAdmin = {
         e.stopPropagation();
         this._onDeleteSection(section);
       });
+      li.draggable = true;
+      this._bindSectionDnD(li);
       list.appendChild(li);
     });
 
@@ -440,6 +443,45 @@ const SafetyChecklistAdmin = {
     await this._api(`/items/${itemId}/${this._qs()}`, { method: 'DELETE' });
     this._markDirty();
     await this._loadAll();
+  },
+
+  // ── 섹션 드래그 앤 드롭 ──────────────────────────────
+  _bindSectionDnD(li) {
+    li.addEventListener('dragstart', (e) => {
+      li.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', li.dataset.sectionId);
+    });
+    li.addEventListener('dragend', () => {
+      li.classList.remove('dragging');
+      document
+        .querySelectorAll('.section-card.drop-target')
+        .forEach((el) => el.classList.remove('drop-target'));
+    });
+    li.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      li.classList.add('drop-target');
+    });
+    li.addEventListener('dragleave', () => {
+      li.classList.remove('drop-target');
+    });
+    li.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      li.classList.remove('drop-target');
+      const draggedId = parseInt(e.dataTransfer.getData('text/plain'), 10);
+      const targetId = parseInt(li.dataset.sectionId, 10);
+      if (draggedId === targetId) return;
+      const ids = this.sections.map((s) => s.id).filter((id) => id !== draggedId);
+      const targetIdx = ids.indexOf(targetId);
+      ids.splice(targetIdx, 0, draggedId);
+      await this._api(`/sections/reorder/${this._qs()}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ordered_ids: ids }),
+      });
+      this._markDirty();
+      await this._loadAll();
+    });
   },
 
   // ── 문항 드래그 앤 드롭 ───────────────────────────────

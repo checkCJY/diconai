@@ -79,3 +79,5 @@ drf-server/celerybeat-schedule
 skill
 
 k8s/secret.yaml
+kubectl
+minikube-linux-amd64
