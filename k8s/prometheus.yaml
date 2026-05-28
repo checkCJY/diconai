@@ -1,0 +1,101 @@
+apiVersion: v1 # k8s API 버전 선언
+kind: ConfigMap # prometheus 설정 파일을 k8s에 저장하는 리소스
+metadata:
+  name: prometheus-config # 아래 Deployment의 volumes에서 이 이름을 참조
+  namespace: diconai
+data:
+  prometheus.yml: | # prometheus 설정 파일 내용 — | 는 줄바꿈을 그대로 유지하는 YAML 문법
+    global:
+      scrape_interval: 15s # 모든 job의 기본 메트릭 수집 주기
+      scrape_timeout: 10s # 수집 요청 타임아웃
+      evaluation_interval: 15s # 알람 규칙 평가 주기
+      external_labels:
+        monitor: diconai # 이 prometheus 인스턴스를 식별하는 라벨
+
+    scrape_configs:
+      - job_name: prometheus # prometheus 자기 자신의 메트릭 수집
+        static_configs:
+          - targets: ["localhost:9090"]
+
+      - job_name: drf # Django DRF 서버 메트릭 수집
+        metrics_path: /metrics # drf가 메트릭을 노출하는 경로
+        static_configs:
+          - targets: ["drf:8000"] # drf = k8s Service 이름
+
+      - job_name: fastapi # FastAPI 서버 메트릭 수집
+        metrics_path: /metrics
+        static_configs:
+          - targets: ["fastapi:8001"] # fastapi = k8s Service 이름
+
+      - job_name: redis # Redis 메트릭 수집 (redis-exporter를 통해)
+        static_configs:
+          - targets: ["redis-exporter:9121"] # docker-compose의 redis_exporter → k8s에서는 redis-exporter로 변경
+---
+apiVersion: v1
+kind: PersistentVolumeClaim # prometheus 수집 데이터를 파드 재시작 후에도 유지하기 위한 스토리지 요청
+metadata:
+  name: prometheus-pvc
+  namespace: diconai
+spec:
+  accessModes:
+    - ReadWriteOnce # 단일 노드에서만 읽기/쓰기 허용
+  resources:
+    requests:
+      storage: 5Gi # 15일치 메트릭 보관 (docker-compose와 동일한 retention 기준)
+---
+apiVersion: v1
+kind: Service # 클러스터 내부에서 prometheus 파드에 접근할 네트워크 엔드포인트
+metadata:
+  name: prometheus # grafana가 "prometheus:9090" 으로 접속할 때 이 이름을 DNS로 사용
+  namespace: diconai
+spec:
+  selector:
+    app: prometheus # 아래 Deployment의 파드 라벨과 매칭
+  ports:
+    - port: 9090 # prometheus 기본 포트
+      targetPort: 9090
+  type: NodePort # minikube에서 브라우저로 직접 접속하기 위해 NodePort 사용
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: diconai
+spec:
+  replicas: 1 # 단일 인스턴스 — prometheus는 데이터를 로컬 디스크에 저장하므로 복수 replica 불가
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus # Service의 selector와 일치해야 트래픽이 연결됨
+    spec:
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v2.55.1 # docker-compose와 동일한 이미지
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml # 위 ConfigMap을 마운트할 경로
+            - --storage.tsdb.path=/prometheus # 메트릭 데이터 저장 경로
+            - --storage.tsdb.retention.time=15d # docker-compose와 동일하게 15일치 보관
+          ports:
+            - containerPort: 9090 # prometheus 웹 UI 및 API 포트
+          resources:
+            requests:
+              cpu: "200m" # 최소 보장 CPU
+              memory: "256Mi" # 최소 보장 메모리
+            limits:
+              cpu: "500m" # 최대 사용 CPU
+              memory: "512Mi" # 최대 사용 메모리
+          volumeMounts:
+            - name: prometheus-config # prometheus 설정 파일 마운트
+              mountPath: /etc/prometheus # prometheus가 설정 파일을 읽는 경로
+            - name: prometheus-data # 메트릭 데이터 저장소 마운트
+              mountPath: /prometheus # --storage.tsdb.path와 일치해야 함
+      volumes:
+        - name: prometheus-config
+          configMap:
+            name: prometheus-config # 위에서 만든 ConfigMap을 파일처럼 마운트
+        - name: prometheus-data
+          persistentVolumeClaim:
+            claimName: prometheus-pvc # 위에서 만든 PVC 참조

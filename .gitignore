@@ -77,3 +77,5 @@ drf-server/celerybeat-schedule
 
 .claude
 skill
+
+k8s/secret.yaml
