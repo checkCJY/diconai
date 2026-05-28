@@ -334,6 +334,19 @@
   gap: 8px;
 }
 
+/* ── Leaflet 팝업 다크테마 override ─────────────────────── */
+.leaflet-popup-content-wrapper {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  color: #e6edf3;
+}
+.leaflet-popup-tip { background: #161b22; }
+.leaflet-popup-close-button { color: #8b949e !important; }
+.leaflet-popup-close-button:hover { color: #e6edf3 !important; }
+.me-popup-row { color: #8b949e; }
+
 /* ── 편집 중 상태 표시 (Leaflet 레이어) ──────────────────── */
 .me-editing-label {
   background: #1f6feb;

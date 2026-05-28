@@ -9,6 +9,7 @@
     border-radius: 4px;
     font-size: 13px;
     color: #1e293b;
+    background: #f8fafc;
 }
 .date-range-sep { color: #94a3b8; font-size: 13px; }
 
@@ -16,7 +17,7 @@
 .date-quick-btn {
     padding: 4px 10px;
     border: 1px solid #cbd5e1;
-    background: #fff;
+    background: #f8fafc;
     border-radius: 4px;
     font-size: 12px;
     color: #475569;
@@ -59,7 +60,7 @@
 
 .btn-export {
     padding: 6px 14px;
-    background: #fff;
+    background: #f8fafc;
     border: 1px solid #cbd5e1;
     border-radius: 4px;
     font-size: 13px;
@@ -69,7 +70,7 @@
     align-items: center;
     gap: 6px;
 }
-.btn-export:hover { background: #f8fafc; }
+.btn-export:hover { background: #f1f5f9; }
 
 /* ── 테이블 텍스트 ───────────────────────────────────────── */
 .log-msg {
@@ -87,5 +88,5 @@
     border-radius: 4px;
     font-size: 13px;
     color: #475569;
-    background: #fff;
+    background: #f8fafc;
 }

@@ -263,4 +263,48 @@ document.getElementById('modal-confirm')?.addEventListener('click', async () => 
   }
 });
 
-document.addEventListener('DOMContentLoaded', loadEventDetail);
+async function loadNotices() {
+  try {
+    const res = await Auth.apiFetch('/api/admin/notices/?is_active=true&page_size=3');
+    if (!res.ok) return;
+    const data = await res.json();
+    const items = data.results ?? data;
+    if (!Array.isArray(items) || items.length === 0) return;
+
+    const list = document.getElementById('notice-list');
+    list.replaceChildren(
+      ...items.map(n => {
+        const row = document.createElement('a');
+        row.className = 'notice-item';
+        row.href = `/admin-panel/notices/${n.id}/`;
+        row.target = '_blank';
+
+        const badge = document.createElement('span');
+        badge.className = n.category === 'urgent' ? 'status-badge danger' : 'status-badge blue';
+        badge.textContent = n.category_display ?? n.category;
+
+        const title = document.createElement('span');
+        title.className = 'notice-title';
+        title.textContent = n.title;
+
+        const date = document.createElement('span');
+        date.className = 'notice-date';
+        const d = n.published_at ?? n.created_at;
+        date.textContent = d
+          ? (typeof TimeFormat !== 'undefined' ? TimeFormat.abs(d) : new Date(d).toLocaleDateString('ko-KR'))
+          : '';
+
+        row.append(badge, title, date);
+        return row;
+      })
+    );
+    document.getElementById('notice-panel').style.display = '';
+  } catch {
+    // 비관리자 또는 네트워크 오류 — 패널 숨김 유지
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadEventDetail();
+  loadNotices();
+});
