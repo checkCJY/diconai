@@ -23,9 +23,14 @@
 
 /* ────────────────────────────────────────────
    페이로드 → renderGrid 인자 변환
-   status는 서버 risk_level이 아닌 클라이언트 THRESHOLD 기준으로 계산
-   (서버와 클라이언트 임계치가 다를 수 있으므로)
+   status 는 서버 risk_level 그대로 사용 (SoT).
+   fastapi equipment_builder 가 채널 정격(power_facility_default %) 기반으로
+   계산한 결과 — B-2 이후 클라이언트 재계산 불필요 (옛 LEGACY_FALLBACK 절대값
+   기준 재계산은 정격 작은 채널을 'safe' 로 잘못 분류함).
+   risk_level 매핑: danger→danger / warning→caution / normal→safe (UI 클래스).
 ────────────────────────────────────────────── */
+const _SERVER_RISK_TO_STATUS = { danger: 'danger', warning: 'caution', normal: 'safe' };
+
 function _mapEquipment(equipment) {
   return equipment.map(eq => {
     const isComm = eq.sensor_status === 'comm_failure';
@@ -33,8 +38,7 @@ function _mapEquipment(equipment) {
     return {
       name:          eq.name ?? '-',
       watt,
-      /* getStatus()는 power_system.js의 THRESHOLD 기준 */
-      status:        isComm ? 'safe' : getStatus(watt),
+      status:        isComm ? 'safe' : (_SERVER_RISK_TO_STATUS[eq.risk_level] ?? 'safe'),
       onoff:         eq.onoff,
       sensor_status: eq.sensor_status,
     };
@@ -56,25 +60,31 @@ function _renderEquipTable(equipList) {
     return;
   }
 
-  /* 카운트: THRESHOLD 기준 status로 집계 */
+  /* 카운트: 서버 risk_level 기준 집계 (SoT — fastapi 의 채널 정격 × % 환산 결과) */
   let cntDanger = 0, cntCaution = 0, cntSafe = 0;
   equipList.forEach(eq => {
-    const s = eq.sensor_status === 'comm_failure' ? 'safe' : getStatus(eq.watt);
+    const s = eq.sensor_status === 'comm_failure'
+      ? 'safe'
+      : (_SERVER_RISK_TO_STATUS[eq.risk_level] ?? 'safe');
     if      (s === 'danger')  cntDanger++;
     else if (s === 'caution') cntCaution++;
     else                      cntSafe++;
   });
   _updateRiskCount(cntDanger, cntCaution, cntSafe);
 
-  tbody.innerHTML = equipList.map(eq => {
+  tbody.innerHTML = equipList.map((eq, idx) => {
     const isComm = eq.sensor_status === 'comm_failure';
     const watt   = isComm || eq.watt == null ? null : Math.round(eq.watt);
-    const status = isComm ? 'safe' : getStatus(watt);
+    const status = isComm
+      ? 'safe'
+      : (_SERVER_RISK_TO_STATUS[eq.risk_level] ?? 'safe');
 
     const powerKw = watt != null ? `${(watt / 1000).toFixed(1)} kW` : '-';
-    /* 부하율: 위험 임계치 THRESHOLD.danger(W) 기준 */
-    const loadPct = watt != null
-      ? `${Math.min(100, (watt / THRESHOLD.danger * 100).toFixed(1))}%`
+    /* 부하율: 채널 정격(power_system.js 의 _resolveChannel) 기준. 정격 미입력 시 '-' */
+    const ch = _resolveChannel(idx + 1);
+    const ratedW = ch.rated_w;
+    const loadPct = (watt != null && ratedW)
+      ? `${Math.min(999, (watt / ratedW * 100)).toFixed(1)}%`
       : '-';
 
     const connBadge = isComm

@@ -173,7 +173,14 @@ class Migration(migrations.Migration):
     dependencies = [
         ("facilities", "0010_thresholdgroup_threshold"),
     ]
-
+    # 변경 (이성현 수정) — 명시적 pk 삽입 후 시퀀스 불일치 방지
     operations = [
-        migrations.RunPython(seed, revert),
-    ]
+    migrations.RunPython(seed, revert),
+    migrations.RunSQL(
+        sql="""
+        SELECT setval(pg_get_serial_sequence('threshold_group', 'id'), MAX(id)) FROM threshold_group;
+        SELECT setval(pg_get_serial_sequence('threshold', 'id'), MAX(id)) FROM threshold;
+        """,
+        reverse_sql=migrations.RunSQL.noop,
+    ),
+]

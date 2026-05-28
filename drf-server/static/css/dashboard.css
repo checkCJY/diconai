@@ -32,7 +32,10 @@ body {
 .col-left   { display: flex; flex-direction: column; gap: 6px; width: 260px; flex-shrink: 0; }
 .col-mid    { flex: 1; display: flex; flex-direction: column; }
 .col-right  { width: 280px; flex-shrink: 0; display: flex; flex-direction: column; }
-.bottom-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; height: 320px; flex-shrink: 0; }
+/* 4 패널 비율 — 표:차트 = 1:1.2 (좌 가스 표/차트 / 우 전력 표/차트).
+   2026-05-27: 1:2 → 표 16.7% 너무 좁아 라벨 세로 줄바꿈, 1:1.5 → 전력 표 "보조 모터" 등 끊김.
+   1:1.2 로 보수적 절충 (표 22.7% / 차트 27.3%) — 표 라벨 가독성 확보 + 차트 폭 소폭 확장 유지. */
+.bottom-row { display: grid; grid-template-columns: 1fr 1.2fr 1fr 1.2fr; gap: 6px; height: 320px; flex-shrink: 0; }
 
 /* ── 공통 패널 ───────────────────────────────────────────── */
 .panel {
@@ -347,12 +350,44 @@ a.more {
 }
 
 /* ── AI 예측 패널 KPI 박스 ──────────────────────────────── */
+/* AI 예측 KPI 박스 — hero 영역 (현재값 + 예측 최대값 강조).
+   2026-05-27 디자인 다듬기 2nd: 첫 시도 28px+padding 14 는 hero 비대 → 차트 영역 잠식.
+   20px + padding 6 로 축소해 차트 영역 회복하되 기본 .big 18px 보단 약간 키워 가독성 유지. */
 .ai-kpi-box {
   background: rgba(255,255,255,0.04);
   border-left: 3px solid var(--blue, #58a6ff);
   border-radius: 4px;
-  padding: 8px 12px;
-  margin-bottom: 8px;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+}
+.ai-kpi-box .big {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.ai-kpi-box .ai-kpi-item .sub {
+  font-size: 10px;
+  color: var(--text2, #8b949e);
+  margin-bottom: 2px;
+}
+.ai-kpi-box .eta-val {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--danger);
+  line-height: 1.15;
+}
+/* power 패널의 aiPowerMaxLoad 가 inline style font-size:14px 로 박혀있어 hero 와 안 맞음.
+   .ai-kpi-box 안의 .fw 를 .big 와 동일 시각으로 일치 (inline style override). */
+.ai-kpi-box .fw#aiPowerMaxLoad {
+  font-size: 18px !important;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
 }
 
 /* ── ai-nav: 장비명 + 방향 버튼 ─────────────────────────── */

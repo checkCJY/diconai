@@ -11,6 +11,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.core.authentication import ServiceTokenAuthentication
+from apps.core.constants import GasTypeChoices
 from apps.facilities.services.threshold_service import get_threshold
 from apps.monitoring.serializers.power_data import (
     PowerDataBulkIngestSerializer,
@@ -21,6 +22,55 @@ from apps.monitoring.serializers.power_data import (
 def _to_float(value):
     """Decimal/None → float/None (JSON 직렬화 호환)."""
     return float(value) if value is not None else None
+
+
+class GasThresholdView(APIView):
+    """
+    GET /api/monitoring/gas/thresholds/
+
+    가스 9종 임계치 dict 반환. 프론트엔드 차트의 임계 라인·칩 라벨 위치 결정용.
+    공개 데이터 (PowerThresholdView 와 동일 정책).
+
+    [단일 진실 공급원]
+    Threshold(group_code="gas_legal") DB 조회. 어드민에서 변경 시 다음 요청부터
+    반영 (signal 기반 invalidate).
+
+    [응답 형식]
+        {
+            "co":  {"warning_min": null, "warning_max": 25.0,
+                    "danger_min": null,  "danger_max": 200.0,
+                    "chart_max": null, "unit": "ppm"},
+            "o2":  {"warning_min": 18.0, "warning_max": 23.5,
+                    "danger_min": 16.0,  "danger_max": null,
+                    "chart_max": null, "unit": "%"},
+            ...
+        }
+
+    o2 처럼 양방향 (warning_min + warning_max 모두 있음) 가스도 동일 형식. FE 가
+    chart_max null 시 자체 fallback (예: warning_max × 1.5) 계산.
+    """
+
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=["Monitoring (Public)"],
+        summary="가스 9종 임계치 조회",
+        description="gas_legal 그룹의 9종 임계치를 gas_code → dict 매핑으로 반환.",
+        responses={200: OpenApiResponse(description="gas_code → threshold dict")},
+    )
+    def get(self, request):
+        result = {}
+        for code in GasTypeChoices.values:
+            t = get_threshold("gas_legal", code) or {}
+            result[code] = {
+                "warning_min": _to_float(t.get("warning_min")),
+                "warning_max": _to_float(t.get("warning_max")),
+                "danger_min": _to_float(t.get("danger_min")),
+                "danger_max": _to_float(t.get("danger_max")),
+                "chart_max": _to_float(t.get("chart_max")),
+                "unit": t.get("unit"),
+            }
+        return Response(result)
 
 
 class PowerThresholdView(APIView):

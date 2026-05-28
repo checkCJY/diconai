@@ -72,9 +72,8 @@ services:
       PROMETHEUS_MULTIPROC_DIR: /app/prometheus_multiproc/drf
     volumes:
       # 소스 핫리로드용 — 코드/템플릿/정적 변경이 별도 빌드 없이 즉시 컨테이너에 노출.
-      # 하위 db.sqlite3/media는 명시적 mount로 source 경계를 분명히 함 (영속 데이터 표시).
+      # 영속 데이터는 PG (postgres_data 볼륨) 로 이관됨 (2026-05-22, 0e33abd).
       - ./drf-server:/app
-      - ./drf-server/db.sqlite3:/app/db.sqlite3
       - ./drf-server/media:/app/media
       # 학습 자산(parquet 스냅샷 등) — 운영 DB와 분리해 별도 보관.
       # ARIMA/IF 학습 셋 export, 모델 재현용 데이터셋 스냅샷이 여기에 적재됨.
@@ -167,7 +166,6 @@ services:
       PROMETHEUS_MULTIPROC_DIR: /app/prometheus_multiproc/celery-alarm
     volumes:
       - ./drf-server:/app
-      - ./drf-server/db.sqlite3:/app/db.sqlite3
       - ./drf-server/media:/app/media
     depends_on:
       drf:
@@ -203,7 +201,6 @@ services:
       PROMETHEUS_MULTIPROC_DIR: /app/prometheus_multiproc/celery-metric
     volumes:
       - ./drf-server:/app
-      - ./drf-server/db.sqlite3:/app/db.sqlite3
       - ./drf-server/media:/app/media
     depends_on:
       drf:

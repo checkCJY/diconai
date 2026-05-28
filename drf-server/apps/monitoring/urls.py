@@ -5,6 +5,7 @@ from django.urls import path
 
 from apps.monitoring.views import (
     GasDataCreateView,
+    GasThresholdView,
     PowerChannelMetaView,
     PowerDataBulkIngestView,
     PowerEventIngestView,
@@ -14,6 +15,7 @@ from apps.monitoring.views import (
 
 urlpatterns = [
     path("gas/", GasDataCreateView.as_view(), name="gas-data-create"),
+    path("gas/thresholds/", GasThresholdView.as_view(), name="gas-thresholds"),
     path("power/thresholds/", PowerThresholdView.as_view(), name="power-thresholds"),
     # T4 D1b — fastapi 5분 sync 용 정격 % 임계치 (power_facility_default 그룹).
     path(

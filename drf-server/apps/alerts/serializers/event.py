@@ -43,6 +43,7 @@ class EventDetailSerializer(serializers.ModelSerializer):
     acknowledged_by_name = serializers.SerializerMethodField()
     resolved_by_name = serializers.SerializerMethodField()
     recommended_actions = serializers.SerializerMethodField()
+    source_connection_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Event
@@ -65,6 +66,7 @@ class EventDetailSerializer(serializers.ModelSerializer):
             "resolved_at",
             "alarms",
             "recommended_actions",
+            "source_connection_status",
         ]
 
     def get_worker_name(self, obj):
@@ -87,3 +89,20 @@ class EventDetailSerializer(serializers.ModelSerializer):
             return []
         actions = obj.policy.recommended_actions
         return actions.get(obj.risk_level) or actions.get("default") or []
+
+    def get_source_connection_status(self, obj):
+        """이벤트 발생원의 연결 상태 라벨. 센서/설비는 last_reading 기반 5분 무수신
+        판정 + status 필드 조합. 지오펜스는 통신 개념이 없으므로 '활성'. 발생원
+        FK 가 모두 비어 있으면 '-' (e.g. system 알림)."""
+        device = obj.source_sensor or obj.source_power_device
+        if device:
+            if device.status == "offline" or device.is_communication_lost:
+                return "오프라인"
+            if device.status == "error":
+                return "오류"
+            if device.status == "inactive":
+                return "비활성"
+            return "정상"
+        if obj.source_geofence:
+            return "활성"
+        return "-"
