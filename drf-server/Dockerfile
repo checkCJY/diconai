@@ -21,8 +21,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     DJANGO_SETTINGS_MODULE=config.settings
 
+# 변경 (이성현 수정) — dbshell 실행을 위한 psql 설치
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl ffmpeg \
+    && apt-get install -y --no-install-recommends curl ffmpeg postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

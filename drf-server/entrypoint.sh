@@ -12,9 +12,16 @@ if [ -n "${PROMETHEUS_MULTIPROC_DIR}" ]; then
 fi
 
 # RUN_MIGRATIONS=0 으로 두면 celery-worker/beat 컨테이너에서 중복 실행 방지.
+# 변경 (이성현 수정) — migrate 완료 후 시퀀스 안전망
 if [ "${RUN_MIGRATIONS:-1}" = "1" ]; then
     echo "[entrypoint] migrate --noinput"
     python manage.py migrate --noinput
+    echo "[entrypoint] reset sequences"
+    python manage.py sqlsequencereset \
+        accounts alerts dashboard facilities geofence ml \
+        monitoring notices notifications operations \
+        positioning reference safety training \
+        | python manage.py dbshell
 fi
 
 # COLLECT_STATIC=0 으로 두면 celery 컨테이너에서 스킵.
