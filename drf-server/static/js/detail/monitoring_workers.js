@@ -348,13 +348,17 @@ async function loadWorkers() {
     const data = await res.json();
 
     const workerList = (data.workers || []).map(w => ({
-      id:        w.id,
-      name:      w.name,
-      dept:      w.department ?? '-',
-      zone:      '-',
-      last_seen: null,
-      connected: false,
-      status:    'normal',
+      id:          w.id,
+      name:        w.name,
+      employee_id: w.employee_id ?? '-',
+      dept:        w.department  ?? '-',
+      position:    w.position    ?? '-',
+      email:       w.email       ?? '-',
+      phone:       w.phone       ?? '-',
+      zone:        '-',
+      last_seen:   null,
+      connected:   false,
+      status:      'normal',
     }));
 
     renderWorkerTable(workerList);

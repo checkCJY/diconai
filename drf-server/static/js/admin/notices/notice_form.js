@@ -64,7 +64,7 @@ const NoticeForm = {
     _addFiles(fileList) {
         Array.from(fileList).forEach(f => {
             if (f.size > 10 * 1024 * 1024) {
-                alert(`${f.name}: 파일 크기가 10MB를 초과합니다.`);
+                this._showToast(`${f.name}: 파일 크기가 10MB를 초과합니다.`, true);
                 return;
             }
             this.newFiles.push(f);
@@ -152,8 +152,8 @@ const NoticeForm = {
             const title = document.getElementById('inputTitle').value.trim();
             const category = document.getElementById('inputCategory').value;
 
-            if (!title) { alert('공지 제목을 입력해 주세요.'); return; }
-            if (!category) { alert('공지 구분을 선택해 주세요.'); return; }
+            if (!title) { this._showToast('공지 제목을 입력해 주세요.', true); return; }
+            if (!category) { this._showToast('공지 구분을 선택해 주세요.', true); return; }
 
             const isEdit = NOTICE_FORM_MODE === 'edit';
             document.getElementById('confirmTitle').textContent =
@@ -199,7 +199,7 @@ const NoticeForm = {
 
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
-            alert(`저장 실패: ${JSON.stringify(err)}`);
+            this._showToast(`저장 실패: ${JSON.stringify(err)}`, true);
             return;
         }
 
@@ -225,8 +225,8 @@ const NoticeForm = {
             });
         }
 
-        alert(isEdit ? '수정되었습니다.' : '등록되었습니다.');
-        location.href = `/admin-panel/notices/${noticeId}/`;
+        this._showToast(isEdit ? '수정되었습니다.' : '등록되었습니다.');
+        setTimeout(() => { location.href = `/admin-panel/notices/${noticeId}/`; }, 800);
     },
 
     _bindCancel() {
@@ -237,6 +237,17 @@ const NoticeForm = {
                     : '/admin-panel/notices/';
             }
         });
+    },
+
+    _showToast(message, isError = false) {
+        const toast = document.createElement('div');
+        toast.style.cssText = `position:fixed;bottom:32px;left:50%;transform:translateX(-50%);
+          background:${isError ? '#be123c' : '#1e293b'};color:#fff;
+          padding:10px 20px;border-radius:6px;font-size:13px;z-index:10001;
+          box-shadow:0 4px 12px rgba(0,0,0,0.2);`;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 2500);
     },
 
     _formatSize(bytes) {
