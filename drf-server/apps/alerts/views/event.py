@@ -14,6 +14,7 @@ from rest_framework.response import Response
 from apps.alerts.models import Event, EventAcknowledgement, EventLog
 from apps.alerts.serializers.event import EventListSerializer, EventDetailSerializer
 from apps.core.constants import EventStatus
+from apps.core.pagination import AdminPagination
 
 
 @extend_schema_view(
@@ -37,6 +38,7 @@ from apps.core.constants import EventStatus
 )
 class EventViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
+    pagination_class = AdminPagination
 
     def get_queryset(self):
         qs = Event.objects.select_related(

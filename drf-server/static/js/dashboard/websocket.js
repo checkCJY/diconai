@@ -51,13 +51,15 @@ function _pushGasHistory(key, label, currentVal) {
   if (h.labels.length > _HIST_MAX) { h.labels.shift(); h.current.shift(); h.predicted.shift(); }
 }
 
-// 현재 선택 가스의 차트를 히스토리 데이터로 교체 렌더링한다.
+// 현재 선택 가스의 차트를 히스토리 데이터로 교체 렌더링 + 가스별 SoT 임계치로 thresholdZones 업데이트.
 function _switchGasChart(key) {
   if (!gasChart || !_aiGasHist[key]) return;
   const h = _aiGasHist[key];
   gasChart.data.labels              = [...h.labels];
   gasChart.data.datasets[0].data   = [...h.current];
   gasChart.data.datasets[1].data   = [...h.predicted];
+  // 가스 전환 시 임계치도 함께 — DASH_GAS_THRESHOLDS[key] 의 warning/danger 라인을 표시.
+  if (typeof updateGasThresholds === 'function') updateGasThresholds(key);
   gasChart.update('none');
 }
 
@@ -105,10 +107,11 @@ function _pushChannelHistory(idx, label, value) {
 }
 
 // 현재 선택된 채널(idx)의 히스토리 데이터로 전력 차트를 교체 렌더링한다.
-// idx 0 = "전체 사용량"(kW 단위), idx 1+ = 설비별(W 단위)이므로 단위에 맞춰 Y축/임계치도 교체한다.
+// idx 0 = "전체 사용량"(kW 단위, 채널 정격 합 × % 임계치), idx 1+ = 설비별(W 단위, 채널 정격 × % 임계치).
 function _switchPowerChart(idx) {
   if (!powerChart || !_aiPowerHist[idx]) return;
-  applyPowerChartUnit(idx === 0 ? 'kW' : 'W');
+  // idx 1+ 은 channel = idx (1~16). idx 0 은 전체 — channel 불필요.
+  applyPowerChartUnit(idx === 0 ? 'kW' : 'W', idx);
   const h = _aiPowerHist[idx];
   powerChart.data.labels           = [...h.labels];
   powerChart.data.datasets[0].data = [...h.data];
