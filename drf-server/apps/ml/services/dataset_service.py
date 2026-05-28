@@ -28,6 +28,7 @@ from datetime import datetime
 import numpy as np
 
 from apps.monitoring.models import GasData, PowerData
+from apps.monitoring.utils.gas_thresholds import GAS_THRESHOLDS
 
 # 가스 9종 화이트리스트 — GasData 컬럼명과 1:1.
 # lel 은 GasData 모델 컬럼 없음(원본은 raw_payload JSONField 에만 보관) → 학습 대상 외.
@@ -177,6 +178,10 @@ def extract_normal_gas_series(
         measured_at__lt=until,
         is_anomaly=False,
         **{f"{gas_name}__isnull": False},
+        # 라벨 누수 보정 — is_anomaly=False 만으로는 시뮬레이터 시나리오 row 가
+        # 학습 풀에 섞임 (CO 학습 풀 std=70, max=300 관측). 정상 임계 한 번 더 정제.
+        # 임계 SoT = apps.monitoring.utils.gas_thresholds.GAS_THRESHOLDS.
+        **{f"{gas_name}__lte": GAS_THRESHOLDS[gas_name]["normal_max"]},
     )
     arrays = _gas_to_arrays(qs, gas_name)
     return TimeSeries(
