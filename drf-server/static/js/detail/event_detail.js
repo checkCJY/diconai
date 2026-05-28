@@ -164,10 +164,13 @@ function renderDetail(ev) {
   updateStatusButtons(ev.status);
 
   // 연관 모니터링 정보 — 같은 SOURCE_TYPE_LABEL 분기 적용.
+  // 연결 상태는 serializer 의 source_connection_status 가 device.status + last_reading
+  // 으로 산정한 값을 그대로 사용 (이전 "정상" 하드코딩 제거).
+  const connState = ev.source_connection_status ?? '-';
   document.getElementById('monitor-sensor').textContent =
-    `${srcMeta.type} : ${ev.source_label ?? '-'} / 현재 상태 ${RISK_LABEL[ev.risk_level] ?? '-'} / 연결 상태 정상`;
+    `${srcMeta.type} : ${ev.source_label ?? '-'} / 현재 상태 ${RISK_LABEL[ev.risk_level] ?? '-'} / 연결 상태 ${connState}`;
   document.getElementById('monitor-worker').textContent =
-    `연관 작업자 : ${ev.worker_name ?? '-'} / 마지막 연결 정상`;
+    `연관 작업자 : ${ev.worker_name ?? '-'} / 마지막 연결 ${connState}`;
 }
 
 // API 응답 (AlertPolicy.recommended_actions) 우선. 빈 배열 또는 부재 시
