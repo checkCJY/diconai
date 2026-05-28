@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: celery-beat
-          image: diconai/drf:latest # drf와 동일한 이미지 사용
+          image: diconai/drf:dev # drf와 동일한 이미지 사용
           command: # docker-compose와 동일한 celery beat 실행 명령
             - celery
             - -A

@@ -28,7 +28,7 @@ spec:
     spec:
       containers:
         - name: drf
-          image: diconai/drf:latest # minikube에 직접 빌드해서 올려야 함 (아래 설명 참고)
+          image: diconai/drf:dev # minikube에 직접 빌드해서 올려야 함 (아래 설명 참고)
           ports:
             - containerPort: 8000 # gunicorn이 바인딩하는 포트
           envFrom: # configmap.yaml과 secret.yaml의 값을 환경변수로 한꺼번에 주입
@@ -45,7 +45,7 @@ spec:
               value: "1" # 정적 파일 수집 — 운영 모드에서는 whitenoise가 서빙
             - name: PROMETHEUS_MULTIPROC_DIR
               value: "/app/prometheus_multiproc/drf" # drf 전용 메트릭 디렉토리 (celery와 충돌 방지)
-          command: # gunicorn 실행 명령 (docker-compose와 동일, --reload 제거)
+          args: # gunicorn 실행 명령 (docker-compose와 동일, --reload 제거)
             - gunicorn
             - config.wsgi:application
             - --bind=0.0.0.0:8000
