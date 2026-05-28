@@ -28,7 +28,7 @@ spec:
     spec:
       containers:
         - name: fastapi
-          image: diconai/fastapi:latest # minikube에 직접 빌드해서 올려야 함
+          image: diconai/fastapi:dev # minikube에 직접 빌드해서 올려야 함
           ports:
             - containerPort: 8001 # uvicorn이 바인딩하는 포트
           envFrom: # configmap.yaml과 secret.yaml의 값을 환경변수로 한꺼번에 주입
