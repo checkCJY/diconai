@@ -23,7 +23,7 @@ from apps.alerts.serializers.alert_policy_admin import (
     AlertPolicyListSerializer,
     AlertPolicyWriteSerializer,
 )
-from apps.alerts.services.policy_matcher import _invalidate_policy_cache
+from apps.alerts.services.policy_matcher import invalidate_policy_cache
 from apps.core.pagination import AdminPagination
 from apps.core.permissions import IsSuperAdmin
 
@@ -173,5 +173,6 @@ class AlertPolicyAdminDetailView(APIView):
         event_type = policy.event_type
         policy.delete()
         # 매처 캐시 무효화 — 삭제된 정책이 다음 매칭에 잡히지 않도록.
-        _invalidate_policy_cache(event_type)
+        # signals.py post_delete 가 동일 동작 자동 수행하지만 fallback 안전망 유지.
+        invalidate_policy_cache(event_type)
         return Response(status=status.HTTP_204_NO_CONTENT)

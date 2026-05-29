@@ -43,8 +43,14 @@ def _get_cached_policies(event_type: str) -> list[AlertPolicy]:
     return policies
 
 
-def _invalidate_policy_cache(event_type: str) -> None:
-    """AlertPolicy 변경 시 해당 event_type 캐시를 즉시 무효화한다."""
+def invalidate_policy_cache(event_type: str) -> None:
+    """AlertPolicy 변경 시 해당 event_type 캐시를 즉시 무효화한다.
+
+    호출 경로: (1) `apps/alerts/signals.py` post_save/post_delete receiver — 어디서
+    저장/삭제하든 자동 발화 (정공법). (2) `save_policy()` 서비스 진입점 + Django
+    admin `save_model` + DRF `AlertPolicyAdminDetailView.delete` 의 명시 호출 —
+    signal 누락 시 fallback 안전망. 본 함수는 외부 호출 의도라 public 명명.
+    """
     cache.delete(_POLICY_CACHE_KEY.format(event_type=event_type))
 
 
@@ -170,5 +176,5 @@ def save_policy(policy: AlertPolicy) -> AlertPolicy:
     """
     policy.condition_summary = compute_condition_summary(policy)
     policy.save()
-    _invalidate_policy_cache(policy.event_type)
+    invalidate_policy_cache(policy.event_type)
     return policy
