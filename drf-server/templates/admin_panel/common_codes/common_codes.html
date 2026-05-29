@@ -1,0 +1,269 @@
+{% extends 'admin_panel/base.html' %}
+{% load static %}
+
+{% block title %}공통코드 관리{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <div class="header-titles">
+        <div class="breadcrumb">기준 정보 관리 &gt; 공통코드 관리</div>
+        <h2 class="page-title">공통 코드 관리</h2>
+        <p class="page-desc">운영 화면에서 사용하는 기준 데이터를 그룹별로 관리합니다.</p>
+    </div>
+    <button class="btn-primary" id="btnAddGroup">코드 그룹 등록</button>
+</section>
+
+<!-- 2패널 레이아웃 -->
+<div class="code-layout">
+
+    <!-- 왼쪽: 코드 그룹 목록 -->
+    <div class="code-left">
+        <div class="panel-header">
+            <span class="panel-title">코드 그룹</span>
+        </div>
+        <p class="panel-desc">그룹을 선택하면 우측에서 코드값과 사용 현황을 확인할 수 있습니다.</p>
+        <div class="group-search">
+            <input type="text" id="groupSearch" placeholder="그룹명 검색">
+            <button class="btn-dark btn-sm" id="btnGroupSearch">검색</button>
+        </div>
+        <ul class="group-list" id="groupList">
+            <li class="group-empty">불러오는 중...</li>
+        </ul>
+        <div class="group-footer">
+            <button class="btn-outline btn-sm full-width" id="btnEditGroup" disabled>수정</button>
+        </div>
+    </div>
+
+    <!-- 오른쪽: 그룹 정보 + 코드 목록 -->
+    <div class="code-right" id="codeRight">
+        <div class="right-empty" id="rightEmpty">
+            <p>왼쪽에서 그룹을 선택하세요.</p>
+        </div>
+
+        <div id="rightContent" style="display:none;">
+
+            <!-- 그룹 정보 카드 -->
+            <div class="group-info-card">
+                <div class="group-info-badge" id="infoSelectedBadge">선택 그룹: -</div>
+                <div class="info-grid">
+                    <div class="info-block">
+                        <div class="info-row">
+                            <span class="info-label">그룹명</span>
+                            <span class="info-value" id="infoName">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">그룹 코드</span>
+                            <span class="info-value mono" id="infoCode">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">관리 범위</span>
+                            <span class="info-value" id="infoScope">-</span>
+                        </div>
+                    </div>
+                    <div class="info-block">
+                        <div class="info-row">
+                            <span class="info-label">최근 수정일</span>
+                            <span class="info-value" id="infoUpdated">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">사용 코드 수</span>
+                            <span class="info-value" id="infoCount">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 코드 목록 테이블 카드 -->
+            <div class="table-card code-table-card">
+                <!-- 툴바 -->
+                <div class="table-toolbar">
+                    <div class="toolbar-left">
+                        <span class="cc-section-title">코드 값 목록</span>
+                        <span class="group-name-badge" id="toolbarGroupBadge"></span>
+                        <span class="selected-badge" id="selectedBadge" style="display:none;"></span>
+                        <button class="btn-danger btn-sm" id="btnDeleteCode" disabled>삭제</button>
+                        <button class="btn-primary btn-sm" id="btnAddCodeTop">등록</button>
+                    </div>
+                    <div class="toolbar-right">
+                        <input type="text" id="codeSearch" class="toolbar-search" placeholder="코드, 코드명 검색">
+                        <button class="btn-outline btn-sm" id="btnResetSearch">초기화</button>
+                        <button class="btn-dark btn-sm" id="btnCodeSearch">검색</button>
+                    </div>
+                </div>
+                <!-- 전체 건수 + 정렬 -->
+                <div class="table-meta">
+                    <span class="total-count">전체 <strong id="codeCount">0</strong>건</span>
+                    <select class="sort-select" id="sortSelect">
+                        <option value="sort_asc">코드 오름차순</option>
+                        <option value="sort_desc">코드 내림차순</option>
+                        <option value="name_asc">코드명 오름차순</option>
+                        <option value="name_desc">코드명 내림차순</option>
+                        <option value="order_asc">정렬 순서 오름차순</option>
+                        <option value="order_desc">정렬 순서 내림차순</option>
+                        <option value="active_first">사용 여부</option>
+                        <option value="updated_desc">최근 수정일 최신순</option>
+                    </select>
+                </div>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="col-check"><input type="checkbox" id="checkAll" title="전체선택"></th>
+                                <th>코드</th>
+                                <th>코드명</th>
+                                <th>설명</th>
+                                <th>정렬순서</th>
+                                <th>사용 여부</th>
+                                <th>최근 수정일</th>
+                            </tr>
+                        </thead>
+                        <tbody id="codeTableBody">
+                            <tr><td colspan="7" class="empty-state">그룹을 선택하세요.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 페이지네이션 -->
+                <div class="pagination-bar" id="paginationBar" style="display:none;">
+                    <span class="page-range" id="pageRange">1 - 10 / 0</span>
+                    <div class="page-buttons" id="pageButtons"></div>
+                </div>
+
+                <!-- 하단 액션바 (Figma 하단 버튼 영역) -->
+                <div class="table-bottom-bar" id="tableBottomBar">
+                    <span class="bottom-count-badge" id="bottomCountBadge" style="display:none;"></span>
+                    <button class="btn-warning btn-sm" id="btnDeactivateCode" disabled>미사용 전환</button>
+                    <button class="btn-outline btn-sm" id="btnEditCodeBottom" disabled>수정</button>
+                    <button class="btn-primary btn-sm" id="btnAddCodeBottom">코드 등록</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── 모달: 코드 그룹 등록 / 수정 ── -->
+<div class="modal-overlay" id="groupModalOverlay" style="display:none;">
+    <div class="code-modal">
+        <div class="modal-header">
+            <h3 class="modal-title" id="groupModalTitle">코드 그룹 등록</h3>
+            <button class="modal-close" id="btnGroupModalClose">&times;</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="groupModalId">
+            <div class="form-row">
+                <div class="form-field">
+                    <label class="form-label">그룹명 <span class="required">*</span></label>
+                    <input type="text" id="groupModalName" class="form-input" placeholder="예: 장비 유형">
+                </div>
+                <div class="form-field">
+                    <label class="form-label">그룹 코드 <span class="required">*</span></label>
+                    <input type="text" id="groupModalCode" class="form-input" placeholder="예: DEVICE_TYPE">
+                    <span class="form-hint">대문자·숫자·언더스코어만 허용</span>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-field">
+                    <label class="form-label">관리 범위 <span class="required">*</span></label>
+                    <input type="text" id="groupModalScope" class="form-input" placeholder="예: 운영 화면 공통 선택값">
+                </div>
+                <div class="form-field">
+                    <label class="form-label">최근 수정일</label>
+                    <input type="text" id="groupModalUpdated" class="form-input readonly" readonly>
+                </div>
+            </div>
+            <div class="form-field">
+                <label class="form-label">설명</label>
+                <textarea id="groupModalDesc" class="form-textarea" rows="3"
+                    placeholder="운영 화면에서 사용하는 선택값 기준 데이터를 그룹 단위로 관리합니다."
+                    maxlength="100"></textarea>
+                <span class="char-hint"><span id="groupDescCount">0</span>/100</span>
+            </div>
+            <div class="form-row">
+                <div class="form-field">
+                    <label class="form-label">수정자</label>
+                    <input type="text" id="groupModalEditor" class="form-input readonly" readonly>
+                </div>
+                <div class="form-field">
+                    <label class="form-label">사용 코드 수</label>
+                    <input type="text" id="groupModalCodeCount" class="form-input readonly" readonly>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-outline" id="btnGroupModalCancel">취소</button>
+            <button class="btn-primary" id="btnGroupModalSave">등록</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── 모달: 공통 코드 등록 / 수정 ── -->
+<div class="modal-overlay" id="codeModalOverlay" style="display:none;">
+    <div class="code-modal">
+        <div class="modal-header">
+            <h3 class="modal-title" id="codeModalTitle">공통 코드 등록</h3>
+            <button class="modal-close" id="btnCodeModalClose">&times;</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="codeModalId">
+            <div class="form-row">
+                <div class="form-field">
+                    <label class="form-label">코드 그룹</label>
+                    <input type="text" id="codeModalGroup" class="form-input readonly" readonly>
+                </div>
+                <div class="form-field">
+                    <label class="form-label">수정자</label>
+                    <input type="text" id="codeModalEditor" class="form-input readonly" readonly>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-field">
+                    <label class="form-label">코드 <span class="required">*</span></label>
+                    <input type="text" id="codeModalCode" class="form-input" placeholder="예: SMART_POWER">
+                    <span class="form-hint">대문자·숫자·언더스코어만 허용</span>
+                </div>
+                <div class="form-field">
+                    <label class="form-label">코드명 <span class="required">*</span></label>
+                    <input type="text" id="codeModalName" class="form-input" placeholder="예: 스마트 전력 시스템">
+                </div>
+            </div>
+            <div class="form-field">
+                <label class="form-label">설명 <span class="required">*</span></label>
+                <textarea id="codeModalDesc" class="form-textarea" rows="2"
+                    placeholder="설명 입력" maxlength="100"></textarea>
+                <span class="char-hint"><span id="codeDescCount">0</span>/100</span>
+            </div>
+            <div class="form-row">
+                <div class="form-field">
+                    <label class="form-label">정렬 순서 <span class="required">*</span></label>
+                    <input type="number" id="codeModalSort" class="form-input" min="0" placeholder="20">
+                </div>
+                <div class="form-field">
+                    <label class="form-label">사용 여부 <span class="required">*</span></label>
+                    <!-- 사용/미사용 토글 버튼 (Figma 스펙) -->
+                    <div class="toggle-group">
+                        <button type="button" class="toggle-btn toggle-active" id="codeActiveTrue">사용</button>
+                        <button type="button" class="toggle-btn" id="codeActiveFalse">미사용</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-outline" id="btnCodeModalCancel">취소</button>
+            <button class="btn-primary" id="btnCodeModalSave">등록</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/admin/common_codes.css' %}">
+{% endblock %}
+
+{% block extra_js %}
+<!-- 현재 로그인 사용자 이름 — 모달 수정자 필드 표시용 -->
+<script>
+const ADMIN_CURRENT_USER = "{{ current_user_display }}";
+</script>
+<script src="{% static 'js/admin/common_codes/common_codes.js' %}"></script>
+{% endblock %}

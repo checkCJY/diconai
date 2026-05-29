@@ -60,12 +60,15 @@ for _gn in ["co", "h2s", "co2"]:
 
 
 # 이성현 추가 — 슬라이딩 윈도우에서 체인지 포인트 탐지
-def _detect_change_point(values: list[float], penalty: float = 3.0) -> bool:
+# penalty 미지정 시 settings.DEMO_GAS_CP_PENALTY 사용 (env override). 시연 시 1.0
+# 으로 낮춰 부드러운 RAMP_UP 도 잡고, 운영 시 3.0 (default) 로 false positive 억제.
+def _detect_change_point(values: list[float], penalty: float | None = None) -> bool:
     """30틱 윈도우에서 패턴 전환 시점이 있으면 True 반환."""
+    pen = settings.DEMO_GAS_CP_PENALTY if penalty is None else penalty
     arr = np.array(values, dtype=np.float64).reshape(-1, 1)
     try:
         model = rpt.Pelt(model="rbf").fit(arr)
-        result = model.predict(pen=penalty)
+        result = model.predict(pen=pen)
         actual_cps = [cp for cp in result if cp < len(arr)]
         return len(actual_cps) > 0
     except Exception:

@@ -542,14 +542,38 @@ async def process_anomaly_inference(
                 )
                 alarm_payload = None
 
+            # event_id 를 push payload 에 포함시키기 위해 forward 를 먼저 race.
+            # 정상 case (200~250ms 측정) → event_id 받아 push payload 보강.
+            # popup 의 격상/RESOLVED/상세보기/ack 4가지 동작이 event_id 의존이라
+            # 본 보강 없으면 모두 작동 안 함.
+            #
+            # timeout 500ms = 측정값 기반 초기값 (정상 200~250ms / peak 300~400ms).
+            # 운영 중 forward 응답시간 분포 (p50/p95/p99) 수집 후 재조정 거리.
+            # TimeoutError 시 background create_task 로 DRF 영속화는 보장 + push 는
+            # event_id 없이 발사 (기존 동작 = popup.js fallback 매칭 안전망 동작).
+            forward_result = None
+            try:
+                forward_result = await asyncio.wait_for(
+                    forward_inference_e2e(ml_payload, alarm_payload),
+                    timeout=0.5,
+                )
+            except asyncio.TimeoutError:
+                asyncio.create_task(forward_inference_e2e(ml_payload, alarm_payload))
+            except Exception:
+                logger.exception(
+                    "[anomaly_inference] forward race failed source=%s",
+                    decision.source,
+                )
+
+            if forward_result and forward_result.get("event_id"):
+                push_payload["event_id"] = forward_result["event_id"]
+
             try:
                 await push_alarm(push_payload)
             except Exception:
                 logger.exception(
                     "[anomaly_inference] push failed source=%s", decision.source
                 )
-
-            asyncio.create_task(forward_inference_e2e(ml_payload, alarm_payload))
         except Exception as exc:
             AI_INFERENCE_FAILED_TOTAL.labels("power_if", "inference_error").inc()
             logger.warning(

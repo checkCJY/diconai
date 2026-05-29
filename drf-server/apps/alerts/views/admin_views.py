@@ -16,14 +16,15 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.alerts.models import AlertPolicy
+from apps.alerts.models import AlertPolicy, Event
 from apps.alerts.selectors.alert_policy_admin import list_admin_policies
+from apps.alerts.serializers.event import EventHistoryAdminSerializer
 from apps.alerts.serializers.alert_policy_admin import (
     AlertPolicyDetailSerializer,
     AlertPolicyListSerializer,
     AlertPolicyWriteSerializer,
 )
-from apps.alerts.services.policy_matcher import _invalidate_policy_cache
+from apps.alerts.services.policy_matcher import invalidate_policy_cache
 from apps.core.pagination import AdminPagination
 from apps.core.permissions import IsSuperAdmin
 
@@ -173,5 +174,60 @@ class AlertPolicyAdminDetailView(APIView):
         event_type = policy.event_type
         policy.delete()
         # 매처 캐시 무효화 — 삭제된 정책이 다음 매칭에 잡히지 않도록.
-        _invalidate_policy_cache(event_type)
+        # signals.py post_delete 가 동일 동작 자동 수행하지만 fallback 안전망 유지.
+        invalidate_policy_cache(event_type)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class EventHistoryAdminListView(APIView):
+    """GET /api/admin/alerts/events/ — 이벤트 이력 목록 (읽기 전용).
+
+    어드민 이벤트 이력 조회 페이지 전용. 기존 EventViewSet(/alerts/api/events/)은
+    대시보드 모니터링용이라 어드민 필터(날짜·구분·상태)가 없음 — 별도 뷰로 분리.
+
+    [쿼리 파라미터]
+    - date       : YYYY-MM-DD — 발생시간 날짜 필터 (미입력 시 전체)
+    - event_type : AlarmType 값 (예: gas_threshold) — 미입력 시 전체
+    - status     : EventStatus 값 (예: active) — 미입력 시 전체
+    - page, page_size : AdminPagination 기본값 (20건/페이지)
+    """
+
+    permission_classes = [IsSuperAdmin]
+
+    @extend_schema(
+        tags=["Admin — Events"],
+        summary="이벤트 이력 목록",
+        parameters=[
+            OpenApiParameter(name="date", type=str, required=False, description="YYYY-MM-DD"),
+            OpenApiParameter(name="event_type", type=str, required=False),
+            OpenApiParameter(name="status", type=str, required=False),
+            OpenApiParameter(name="page", type=int, required=False),
+            OpenApiParameter(name="page_size", type=int, required=False),
+        ],
+        responses={200: EventHistoryAdminSerializer(many=True)},
+    )
+    def get(self, request):
+        qs = (
+            Event.objects.select_related("policy")
+            .order_by("-first_detected_at")
+        )
+
+        # 날짜 필터 — first_detected_at 기준 (발생시간)
+        date_str = request.query_params.get("date")
+        if date_str:
+            qs = qs.filter(first_detected_at__date=date_str)
+
+        # 이벤트 구분 필터
+        event_type = request.query_params.get("event_type")
+        if event_type:
+            qs = qs.filter(event_type=event_type)
+
+        # 이벤트 상태 필터
+        status_param = request.query_params.get("status")
+        if status_param:
+            qs = qs.filter(status=status_param)
+
+        paginator = AdminPagination()
+        page = paginator.paginate_queryset(qs, request)
+        serializer = EventHistoryAdminSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
