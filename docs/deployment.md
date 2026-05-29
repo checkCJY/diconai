@@ -15,7 +15,7 @@ Docker Compose 기반 7-서비스 구조로 drf-server / fastapi-server / postgr
 |---|---|
 | **Docker Compose 통합 환경** | 2026-05-11 결정. 로컬·시연·운영 환경 동일성 보장. 7-서비스 단일 명령으로 기동 |
 | **settings dev/prod 분리** | PR #93 — `config/settings/{base,dev,prod}.py` 분기. `DJANGO_DEBUG` 값에 따라 자동 선택 |
-| **K8s manifest 미적용** | 5개월차 팀 위험관리. 다중 인스턴스 시점에 도입 (현재 시연·운영 Compose로 충분) |
+| **K8s manifest 작성 완료** | `k8s/` 폴더에 manifest 14개 작성, minikube 검증 완료 (feature/0527_k8s_manifest). 시연·운영은 Compose 사용, k8s는 검증 환경 |
 
 ## 1. 환경 세팅 (신규 머신)
 
@@ -80,9 +80,9 @@ host
      └─ grafana (3000)
 ```
 
-### Phase 2 (K8s)
+### K8s (minikube 검증 환경)
 
-manifest는 [docs/roadmap-phase2.md](roadmap-phase2.md) (작성 예정) 참조. 진입 조건: 다중 인스턴스가 필요한 시점.
+manifest 14개가 [`k8s/`](../k8s/) 폴더에 작성되어 있습니다. minikube 기준으로 검증 완료. 팀원 실행 절차는 PR #98 설명 참조.
 
 ## 4. 모니터링
 

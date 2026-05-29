@@ -18,6 +18,8 @@ metadata:
   namespace: diconai
 spec:
   replicas: 1 # 단일 인스턴스 — DB 마이그레이션 중복 실행 방지
+  strategy:
+    type: Recreate # 이성현 수정 — 구 파드 완전 종료 후 신 파드 기동 (동시 실행 불가 의도 명시)
   selector:
     matchLabels:
       app: drf
@@ -28,7 +30,8 @@ spec:
     spec:
       containers:
         - name: drf
-          image: diconai/drf:dev # minikube에 직접 빌드해서 올려야 함 (아래 설명 참고)
+          image: diconai/drf:dev # minikube에 직접 빌드해서 올려야 함 (eval $(minikube docker-env) 후 build)
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000 # gunicorn이 바인딩하는 포트
           envFrom: # configmap.yaml과 secret.yaml의 값을 환경변수로 한꺼번에 주입
@@ -57,9 +60,16 @@ spec:
             httpGet:
               path: /health/ # docker-compose의 healthcheck와 동일한 엔드포인트
               port: 8000
-            initialDelaySeconds: 30 # 마이그레이션 + gunicorn 기동 시간 확보
-            periodSeconds: 15 # 15초마다 체크
-            failureThreshold: 5 # 5번 실패해야 비정상으로 판단
+            initialDelaySeconds: 30    # 마이그레이션 + gunicorn 기동 시간 확보
+            periodSeconds: 15
+            failureThreshold: 5
+          livenessProbe:
+            httpGet:
+              path: /health/
+              port: 8000
+            initialDelaySeconds: 60    # 이성현 수정 — migrate+reset+collectstatic 완료 시간 고려
+            periodSeconds: 30
+            failureThreshold: 3
           resources:
             requests:
               cpu: "200m" # 최소 보장 CPU
