@@ -20,6 +20,9 @@ class CodeGroup(BaseModel):
 
     code = models.CharField(max_length=50, unique=True, verbose_name="그룹 코드")
     name = models.CharField(max_length=100, verbose_name="그룹 명")
+    # Figma "관리범위" 입력칸 — 이 코드그룹이 어느 도메인에 쓰이는지 자유 텍스트
+    # (예: "가스 종류", "장비 유형"). blank=True 이므로 기존 데이터에 영향 없음.
+    scope = models.CharField(max_length=200, blank=True, default="", verbose_name="관리 범위")
     description = models.TextField(blank=True, default="")
     is_active = models.BooleanField(default=True)
 

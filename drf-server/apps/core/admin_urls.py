@@ -16,6 +16,10 @@ config/urls.py 등록:
 from django.urls import path
 
 from apps.core.views import MapEditLogAdminListView, SystemLogAdminListView
+from apps.core.views.risk_standard_admin import (
+    RiskStandardAdminDetailView,
+    RiskStandardAdminListView,
+)
 
 urlpatterns = [
     # GET /api/admin/activity-logs/   — 사용자 활동 로그
@@ -23,4 +27,8 @@ urlpatterns = [
 
     # GET /api/admin/map-edit-logs/   — 지도 편집 로그 (MAP_ action만)
     path("map-edit-logs/", MapEditLogAdminListView.as_view(), name="admin-map-edit-logs"),
+
+    # 위험 기준 관리
+    path("risk-standards/", RiskStandardAdminListView.as_view(), name="admin-risk-standards-list"),
+    path("risk-standards/<int:pk>/", RiskStandardAdminDetailView.as_view(), name="admin-risk-standards-detail"),
 ]

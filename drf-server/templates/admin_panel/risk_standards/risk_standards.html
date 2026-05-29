@@ -1,0 +1,146 @@
+{% extends 'admin_panel/base.html' %}
+{% load static %}
+
+{% block title %}위험 기준 관리{% endblock %}
+
+{% block content %}
+<!-- 페이지 헤더 -->
+<section class="page-header">
+    <div class="header-titles">
+        <div class="breadcrumb">안전 정책/기준 관리 &gt; 위험 기준 관리</div>
+        <h2 class="page-title">위험 기준 관리</h2>
+        <p class="page-desc">위험 단계별 기준과 알림 강도를 관리합니다.</p>
+    </div>
+</section>
+
+<!-- 검색 필터 -->
+<section class="filter-card">
+    <div class="filter-inputs">
+        <div class="input-group">
+            <label>단계코드</label>
+            <select id="filterCode">
+                <option value="">전체</option>
+                <option value="normal">normal</option>
+                <option value="warning">warning</option>
+                <option value="danger">danger</option>
+            </select>
+        </div>
+        <div class="input-group">
+            <label>사용여부</label>
+            <select id="filterActive">
+                <option value="">전체</option>
+                <option value="true">사용</option>
+                <option value="false">미사용</option>
+            </select>
+        </div>
+        <div class="input-group">
+            <label>색상표시</label>
+            <input type="text" id="filterColor" placeholder="색상 토큰 입력 (예: green)">
+        </div>
+    </div>
+    <div class="filter-actions">
+        <button class="btn-outline" id="btnReset">초기화</button>
+        <button class="btn-dark" id="btnSearch">검색</button>
+    </div>
+</section>
+
+<!-- 목록 테이블 -->
+<section class="table-card">
+    <div class="table-toolbar">
+        <div class="toolbar-left">
+            <span class="total-count">전체 <strong id="totalCount">0</strong>건</span>
+            <span class="toolbar-desc">행을 클릭하면 수정할 수 있습니다.</span>
+        </div>
+    </div>
+
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>단계명</th>
+                    <th>단계코드</th>
+                    <th>사용여부</th>
+                    <th>색상표시</th>
+                    <th>알림강도</th>
+                    <th>우선순위</th>
+                    <th>최근수정일</th>
+                </tr>
+            </thead>
+            <tbody id="riskTableBody">
+                <tr>
+                    <td colspan="7" class="empty-state">데이터를 불러오는 중...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<!-- 수정 모달 -->
+<div class="modal-overlay" id="editOverlay" style="display:none;">
+    <div class="risk-edit-modal">
+        <div class="modal-header">
+            <h3 class="modal-title">위험 기준 수정</h3>
+            <button class="modal-close" id="btnEditClose">&times;</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="editId">
+
+            <!-- 단계코드 — 읽기 전용 표시 -->
+            <div class="form-field">
+                <label class="form-label">단계코드 <span class="readonly-badge">읽기 전용</span></label>
+                <input type="text" id="editCode" class="form-input readonly" readonly>
+            </div>
+
+            <div class="form-field">
+                <label class="form-label">단계명 <span class="required">*</span></label>
+                <input type="text" id="editName" class="form-input" placeholder="단계명 입력">
+            </div>
+
+            <div class="form-field">
+                <label class="form-label">색상 토큰</label>
+                <input type="text" id="editColor" class="form-input" placeholder="예: green, orange, red">
+            </div>
+
+            <div class="form-row">
+                <div class="form-field">
+                    <label class="form-label">알림강도</label>
+                    <select id="editIntensity" class="form-input">
+                        {% for ai in alert_intensities %}
+                        <option value="{{ ai.value }}">{{ ai.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label class="form-label">우선순위</label>
+                    <input type="number" id="editPriority" class="form-input" min="1">
+                </div>
+            </div>
+
+            <div class="form-field">
+                <label class="form-label">사용여부</label>
+                <select id="editActive" class="form-input">
+                    <option value="true">사용</option>
+                    <option value="false">미사용</option>
+                </select>
+            </div>
+
+            <div class="form-field">
+                <label class="form-label">설명</label>
+                <textarea id="editDescription" class="form-textarea" rows="3" placeholder="설명 입력"></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-outline" id="btnEditCancel">취소</button>
+            <button class="btn-primary" id="btnEditSave">저장</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/admin/risk_standards.css' %}">
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/admin/risk_standards/risk_standards.js' %}"></script>
+{% endblock %}
