@@ -3,6 +3,41 @@ from apps.alerts.models import Event
 from apps.alerts.serializers.alarm_record import AlarmRecordSerializer
 
 
+class EventHistoryAdminSerializer(serializers.ModelSerializer):
+    """어드민 이벤트 이력 조회 전용 시리얼라이저.
+
+    EventListSerializer 와 달리 연결 정책명·해제시간·상세본문·상태메모를
+    포함한다. 목록(테이블)과 상세 팝업 양쪽을 하나의 시리얼라이저로 커버.
+    """
+
+    # "gas_threshold" → "가스 경보" 등 AlarmType choices 한글 라벨
+    event_type_display = serializers.CharField(source="get_event_type_display", read_only=True)
+    # "active" → "발생" 등 EventStatus choices 한글 라벨
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+    # 연결 정책명 — policy FK null 허용이므로 SerializerMethodField 로 안전 처리
+    policy_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Event
+        fields = [
+            "id",
+            "event_type",
+            "event_type_display",
+            "source_label",       # 발생 대상 (장비/구역 이름 캐시)
+            "policy_name",        # 연결 정책
+            "status",
+            "status_display",
+            "first_detected_at",  # 발생시간
+            "resolved_at",        # 해제시간 (미해제 시 null)
+            "summary",            # 발생 내용 요약 (목록)
+            "description",        # 발생 내용 상세 (팝업)
+            "status_note",        # 상태 메모 (팝업)
+        ]
+
+    def get_policy_name(self, obj):
+        return obj.policy.name if obj.policy else "-"
+
+
 class EventListSerializer(serializers.ModelSerializer):
     alarm_count = serializers.IntegerField(source="alarms.count", read_only=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)

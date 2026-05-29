@@ -5,7 +5,7 @@ metadata: # 이 ConfigMap의 메타데이터
   namespace: diconai # namespace.yaml에서 만든 diconai 네임스페이스에 소속
 data: # 실제 설정값 목록 (평문 저장, base64 불필요)
   DJANGO_DEBUG: "False" # 운영 모드 (True면 에러 상세 노출 — k8s에선 항상 False)
-  DJANGO_ALLOWED_HOSTS: "drf,localhost,127.0.0.1,*" # Django가 요청 수락할 호스트명 목록
+  DJANGO_ALLOWED_HOSTS: "drf,localhost,127.0.0.1" # Django가 요청 수락할 호스트명 목록
   DJANGO_LOG_LEVEL: "INFO" # Django 로그 레벨
   JWT_ALGORITHM: "HS256" # JWT 서명 알고리즘 (drf ↔ fastapi 공유)
   JWT_ACCESS_TOKEN_LIFETIME_HOURS: "2" # 액세스 토큰 유효 시간 (시간 단위)
