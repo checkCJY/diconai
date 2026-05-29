@@ -1,5 +1,9 @@
 #!/bin/sh
 set -e
+# 이성현 수정 — Pod IP를 ALLOWED_HOSTS에 런타임 주입 (* 없이 readinessProbe 통과)
+POD_IP=$(hostname -i | awk '{print $1}')
+export DJANGO_ALLOWED_HOSTS="${DJANGO_ALLOWED_HOSTS},${POD_IP}"
+
 
 # prometheus_client multiprocess 모드 — drf + celery-worker가 같은 디렉토리에 쓰고
 # /metrics 엔드포인트에서 합산해 노출한다. 두 컨테이너 모두 /app 볼륨을 공유하므로
