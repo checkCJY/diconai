@@ -35,6 +35,10 @@ services:
       - max_connections=50
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    # dev 전용 — DBeaver 등 GUI 클라이언트가 호스트에서 붙도록 노출.
+    # 127.0.0.1 바인딩으로 외부 네트워크 노출은 막음 (WSL2는 Windows localhost 자동 포워딩).
+    ports:
+      - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-diconai}"]
       interval: 10s

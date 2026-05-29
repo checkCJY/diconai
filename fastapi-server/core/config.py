@@ -74,6 +74,14 @@ class Settings(BaseSettings):
     # → 시연용 1.0 권장. 운영 시 3.0 default — false positive 억제 의도.
     DEMO_GAS_CP_PENALTY: float = 3.0
 
+    # ── 전력 `overload` 시연 override ─────────────────────────
+    # power_dummy.SCENARIO_PATTERNS["overload"] 의 상태머신 틱 값을 env 로 외부화.
+    # 시연 시 RAMP_UP 을 늘려 "정상(정격×1.0) → 주의 → 위험(정격×1.10)" 격상 흐름이
+    # 운영자가 추적 가능한 속도로 진행되게 한다. 미설정 시 기본 5/60/10 = 코드 원래 값.
+    DEMO_OVERLOAD_RAMP_UP_TICKS: int = 5
+    DEMO_OVERLOAD_HOLD_TICKS: int = 60
+    DEMO_OVERLOAD_RAMP_DOWN_TICKS: int = 10
+
     # ── AI 알람 rate limit ────────────────────────────────────
     # 같은 센서에서 AI 이상탐지 알람을 최소 이 초(秒) 이상 간격으로 발화.
     # DRF 의 ALARM_REPOPUP_COOLDOWN_SEC (event_service 쿨다운, 기본 60s) 과

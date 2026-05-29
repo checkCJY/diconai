@@ -3,12 +3,17 @@
 
 생성 항목:
 - Facility(id=1) — 도면 1290x590 (위치 더미 좌표 범위)
-- CustomUser × 4 (id=1~4, user_type=WORKER) — 위치 더미가 worker_id=1~4 송출
+- CustomUser × 4 (worker_a~d, user_type=WORKER) — 위치 더미가 username 기반 lookup
 - GasSensor(device_id="63200c3afd12") — 가스 더미가 송출하는 device_id
 - PowerDevice(device_id="63200c3afd12") — 전력 더미가 송출하는 device_id
 
 실행: python manage.py seed_dummy_data
 재실행 안전 (idempotent).
+
+[2026-05-29 변경] 워커 pk=1~4 하드코딩 제거 — PG 환경에서 admin/manager 등이 이미
+pk=1~4 를 점유한 상태에서 seed 가 skip 되어 worker_a~d 가 생성되지 않던 문제 수정.
+username 기반 lookup 으로 전환. PK 는 sequence 가 자동 부여.
+※ 와이어 프로토콜 (`worker_id: int = PK`) 는 별도 — 작업자 디바이스 결정 후 정렬 예정.
 """
 
 from django.core.management.base import BaseCommand
@@ -22,10 +27,10 @@ DUMMY_DEVICE_ID = "63200c3afd12"
 DEFAULT_PASSWORD = "worker1234!"
 
 DUMMY_WORKERS = [
-    {"pk": 1, "username": "worker_a", "name": "작업자 A"},
-    {"pk": 2, "username": "worker_b", "name": "작업자 B"},
-    {"pk": 3, "username": "worker_c", "name": "작업자 C"},
-    {"pk": 4, "username": "worker_d", "name": "작업자 D"},
+    {"username": "worker_a", "name": "작업자 A"},
+    {"username": "worker_b", "name": "작업자 B"},
+    {"username": "worker_c", "name": "작업자 C"},
+    {"username": "worker_d", "name": "작업자 D"},
 ]
 
 
@@ -55,16 +60,16 @@ class Command(BaseCommand):
         return facility
 
     def _seed_workers(self, facility: Facility) -> None:
+        # username 기반 lookup — PK 는 sequence 가 자동 부여. 기존 워커는 skip.
         for w in DUMMY_WORKERS:
-            existing = CustomUser.objects.filter(pk=w["pk"]).first()
+            existing = CustomUser.objects.filter(username=w["username"]).first()
             if existing:
                 self.stdout.write(
-                    f"  · CustomUser(id={w['pk']}) 이미 존재 "
-                    f"(username={existing.username}) — skip"
+                    f"  · CustomUser(username={w['username']}) 이미 존재 "
+                    f"(id={existing.id}) — skip"
                 )
                 continue
             user = CustomUser(
-                pk=w["pk"],
                 username=w["username"],
                 name=w["name"],
                 user_type=UserType.WORKER,
@@ -73,7 +78,7 @@ class Command(BaseCommand):
             user.set_password(DEFAULT_PASSWORD)
             user.save()
             self.stdout.write(
-                f"  · CustomUser(id={w['pk']}, {w['username']}) 생성 "
+                f"  · CustomUser(id={user.id}, {w['username']}) 생성 "
                 f"[비밀번호: {DEFAULT_PASSWORD}]"
             )
 

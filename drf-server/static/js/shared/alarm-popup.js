@@ -438,6 +438,9 @@ const AlarmPopup = {
   _inited:      false,
   _currentId:   null,
   _currentLevel: null,    // 격상 비교용 — 현재 떠있는 모달의 risk_level
+  _currentChannel: null,  // 격상 매칭 fallback — push payload 에 event_id 가 없는
+  _currentAlarmType: null,// 케이스 (예: power_anomaly_ai 의 forward race timeout)
+                          // event_id 우선, 없으면 alarm_type+channel 로 매칭
   droppedCount: 0,           // 큐 풀 시 누적 (운영 가시성 — 03 R2)
   MAX_QUEUE:    30,          // 다채널 동시 발화 폭주 시 drop 회피 (5 → 30)
   GROUP_WINDOW_MS: 5000,     // 같은 센서·동일 레벨 연속 알람 그룹핑 윈도우
@@ -467,12 +470,27 @@ const AlarmPopup = {
 
     // 위험도 격상 — 같은 event 가 warning → danger 로 올라온 경우 현재 모달 강제 교체.
     // dedup/큐 우회: 운영자 시각에 격상 즉시 반영. ack 무시 (격상은 더 큰 위험).
+    //
+    // 매칭 전략:
+    //   (1) event_id 매칭 (정상 경로) — 가스/전력 룰 / 전력 AI 의 forward race 정상 case
+    //   (2) channel+alarm_type fallback — event_id 둘 다 null 일 때 (전력 AI 의 forward
+    //       race 가 500ms 안 응답 못 받은 case). 같은 채널의 warning → danger 만 매칭.
+    const sameEvent = (
+      eventId != null && eventId === this._currentId
+    );
+    const sameChannelFallback = (
+      eventId == null
+      && this._currentId == null
+      && data.alarm_type != null
+      && data.alarm_type === this._currentAlarmType
+      && data.channel != null
+      && data.channel === this._currentChannel
+    );
     if (
       this.isOpen
-      && eventId != null
-      && eventId === this._currentId
       && this._currentLevel === 'warning'
       && level === 'danger'
+      && (sameEvent || sameChannelFallback)
     ) {
       this.queue.unshift(data);          // 큐 맨 앞에 — close 후 _process 가 즉시 픽업
       this.close({ acknowledged: false });
@@ -562,6 +580,8 @@ const AlarmPopup = {
     const cfg   = _POPUP_CFG[level] || _POPUP_CFG.danger;
     this._currentId = data.event_id || data.id || null;
     this._currentLevel = level;
+    this._currentChannel = data.channel ?? null;
+    this._currentAlarmType = data.alarm_type ?? null;
 
     const popup = document.getElementById('alarm-popup');
     if (!popup) { this.isOpen = false; return; }
@@ -685,6 +705,8 @@ const AlarmPopup = {
     }
     this._currentId = null;
     this._currentLevel = null;
+    this._currentChannel = null;
+    this._currentAlarmType = null;
     const popup = document.getElementById('alarm-popup');
     if (popup) {
       popup.style.display = 'none';
@@ -769,6 +791,9 @@ const AlarmPopup = {
     // 누락 카운트는 reset — 운영자가 이력 페이지에서 확인 의사.
     clearTimeout(this._autoCloseTimer);
     this._currentId = null;
+    this._currentLevel = null;
+    this._currentChannel = null;
+    this._currentAlarmType = null;
     this.isOpen = false;
     this.queue = [];
     this.droppedCount = 0;

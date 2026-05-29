@@ -126,9 +126,10 @@ SCENARIO_PATTERNS: dict[str, dict] = {
         "w_factor": 1.10,
         "a_factor": 1.10,
         "v_factor": 0.93,
-        "ramp_up": 5,
-        "hold": 60,
-        "ramp_down": 10,
+        # 시연용 env override — 미설정 시 5/60/10 코드 기본값.
+        "ramp_up": settings.DEMO_OVERLOAD_RAMP_UP_TICKS,
+        "hold": settings.DEMO_OVERLOAD_HOLD_TICKS,
+        "ramp_down": settings.DEMO_OVERLOAD_RAMP_DOWN_TICKS,
     },
     "voltage_drop": {  # 보조 — multi-channel 시나리오 (Phase 3 다채널 학습 가치)
         "w_factor": 0.85,
