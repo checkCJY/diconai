@@ -31,6 +31,13 @@ class ThresholdGroup(BaseModel):
     name = models.CharField(max_length=100, verbose_name="그룹 명")
     description = models.TextField(blank=True, default="")
     is_active = models.BooleanField(default=True)
+    # 이 그룹의 임계치가 반영되는 위치 목록 (실시간관제/AI예측/알림)
+    apply_scope = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name="반영 범위",
+        help_text='예: ["realtime", "ai", "alert"]',
+    )
 
     def __str__(self):
         return f"{self.code} ({self.name})"
@@ -88,6 +95,19 @@ class Threshold(BaseModel):
         max_digits=12, decimal_places=4, null=True, blank=True
     )
     unit = models.CharField(max_length=10, default="ppm")
+    # 주의/위험 구간이 "초과(gt) / 이상(gte) / 미만(lt) / 이하(lte)" 중 어느 방향인지
+    CONDITION_CHOICES = [
+        ("gt", "초과"),
+        ("gte", "이상"),
+        ("lt", "미만"),
+        ("lte", "이하"),
+    ]
+    condition_type = models.CharField(
+        max_length=5,
+        choices=CONDITION_CHOICES,
+        default="gt",
+        verbose_name="판단조건",
+    )
     chart_max = models.DecimalField(
         max_digits=12,
         decimal_places=4,

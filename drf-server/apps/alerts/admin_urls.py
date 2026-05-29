@@ -9,6 +9,7 @@ from django.urls import path
 from apps.alerts.views.admin_views import (
     AlertPolicyAdminDetailView,
     AlertPolicyAdminListView,
+    EventHistoryAdminListView,
 )
 
 urlpatterns = [
@@ -21,5 +22,11 @@ urlpatterns = [
         "policies/<int:pk>/",
         AlertPolicyAdminDetailView.as_view(),
         name="admin-alert-policies-detail",
+    ),
+    # GET /api/admin/alerts/events/ — 이벤트 이력 조회 (읽기 전용)
+    path(
+        "events/",
+        EventHistoryAdminListView.as_view(),
+        name="admin-event-history-list",
     ),
 ]

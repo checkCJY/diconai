@@ -23,6 +23,7 @@ from django.views.generic import TemplateView
 
 from apps.accounts.models.department import Department
 from apps.accounts.models.position import Position
+from apps.core.constants import AlarmType, EventStatus
 from apps.geofence.views.admin_views import GeoFenceAdminPageView
 from apps.facilities.views.map_editor import MapEditorPageView
 from apps.facilities.views.gas_sensor_admin import GasSensorAdminPageView
@@ -229,6 +230,89 @@ class MapEditLogPageView(TemplateView):
         return ctx
 
 
+class CommonCodesAdminPageView(TemplateView):
+    """공통 코드 관리 페이지.
+
+    왼쪽: CodeGroup 목록 / 오른쪽: 선택 그룹의 CommonCode 목록.
+    실제 데이터는 JS 가 /api/admin/code-groups/ 를 fetch 해서 렌더링한다.
+    Phase 1: 공통코드 페이지 내 CRUD만 동작 / 다른 페이지 연동은 Phase 2.
+    """
+
+    template_name = "admin_panel/common_codes/common_codes.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["active_nav"] = "common_code"
+        # 모달의 수정자(readonly) 필드에 표시할 현재 로그인 사용자 이름
+        # AnonymousUser 는 get_full_name() 이 없으므로 hasattr 로 방어
+        user = self.request.user
+        full_name = getattr(user, 'get_full_name', lambda: '')()
+        ctx["current_user_display"] = full_name or getattr(user, 'username', '')
+        return ctx
+
+
+class ThresholdAdminPageView(TemplateView):
+    """임계치 기준 관리 페이지.
+
+    왼쪽: ThresholdGroup 목록 / 오른쪽: 선택 그룹의 Threshold 목록.
+    실제 데이터는 JS 가 /api/admin/threshold-groups/ 를 fetch 해서 렌더링한다.
+    """
+
+    template_name = "admin_panel/thresholds/thresholds.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["active_nav"] = "threshold"
+        return ctx
+
+
+class RiskStandardsAdminPageView(TemplateView):
+    """위험 기준 관리 페이지.
+
+    RiskLevelStandard 3개 레코드 조회·수정 전용.
+    필터 드롭다운용 색상 옵션을 context 로 전달.
+    실제 데이터는 JS 가 /api/admin/risk-standards/ 를 fetch 해서 렌더링한다.
+    """
+
+    template_name = "admin_panel/risk_standards/risk_standards.html"
+
+    def get_context_data(self, **kwargs):
+        from apps.core.models.risk_level_standard import RiskLevelStandard
+
+        ctx = super().get_context_data(**kwargs)
+        ctx["active_nav"] = "risk_standard"
+        # 알림강도 드롭다운 선택지
+        ctx["alert_intensities"] = [
+            {"value": v, "label": label}
+            for v, label in RiskLevelStandard.AlertIntensity.choices
+        ]
+        return ctx
+
+
+class EventHistoryAdminPageView(TemplateView):
+    """이벤트 이력 조회 페이지.
+
+    읽기 전용 조회 페이지 — CRUD 없음.
+    필터 드롭다운용 alarm_types / event_statuses 를 context 로 전달.
+    실제 데이터는 JS 가 /api/admin/alerts/events/ 를 fetch 해서 렌더링한다.
+    """
+
+    template_name = "admin_panel/events/event_history.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["active_nav"] = "event_history"
+        # 이벤트 구분 드롭다운 — AlarmType choices 전달
+        ctx["alarm_types"] = [
+            {"value": v, "label": label} for v, label in AlarmType.choices
+        ]
+        # 이벤트 상태 드롭다운 — EventStatus choices 전달
+        ctx["event_statuses"] = [
+            {"value": v, "label": label} for v, label in EventStatus.choices
+        ]
+        return ctx
+
+
 class AlertPolicyAdminPageView(TemplateView):
     """알림 정책 관리 페이지.
 
@@ -324,5 +408,25 @@ urlpatterns = [
         "alerts/policies/",
         AlertPolicyAdminPageView.as_view(),
         name="admin-alert-policies-page",
+    ),
+    path(
+        "events/history/",
+        EventHistoryAdminPageView.as_view(),
+        name="admin-event-history-page",
+    ),
+    path(
+        "risk-standards/",
+        RiskStandardsAdminPageView.as_view(),
+        name="admin-risk-standards-page",
+    ),
+    path(
+        "thresholds/",
+        ThresholdAdminPageView.as_view(),
+        name="admin-thresholds-page",
+    ),
+    path(
+        "common-codes/",
+        CommonCodesAdminPageView.as_view(),
+        name="admin-common-codes-page",
     ),
 ]

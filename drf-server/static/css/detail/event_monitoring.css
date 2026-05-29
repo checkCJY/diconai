@@ -271,7 +271,7 @@
   color: #fff;
 }
 
-<<<<<<< HEAD
+
 /* ── 공지사항 패널 ── */
 .notice-item {
   display: flex;
@@ -306,7 +306,7 @@
   white-space: nowrap;
   flex-shrink: 0;
 }
-=======
+
 /* 페이지네이션 (admin.css 와 동일 패턴, 다크 톤 톤다운) */
 .pagination { display: flex; gap: 4px; justify-content: center; padding: 12px 0; }
 .pagination button {
@@ -322,4 +322,3 @@
 .pagination button:hover:not(:disabled):not(.active) { background: rgba(48,54,61,0.6); }
 .pagination button.active { background: rgba(56,139,253,0.85); border-color: transparent; color: #fff; }
 .pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
->>>>>>> origin/devleop

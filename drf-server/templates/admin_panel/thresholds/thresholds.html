@@ -1,0 +1,284 @@
+{% extends 'admin_panel/base.html' %}
+{% load static %}
+
+{% block title %}임계치 기준 관리{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <div class="header-titles">
+        <div class="breadcrumb">기준 정보 관리 &gt; 임계치 기준 관리</div>
+        <h2 class="page-title">임계치 기준 관리</h2>
+        <p class="page-desc">가스/전력 데이터의 임계치 기준을 관리합니다.</p>
+    </div>
+    <!-- 그룹 등록은 페이지 상단 우측에 위치 -->
+    <button class="btn-primary" id="btnAddGroup">기준 분류 등록</button>
+</section>
+
+<!-- 2패널 레이아웃 -->
+<div class="threshold-layout">
+
+    <!-- 왼쪽: 기준 분류 그룹 목록 -->
+    <div class="threshold-left">
+        <div class="panel-header">
+            <span class="panel-title">기준 분류 그룹</span>
+        </div>
+        <p class="panel-desc">분류를 선택하면 우측에서 위험 유형과 반영 위치를 확인할 수 있습니다.</p>
+        <div class="group-search">
+            <input type="text" id="groupSearch" placeholder="그룹명 검색">
+            <button class="btn-dark btn-sm" id="btnGroupSearch">검색</button>
+        </div>
+        <ul class="group-list" id="groupList">
+            <li class="group-empty">불러오는 중...</li>
+        </ul>
+        <!-- 그룹 수정만 (등록은 상단, 삭제 없음) -->
+        <div class="group-footer">
+            <button class="btn-outline btn-sm full-width" id="btnEditGroup" disabled>수정</button>
+        </div>
+    </div>
+
+    <!-- 오른쪽: 그룹 정보 + 임계치 목록 -->
+    <div class="threshold-right" id="thresholdRight">
+        <!-- 그룹 미선택 초기 상태 -->
+        <div class="right-empty" id="rightEmpty">
+            <p>왼쪽에서 그룹을 선택하세요.</p>
+        </div>
+
+        <!-- 그룹 선택 시 표시 -->
+        <div id="rightContent" style="display:none;">
+
+            <!-- 그룹 정보 카드 -->
+            <div class="group-info-card">
+                <div class="group-info-badge" id="infoSelectedBadge">선택 분류: -</div>
+                <div class="info-grid">
+                    <!-- 왼쪽 묶음 -->
+                    <div class="info-block">
+                        <div class="info-row">
+                            <span class="info-label">분류명</span>
+                            <span class="info-value" id="infoName">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">분류 코드</span>
+                            <span class="info-value mono" id="infoCode">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">반영 범위</span>
+                            <span class="info-value" id="infoScope">-</span>
+                        </div>
+                    </div>
+                    <!-- 오른쪽 묶음 -->
+                    <div class="info-block">
+                        <div class="info-row">
+                            <span class="info-label">최근 수정일</span>
+                            <span class="info-value" id="infoUpdated">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">사용 기준 수</span>
+                            <span class="info-value" id="infoCount">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 임계치 목록 테이블 카드 -->
+            <div class="table-card threshold-table-card">
+                <!-- 툴바: 배지 + 액션 버튼 + 검색 -->
+                <div class="table-toolbar">
+                    <div class="toolbar-left">
+                        <span class="th-section-title">임계치 기준 목록</span>
+                        <span class="group-name-badge" id="toolbarGroupBadge"></span>
+                        <span class="selected-badge" id="selectedBadge" style="display:none;"></span>
+                        <button class="btn-danger btn-sm" id="btnDeleteThreshold" disabled>삭제</button>
+                        <button class="btn-primary btn-sm" id="btnAddThreshold">등록</button>
+                    </div>
+                    <div class="toolbar-right">
+                        <input type="text" id="thresholdSearch" class="toolbar-search" placeholder="측정 항목 검색">
+                        <button class="btn-outline btn-sm" id="btnResetSearch">초기화</button>
+                        <button class="btn-dark btn-sm" id="btnThresholdSearch">검색</button>
+                    </div>
+                </div>
+                <!-- 전체 건수 + 정렬 -->
+                <div class="table-meta">
+                    <span class="total-count">전체 <strong id="thresholdCount">0</strong>건</span>
+                    <select class="sort-select" id="sortSelect">
+                        <option value="item_asc">측정항목 오름차순</option>
+                        <option value="item_desc">측정항목 내림차순</option>
+                        <option value="active_first">사용 여부</option>
+                        <option value="updated_desc">최근 수정일 최신순</option>
+                        <option value="updated_asc">최근 수정일 오래된순</option>
+                    </select>
+                </div>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="col-check">
+                                    <input type="checkbox" id="checkAll" title="전체선택">
+                                </th>
+                                <th>측정항목</th>
+                                <th>단위</th>
+                                <th>판단 조건</th>
+                                <th>주의값</th>
+                                <th>위험값</th>
+                                <th>사용 여부</th>
+                                <th>반영 위치</th>
+                                <th>최근 수정일</th>
+                            </tr>
+                        </thead>
+                        <tbody id="thresholdTableBody">
+                            <tr><td colspan="9" class="empty-state">그룹을 선택하세요.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 페이지네이션 -->
+                <div class="pagination-bar" id="paginationBar" style="display:none;">
+                    <span class="page-range" id="pageRange">1 - 10 / 0</span>
+                    <div class="page-buttons" id="pageButtons"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── 모달: 그룹 등록 / 수정 ── -->
+<div class="modal-overlay" id="groupModalOverlay" style="display:none;">
+    <div class="threshold-modal">
+        <div class="modal-header">
+            <h3 class="modal-title" id="groupModalTitle">기준 분류 등록</h3>
+            <button class="modal-close" id="btnGroupModalClose">&times;</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="groupModalId">
+            <div class="form-field">
+                <label class="form-label">분류코드 <span class="required">*</span></label>
+                <input type="text" id="groupModalCode" class="form-input" placeholder="예: TH_GAS">
+                <span class="form-hint">소문자·숫자·언더스코어만 허용</span>
+            </div>
+            <div class="form-field">
+                <label class="form-label">분류명 <span class="required">*</span></label>
+                <input type="text" id="groupModalName" class="form-input" placeholder="분류명 입력">
+            </div>
+            <!-- 반영범위 체크박스 -->
+            <div class="form-field">
+                <label class="form-label">반영범위</label>
+                <div class="checkbox-group">
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="groupScope" value="realtime"> 실시간관제
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="groupScope" value="ai"> AI예측
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="groupScope" value="alert"> 알림
+                    </label>
+                </div>
+            </div>
+            <div class="form-field">
+                <label class="form-label">사용여부</label>
+                <select id="groupModalActive" class="form-input">
+                    <option value="true">사용</option>
+                    <option value="false">미사용</option>
+                </select>
+            </div>
+            <div class="form-field">
+                <label class="form-label">설명</label>
+                <textarea id="groupModalDesc" class="form-textarea" rows="3" placeholder="설명 입력"></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-outline" id="btnGroupModalCancel">취소</button>
+            <button class="btn-primary" id="btnGroupModalSave">등록</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── 모달: 임계치 등록 / 수정 ── -->
+<div class="modal-overlay" id="thresholdModalOverlay" style="display:none;">
+    <div class="threshold-modal wide">
+        <div class="modal-header">
+            <h3 class="modal-title" id="thresholdModalTitle">임계치 기준 등록</h3>
+            <button class="modal-close" id="btnThresholdModalClose">&times;</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="thresholdModalId">
+            <!-- 기준분류 (읽기전용 — 선택된 그룹명 표시) -->
+            <div class="form-field">
+                <label class="form-label">기준분류</label>
+                <input type="text" id="thresholdModalGroup" class="form-input readonly" readonly>
+            </div>
+            <div class="form-row">
+                <div class="form-field">
+                    <label class="form-label">측정항목 <span class="required">*</span></label>
+                    <input type="text" id="thresholdModalItem" class="form-input" placeholder="예: co, h2s, power_w">
+                    <span class="form-hint">소문자·숫자·언더스코어만 허용</span>
+                </div>
+                <div class="form-field">
+                    <label class="form-label">단위</label>
+                    <input type="text" id="thresholdModalUnit" class="form-input" placeholder="예: ppm, kW">
+                </div>
+            </div>
+            <div class="form-field">
+                <label class="form-label">판단조건</label>
+                <select id="thresholdModalCondition" class="form-input">
+                    <option value="gt">초과</option>
+                    <option value="gte">이상</option>
+                    <option value="lt">미만</option>
+                    <option value="lte">이하</option>
+                </select>
+            </div>
+            <div class="form-section-title">주의 구간</div>
+            <div class="form-row">
+                <div class="form-field">
+                    <label class="form-label">주의 최솟값</label>
+                    <input type="number" id="thresholdModalWarnMin" class="form-input" step="any" placeholder="미입력 시 없음">
+                </div>
+                <div class="form-field">
+                    <label class="form-label">주의 최댓값</label>
+                    <input type="number" id="thresholdModalWarnMax" class="form-input" step="any" placeholder="미입력 시 없음">
+                </div>
+            </div>
+            <div class="form-section-title">위험 구간</div>
+            <div class="form-row">
+                <div class="form-field">
+                    <label class="form-label">위험 최솟값</label>
+                    <input type="number" id="thresholdModalDangerMin" class="form-input" step="any" placeholder="미입력 시 없음">
+                </div>
+                <div class="form-field">
+                    <label class="form-label">위험 최댓값</label>
+                    <input type="number" id="thresholdModalDangerMax" class="form-input" step="any" placeholder="미입력 시 없음">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-field">
+                    <label class="form-label">차트 최댓값</label>
+                    <input type="number" id="thresholdModalChartMax" class="form-input" step="any" placeholder="미입력 시 자동">
+                </div>
+                <div class="form-field">
+                    <label class="form-label">사용여부</label>
+                    <select id="thresholdModalActive" class="form-input">
+                        <option value="true">사용</option>
+                        <option value="false">미사용</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-field">
+                <label class="form-label">설명</label>
+                <textarea id="thresholdModalDesc" class="form-textarea" rows="2" placeholder="설명 입력"></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-outline" id="btnThresholdModalCancel">취소</button>
+            <button class="btn-primary" id="btnThresholdModalSave">등록</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/admin/thresholds.css' %}">
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/admin/thresholds/thresholds.js' %}"></script>
+{% endblock %}
