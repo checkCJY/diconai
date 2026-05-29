@@ -90,9 +90,11 @@ def build_logging_config(level: str = "INFO") -> dict:
                 "propagate": False,
             },
             # IoT 가스 페이로드 파싱·검증 (gas.services.gas_service 등).
+            # level 은 setup_logging 인자 = settings.LOG_LEVEL 반영. LOG_LEVEL=DEBUG
+            # 시 ChangePoint/IF 추론 게이트 진단 로그 노출. 운영 default INFO 유지.
             "gas.services": {
                 "handlers": ["console", "file_app", "file_error"],
-                "level": "INFO",
+                "level": level,
                 "propagate": False,
             },
             # IoT 전력 페이로드 파싱·AI 추론 (power.services.anomaly_inference 등).

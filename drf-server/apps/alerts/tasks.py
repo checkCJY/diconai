@@ -412,7 +412,9 @@ def fire_clear_notification_task(
         from apps.alerts.services.event_service import auto_resolve_active_events
 
         resolved = auto_resolve_active_events(
-            event_type_prefix="gas", sensor_id=sensor_id
+            event_type_prefix="gas",
+            sensor_id=sensor_id,
+            cleared_gases=gas_types,
         )
         logger.info(
             "정상화 알림 발송 | sensor=%s gases=%s resolved=%d",

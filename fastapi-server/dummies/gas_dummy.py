@@ -35,7 +35,6 @@ from dummies._state_machine import (
     ChannelState,
     enter_scenario,
     maybe_trigger,
-    mix,
     step,
 )
 
@@ -163,7 +162,12 @@ _SCENARIO_NAMES = list(SCENARIOS.keys())
 # 1틱 = DUMMY_SEND_INTERVAL_SEC 초 (기본 1초)
 # ---------------------------------------------------------------------------
 SCENARIO_PATTERNS: dict[str, dict[str, int]] = {
-    "co_leak": {"ramp_up": 5, "hold": 30, "ramp_down": 5},
+    # co_leak 만 env override 지원 — 시연 시 격상 흐름 가시화용 (settings 기본 5/30/5).
+    "co_leak": {
+        "ramp_up": settings.DEMO_CO_LEAK_RAMP_UP_TICKS,
+        "hold": settings.DEMO_CO_LEAK_HOLD_TICKS,
+        "ramp_down": settings.DEMO_CO_LEAK_RAMP_DOWN_TICKS,
+    },
     "h2s_leak": {"ramp_up": 5, "hold": 30, "ramp_down": 5},
     "fire": {"ramp_up": 3, "hold": 20, "ramp_down": 5},  # 화재는 더 빠른 진입
     "chemical_spill": {"ramp_up": 5, "hold": 30, "ramp_down": 5},
@@ -269,11 +273,26 @@ def _build_gas_values(mode: str) -> tuple[dict[str, float | int], str | None]:
     weight = out.scenario_weight
     gas_values: dict[str, float | int] = {}
     for gas in GAS_NORMAL_RANGE:
-        normal_pick = _pick_value(gas, "normal")
+        # 시연 시 RAMP_UP/RAMP_DOWN 동안 normal_pick 의 random noise 가 mix 값을
+        # 임계 아래로 끌어내려 fire_clear → event RESOLVED → 격상 시 새 event_id
+        # 가 발급되는 race 발생. 해결: normal range mid 가 아닌 normal_low 부터
+        # scenario range mid 까지 weight 선형 보간 + ±15% noise.
+        # → 단조 trend 보장 (event 격상 가시화) + IF 학습 시점의 noisy mix() 분포에
+        #   feature(std/diff/arima_resid) 근사 → IF 가 anomaly 로 인식 (pred=-1).
+        # → 혹시 발생할 임계 cross 는 C 패치 (partial skip) 가 흡수.
+        normal_low = float(GAS_NORMAL_RANGE[gas][0])
         scenario_level = scenario_levels.get(gas, "normal")
-        scenario_pick = _pick_value(gas, scenario_level)
-        v = mix(float(normal_pick), float(scenario_pick), weight)
-        # 정수 가스(co/h2s/co2/lel/nh3 등 일부) 도 float 로 저장 가능 (GasData.FloatField)
+        sc_low, sc_high = _RANGE_BY_LEVEL[scenario_level][gas]
+        scenario_mid = (float(sc_low) + float(sc_high)) / 2
+        v = normal_low + (scenario_mid - normal_low) * weight
+        if weight >= 1.0:
+            # HOLD 동안 큰 진폭 noise — IF feature (std/diff/arima_resid) 가 학습
+            # 시점의 noisy mix() 분포에 근사 → IF score 음수로 끌어내려 pred=-1 유도.
+            v *= random.uniform(0.6, 1.4)
+        else:
+            # RAMP_UP/RAMP_DOWN 동안 작은 noise — 단조 trend 보장 (격상 가시화)
+            # + 시연 화면이 너무 인공적이지 않도록 ±5% 자연스러움.
+            v *= random.uniform(0.95, 1.05)
         gas_values[gas] = round(v, 2)
     return gas_values, scenario
 
