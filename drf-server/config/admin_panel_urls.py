@@ -283,8 +283,8 @@ class RiskStandardsAdminPageView(TemplateView):
         ctx["active_nav"] = "risk_standard"
         # 알림강도 드롭다운 선택지
         ctx["alert_intensities"] = [
-            {"value": v, "label": l}
-            for v, l in RiskLevelStandard.AlertIntensity.choices
+            {"value": v, "label": label}
+            for v, label in RiskLevelStandard.AlertIntensity.choices
         ]
         return ctx
 
@@ -304,11 +304,11 @@ class EventHistoryAdminPageView(TemplateView):
         ctx["active_nav"] = "event_history"
         # 이벤트 구분 드롭다운 — AlarmType choices 전달
         ctx["alarm_types"] = [
-            {"value": v, "label": l} for v, l in AlarmType.choices
+            {"value": v, "label": label} for v, label in AlarmType.choices
         ]
         # 이벤트 상태 드롭다운 — EventStatus choices 전달
         ctx["event_statuses"] = [
-            {"value": v, "label": l} for v, l in EventStatus.choices
+            {"value": v, "label": label} for v, label in EventStatus.choices
         ]
         return ctx
 
