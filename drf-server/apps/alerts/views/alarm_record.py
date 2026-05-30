@@ -280,15 +280,13 @@ class AlarmRecordViewSet(viewsets.ReadOnlyModelViewSet):
     def summary(self, request):
         """최근 24시간 AlarmRecord 누적 + 현재 미확인 Event 건수.
 
-        [원안 디자인 — 미확인 카운트 추가]
         24h 누적 (last_24h_*) 은 운영 통계용, 미확인 (unacknowledged_event_count) 은
         "지금 운영자가 처리해야 할 사건 수". Event.status ∈ {active, acknowledged,
-        in_progress} 가 미확인. resolved 는 처리 완료라 제외.
+        in_progress} 가 미확인 (resolved 는 처리 완료라 제외).
 
-        [2026-05-17 D 옵션 — user-scoped unread]
-        user_unread_event_count — 본인이 아직 ack 안 한 활성 이벤트 수 (Phase 1
-        EventAcknowledgement 활용). 헤더 미확인 배지의 초기값으로 사용. 글로벌
-        unacknowledged 와 달리 본 사람만 줄어드는 카운트.
+        user_unread_event_count — 본인이 아직 ack 안 한 활성 이벤트 수
+        (EventAcknowledgement 활용). 헤더 미확인 배지의 초기값. 글로벌 unacknowledged
+        와 달리 본 사람만 줄어드는 카운트.
         """
         from apps.alerts.models import Event
         from apps.alerts.selectors.event_ack_selector import (
@@ -330,7 +328,7 @@ class AlarmRecordViewSet(viewsets.ReadOnlyModelViewSet):
         summary="WS 재연결 catch-up — since 이후 24h 내 미수신 알람",
         description=(
             "클라이언트가 WS 끊김 후 재연결할 때 localStorage 의 last_seen_ts 를 "
-            "since 로 전달해 미수신 알람을 보충 (2026-05-15 알람 재설계). "
+            "since 로 전달해 미수신 알람을 보충. "
             "fastapi 거치지 않고 클라가 drf 직접 호출 — simplicity. "
             "응답 모양은 fastapi broadcast payload 와 동일해 클라 측 mapper 공용 처리 가능. "
             "since=24h 이상 과거면 24h 까지로 클램프. 최대 100건 응답."
