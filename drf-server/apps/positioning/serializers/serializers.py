@@ -3,11 +3,10 @@ from rest_framework import serializers
 
 
 class WorkerPositionReceiveSerializer(serializers.Serializer):
-    """
-    FastAPI로부터 작업자 위치 데이터 수신용 Serializer
+    """FastAPI로부터 작업자 위치 데이터 수신용 Serializer.
 
-    [node_id — Phase 3-a]
-    PositionNode.device_id 그대로 (예: "NODE-001"). 미수신/미상 row는 None 허용.
+    node_id 는 PositionNode.device_id 그대로 (예: "NODE-001"). 미수신/미상 row는
+    None 허용.
     """
 
     worker_id = serializers.IntegerField()

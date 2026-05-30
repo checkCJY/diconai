@@ -139,13 +139,12 @@ def handle_position_receive(
     → 모든 위치를 DB에 저장 (위치 이력 완전 보존)
     → 지오펜스 30픽셀 이내 접근 시에만 지오펜스 알람 판정
 
-    [M-9 수정] 기존 "지오펜스 근접 시에만 DB 저장" 정책은 대부분의 위치 이력을 유실시켜
-    사고 소급 분석·동선 추적이 불가능했다. 위치 저장과 알람 판정을 분리해,
-    저장은 항상, 알람은 지오펜스 근접 시에만 발화한다.
+    위치 저장과 알람 판정을 분리한다 — 저장은 항상, 알람은 지오펜스 근접 시에만.
+    "근접 시에만 저장" 으로 두면 대부분의 위치 이력이 유실돼 사고 소급 분석·동선
+    추적이 불가능해지기 때문.
 
-    [node_id — Phase 3-a]
-    PositionNode.device_id 문자열. lookup 실패 시 received_node=None으로 저장
-    (데이터 손실보다 NULL 허용 우선).
+    node_id 는 PositionNode.device_id 문자열. lookup 실패 시 received_node=None 으로
+    저장 (데이터 손실보다 NULL 허용 우선).
 
     반환: {
         "worker_id": int,
@@ -163,7 +162,7 @@ def handle_position_receive(
             device_id=node_id, is_active=True
         ).first()
 
-    # [M-9] 지오펜스 근접 여부와 무관하게 모든 위치 저장
+    # 지오펜스 근접 여부와 무관하게 모든 위치 저장 (이력 완전 보존)
     pos = WorkerPosition.objects.create(
         worker_id=worker_id,
         facility_id=facility_id,
@@ -183,7 +182,7 @@ def handle_position_receive(
     # GEOFENCE_CHECK_DURATION: 위험 센서 판정에 걸린 시간을 히스토그램으로 기록한다.
     # geofence가 있을 때만 DB 쿼리가 실행되므로 geofence가 None인 케이스는 측정에서 제외.
     # p99 ≥ 100ms이면 DB 인덱스 점검 또는 worker 스케일 아웃 검토.
-    # [M-9] 저장은 항상 하되 알람 판정은 지오펜스 근접 시에만 실행 (저장·알람 분리).
+    # 저장은 항상 하되 알람 판정은 지오펜스 근접 시에만 실행 (저장·알람 분리).
     if geofence and _is_near_any_geofence(facility_id, x, y):
         _t = time.perf_counter()
         danger_info = _get_dangerous_sensors_in_geofence(geofence)
