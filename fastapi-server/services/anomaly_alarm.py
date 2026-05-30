@@ -1,9 +1,8 @@
 """AI 이상탐지 추론 결과의 DRF forward helper.
 
-[T4 D2 변경]
-push_alarm / mark_ai_recent 호출은 본 함수에서 제거 — 호출자 (power_service.
-process_anomaly_inference) 가 decide_alarm 매트릭스 결정 후 직접 호출. 본 함수는
-DRF 영속화만 담당:
+[책임 범위]
+push_alarm / mark_ai_recent 는 호출자 (power_service.process_anomaly_inference)
+가 decide_alarm 매트릭스 결정 후 직접 호출한다. 본 함수는 DRF 영속화만 담당:
   1. MLAnomalyResult forward — 추론 매번 (운영 추적용).
   2. AnomalyAlarmRecord forward — alarm_payload 있을 때 (decide_alarm fire 결정).
 
@@ -13,11 +12,6 @@ DRF 영속화만 담당:
 - 모든 외부 호출 silent fail + Prometheus counter (stage label) + logger.exception.
 - kill switch FORWARD_ANOMALY_TO_DRF=false 시 즉시 return.
 - timeout=2.0 명시 — httpx default 5s 너무 길어 fire-and-forget 패턴에 부적합.
-
-[T4 D2 이전 흐름 (참고)]
-이전엔 본 함수가 push_alarm 도 발사 (a 경로) + mark_ai_recent 도 호출. AI 가 단일
-결정자가 아닌 환경에선 fastapi 가 AI 알람만 직접 push 했고, DRF 측 룰 알람과
-race 가능. D2 로 fastapi 가 매트릭스 단일 결정자가 되어 (a) 경로 자연 사라짐.
 """
 
 import logging
@@ -37,9 +31,9 @@ anomaly_forward_failures = Counter(
     ["stage"],
 )
 
-# 본 sprint plan §Open Questions #2: dev=true / prod=true 기본. DRF SQLite 부하
-# 발견 시 false 로 즉시 disable. push 까지 비활성 (forward 만 끄면 화면 표시는
-# 유지 + DB 저장만 제외 같은 분리 필요하면 후속 sprint 에서 별도 flag 도입).
+# kill switch — 기본 활성(dev/prod 모두 true). DRF SQLite 부하 발견 시 false 로
+# 즉시 disable. forward·push 모두 비활성 (화면 표시 유지 + DB 저장만 제외 같은
+# 분리가 필요하면 별도 flag 도입).
 FORWARD_ENABLED = os.getenv("FORWARD_ANOMALY_TO_DRF", "true").lower() == "true"
 
 ML_PATH = "/api/ml/anomaly-results/"
@@ -54,7 +48,7 @@ async def forward_inference_e2e(
     ml_payload: dict,
     alarm_payload: dict | None = None,
 ) -> dict | None:
-    """T4 D2 — ML forward (매번) + AlarmRecord forward (alarm_payload 있을 때).
+    """ML forward (매번) + AlarmRecord forward (alarm_payload 있을 때).
 
     Flow:
       1. ML forward (await, ml_id 추출).

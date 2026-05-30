@@ -134,14 +134,22 @@ class PowerDataBulkIngestSerializer(serializers.Serializer):
         try:
             PowerData.objects.bulk_create(objs, ignore_conflicts=True)
         except OperationalError as e:
-            error_type = "db_locked" if "database is locked" in str(e).lower() else "other"
-            DB_SAVE_TOTAL.labels(model="power", result="error", error_type=error_type).inc()
+            error_type = (
+                "db_locked" if "database is locked" in str(e).lower() else "other"
+            )
+            DB_SAVE_TOTAL.labels(
+                model="power", result="error", error_type=error_type
+            ).inc()
             raise
         except IntegrityError:
-            DB_SAVE_TOTAL.labels(model="power", result="error", error_type="integrity").inc()
+            DB_SAVE_TOTAL.labels(
+                model="power", result="error", error_type="integrity"
+            ).inc()
             raise
         except Exception:
-            DB_SAVE_TOTAL.labels(model="power", result="error", error_type="other").inc()
+            DB_SAVE_TOTAL.labels(
+                model="power", result="error", error_type="other"
+            ).inc()
             raise
         finally:
             DB_SAVE_DURATION.labels(model="power").observe(time.perf_counter() - _t)

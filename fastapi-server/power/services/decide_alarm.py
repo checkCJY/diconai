@@ -1,8 +1,8 @@
-# power/services/decide_alarm.py — T4 D2 fastapi 단일 정책 결정
+# power/services/decide_alarm.py — fastapi 단일 정책 결정
 #
 # AI 추론 5 state + 정적 평가 결과 → source 6 매트릭스 분기 → AlarmDecision.
 # 호출자 (power_service.process_anomaly_inference) 가 본 결정을 받아 push_payload
-# 조립 + push_alarm 직접 호출. T4 sub-plan §4·§5.
+# 조립 + push_alarm 직접 호출.
 #
 # [순수 함수]
 # decide_alarm 은 I/O 없는 분기 로직만 — AI state·정적 risk 결과를 인자로 받음.
@@ -22,7 +22,7 @@ class AlarmDecision:
     Attributes:
         source: AlarmSource 6종 중 하나 — `ai` / `static_cover_miss` /
             `static_cover_inference_fail` / `static_cover_warmup` /
-            `static_no_ai_available` / `static_legacy` (T4 후 미사용).
+            `static_no_ai_available` / `static_legacy` (DRF fallback, 본 경로 미사용).
         alarm_type: `power_anomaly_ai` (source=ai) 또는 `power_overload` (그 외).
         risk_level: `warning` | `danger` — UI 색상·prefix 분기.
         reason: ALARM_SOURCE_REASON[source] — push_payload.reason 그대로 동봉.
@@ -60,7 +60,7 @@ def decide_alarm(
     ai_combined_risk: str,
     static_risk: str,
 ) -> AlarmDecision | None:
-    """T4 D2 — 6 매트릭스 분기 (plan §5.1).
+    """AI 상태 × 정적 결과 6 매트릭스로 알람 source 를 분기한다.
 
     | AI 상태             | 정적 결과   | source                          |
     |---------------------|------------|---------------------------------|
