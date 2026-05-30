@@ -131,14 +131,9 @@ def extract_labeled_power_series(
     )
 
 
-# ---------------------------------------------------------------------------
-# 가스 도메인 — wide-format (한 row 에 9종 가스 동시 저장)
-#
+# 가스 도메인 — wide-format (한 row 에 9종 가스 동시 저장).
 # 전력은 (device, channel, data_type) 세 키로 시계열을 분리하지만, 가스는
 # 가스명만 선택해 (sensor_id, gas_name) 두 키로 분리한다.
-# ---------------------------------------------------------------------------
-
-
 def _gas_to_arrays(qs, gas_name: str) -> tuple:
     """GasData QuerySet → (measured_at, values, is_anomaly, anomaly_type) numpy 배열.
 

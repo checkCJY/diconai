@@ -30,11 +30,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ai", tags=["ai"])
 
 
-# ---------------------------------------------------------------------------
 # 모델 캐시 — sensor_type 별 1개씩 (active 모델). 프로세스 메모리 영속.
-# ---------------------------------------------------------------------------
-
-
 class _CachedModel:
     """로딩된 IF 모델 + 학습 메타 + 로딩 시각."""
 
@@ -51,7 +47,7 @@ class _CachedModel:
 
 
 class _CachedArimaModel:
-    """로딩된 ARIMA 결과 + 메타 + 로딩 시각 (W2 신규).
+    """로딩된 ARIMA 결과 + 메타 + 로딩 시각.
 
     IF 와 분리 — ARIMA pkl bundle 은 {"result": ARIMAResultsWrapper, "order": (p,d,q)}
     구조라 feature_columns/window 가 없음.
@@ -66,7 +62,7 @@ class _CachedArimaModel:
         self.loaded_at = time.time()
 
 
-# W2 — cache key 를 (sensor_type, algorithm, sensor_identifier) 3축 tuple 로 확장.
+# cache key 는 (sensor_type, algorithm, sensor_identifier) 3축 tuple.
 # 같은 dict 에 IF 와 ARIMA 가 분리된 키로 공존.
 _cache: dict[tuple[str, str, str], _CachedModel | _CachedArimaModel] = {}
 _cache_lock = Lock()
@@ -89,7 +85,7 @@ async def _fetch_active_model_meta(
     algorithm: str = "isolation_forest",
     sensor_identifier: str = "",
 ) -> dict:
-    """DRF active 모델 메타 조회 — W2 에서 3축 매칭 (algorithm, sensor_identifier).
+    """DRF active 모델 메타 조회 — 3축 매칭 (algorithm, sensor_identifier).
 
     file_path 는 ML_MODELS_DIR 기준 상대 경로. default 호출은 기존 IF 매칭 회귀 0.
     """
@@ -120,9 +116,9 @@ def _load_pkl(file_name: str) -> tuple[object, list[str], int]:
 
 
 def _load_arima_pkl(file_name: str) -> tuple[object, tuple]:
-    """ML_MODELS_DIR 아래 ARIMA .pkl 로드 → (result, order) (W2 신규).
+    """ML_MODELS_DIR 아래 ARIMA .pkl 로드 → (result, order).
 
-    train_arima_model.py / train_arima_power_model.py (W2.5) 가 저장한 bundle 형식:
+    train_arima_model.py / train_arima_power_model.py 가 저장한 bundle 형식:
     {"result": ARIMAResultsWrapper, "order": (p, d, q)}.
     """
     path = Path(settings.ML_MODELS_DIR) / file_name
@@ -140,7 +136,7 @@ async def _get_or_load(
     algorithm: str = "isolation_forest",
     sensor_identifier: str = "",
 ) -> _CachedModel:
-    """IF 모델 캐시/로드 — W2 에서 (sensor_type, algorithm, sensor_identifier) 3축 매칭.
+    """IF 모델 캐시/로드 — (sensor_type, algorithm, sensor_identifier) 3축 매칭.
 
     default 호출 (`_get_or_load("power")`) 은 algorithm="isolation_forest",
     sensor_identifier="" 매칭 → 기존 IF 동작 회귀 0.
@@ -196,11 +192,10 @@ async def _get_or_load_arima(
     sensor_type: str,
     sensor_identifier: str,
 ) -> _CachedArimaModel:
-    """ARIMA 모델 캐시/로드 — sensor_identifier 단위 매칭 (W2 신규).
+    """ARIMA 모델 캐시/로드 — sensor_identifier 단위 매칭.
 
-    W2.5 (train_arima_power_model.py) 가 학습한 전력 ARIMA 를 W3 추론 분기가 호출.
-    가스 ARIMA 의 MLModel 통합은 가스 담당자 후속 task (plan §12) — 그 시점부터
-    가스 측도 본 헬퍼 경유 가능.
+    train_arima_power_model.py 가 학습한 전력 ARIMA 를 추론 분기가 호출. 가스 ARIMA
+    의 MLModel 통합은 후속 작업 — 그 시점부터 가스 측도 본 헬퍼 경유 가능.
     """
     algorithm = "arima"
     cache_key = (sensor_type, algorithm, sensor_identifier)
@@ -237,11 +232,7 @@ async def _get_or_load_arima(
     return entry
 
 
-# ---------------------------------------------------------------------------
 # Feature engineering — drf-server feature_service 와 동일 수식 (의존성 분리)
-# ---------------------------------------------------------------------------
-
-
 def _build_feature_row(window_values: list[float], window: int) -> np.ndarray:
     """추론 1회용 — 최근 window 틱 raw value 로 (value, roll_mean, roll_std, diff) 산출.
 
@@ -259,8 +250,6 @@ def _build_feature_row(window_values: list[float], window: int) -> np.ndarray:
     diff = float(arr[-1] - arr[-2])
     return np.array([[value, roll_mean, roll_std, diff]], dtype=np.float64)
 
-    # 이성현 추가 — 다변량 추론용 피처 빌더 (co + h2s + co2 동시)
-
 
 # 이성현 추가 — ARIMA 잔차 실시간 계산 헬퍼
 def _compute_arima_resid(values: list[float], arima_result) -> float:
@@ -273,9 +262,9 @@ def _compute_arima_resid(values: list[float], arima_result) -> float:
         return 0.0
 
 
-# W3 — ARIMA forecast + 신뢰구간 위반 판정 (skill/plan/power-ai-un-downgrade-phase2-apply.md §7).
+# ARIMA forecast + 신뢰구간 위반 판정.
 def _arima_forecast(values: list[float], arima_result, alpha: float = 0.05) -> dict:
-    """슬라이딩 윈도우에 ARIMA 적용 → 진짜 1-step ahead forecast + 신뢰구간 (W3 신규).
+    """슬라이딩 윈도우에 ARIMA 적용 → 진짜 1-step ahead forecast + 신뢰구간.
 
     검증 흐름:
       1. values[:-1] (마지막 값 제외) 로 새 fit (training)
@@ -283,9 +272,9 @@ def _arima_forecast(values: list[float], arima_result, alpha: float = 0.05) -> d
       3. actual = values[-1] (forecast 의 비교 대상, fit 에는 안 들어감)
       4. is_violation = actual 이 forecast 의 95% CI 밖
 
-    ⚠ 초기 plan §5.1 코드는 apply(values) 전체 fit 후 actual=values[-1] 비교 —
-    actual 이 fit 의 일부라 forecast 가 actual 근처로 따라감 → 자기충족 false
-    negative. 본 함수는 values[:-1] 로 수정해 진짜 외부 값 비교.
+    ⚠ apply(values) 전체 fit 후 actual=values[-1] 비교 시 actual 이 fit 의 일부라
+    forecast 가 actual 근처로 따라감 → 자기충족 false negative. 그래서 values[:-1]
+    로 training 해 진짜 외부 값과 비교한다.
 
     Args:
         values: 최근 N 틱 raw 측정값. 최소 길이 2 이상 (training + 1 actual).
@@ -343,11 +332,7 @@ def _build_multi_feature_row(
     return np.array([parts], dtype=np.float64)
 
 
-# ---------------------------------------------------------------------------
 # 스키마
-# ---------------------------------------------------------------------------
-
-
 class PredictRequest(BaseModel):
     sensor_type: str = Field(description="power | gas")
     sensor_identifier: str = Field(
@@ -368,11 +353,7 @@ class PredictResponse(BaseModel):
     features: dict
 
 
-# ---------------------------------------------------------------------------
 # 엔드포인트
-# ---------------------------------------------------------------------------
-
-
 @router.post(
     "/predict",
     response_model=PredictResponse,
@@ -437,7 +418,7 @@ async def reload_model(
     algorithm: str | None = None,
     sensor_identifier: str | None = None,
 ) -> dict:
-    """W2 — 3축 매칭 단위 cache evict. algorithm 미지정 시 sensor_type 전체."""
+    """3축 매칭 단위 cache evict. algorithm 미지정 시 sensor_type 전체."""
     evicted: list[list[str]] = []
     with _cache_lock:
         if algorithm is None:
