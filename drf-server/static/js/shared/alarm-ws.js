@@ -14,8 +14,8 @@
 
       data.alarms.forEach(function (alarm) {
         const alarmData = AlarmMapper.fromSensorsAlarm(alarm);
-        // 2026-05-15 알람 재설계: event_resolved_at 박힌 RESOLVED 신호도 AlarmPopup.show 로
-        // 흘려보내 _handleResolved 분기가 같은 event_id 팝업 close + 토스트 처리.
+        // event_resolved_at 박힌 RESOLVED 신호도 AlarmPopup.show 로 흘려보내
+        // _handleResolved 분기가 같은 event_id 팝업 close + 토스트 처리.
         if (alarm.is_new_event || alarm.event_resolved_at) {
           AlarmPopup.show(alarmData);
         }

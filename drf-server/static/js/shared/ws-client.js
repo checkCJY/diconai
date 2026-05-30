@@ -25,7 +25,7 @@
    상위 호환:
      - 기존 alarm-ws.js, dashboard/websocket.js의 별개 연결을 통합
      - attachToken: true 옵션이면 ?token=<access_token> 쿼리 자동 부착
-       (서버는 settings.JWT_SIGNING_KEY 설정 시 query token 검증 — Phase 5)
+       (서버는 settings.JWT_SIGNING_KEY 설정 시 query token 검증)
    ========================================================== */
 
 'use strict';
