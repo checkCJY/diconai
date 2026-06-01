@@ -35,6 +35,7 @@ from websocket.routers.ws_router import (
     broadcast_loop,
     router as ws_router,
 )
+from websocket.services.alarm_queue import reset_stream_if_wrongtype
 
 
 setup_logging(settings.LOG_LEVEL)
@@ -54,6 +55,9 @@ async def lifespan(app: FastAPI):
     task1 = asyncio.create_task(
         broadcast_loop()
     )  # 센서 통합 페이로드 주기 브로드캐스트
+    # LIST→Stream 전환: 잔존 LIST 키가 있으면 1회 정리 (WRONGTYPE 방지).
+    # alarm_flush_loop(XREAD)/push_alarm(XADD) 이 키를 건드리기 전에 실행.
+    await reset_stream_if_wrongtype()
     task2 = asyncio.create_task(alarm_flush_loop())  # 신규 알람 즉시 플러시
     task3 = asyncio.create_task(
         channel_meta_refresh_loop()

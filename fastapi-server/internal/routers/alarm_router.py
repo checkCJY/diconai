@@ -1,8 +1,8 @@
 # internal/routers/alarm_router.py — Celery → FastAPI WebSocket 브리지
 #
 # Celery 태스크(DRF 컨텍스트)가 알람을 생성한 뒤 이 엔드포인트를 호출해
-# Redis 알람 큐(`diconai:ws:alarms`)에 LPUSH한다 (Phase 1 C4).
-# alarm_flush_loop이 BRPOP으로 즉시 소비해 브라우저로 전달.
+# Redis 알람 스트림(`diconai:ws:alarms`)에 XADD한다 (Phase 1 C4 → Stream 전환).
+# alarm_flush_loop이 XREAD로 즉시 소비해 브라우저로 전달.
 #
 # 보안: 127.0.0.1 (localhost)에서만 호출 가능 — 또는 INTERNAL_SERVICE_TOKEN 검증.
 
@@ -136,7 +136,7 @@ async def push_alarm_handler(request: Request, alarm: AlarmPayload):
 
     payload = alarm.model_dump(exclude_none=True)
 
-    # Phase 1 C4 — Redis LIST에 LPUSH. 장애 시 503으로 Celery retry 유도.
+    # Phase 1 C4 → Stream — Redis Stream에 XADD. 장애 시 503으로 Celery retry 유도.
     try:
         await push_alarm(payload)
     except Exception as exc:
