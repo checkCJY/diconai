@@ -234,3 +234,44 @@ POWER_AI_ALARM_FIRED_TOTAL = Counter(
     "Number of power AI alarms actually fired (passed rate limit and sent to Redis queue)",
     ["algorithm_source"],
 )
+
+# ── 가스 AI 모니터링 메트릭 ────────────────────────────────────────────────────
+# 가스 AI 추론 흐름의 각 구간을 메트릭으로 관찰한다.
+# 전력 AI 메트릭과 동일한 설계 원칙 — "AI가 왜 안 움직이냐"를 Grafana만 보고 특정.
+
+# 추론 실행 횟수 —
+#   change point 감지 후 실제로 IF 추론이 실행된 횟수.
+#   갑자기 0이 되면 change point가 감지 안 되거나 윈도우 미충족 상태.
+GAS_AI_INFERENCE_TOTAL = Counter(
+    "gas_ai_inference_total",
+    "Number of gas AI inference executions (after change point detection and window warmup)",
+)
+
+# change point 감지 횟수 —
+#   co/h2s/co2 중 하나라도 패턴 변화가 감지된 횟수.
+#   이 값 대비 GAS_AI_INFERENCE_TOTAL이 낮으면 모델 미로드 등 skip이 많다는 신호.
+GAS_CP_DETECTED_TOTAL = Counter(
+    "gas_cp_detected_total",
+    "Number of change point detections in gas sensor sliding window (co/h2s/co2)",
+)
+
+# rate limit 억제 횟수 —
+#   AI가 이상 감지했지만 60초 이내 재발화라 억제된 횟수.
+#   알람이 1번만 왔다는 신고 시 이 카운터 확인.
+GAS_AI_RATE_LIMITED_TOTAL = Counter(
+    "gas_ai_rate_limited_total",
+    "Number of gas AI alarms suppressed by rate limit (60s per sensor)",
+)
+
+# 실제 알람 발화 횟수 —
+#   rate limit 통과 후 실제로 DRF에 AlarmRecord가 생성된 횟수.
+#   gas_type 레이블로 어느 가스가 트리거했는지 구분.
+#
+# 레이블:
+#   gas_type  : "co" | "h2s" | "co2" (AI 발화 시 대표 가스)
+#   risk_level: "danger" (가스 AI는 항상 danger로 발화)
+GAS_AI_ALARM_FIRED_TOTAL = Counter(
+    "gas_ai_alarm_fired_total",
+    "Number of gas AI alarms actually fired (passed rate limit)",
+    ["gas_type", "risk_level"],
+)

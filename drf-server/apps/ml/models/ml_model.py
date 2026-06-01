@@ -9,14 +9,10 @@ class MLModel(models.Model):
     학습 1회 = MLModel row 1건 + .pkl 파일 1개.
     .pkl 파일 실체는 settings.ML_MODELS_DIR 아래 저장 (MEDIA_ROOT 밖, 웹 서빙 차단).
 
-    W1 변경 (ARIMA un-downgrade plan §4):
-    - ModelType → Algorithm 으로 rename + ARIMA choice 추가
-    - model_type 필드 → algorithm 으로 RenameField (데이터 그대로 보존)
-    - sensor_identifier 필드 추가 — ARIMA 등 단일 시계열 모델 단위 매칭용.
-      빈 문자열 = sensor_type 단위 공유 (기존 IF 동작 유지)
-    - Meta constraints: (sensor_type, algorithm, sensor_identifier, version)
-      4축 unique + 활성 모델은 (sensor_type, algorithm, sensor_identifier)
-      단위 1건 제약 (기존 sensor_type 단위 → 매칭 단위로 확장)
+    [매칭 단위]
+    sensor_identifier 로 단일 시계열 모델(ARIMA 등)을 식별한다. 빈 문자열이면
+    sensor_type 단위 공유 (IF 기본 동작). 활성 모델은 (sensor_type, algorithm,
+    sensor_identifier) 단위로 1건만 허용 (Meta constraints).
     """
 
     class Algorithm(models.TextChoices):

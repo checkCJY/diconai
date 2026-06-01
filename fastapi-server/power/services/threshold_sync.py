@@ -1,9 +1,9 @@
-# power/services/threshold_sync.py — DRF Threshold 5분 sync (T4 D1b)
+# power/services/threshold_sync.py — DRF Threshold 5분 sync
 #
 # 운영자가 어드민에서 정격 % 임계치 (power_facility_default 그룹) 를 변경할 수
 # 있도록, 코드 하드코딩 대신 DRF 에서 주기적으로 fetch 한 threshold 를 메모리에
-# 캐싱한다. T4 sub-plan §3.1 — fastapi 가 단일 결정자가 되려면 DRF 가 진실
-# 공급원인 정적 임계치를 5분 주기로 sync 해야 한다.
+# 캐싱한다. fastapi 가 단일 결정자가 되려면 DRF 가 진실 공급원인 정적 임계치를
+# 5분 주기로 sync 해야 한다.
 #
 # [패턴 차용]
 # channel_meta_cache.py 와 동일 구조 (5분 polling + 지수 backoff + lifespan task).
@@ -29,7 +29,7 @@ DRF_THRESHOLD_META_PATH = "/api/monitoring/power/threshold-meta/"
 
 # {item_name: {warning_min, warning_max, danger_min, danger_max, unit}}
 # item_name ∈ {"power_w", "current", "voltage"}.
-# decide_alarm 매트릭스 (D2 commit) 의 정적 평가 입력. None 값은 단방향 임계치를
+# decide_alarm 매트릭스의 정적 평가 입력. None 값은 단방향 임계치를
 # 의미 (예: power_w 의 warning_min/danger_min = None — 상한만 평가).
 _threshold_meta: dict[str, dict[str, Any]] = {}
 

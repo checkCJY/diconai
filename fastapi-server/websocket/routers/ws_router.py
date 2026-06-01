@@ -4,7 +4,7 @@
 #   WS /ws/sensors/  : 브라우저 연결. 단일 브로드캐스터(broadcast_loop)가 모든 클라이언트에
 #                      동시 전송해 active_alarms 중복 소비를 방지한다.
 #   WS /ws/position/ : IoT 위치 장비 연결. 위치 데이터를 수신해 DRF에 저장하고
-#                      worker_positions 공유 상태를 갱신한다.
+#                      Redis worker 상태를 갱신한다.
 import asyncio
 import logging
 import time
@@ -21,11 +21,14 @@ from websocket.services.alarm_queue import (
     read_alarms_blocking,
     stream_tail_id,
 )
-from websocket.services.broadcast import build_broadcast_payload
+from websocket.services.broadcast import (
+    build_broadcast_payload,
+    fetch_broadcast_state,
+)
+from websocket.snap_store import store_worker_position
 from websocket.state import (
     sensor_clients,
     worker_clients,
-    worker_positions,
 )
 
 logger = logging.getLogger(__name__)
@@ -76,16 +79,24 @@ async def alarm_flush_loop():
             await asyncio.sleep(1)
             continue
         new_last_id, payloads = await read_alarms_blocking(last_id, timeout=1)
-        for payload in payloads:
-            ingress_ts = payload.pop("ingress_ts", None)
-            if ingress_ts is not None:
-                risk_level = payload.get("risk_level", "unknown")
-                E2E_ALARM_LATENCY.labels(risk_level=risk_level).observe(
-                    time.time() - ingress_ts
-                )
-            base = build_broadcast_payload(include_alarms=False)
-            base["alarms"] = [payload]
-            await _send_to_all(base)
+        if payloads:
+            # 배치 broadcast 전 state 1회 조회 (develop 시그니처). Redis 읽기 실패 시
+            # 커서 미전진으로 continue → 다음 tick 재처리(알람 보존).
+            try:
+                state = await fetch_broadcast_state()
+            except Exception:
+                logger.warning("[alarm_flush_loop] Redis 읽기 실패 — tick 스킵")
+                continue
+            for payload in payloads:
+                ingress_ts = payload.pop("ingress_ts", None)
+                if ingress_ts is not None:
+                    risk_level = payload.get("risk_level", "unknown")
+                    E2E_ALARM_LATENCY.labels(risk_level=risk_level).observe(
+                        time.time() - ingress_ts
+                    )
+                base = build_broadcast_payload(state, include_alarms=False)
+                base["alarms"] = [payload]
+                await _send_to_all(base)
         last_id = new_last_id  # 배치 마지막 ID로 커서 전진 (빈 결과면 그대로 유지)
         # stream lag — 말단과 커서의 시간차(초). last_id가 아직 "$"(미처리)거나
         # 스트림이 비었으면 0 (ms 파싱 불가).
@@ -102,7 +113,12 @@ async def broadcast_loop():
         await asyncio.sleep(settings.BROADCAST_INTERVAL_SEC)
         if not sensor_clients:
             continue
-        await _send_to_all(build_broadcast_payload())
+        try:  # 이성현 수정 — Redis 읽기 실패 시 tick 스킵
+            state = await fetch_broadcast_state()
+        except Exception:
+            logger.warning("[broadcast_loop] Redis 읽기 실패 — tick 스킵")
+            continue
+        await _send_to_all(build_broadcast_payload(state))
 
 
 async def _save_iot_position(payload: dict) -> dict:
@@ -141,7 +157,8 @@ async def sensor_stream(websocket: WebSocket):
     WS_CONNECTIONS.labels("sensor").inc()
     logger.info(f"[ws/sensors] action=connect total={len(sensor_clients)}")
     try:
-        await websocket.send_json(build_broadcast_payload(include_alarms=False))
+        state = await fetch_broadcast_state()  # 이성현 수정
+        await websocket.send_json(build_broadcast_payload(state, include_alarms=False))
         await websocket.receive_text()  # 연결 유지 (disconnect까지 대기)
     except WebSocketDisconnect:
         pass
@@ -213,7 +230,7 @@ async def position_stream(websocket: WebSocket):
     현재는 무인증 유지 (`/ws/sensors/`, `/ws/worker/`와 달리 JWT 적용 안 됨).
 
     장비로부터 worker_id, facility_id, x, y 를 수신해 DRF에 저장하고
-    worker_positions 공유 상태를 갱신한다.
+    Redis worker 상태를 갱신한다.
     갱신된 위치는 /ws/sensors/ 다음 틱에 브라우저로 전달된다.
     필수 필드가 누락된 경우 에러 응답을 반환하고 다음 수신을 계속 대기한다.
     """
@@ -240,13 +257,20 @@ async def position_stream(websocket: WebSocket):
                 "measured_at": datetime.now(timezone.utc).isoformat(),
             }
             result = await _save_iot_position(payload)
-            if result["status"] == "ok":
-                worker_positions[worker_id] = {
-                    "x": payload["x"],
-                    "y": payload["y"],
-                    "facility_id": payload["facility_id"],
-                    "updated_at": payload["measured_at"],
-                }
+            if result["status"] == "ok":  # 이성현 수정 — 메모리 → Redis 이관
+                await store_worker_position(
+                    worker_id,
+                    {
+                        "x": payload["x"],
+                        "y": payload["y"],
+                        "facility_id": payload["facility_id"],
+                        "updated_at": payload["measured_at"],
+                        "risk_level": "normal",
+                        "zone_name": None,
+                        "worker_name": None,
+                        "movement_status": None,
+                    },
+                )
             await websocket.send_json(result)
     except WebSocketDisconnect:
         logger.info("[ws/position] action=disconnect")

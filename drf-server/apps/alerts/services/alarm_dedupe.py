@@ -1,18 +1,17 @@
 # apps/alerts/services/alarm_dedupe.py — 알람 상태 천이 원자화 + AI 우선순위 mute
 #
-# Phase 1 C2 — Redis Lua로 GET→CMP→SET을 단일 명령으로 실행해
-# gas_alarm/power_alarm의 cache.get → fire_task.delay → cache.set 비원자
-# 패턴을 원자화한다. 동시 다중 수신 시 중복 fire를 방지.
+# Redis Lua로 GET→CMP→SET을 단일 명령으로 실행해 gas_alarm/power_alarm의
+# cache.get → fire_task.delay → cache.set 비원자 패턴을 원자화한다. 동시 다중
+# 수신 시 중복 fire를 방지.
 #
 # Django RedisCache와 같은 키 공간/직렬화(피클)를 사용해 try_transition이
 # SET한 값을 cache.get/cache.add 등 기존 코드 경로에서도 그대로 읽을 수
 # 있도록 보장한다.
 #
-# [Step 3 — AI 우선순위 mute]
-# AI 추론 알람이 발화하면 같은 (device, channel) 의 룰 알람을 60s 동안 mute 한다.
-# AI 가 fastapi 측에서 Redis 에 직접 마킹한 키를 본 모듈의 헬퍼가 읽어 가드.
-# 격상 (warning AI → danger 룰) 케이스는 mute 키 자체가 level 별로 분리되어
-# 있어 자연 bypass — 별도 분기 로직 불요.
+# AI 우선순위 mute: AI 추론 알람이 발화하면 같은 (device, channel) 의 룰 알람을
+# 60s 동안 mute 한다. AI 가 fastapi 측에서 Redis 에 직접 마킹한 키를 본 모듈의
+# 헬퍼가 읽어 가드. 격상 (warning AI → danger 룰) 케이스는 mute 키가 level 별로
+# 분리돼 있어 자연 bypass — 별도 분기 로직 불요.
 
 import pickle
 
@@ -57,7 +56,7 @@ def clear_state(state_key: str) -> None:
     cache.delete(state_key)
 
 
-# ── Step 3 — AI 발화 시 룰 mute 가드 ─────────────────────────────────────────
+# AI 발화 시 룰 mute 가드
 
 # 룰 위험도의 순서 — 격상 bypass 키 설계용.
 # AI 가 warning 발화 시 normal·warning 키만 set → 룰 danger 들어오면 danger 키 부재
@@ -131,9 +130,8 @@ def is_ai_mute_active(device_id: int | str, channel: int, rule_level: str) -> bo
         return False
 
 
-# ── 가스 도메인 ─────────────────────────────────────────────────────────────
-# fastapi services/ai_mute.py 의 mark_gas_ai_recent 와 동일 키 형식 — prefix
-# `ai_fired_gas:*` 로 power 와 분리. 추론 가스 3종 (co/h2s/co2) 만 적용.
+# 가스 도메인 — fastapi services/ai_mute.py 의 mark_gas_ai_recent 와 동일 키 형식.
+# prefix `ai_fired_gas:*` 로 power 와 분리. 추론 가스 3종 (co/h2s/co2) 만 적용.
 _GAS_AI_FIRED_KEY_TEMPLATE = "ai_fired_gas:{sensor_id}:{gas_type}:{rule_level}"
 
 

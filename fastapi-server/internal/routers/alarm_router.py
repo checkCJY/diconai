@@ -1,10 +1,12 @@
 # internal/routers/alarm_router.py — Celery → FastAPI WebSocket 브리지
 #
-# Celery 태스크(DRF 컨텍스트)가 알람을 생성한 뒤 이 엔드포인트를 호출해
-# Redis 알람 스트림(`diconai:ws:alarms`)에 XADD한다 (Phase 1 C4 → Stream 전환).
-# alarm_flush_loop이 XREAD로 즉시 소비해 브라우저로 전달.
+# 데이터 흐름:
+#   IN  : DRF Celery 태스크의 POST /internal/alarms/push/ (AlarmPayload)
+#   OUT : 1) Redis 알람 스트림(`diconai:ws:alarms`)에 XADD (Phase 1 C4 → Stream 전환)
+#            — alarm_flush_loop 이 XREAD 로 즉시 소비해 브라우저로 broadcast
+#         2) geofence_intrusion + worker_id 지정 시 해당 작업자 ws 개인 전송
 #
-# 보안: 127.0.0.1 (localhost)에서만 호출 가능 — 또는 INTERNAL_SERVICE_TOKEN 검증.
+# 보안: INTERNAL_SERVICE_TOKEN 검증, 미설정 시 127.0.0.1(localhost) 한정.
 
 import logging
 
@@ -24,7 +26,7 @@ class AnomalyMeta(BaseModel):
     """ANOMALY 알람 전용 ML 메타 — AlarmPayload.anomaly_meta 에 nested.
 
     [확장 정책]
-    §3 multi-variate IF / CPD / spike detection 추가 시 본 모델에만 필드 추가
+    multi-variate IF / CPD / spike detection 추가 시 본 모델에만 필드 추가
     (combined_risk/anomaly_score 외에 cpd_change_score, ar_residual 등). 외부
     AlarmPayload 는 그대로 유지 → 다른 alarm_type · 브라우저 처리 영향 0.
     """
@@ -37,9 +39,8 @@ class AnomalyMeta(BaseModel):
 
 
 class AlarmPayload(BaseModel):
-    # 미정의 필드는 통과시키지 않음 — DRF Celery 측이 명시 필드만 보내야 함.
-    # T4 D3 — extra=ignore 유지 (시연 후 staged forbid 전환, plan §1 #5). 본 commit
-    # 에서는 push_alarm_handler 가 unknown 키 WARN 로깅으로 silent drop 가시화.
+    # 미정의 필드는 무시 (extra=ignore) — DRF Celery 측이 명시 필드만 보내야 한다.
+    # push_alarm_handler 가 unknown 키를 WARN 로깅해 silent drop 을 가시화한다.
     model_config = {"extra": "ignore"}
 
     alarm_type: str
@@ -65,23 +66,21 @@ class AlarmPayload(BaseModel):
     message: str | None = None
     # ANOMALY 알람 전용 nested 메타 (다른 alarm_type 에선 None)
     anomaly_meta: AnomalyMeta | None = None
-    # 2026-05-15 알람 재설계: Event 가 RESOLVED 로 전이된 시각.
-    # 운영자가 update_status 를 RESOLVED 로 호출하면 drf 가 이 필드를 채워서 broadcast.
-    # 클라는 이 필드가 박혀있으면 같은 event_id 로 떠있는 팝업을 close + "위험 해소" 토스트.
-    # 일반 알람에선 None.
+    # Event 가 RESOLVED 로 전이된 시각. 운영자가 update_status 를 RESOLVED 로
+    # 호출하면 drf 가 이 필드를 채워 broadcast. 클라는 이 값이 있으면 같은 event_id
+    # 로 떠있는 팝업을 close + "위험 해소" 토스트. 일반 알람에선 None.
     event_resolved_at: str | None = None
-    # T3 (2026-05-19) — 다중 관리자 환경 ack 시그널. 활성 Event 의 EventAck 한 사용자명 list.
-    # 토스트·모달 본문에 "(N 확인 중)" 시그널 표시용 (dedup 과 분리 — 안전망 유지).
-    # AlarmPayload.model_config="extra:ignore" 라 명시 정의 필수 (누락 시 silent drop).
+    # 다중 관리자 환경 ack 시그널 — 활성 Event 의 EventAck 사용자명 list. 토스트·모달
+    # 본문 "(N 확인 중)" 표시용 (dedup 과 분리, 안전망). extra=ignore 라 명시 정의 필수.
     event_ack_users: list[str] = []
     # E2E latency 측정용 — IoT 수신 시각(Unix time). alarm_flush_loop에서 소비.
     ingress_ts: float | None = None
-    # T4 D3 — 검출 주체 (ai / static_cover_* / static_no_ai_available / static_legacy).
-    # decide_alarm 매트릭스 (D2) 결과 또는 DRF tasks.py fallback. 프론트가 시각 톤·
-    # 배지 분기 (D4). None 허용 — 옛 발신자 호환.
+    # 검출 주체 (ai / static_cover_* / static_no_ai_available / static_legacy).
+    # decide_alarm 매트릭스 결과 또는 DRF tasks.py fallback. 프론트가 시각 톤·배지
+    # 분기에 사용. None 허용 — 옛 발신자 호환.
     source: str | None = None
-    # T4 D3 — source 별 운영자 친화 사유 문구 (ALARM_SOURCE_REASON lookup 결과).
-    # 모달·토스트 보조 텍스트. ai / static_no_ai_available / static_legacy 는 None.
+    # source 별 운영자 친화 사유 문구 (ALARM_SOURCE_REASON lookup 결과). 모달·토스트
+    # 보조 텍스트. ai / static_no_ai_available / static_legacy 는 None.
     reason: str | None = None
 
 
@@ -101,9 +100,8 @@ class AlarmPayload(BaseModel):
     },
 )
 async def push_alarm_handler(request: Request, alarm: AlarmPayload):
-    # T4 D3 — AlarmPayload.model_config=extra:ignore 라 미정의 필드는 silent drop.
-    # T3 (event_ack_users 누락) 같은 사고 재발 방지를 위해 raw body 의 키를 모델
-    # 정의 필드와 비교해 차이를 WARN. forbid 전환 (시연 후) 전 1단계 가시화.
+    # extra=ignore 라 미정의 필드는 silent drop — 필드 누락 사고 재발 방지를 위해
+    # raw body 의 키를 모델 정의 필드와 비교해 차이를 WARN 로깅으로 가시화한다.
     try:
         raw_body = await request.json()
         if isinstance(raw_body, dict):

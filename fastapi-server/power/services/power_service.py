@@ -3,7 +3,7 @@
 # 데이터 흐름:
 #   IN  : power_router (FastAPI) — 채널별 측정 페이로드 (watt/current/voltage/onoff)
 #   OUT : 1) DRF HTTP POST — PowerData / PowerEvent 영속화 (fire-and-forget)
-#         2) websocket.state.power_latest — 채널별 dict 갱신 (broadcast_loop 가 읽음)
+#         2) Redis snap_store — 채널별 dict 갱신 (broadcast_loop 가 읽음)
 #         3) AI 추론 분기 → anomaly_inference.process_anomaly_inference
 #
 # 본 모듈은 진입 façade — 실제 로직은 도메인별 서비스 모듈로 분리:
@@ -18,7 +18,7 @@ from power.services.equipment_builder import build_equipment
 from power.services.night_escalation import _is_night_kst_iso
 from power.services.zscore_anomaly import _INFERENCE_WINDOW, _zscore_check
 from services.drf_client import post_to_drf
-from websocket.state import power_latest
+from websocket.snap_store import store_power_snapshot
 
 __all__ = [
     "DRF_POWER_DATA_PATH",
@@ -79,10 +79,10 @@ def to_channel_list(
     ]
 
 
-def update_power_state(data_type: str, values: dict, measured_at: str) -> None:
-    """power_latest 공유 상태를 갱신한다.
+async def update_power_state(data_type: str, values: dict, measured_at: str) -> None:
+    # 이성현 수정 — 프로세스 메모리(power_latest) → Redis(snap_store) 이관
+    """전력 스냅샷을 Redis에 갱신한다.
 
-    갱신된 값은 다음 WebSocket 틱에서 build_equipment() 를 통해 브라우저로 전달된다.
+    갱신된 값은 다음 WebSocket 틱에서 broadcast가 Redis를 읽어 브라우저로 전달된다.
     """
-    power_latest[data_type] = values
-    power_latest["updated_at"] = measured_at
+    await store_power_snapshot(data_type, values, measured_at)

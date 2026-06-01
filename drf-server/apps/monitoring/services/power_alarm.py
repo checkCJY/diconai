@@ -51,22 +51,21 @@ from apps.facilities.services.threshold_service import (
 
 logger = logging.getLogger(__name__)
 
-# T4 D3 — shadow_audit 비교 window. fastapi 결정 도착까지 round-trip + Celery
-# worker queue + AlarmRecord 생성 여유. 너무 짧으면 false mismatch, 너무 길면
-# 누락 감지 둔감. 5s 기본값 — 시연 후 실측으로 튜닝.
+# shadow_audit 비교 window — fastapi 결정 도착까지 round-trip + Celery worker
+# queue + AlarmRecord 생성 여유. 너무 짧으면 false mismatch, 너무 길면 누락 감지
+# 둔감. 5s 기본값.
 _AUDIT_WINDOW_SEC = 5
 
-# state_key 캐시 유지 시간. [Step 4 — 1시간 → 1분 단축, 5번 문서 §9 정렬]
-# settings.ALARM_REPOPUP_COOLDOWN_SEC (기본 60s) 와 일치시켜 try_transition / Event cooldown 두 dedup
-# 계층 시간 정렬. 가스 측 동일 변경과 짝. 위험 지속 시 1분 cadence 는 escalation
-# 트리거 역할 — 운영자가 1분째 대응 안 하면 같은 알람 재푸시로 인지 유도.
-# 추후 1~2주 운영 데이터 후 재평가.
+# state_key 캐시 유지 시간 — settings.ALARM_REPOPUP_COOLDOWN_SEC (기본 60s) 와
+# 일치시켜 try_transition / Event cooldown 두 dedup 계층 시간을 정렬한다 (가스 측과
+# 짝). 위험 지속 시 1분 cadence 가 escalation 트리거 역할 — 운영자가 1분째 대응
+# 안 하면 같은 알람 재푸시로 인지 유도.
 _CACHE_TTL = 60
 _AXIS_TTL = 300  # 축별 위험도 캐시 (송신 주기 1초 대비 충분)
 
 # task_key (`alarm:power:task:{device_id}:{channel}`) — WARNING 타이머 진행 신호.
-# [Step 5 — TTL 분리] WARNING_DURATION_SEC + 5s 마진. 정상 종료 시 tasks.py 가
-# cache.delete 로 즉시 정리. retry/실패는 자연 만료.
+# WARNING_DURATION_SEC + 5s 마진. 정상 종료 시 tasks.py 가 cache.delete 로 즉시
+# 정리. retry/실패는 자연 만료.
 _TASK_KEY_TTL = WARNING_DURATION_SEC + 5
 
 # data_type → (평가 함수, 축 이름)
@@ -106,11 +105,10 @@ def _revoke(task_id: str) -> None:
 
 
 def _channel_label(device, channel: int) -> str:
-    """PowerDevice.get_channel_label 의 thin wrapper (2026-05-17 통합).
+    """PowerDevice.get_channel_label 의 thin wrapper.
 
-    기존엔 본 모듈에 채널 라벨 로직이 직접 있었음. AlarmRecord.get_short_message
-    가 같은 라벨을 만들려고 보니 중복 — PowerDevice 모델 메서드로 단일화.
-    호출자(power_alarm 흐름)는 시그니처 변경 없이 그대로 사용.
+    채널 라벨 로직은 AlarmRecord.get_short_message 와의 중복을 피해 PowerDevice
+    모델 메서드로 단일화돼 있다. 호출자(power_alarm 흐름)는 그대로 사용.
     """
     return device.get_channel_label(channel)
 
@@ -133,15 +131,12 @@ def _aggregate_risk(device_id: int, channel: int, axis: str, this_risk: str) -> 
 
 
 def _shadow_audit(device_id: int, channel: int, would_fire_level: str) -> None:
-    """T4 D3 — DRF 정적 평가 결과를 fastapi 결정과 비교 (활성화 모드 전용).
+    """DRF 정적 평가 결과를 fastapi 결정과 비교한다 (활성화 모드 전용).
 
     비활성화 모드 (STATIC_THRESHOLD_AT_FASTAPI=False) 에선 호출 안 됨. 활성화 후
     DRF 가 fire 했을 알람과 fastapi 가 실제 만든 AlarmRecord 의 정합성 모니터링
     — 직전 _AUDIT_WINDOW_SEC 안 같은 채널 AlarmRecord 가 없으면 mismatch (fastapi
-    누락 의심).
-
-    1~2주 운영 후 mismatch counter 가 0/낮음이면 정식 제거 (환경변수·shadow_audit
-    삭제). plan §6.1.
+    누락 의심). mismatch counter 가 0/낮으면 정식 제거 대상.
     """
     if not would_fire_level or would_fire_level == RiskLevel.NORMAL:
         return  # 정적 평가가 발화 안 했으면 비교 불요
@@ -199,7 +194,7 @@ def trigger_power_alarms(objs: list, device, ingress_ts: float | None = None) ->
         this_risk = eval_fn(value, channel=channel, device_id=device_id)
         aggregate = _aggregate_risk(device_id, channel, axis_name, this_risk)
 
-        # T4 D3 — 활성화 모드: fastapi 가 단일 결정자라 DRF 정적 fire 전부 skip.
+        # 활성화 모드: fastapi 가 단일 결정자라 DRF 정적 fire 전부 skip.
         # shadow_audit 으로 정합성 모니터링만 수행. 기본값 False → 분기 미진입.
         if settings.STATIC_THRESHOLD_AT_FASTAPI:
             STATIC_FIRE_SUPPRESSED_BY_FASTAPI_TOTAL.labels(
@@ -223,7 +218,7 @@ def trigger_power_alarms(objs: list, device, ingress_ts: float | None = None) ->
                 _revoke(pending)
                 cache.delete(task_key)
 
-            # [Step 3] AI 가 같은 채널에 최근 발화한 경우 룰 fire 를 60s suppress.
+            # AI 가 같은 채널에 최근 발화한 경우 룰 fire 를 60s suppress.
             # 격상 (AI=warning, 룰=danger) 은 danger 키 부재로 자연 통과.
             # device_iot_id 사용 — fastapi 마킹 키와 식별자 일치 (PK 쓰면 mismatch).
             if is_ai_mute_active(device_iot_id, channel, RiskLevel.DANGER):
@@ -244,7 +239,7 @@ def trigger_power_alarms(objs: list, device, ingress_ts: float | None = None) ->
             prev_state = get_state(state_key)
             if prev_state in (RiskLevel.WARNING, RiskLevel.DANGER):
                 continue
-            # [Step 3] AI mute 가드. WARNING 의 경우 AI 가 같은 또는 더 높은 레벨로
+            # AI mute 가드. WARNING 의 경우 AI 가 같은 또는 더 높은 레벨로
             # 발화했으면 룰 fire suppress (단계 일치 또는 격상 케이스). 격상은 AI 가
             # 더 높은 키 set → 모두 부재 → 통과 (방향 반대라 fire 진행 정상).
             # device_iot_id — fastapi 마킹 키 식별자와 일치.

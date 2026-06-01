@@ -1,5 +1,5 @@
 """
-threshold_eval — fastapi 측 power threshold 평가 (트랙 1 v2)
+threshold_eval — fastapi 측 power threshold 평가
 
 [배경]
 DRF evaluate_power_risk / _current / _voltage 의 정격 % 환산 룰을 fastapi 에 복제.
@@ -20,7 +20,7 @@ from __future__ import annotations
 from power.services.channel_meta_cache import get_channel_entry
 from power.services.threshold_sync import get_threshold_meta
 
-# T4 D2 — fastapi data_type → DRF Threshold.measurement_item 매핑.
+# fastapi data_type → DRF Threshold.measurement_item 매핑.
 _DRF_ITEM_BY_DATA_TYPE = {
     "watt": "power_w",
     "current": "current",
@@ -123,15 +123,15 @@ def evaluate_static_risk_from_cache(
     device_id: str | None,
     channel: int,
 ) -> str:
-    """T4 D2 — DRF threshold-meta sync 캐시 기반 정적 평가.
+    """DRF threshold-meta sync 캐시 기반 정적 평가.
 
     `calculate_power_risk` 와 같은 % 환산 로직이지만, 임계치 출처가 DRF sync 캐시
-    (D1b `threshold_sync.get_threshold_meta`). decide_alarm 매트릭스 (T4 plan §5)
-    의 "정적 fired/not fired" 입력 단일 진실 공급원.
+    (`threshold_sync.get_threshold_meta`). decide_alarm 매트릭스의 "정적
+    fired/not fired" 입력 단일 진실 공급원.
 
     `calculate_power_risk` 는 hardcoded 상수 (80%/100%) — combine_risk_5axis 의
     축 입력. 본 함수는 별개 — admin 임계치 수정 반영. 두 함수의 결과가 다를 수
-    있음 (5분 sync lag 동안 / admin 이 80% 외 값으로 수정 시) — plan §10 위험.
+    있음 (5분 sync lag 동안 / admin 이 80% 외 값으로 수정 시).
 
     fail-safe — 캐시 미존재 / 정격 미지정 / 임계치 None / data_type 미인식 →
     모두 'normal' 반환. AI 정상 + 정적 정상 = 알람 없음 (안전 측 보수적 분기).
@@ -180,7 +180,7 @@ def get_static_threshold_abs(
     device_id: str | None,
     channel: int,
 ) -> float | None:
-    """T2+T6 — risk level 의 임계치 절대값 환산 (모달 thrEl 컨텍스트용).
+    """risk level 의 임계치 절대값 환산 (모달 thrEl 컨텍스트용).
 
     `evaluate_static_risk_from_cache` 가 fire 결정한 risk level (warning/danger) 의
     정격 × % 절대값. 예: rated_w=7500, warning_max=80% → 6000W. 모달이 "위험 기준
