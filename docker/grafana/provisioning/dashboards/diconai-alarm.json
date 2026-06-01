@@ -504,6 +504,58 @@
           "refId": "A"
         }
       ]
+    },
+    {
+      "id": 11,
+      "title": "가스 AI — anomaly_ai 알람 발화 횟수 (5m)",
+      "description": "FastAPI gas_service에서 직접 발화하는 AI 기반 가스 알람 횟수. DRF Celery를 거치지 않으므로 패널 ⑤(Celery 알람 발송)에 안 잡힘. 시나리오 A 시연 시 co 라인이 올라와야 정상 — gas_threshold/danger가 AI mute로 억제되는 대신 이 라인이 발화.",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cps",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (gas_type, risk_level) (rate(gas_ai_alarm_fired_total{job=\"fastapi\"}[5m]))",
+          "legendFormat": "gas_anomaly_ai / {{gas_type}} / {{risk_level}}",
+          "refId": "A"
+        }
+      ]
     }
   ],
   "schemaVersion": 39,
