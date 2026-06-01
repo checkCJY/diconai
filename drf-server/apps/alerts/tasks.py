@@ -148,6 +148,7 @@ def fire_danger_alarm_task(
     ingress_ts: float | None = None,
 ):
     """DANGER 즉각 알람 — AlarmRecord/Event 생성 후 FastAPI WS 큐에 푸시."""
+    from apps.alerts.selectors.alarm_targets import get_facility_worker_ids
     from apps.alerts.services.event_service import create_alarm_and_event
     from apps.core.constants import AlarmType
     from apps.monitoring.utils.gas_thresholds import GAS_UNITS, get_threshold_value
@@ -195,6 +196,9 @@ def fire_danger_alarm_task(
                     "source_label": source_label,
                     "summary": summary,
                     "message": alarm.get_short_message(),
+                    # 소속 시설 작업자에게도 대피 알림 — FastAPI가 이 목록으로만
+                    # worker_clients 분배(전체 broadcast 아님). 누락 시 작업자 미전송.
+                    "target_worker_ids": get_facility_worker_ids(facility_id),
                     # T3 (2026-05-19) — 활성 Event 의 EventAck 사용자명 list.
                     # 다중 관리자 환경에서 토스트에 "(N 확인 중)" 시그널 표시용.
                     "event_ack_users": _get_event_ack_names(event.id),
@@ -439,6 +443,7 @@ def fire_power_danger_task(
     ingress_ts: float | None = None,
 ):
     """전력 DANGER 즉각 알람 — AlarmRecord/Event 생성 후 FastAPI WS 큐에 푸시."""
+    from apps.alerts.selectors.alarm_targets import get_facility_worker_ids
     from apps.alerts.services.event_service import create_alarm_and_event
     from apps.core.constants import AlarmType
     from apps.facilities.services.threshold_service import get_threshold
@@ -482,6 +487,9 @@ def fire_power_danger_task(
                     "source_label": source_label,
                     "summary": summary,
                     "message": alarm.get_short_message(),
+                    # 소속 시설 작업자에게도 대피 알림 — FastAPI가 이 목록으로만
+                    # worker_clients 분배(전체 broadcast 아님). 누락 시 작업자 미전송.
+                    "target_worker_ids": get_facility_worker_ids(facility_id),
                     # T3 (2026-05-19) — 활성 Event 의 EventAck 사용자명 list.
                     # 다중 관리자 환경에서 토스트에 "(N 확인 중)" 시그널 표시용.
                     "event_ack_users": _get_event_ack_names(event.id),
