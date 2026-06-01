@@ -22,8 +22,10 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, field_validator
 
-from core.config import settings
-from websocket.state import scenario_mode
+from websocket.snap_store import (
+    load_scenario_mode,
+    store_scenario_mode,
+)  # 이성현 수정 — Redis 이관
 
 router = APIRouter(prefix="/internal/scenario", tags=["internal"])
 
@@ -60,11 +62,6 @@ class ModePayload(BaseModel):
         return v
 
 
-# 부팅 시 환경변수 값으로 초기화 (Settings 기본값 적용)
-if settings.DUMMY_SCENARIO_MODE in ALLOWED_MODES:
-    scenario_mode["value"] = settings.DUMMY_SCENARIO_MODE
-
-
 @router.get(
     "/mode",
     summary="현재 시나리오 모드 조회",
@@ -76,7 +73,8 @@ if settings.DUMMY_SCENARIO_MODE in ALLOWED_MODES:
     ),
 )
 async def get_mode() -> dict:
-    return {"mode": scenario_mode["value"]}
+    # 이성현 수정 — 메모리 → Redis 읽기
+    return {"mode": await load_scenario_mode()}
 
 
 @router.post(
@@ -101,5 +99,6 @@ async def get_mode() -> dict:
 async def set_mode(payload: ModePayload) -> dict:
     if payload.mode not in ALLOWED_MODES:
         raise HTTPException(status_code=400, detail="허용되지 않은 모드입니다.")
-    scenario_mode["value"] = payload.mode
-    return {"mode": scenario_mode["value"]}
+    # 이성현 수정 — 메모리 → Redis 쓰기
+    await store_scenario_mode(payload.mode)
+    return {"mode": payload.mode}

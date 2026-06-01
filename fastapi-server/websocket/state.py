@@ -1,35 +1,17 @@
-# websocket/state.py — 프로세스 공유 상태
+# websocket/state.py — 프로세스 공유 상태 (WebSocket 연결 목록만 유지)
 #
-# 모든 라우터가 이 모듈을 import해 직접 읽고 쓴다 (HTTP /internal/* 없이 상태 공유).
-# 알람 큐는 재시작 휘발·race 문제로 메모리에서 Redis LIST 로 이관됨 —
-# websocket/services/alarm_queue.py 참조.
+# 이성현 수정 — 계층 1 Redis 이관으로 broadcast 스냅샷 변수 5개 제거:
+#   worker_positions, latest_gas_snapshot, gas_latest, power_latest, scenario_mode
+#   → 이관 위치: websocket/snap_store.py (Redis 키)
+#
+# 현재 이 파일에는 WebSocket 연결 목록만 남는다.
+# 연결 목록은 프로세스 메모리에 두는 것이 맞다 — 각 pod의 연결만 관리하면 되기 때문.
+# (broadcast 데이터는 Redis 공유, 연결 목록은 각 pod 독립 관리)
 
 from fastapi import WebSocket
 
-# 연결된 브라우저 WebSocket 클라이언트 목록 (관리자 broadcast용)
+# 연결된 브라우저 WebSocket 클라이언트 목록 (broadcast용)
 sensor_clients: list[WebSocket] = []
 
 # 작업자 개인 알림용 WebSocket { user_id: WebSocket }
 worker_clients: dict[int, WebSocket] = {}
-
-# 작업자 최신 위치 { worker_id: { x, y, facility_id, updated_at } }
-worker_positions: dict[int, dict] = {}
-
-# 최신 가스 측정 스냅샷 — gas_service가 갱신, broadcast가 페이로드에 spread
-latest_gas_snapshot: dict = {}
-
-# 가스 스냅샷 최종 갱신 시각 — broadcast의 stale 판단에 사용
-gas_latest: dict = {"updated_at": None}
-
-# 전력 최신값 — power_service가 갱신, broadcast가 equipment[] 조립에 사용
-power_latest: dict = {
-    "onoff": {},
-    "current": {},
-    "voltage": {},
-    "watt": {},
-    "updated_at": None,
-}
-
-# 시연 시나리오 모드 — 더미가 polling, 프론트가 POST로 변경
-# 값: "mixed" | "normal" | "warning" | "danger"
-scenario_mode: dict = {"value": "mixed"}

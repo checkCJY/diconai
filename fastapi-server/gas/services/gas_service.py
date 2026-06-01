@@ -39,7 +39,7 @@ from core.metrics import (
     AI_INFERENCE_FAILED_TOTAL,
     SENSOR_LAST_RECEIVED,
 )
-from websocket.state import gas_latest, latest_gas_snapshot
+from websocket.snap_store import store_gas_snapshot  # 이성현 수정 — Redis 이관
 from collections import (
     deque,
 )
@@ -309,8 +309,9 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
         "voc": payload.voc,
         **individual_risks,
     }
-    latest_gas_snapshot.update(gas_snapshot)
-    gas_latest["updated_at"] = datetime.now(timezone.utc).isoformat()
+    await store_gas_snapshot(
+        gas_snapshot, datetime.now(timezone.utc).isoformat()
+    )  # 이성현 수정 — Redis 이관
 
     logger.debug(
         f"[gas_service] action=processed device={payload.device_id} "
