@@ -15,17 +15,15 @@ from django.conf import settings
 from django.core.cache import cache
 from django.utils import timezone
 
-# ── Prometheus 메트릭 ─────────────────────────────────────────────────────
-# 메트릭 선언은 apps/core/metrics.py 에 중앙화되어 있다.
-# Celery worker 프로세스에서도 multiprocess 파일 기반으로 gunicorn과 공유된다.
+# Prometheus 메트릭 — 선언은 apps/core/metrics.py 에 중앙화. Celery worker
+# 프로세스에서도 multiprocess 파일 기반으로 gunicorn과 공유된다.
 from apps.core.metrics import ALARM_FIRED_TOTAL, ALARM_WS_PUSH_FAILED_TOTAL
 
 logger = logging.getLogger(__name__)
 
-# WARNING 타이머 — gas_alarm.py / power_alarm.py가 import해서 사용하므로
-# 이 값만 바꾸면 두 도메인의 countdown이 함께 변경된다.
-# 10초였으나 더미 시나리오에서 WARNING 구간이 빠르게 DANGER로 점프해
-# 거의 발화되지 않아 3초로 완화 (Phase 2 P2 운영 피드백).
+# WARNING 타이머 — gas_alarm.py / power_alarm.py가 import해서 쓰므로 이 값만
+# 바꾸면 두 도메인의 countdown이 함께 변경된다. 더미 시나리오에서 WARNING 구간이
+# 빠르게 DANGER로 점프해 거의 발화되지 않아 3초로 짧게 둔다.
 WARNING_DURATION_SEC = 3
 
 # FastAPI 내부 알람 푸시 엔드포인트.
@@ -49,7 +47,7 @@ _GAS_NAME = {
 
 
 def _get_event_ack_names(event_id: int | None) -> list[str]:
-    """T3 (2026-05-19) — 활성 Event 의 EventAck 사용자명 list.
+    """활성 Event 의 EventAck 사용자명 list 를 반환한다.
 
     push_payload 의 `event_ack_users` 필드용. 다중 관리자 환경에서 운영자 A 가
     이미 "확인 완료" 클릭한 알람이 재발화 시 다른 운영자 B 의 토스트에
@@ -71,20 +69,18 @@ def _get_event_ack_names(event_id: int | None) -> list[str]:
 def _push_to_ws(alarm_data: dict, *, raise_on_failure: bool = True) -> None:
     """FastAPI WebSocket 브로드캐스트 큐에 알람을 추가한다.
 
-    Phase 1 C5 — 일시 장애 시 silent fail로 알람이 영구 누락되던 결함 보강.
-    timeout 3.0→10.0초로 도커 네트워크 마진 확보, 5xx 및 네트워크 오류는
-    raise해서 호출자(fire_*_task)의 self.retry(exc=exc)에 흡수되도록 한다.
+    timeout 10초로 도커 네트워크 마진을 두고, 5xx 및 네트워크 오류는 raise 해서
+    호출자(fire_*_task)의 self.retry(exc=exc)에 흡수되도록 한다 — 일시 장애 시
+    silent fail로 알람이 영구 누락되지 않게.
 
     raise_on_failure=False는 fire_clear_*_task에서만 사용 — 정상화 알림은
     critical하지 않아 retry로 인한 중복 발송보다 손실 허용이 합리적.
 
-    [IntegrationLog 비동기 기록 — PR-D]
-    호출 결과(성공/실패)를 Celery task delay()로 비동기 INSERT.
+    IntegrationLog: 호출 결과(성공/실패)를 Celery task delay()로 비동기 INSERT.
     broker 다운 시 silent fail — 본 흐름 비차단.
 
-    [created_at 주입 — JS 03 R3]
-    호출자가 명시하지 않으면 이 시점(UTC ISO-8601)을 알람 생성 시각으로 기록.
-    클라이언트는 매퍼에서 이 값을 우선 사용 (fallback: new Date()).
+    created_at: 호출자가 명시하지 않으면 이 시점(UTC ISO-8601)을 알람 생성 시각으로
+    기록. 클라이언트는 매퍼에서 이 값을 우선 사용 (fallback: new Date()).
     """
     from datetime import datetime, timezone
 
@@ -152,10 +148,10 @@ def fire_danger_alarm_task(
     from apps.core.constants import AlarmType
     from apps.monitoring.utils.gas_thresholds import GAS_UNITS, get_threshold_value
 
-    # [H-5 수정] DB 쓰기(create_alarm_and_event)와 WS 푸시를 별도 try 블록으로 분리.
-    # 이유: _push_to_ws 실패 시 retry 되면 create_alarm_and_event 가 재실행돼
-    # AlarmRecord 가 중복 생성된다. DB 쓰기 성공 후 WS 푸시가 실패하면
-    # retry 없이 경고 로그만 남긴다 — alarm 은 DB에 보존되므로 유실 없음.
+    # DB 쓰기(create_alarm_and_event)와 WS 푸시를 별도 try 블록으로 분리한다 —
+    # _push_to_ws 실패 시 retry 가 create_alarm_and_event 를 재실행하면 AlarmRecord
+    # 가 중복 생성되기 때문. DB 쓰기 성공 후 WS 푸시 실패는 retry 없이 경고 로그만
+    # 남긴다 (alarm 은 DB에 보존되므로 유실 없음).
     try:
         gas_name = _GAS_NAME.get(gas_type, gas_type.upper())
         unit = GAS_UNITS.get(gas_type, "")
@@ -195,13 +191,13 @@ def fire_danger_alarm_task(
                     "source_label": source_label,
                     "summary": summary,
                     "message": alarm.get_short_message(),
-                    # T3 (2026-05-19) — 활성 Event 의 EventAck 사용자명 list.
-                    # 다중 관리자 환경에서 토스트에 "(N 확인 중)" 시그널 표시용.
+                    # 활성 Event 의 EventAck 사용자명 list — 다중 관리자 환경에서
+                    # 토스트에 "(N 확인 중)" 시그널 표시용.
                     "event_ack_users": _get_event_ack_names(event.id),
                     "is_new_event": alarm is not None,
                     "ingress_ts": ingress_ts,
-                    # T4 D3 — DRF 룰 단독 fire (레거시 경로). 활성화 모드에서는
-                    # fastapi 가 직접 push 하므로 본 fallback 미사용.
+                    # DRF 룰 단독 fire (레거시 경로) — 활성화 모드에서는 fastapi 가
+                    # 직접 push 하므로 본 fallback 미사용.
                     "source": "static_legacy",
                     "reason": None,
                 }
@@ -240,7 +236,7 @@ def fire_warning_alarm_task(
     from apps.core.constants import AlarmType
     from apps.monitoring.utils.gas_thresholds import GAS_UNITS, get_threshold_value
 
-    # [H-5 수정] DB 쓰기와 WS 푸시를 별도 try 블록으로 분리 (fire_danger_alarm_task 참고).
+    # DB 쓰기와 WS 푸시를 별도 try 블록으로 분리 (fire_danger_alarm_task 참고).
     try:
         gas_name = _GAS_NAME.get(gas_type, gas_type.upper())
         unit = GAS_UNITS.get(gas_type, "")
@@ -280,13 +276,13 @@ def fire_warning_alarm_task(
                     "source_label": source_label,
                     "summary": summary,
                     "message": alarm.get_short_message(),
-                    # T3 (2026-05-19) — 활성 Event 의 EventAck 사용자명 list.
-                    # 다중 관리자 환경에서 토스트에 "(N 확인 중)" 시그널 표시용.
+                    # 활성 Event 의 EventAck 사용자명 list — 다중 관리자 환경에서
+                    # 토스트에 "(N 확인 중)" 시그널 표시용.
                     "event_ack_users": _get_event_ack_names(event.id),
                     "is_new_event": alarm is not None,
                     "ingress_ts": ingress_ts,
-                    # T4 D3 — DRF 룰 단독 fire (레거시 경로). 활성화 모드에서는
-                    # fastapi 가 직접 push 하므로 본 fallback 미사용.
+                    # DRF 룰 단독 fire (레거시 경로) — 활성화 모드에서는 fastapi 가
+                    # 직접 push 하므로 본 fallback 미사용.
                     "source": "static_legacy",
                     "reason": None,
                 }
@@ -302,11 +298,10 @@ def fire_warning_alarm_task(
                 alarm is not None,
             )
 
-    # [Step 5] 정상 종료 시 task_key 즉시 정리.
-    # normal 처리 (gas_alarm.py) 의 cache.delete 에 의존하지 않고 task 가 직접
-    # 책임 — normal 천이가 안 들어와도 잔류 키로 다음 WARNING 이 막히지 않게.
-    # retry 경로는 위 except(DB 실패)에서 raise 후 여기까지 미도달 → 잔류 허용
-    # (_TASK_KEY_TTL=35s 로 자연 정리).
+    # 정상 종료 시 task_key 즉시 정리 — normal 처리(gas_alarm.py)의 cache.delete 에
+    # 의존하지 않고 task 가 직접 책임진다. normal 천이가 안 들어와도 잔류 키로 다음
+    # WARNING 이 막히지 않게. retry 경로는 위 except(DB 실패)에서 raise 후 여기까지
+    # 미도달 → 잔류 허용 (_TASK_KEY_TTL 로 자연 정리).
     cache.delete(f"alarm:task:{sensor_id}:{gas_type}")
 
 
@@ -353,12 +348,12 @@ def fire_geofence_alarm_task(
                     "source_label": geofence_name,
                     "summary": summary,
                     "message": alarm.get_short_message(),
-                    # T3 (2026-05-19) — 활성 Event 의 EventAck 사용자명 list.
-                    # 다중 관리자 환경에서 토스트에 "(N 확인 중)" 시그널 표시용.
+                    # 활성 Event 의 EventAck 사용자명 list — 다중 관리자 환경에서
+                    # 토스트에 "(N 확인 중)" 시그널 표시용.
                     "event_ack_users": _get_event_ack_names(event.id),
                     "is_new_event": alarm is not None,
-                    # 2026-05-15 알람 재설계: fastapi alarm_router 가 alarm.worker_id 기반으로
-                    # worker_clients 개인 전송 분기. 그동안 payload 누락으로 broadcast 만 되던 버그 픽스.
+                    # fastapi alarm_router 가 alarm.worker_id 기반으로 worker_clients
+                    # 개인 전송 분기 — broadcast 외 타겟 작업자 개인 push 용.
                     "worker_id": worker_id,
                 }
             )
@@ -443,7 +438,7 @@ def fire_power_danger_task(
     from apps.core.constants import AlarmType
     from apps.facilities.services.threshold_service import get_threshold
 
-    # [H-5 수정] DB 쓰기와 WS 푸시를 별도 try 블록으로 분리 (gas alarm 과 동일 패턴).
+    # DB 쓰기와 WS 푸시를 별도 try 블록으로 분리 (gas alarm 과 동일 패턴).
     try:
         power_threshold = get_threshold("power_default", "power_w") or {}
         danger_max = power_threshold.get("danger_max")
@@ -482,13 +477,13 @@ def fire_power_danger_task(
                     "source_label": source_label,
                     "summary": summary,
                     "message": alarm.get_short_message(),
-                    # T3 (2026-05-19) — 활성 Event 의 EventAck 사용자명 list.
-                    # 다중 관리자 환경에서 토스트에 "(N 확인 중)" 시그널 표시용.
+                    # 활성 Event 의 EventAck 사용자명 list — 다중 관리자 환경에서
+                    # 토스트에 "(N 확인 중)" 시그널 표시용.
                     "event_ack_users": _get_event_ack_names(event.id),
                     "is_new_event": alarm is not None,
                     "ingress_ts": ingress_ts,
-                    # T4 D3 — DRF 룰 단독 fire (레거시 경로). 활성화 모드에서는
-                    # fastapi 가 직접 push 하므로 본 fallback 미사용.
+                    # DRF 룰 단독 fire (레거시 경로) — 활성화 모드에서는 fastapi 가
+                    # 직접 push 하므로 본 fallback 미사용.
                     "source": "static_legacy",
                     "reason": None,
                 }
@@ -520,7 +515,7 @@ def fire_power_warning_task(
     from apps.core.constants import AlarmType
     from apps.facilities.services.threshold_service import get_threshold
 
-    # [H-5 수정] DB 쓰기와 WS 푸시를 별도 try 블록으로 분리 (gas alarm 과 동일 패턴).
+    # DB 쓰기와 WS 푸시를 별도 try 블록으로 분리 (gas alarm 과 동일 패턴).
     try:
         power_threshold = get_threshold("power_default", "power_w") or {}
         warning_max = power_threshold.get("warning_max")
@@ -561,13 +556,13 @@ def fire_power_warning_task(
                     "source_label": source_label,
                     "summary": summary,
                     "message": alarm.get_short_message(),
-                    # T3 (2026-05-19) — 활성 Event 의 EventAck 사용자명 list.
-                    # 다중 관리자 환경에서 토스트에 "(N 확인 중)" 시그널 표시용.
+                    # 활성 Event 의 EventAck 사용자명 list — 다중 관리자 환경에서
+                    # 토스트에 "(N 확인 중)" 시그널 표시용.
                     "event_ack_users": _get_event_ack_names(event.id),
                     "is_new_event": alarm is not None,
                     "ingress_ts": ingress_ts,
-                    # T4 D3 — DRF 룰 단독 fire (레거시 경로). 활성화 모드에서는
-                    # fastapi 가 직접 push 하므로 본 fallback 미사용.
+                    # DRF 룰 단독 fire (레거시 경로) — 활성화 모드에서는 fastapi 가
+                    # 직접 push 하므로 본 fallback 미사용.
                     "source": "static_legacy",
                     "reason": None,
                 }
@@ -583,8 +578,8 @@ def fire_power_warning_task(
                 alarm is not None,
             )
 
-    # [Step 5] 정상 종료 시 task_key 즉시 정리 (가스 task 와 동일 패턴).
-    # retry 경로는 DB 실패 except 에서 raise → 여기 미도달 (잔류 허용, TTL 자연 만료).
+    # 정상 종료 시 task_key 즉시 정리 (가스 task 와 동일 패턴). retry 경로는 DB 실패
+    # except 에서 raise → 여기 미도달 (잔류 허용, TTL 자연 만료).
     cache.delete(f"alarm:power:task:{device_id}:{channel}")
 
 

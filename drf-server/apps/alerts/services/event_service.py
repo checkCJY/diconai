@@ -30,12 +30,12 @@ def _notify_safe(event) -> None:
         )
 
 
-# 재푸시 cooldown 은 settings.ALARM_REPOPUP_COOLDOWN_SEC 에서 주입 (2026-05-15 알람 재설계).
-# 기존 RENOTIFY_COOLDOWN_MINUTES=1 상수에서 env 변수화 — 운영 60s / 시연 15s 로 분기 가능.
-# 가스/전력 dedup TTL (monitoring._CACHE_TTL) 과의 일관성은 운영 측에서 env 정렬로 유지.
+# 재푸시 cooldown 은 settings.ALARM_REPOPUP_COOLDOWN_SEC 에서 주입 — 운영 60s /
+# 시연 15s 로 분기 가능. 가스/전력 dedup TTL (monitoring._CACHE_TTL) 과의 일관성은
+# 운영 측에서 env 정렬로 유지한다.
 
 
-# 알람발생 시, Event 생성/병합 플로우
+# 알람 발생 시 Event 생성/병합 플로우
 @transaction.atomic
 def create_alarm_and_event(
     facility_id: int,
@@ -55,12 +55,13 @@ def create_alarm_and_event(
     algorithm_source: str = "",
     source: str = "",
 ):
-    """
-    AlarmRecord + Event 생성/병합 핵심 로직
+    """AlarmRecord + Event 를 생성하거나 활성 Event 에 병합한다.
 
     1. 병합 대상 활성 Event 검색 (select_for_update)
     2. 존재: AlarmRecord만 생성, Event 업데이트
     3. 없음: Event 생성 + AlarmRecord 생성 + EventLog(CREATED)
+
+    동시성: select_for_update 로 동일 facility 동시 생성 race 방지.
     """
     # 활성 Event 조회 (레이스 컨디션 방지 select_for_update)
     event_qs = Event.objects.select_for_update().filter(
@@ -82,7 +83,7 @@ def create_alarm_and_event(
     active_event = event_qs.first()
 
     if active_event:
-        # 🚨 [추가된 로직] 타임 윈도우 검사 (무한 병합 방지)
+        # 타임 윈도우 검사 — 너무 오래된 활성 Event 와의 무한 병합 방지.
         if not active_event.is_mergeable_time_window:
             previous_status = active_event.status
             # 기존 이벤트를 강제로 완료 처리 (쿼리에서 다시 잡히지 않도록 상태 변경)
@@ -101,7 +102,7 @@ def create_alarm_and_event(
             active_event = None
 
         else:
-            # ✅ [기존 로직] 정상 병합 (타임 윈도우 이내)
+            # 정상 병합 (타임 윈도우 이내) — 기존 Event 에 AlarmRecord 만 추가.
             alarm = AlarmRecord.objects.create(
                 facility_id=facility_id,
                 event=active_event,
@@ -119,10 +120,8 @@ def create_alarm_and_event(
                 source=source,
             )
             active_event.last_detected_at = detected_at
-            # 위험도 상승 시 Event risk_level 업데이트
-            # [M-12] 위험도 상승 이력을 EventLog 에 기록한다.
-            # 이유: WARNING → DANGER 천이는 중요한 상태 변화지만 기존 코드에서
-            # EventLog 가 남지 않아 사고 소급 분석 시 이 구간이 공백이었다.
+            # 위험도 상승(WARNING → DANGER) 시 Event risk_level 업데이트 + EventLog
+            # 기록 — 사고 소급 분석에서 이 상태 변화 구간이 공백이 되지 않게.
             risk_escalated = RISK_LEVELS.index(risk_level) > RISK_LEVELS.index(
                 active_event.risk_level
             )
@@ -149,9 +148,8 @@ def create_alarm_and_event(
                 active_event.save(
                     update_fields=["last_detected_at", "risk_level", "last_notified_at"]
                 )
-                # [H-1 수정] 재알림 발송 시 Notification 생성.
-                # on_commit 사용 이유: 트랜잭션이 완전히 커밋된 후에 호출해야
-                # Notification이 아직 롤백될 수 있는 Event를 참조하는 상황을 막는다.
+                # 재알림 발송 시 Notification 생성. on_commit 으로 트랜잭션 커밋 후
+                # 호출 — 롤백될 수 있는 Event 를 Notification 이 참조하는 상황 방지.
                 _event_ref = active_event
                 transaction.on_commit(lambda: _notify_safe(_event_ref))
                 return active_event, alarm  # 재알림 발송
@@ -161,7 +159,7 @@ def create_alarm_and_event(
 
     # 새 Event 생성 (활성 이벤트가 없거나, 타임 윈도우 초과로 강제 분리된 경우 실행됨)
     if not active_event:
-        # Phase 4-e: AlertPolicy 자동 매칭 → Event.policy FK 채움
+        # AlertPolicy 자동 매칭 → Event.policy FK 채움
         from apps.alerts.services.policy_matcher import match_policy
 
         policy = match_policy(
@@ -209,9 +207,8 @@ def create_alarm_and_event(
             action=EventLog.Action.CREATED,
             new_status=EventStatus.ACTIVE,
         )
-        # [H-1 수정] 신규 Event 생성 시 Notification 생성.
-        # on_commit 사용 이유: 트랜잭션이 완전히 커밋된 후에 호출해야
-        # Notification이 아직 롤백될 수 있는 Event를 참조하는 상황을 막는다.
+        # 신규 Event 생성 시 Notification 생성. on_commit 으로 트랜잭션 커밋 후
+        # 호출 — 롤백될 수 있는 Event 를 Notification 이 참조하는 상황 방지.
         _event_ref = event
         transaction.on_commit(lambda: _notify_safe(_event_ref))
         return event, alarm  # 새 Event는 Notification 발송
@@ -219,7 +216,7 @@ def create_alarm_and_event(
 
 # 관리자 이벤트 확인 플로우
 def acknowledge_event(event_id: int, actor_user_id: int, note: str = ""):
-    """관리자가 이벤트 확인 처리"""
+    """관리자가 이벤트를 확인(ACKNOWLEDGED) 처리한다."""
     event = Event.objects.select_for_update().get(pk=event_id)
 
     if event.status != EventStatus.ACTIVE:

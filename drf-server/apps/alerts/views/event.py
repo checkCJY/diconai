@@ -133,10 +133,10 @@ class EventViewSet(viewsets.ReadOnlyModelViewSet):
             new_status=new_status,
         )
 
-        # 2026-05-15 알람 재설계: Event 가 RESOLVED 로 전이되면 떠있는 팝업을 닫게
-        # 모든 WS 클라이언트에 broadcast. AlarmPayload.event_resolved_at 박힌 신호를
-        # 받은 클라가 같은 event_id 팝업 close + "위험 해소" 토스트. WS 푸시 실패는
-        # update_status 응답을 망치지 않도록 raise_on_failure=False — 트랜잭션은 성공.
+        # Event 가 RESOLVED 로 전이되면 떠있는 팝업을 닫게 모든 WS 클라이언트에
+        # broadcast. AlarmPayload.event_resolved_at 박힌 신호를 받은 클라가 같은
+        # event_id 팝업 close + "위험 해소" 토스트. WS 푸시 실패는 update_status
+        # 응답을 망치지 않도록 raise_on_failure=False — 트랜잭션은 성공.
         if new_status == EventStatus.RESOLVED:
             from apps.alerts.tasks import _push_to_ws
 

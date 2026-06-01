@@ -15,9 +15,8 @@ class MLAnomalyResult(models.Model):
         ANOMALY = "anomaly", "이상"
 
     class RiskClassified(models.TextChoices):
-        # fastapi combine_risk_5axis 와 vocab 동기화 (2026-05-21).
-        # 외부 리뷰어 #1 (a/c path 충돌) 본체 해결: "warning" 은 3축 매트릭스에서
-        # 정적 임계 + AI 신호 부분 동의 시 의도적 격상값. 누락 시 forward 400 발생.
+        # fastapi combine_risk_5axis 와 vocab 동기화 필수. "warning" 은 3축
+        # 매트릭스에서 정적 임계 + AI 신호 부분 동의 시 격상값 — 누락 시 forward 400.
         NORMAL = "normal", "정상"
         CAUTION = "caution", "주의"
         PREDICT_WARN = "predict_warn", "예측경고"
@@ -64,7 +63,7 @@ class MLAnomalyResult(models.Model):
         choices=RiskClassified.choices,
         default=RiskClassified.NORMAL,
         verbose_name="결합 위험도",
-        help_text="STEP D 의 결합 매트릭스로 임계치 평가와 결합한 4단계 분류",
+        help_text="결합 매트릭스로 임계치 평가와 AI 신호를 합친 분류",
     )
     feature_snapshot_json = models.JSONField(
         verbose_name="입력 피처 스냅샷",

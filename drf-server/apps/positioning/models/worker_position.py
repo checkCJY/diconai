@@ -25,10 +25,9 @@ class WorkerPosition(models.Model):
     worker: SET_NULL — CustomUser.deactivate() 정책과 일관
     worker=NULL 레코드 = 탈퇴 작업자 이력 (사고 조사/감사 대응)
 
-    [대용량 대응 — 3차 한계]
-    작업자 50명 × 30초 주기 가정 시 연간 약 5,256만 행
-    3차는 파티셔닝 없이 운영, 4차에 TimescaleDB 또는 월별 파티션 도입 예정
-    (로드맵 4.1, 4.2 참조)
+    [대용량 대응]
+    작업자 50명 × 30초 주기 가정 시 연간 약 5,256만 행. 현재는 파티셔닝 없이
+    운영하고, 규모 확대 시 TimescaleDB 또는 월별 파티션 도입 예정.
     """
 
     class MovementStatus(models.TextChoices):
@@ -56,7 +55,7 @@ class WorkerPosition(models.Model):
         blank=True,
         related_name="worker_positions",
     )
-    # 수신 노드 FK — 어떤 PositionNode가 본 좌표를 측정·전송했는지 기록 (Phase 3-a)
+    # 수신 노드 FK — 어떤 PositionNode가 본 좌표를 측정·전송했는지 기록.
     # nullable: 펌웨어 페이로드 갱신 전 row + node_id 미상 케이스 보존
     received_node = models.ForeignKey(
         "facilities.PositionNode",
@@ -69,7 +68,7 @@ class WorkerPosition(models.Model):
     x = models.FloatField(verbose_name="x 좌표")
     y = models.FloatField(verbose_name="y 좌표")
     movement_status = models.CharField(
-        max_length=20,  # v2 오기 100 → 20으로 수정
+        max_length=20,
         choices=MovementStatus.choices,
         default=MovementStatus.MOVING,
     )

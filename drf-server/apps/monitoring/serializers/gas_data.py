@@ -11,8 +11,7 @@ from apps.monitoring.models.gas_data import GasData
 
 
 class GasDataCreateSerializer(serializers.ModelSerializer):
-    """
-    FastAPI → DRF: GasData 수신 시리얼라이저.
+    """FastAPI → DRF: GasData 수신 시리얼라이저.
 
     필드:
       device_id              : GasSensor.device_id → FK 매핑
@@ -25,7 +24,9 @@ class GasDataCreateSerializer(serializers.ModelSerializer):
     """
 
     device_id = serializers.CharField(write_only=True)
-    ingress_ts = serializers.FloatField(required=False, allow_null=True, default=None, write_only=True)
+    ingress_ts = serializers.FloatField(
+        required=False, allow_null=True, default=None, write_only=True
+    )
 
     class Meta:
         model = GasData
@@ -81,11 +82,17 @@ class GasDataCreateSerializer(serializers.ModelSerializer):
         try:
             gas_data = GasData.objects.create(**validated_data)
         except OperationalError as e:
-            error_type = "db_locked" if "database is locked" in str(e).lower() else "other"
-            DB_SAVE_TOTAL.labels(model="gas", result="error", error_type=error_type).inc()
+            error_type = (
+                "db_locked" if "database is locked" in str(e).lower() else "other"
+            )
+            DB_SAVE_TOTAL.labels(
+                model="gas", result="error", error_type=error_type
+            ).inc()
             raise
         except IntegrityError:
-            DB_SAVE_TOTAL.labels(model="gas", result="error", error_type="integrity").inc()
+            DB_SAVE_TOTAL.labels(
+                model="gas", result="error", error_type="integrity"
+            ).inc()
             raise
         except Exception:
             DB_SAVE_TOTAL.labels(model="gas", result="error", error_type="other").inc()
@@ -95,13 +102,11 @@ class GasDataCreateSerializer(serializers.ModelSerializer):
 
         DB_SAVE_TOTAL.labels(model="gas", result="ok", error_type="").inc()
 
-        # [H-3 수정] GasData 저장과 센서 last_reading 업데이트를 하나의 트랜잭션으로 묶는다.
-        # 이유: sensor.save() 실패 시 GasData는 저장됐는데 알람 트리거가 건너뛰어지는
-        # 상황을 방지. 둘 다 성공해야 커밋되고, 실패 시 둘 다 롤백된다.
-
+        # GasData 저장과 센서 last_reading 업데이트를 한 트랜잭션으로 묶는다 —
+        # sensor.save() 실패 시 GasData만 저장돼 알람 트리거가 누락되는 상황 방지.
         #
-        # [L-7 수정] last_reading은 5분 오프라인 판정에만 쓰인다.
-        # 초당 1회 UPDATE는 불필요한 DB 쓰기 부하 — 60초에 1회로 스로틀링한다.
+        # last_reading 은 5분 오프라인 판정에만 쓰이므로, 초당 1회 UPDATE 부하를
+        # 피해 60초에 1회로 스로틀링한다.
         sensor = gas_data.gas_sensor
         last = sensor.last_reading
         new_ts = gas_data.measured_at
@@ -110,7 +115,6 @@ class GasDataCreateSerializer(serializers.ModelSerializer):
             with transaction.atomic():
                 sensor.last_reading = new_ts
                 sensor.save(update_fields=["last_reading", "updated_at"])
-
 
         # 알람 트리거는 atomic 블록 밖에서 실행 — 저장이 완전히 커밋된 후 Celery 태스크 발행.
         # atomic 블록 안에서 .delay() 하면 트랜잭션 롤백 시 태스크가 존재하지 않는

@@ -1,5 +1,5 @@
 """
-risk_combine — fastapi 측 combine_risk 매트릭스 (트랙 1 v2 — fastapi 중심)
+risk_combine — fastapi 측 combine_risk 매트릭스
 
 [배경]
 가스/전력 추론은 fastapi 안에서 실시간 처리 (엣지게이트웨이 → fastapi → 알람).
@@ -51,16 +51,12 @@ def combine_risk(threshold_risk: str, ml_prediction: str) -> str:
     return _MATRIX[key]
 
 
-# ---------------------------------------------------------------------------
-# W3 — 3축 매트릭스 (skill/plan/power-ai-un-downgrade-phase2-apply.md §7).
-# 두 AI 모델 (IF + ARIMA) 동의 시 한 단계 격상 / 단일 AI 만 발화 시 보수적.
+# 3축 매트릭스 — 두 AI 모델 (IF + ARIMA) 동의 시 한 단계 격상, 단일 발화 시 보수적.
 # ⚠ 2축 matrix 와 다름 — 단일 AI 발화 시 본 3축이 한 단계 낮음:
 #   - 2축 ("warning", "anomaly") = "danger" (IF 단독으로 격상)
 #   - 3축 ("warning", "anomaly", False) = "warning" (두 AI 동의 시만 격상)
 # 의도: 두 AI 환경에서 한 쪽만 발화 시 신뢰도 ↓ 반영. ARIMA pkl 없는 채널은
 # caller 가 arima_violation=False 호출 → 본 3축 보수적 결과 적용 (2축 fallback X).
-# ---------------------------------------------------------------------------
-
 _MATRIX_3AXIS: dict[tuple[str, str, bool], str] = {
     # (threshold, if_prediction, arima_violation) → combined
     ("normal", "normal", False): "normal",
@@ -105,16 +101,12 @@ def combine_risk_3axis(
     return _MATRIX_3AXIS[key]
 
 
-# ---------------------------------------------------------------------------
-# §F — 5축 우선순위 함수 (skill/plan/power-zscore-changepoint-apply.md §F).
-# STEP 5 우선순위 매트릭스 직접 매핑 — 48-cell dict 회피.
+# 5축 우선순위 함수 — 우선순위 매트릭스 직접 매핑 (48-cell dict 회피).
 #
-# [설계 결정 — 2026-05-19, plan §1]
-# base = combine_risk_3axis (W3 매트릭스 12-cell 회귀 보존) 으로 threshold ×
-# IF × ARIMA 부분은 그대로 사용. Z-score / CP 는 base 가 "normal" 일 때만
-# "predict_warn" 으로 격상 (조기 경고 신호). base 가 이미 caution/predict_warn/
-# warning/danger 면 ML/threshold 우선 → Z-score / CP 무시 (STEP 5 우선순위 일치).
-# ---------------------------------------------------------------------------
+# [설계 결정]
+# base = combine_risk_3axis (threshold × IF × ARIMA) 를 그대로 사용. Z-score / CP
+# 는 base 가 "normal" 일 때만 "predict_warn" 으로 격상 (조기 경고 신호). base 가
+# 이미 caution/predict_warn/warning/danger 면 ML/threshold 우선 → Z-score / CP 무시.
 
 
 def combine_risk_5axis(
@@ -124,7 +116,7 @@ def combine_risk_5axis(
     z_score_anomaly: bool,
     change_point: bool,
 ) -> tuple[str, str]:
-    """5축 결합 — STEP 5 우선순위 매트릭스 (CRITICAL > ML_ANOMALY >
+    """5축 결합 — 우선순위 매트릭스 (CRITICAL > ML_ANOMALY >
     ANOMALY_WARNING > TREND_SHIFT > PREDICTIVE_ALERT > NORMAL).
 
     [매핑]
@@ -150,7 +142,7 @@ def combine_risk_5axis(
           base 가 normal 일 때 z/cp 가 격상에 기여했으면 그 라벨, 아니면 "".
           caller (algorithm_source 결정 흐름) 가 "z/cp 가 실제 risk 격상에 기여했나"
           판단에 사용 — base 가 이미 발화 등급이면 z/cp 무시되므로 escalation_source=""
-          반환 → 라벨 의미론 일관성 (코드리뷰 2026-05-19 §2.1 보강).
+          반환 → 라벨 의미론 일관성.
         - z/cp 둘 다 True 면 change_point 우선 (algorithm_source priority 매핑).
     """
     base = combine_risk_3axis(threshold_risk, if_prediction, arima_violation)

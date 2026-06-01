@@ -7,12 +7,11 @@ from apps.core.models.base import BaseModel
 
 
 class Event(BaseModel):
-    """
-    업무 워크플로우 단위 — 여러 AlarmRecord를 묶음
+    """업무 워크플로우 단위 — 여러 AlarmRecord를 묶음.
 
-    [v3 신설 — 판정과 업무의 분리]
-    AlarmRecord(자동 판정)와 Event(업무 워크플로우)를 별도 모델로 분리
-    한 이벤트에 여러 AlarmRecord가 묶임 (N:1 관계)
+    [판정과 업무의 분리]
+    AlarmRecord(자동 판정)와 Event(업무 워크플로우)를 별도 모델로 분리한다.
+    한 이벤트에 여러 AlarmRecord가 묶인다 (N:1 관계).
 
     [병합 기준]
     병합 키: (source_sensor 또는 source_power_device 또는 source_geofence, event_type)
@@ -87,12 +86,12 @@ class Event(BaseModel):
     )
 
     summary = models.CharField(max_length=200, verbose_name="이벤트 요약")
-    # Phase 3-d: summary는 한 줄 요약(목록), description은 상세 본문(상세 팝업)
+    # summary 는 한 줄 요약(목록), description 은 상세 본문(상세 팝업).
     description = models.TextField(blank=True, default="", verbose_name="상세 본문")
-    # Phase 3-d: 현재 상태에 대한 처리자 메모. 상태 전환 시 EventLog.note에 직전값 복사 보존.
+    # 현재 상태에 대한 처리자 메모. 상태 전환 시 EventLog.note 에 직전값 복사 보존.
     status_note = models.TextField(blank=True, default="", verbose_name="상태 메모")
-    # Phase 3-d: 트리거 정책 추적. AlertPolicy 비활성/삭제 시 SET_NULL로 이력 보존.
-    # 자동 매칭은 Phase 4-e policy_matcher가 채움 (본 PR은 FK만).
+    # 트리거 정책 추적. AlertPolicy 비활성/삭제 시 SET_NULL 로 이력 보존.
+    # 자동 매칭은 policy_matcher 가 채운다.
     policy = models.ForeignKey(
         "alerts.AlertPolicy",
         on_delete=models.SET_NULL,

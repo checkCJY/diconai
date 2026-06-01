@@ -19,11 +19,7 @@ class SensorLocation(BaseModel):
     y: float
 
 
-# ============================================================
-# 기기 정보 (부팅 시 1회)  →  POST /api/sensors/info
-# ============================================================
-
-
+# 기기 정보 (부팅 시 1회) → POST /api/sensors/info
 class DeviceInfoPayload(BaseModel):
     """
     기기 부팅 시 1회 전송하는 식별 정보.
@@ -41,11 +37,7 @@ class DeviceInfoPayload(BaseModel):
     location: SensorLocation
 
 
-# ============================================================
-# 기기 환경 데이터 (1초마다)  →  POST /api/sensors/gas
-# ============================================================
-
-
+# 기기 환경 데이터 (1초마다) → POST /api/sensors/gas
 class GasDataPayload(BaseModel):
     """
     가스 센서 실시간 측정값.
@@ -116,11 +108,7 @@ class GasDataPayload(BaseModel):
         return self
 
 
-# ============================================================
 # 응답 스키마 (OpenAPI 자동 문서화용)
-# ============================================================
-
-
 class DeviceInfoResponse(BaseModel):
     """기기 식별 정보 수신 확인 응답."""
 

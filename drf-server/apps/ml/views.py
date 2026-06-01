@@ -5,7 +5,7 @@ ML 모델 메타데이터 + 추론 결과 저장 API.
 운영 흐름:
 - drf-server: 학습 + MLModel row 관리 (단일 진실 공급원) + 추론 결과 저장
 - fastapi-server: GET /api/ml/models/active/?sensor_type=power 로 active 모델 메타 조회 후 .pkl 로드
-- T1 추론 트리거 (별도 작업): fastapi 추론 → combine_risk → POST /api/ml/anomaly-results/
+- 추론 트리거: fastapi 추론 → combine_risk → POST /api/ml/anomaly-results/
 """
 
 from rest_framework import serializers
@@ -109,7 +109,7 @@ class MLAnomalyResultCreateView(CreateAPIView):
           measured_at, anomaly_score, prediction, risk_classified, feature_snapshot_json
     Returns: 201 + 생성된 row
 
-    호출자 (T1-6 추론 트리거): fastapi /predict 응답을 받아 threshold_risk 와 함께
+    호출자 (추론 트리거): fastapi /predict 응답을 받아 threshold_risk 와 함께
     combine_risk 계산 후 risk_classified 채워서 POST. 본 view 는 단순 INSERT 만 담당.
     """
 

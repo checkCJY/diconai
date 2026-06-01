@@ -35,8 +35,8 @@ class GeoFence(BaseModel):
     이유: 과거 AlarmRecord, Event, WorkerPosition의 geofence FK 참조 유지
 
     [risk_level 통일]
-    v2의 zone_type + risk_level 이중 관리 제거
-    RiskLevel TextChoices로 통일 (core.constants)
+    zone_type + risk_level 이중 관리 없이 RiskLevel TextChoices로 통일
+    (core.constants)
 
     [polygon 변경과 캐시 무효화]
     polygon이 수정되면 해당 공장의 모든 활성 WorkerPosition의

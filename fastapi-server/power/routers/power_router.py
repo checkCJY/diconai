@@ -9,7 +9,7 @@
 #
 # 모든 엔드포인트의 처리 흐름:
 #   1. Pydantic 스키마로 수신 데이터 검증 후 채널 딕셔너리로 변환
-#   2. power_latest 공유 상태 즉시 갱신 → WebSocket 브로드캐스트에 즉시 반영
+#   2. Redis snap_store 즉시 갱신 → WebSocket 브로드캐스트에 즉시 반영
 #   3. DRF 저장은 BackgroundTask로 비동기 처리 → 응답을 블로킹하지 않음
 import time
 
@@ -57,11 +57,11 @@ _COMMON_RESPONSES = {
     responses=_COMMON_RESPONSES,
 )
 async def recv_onoff(payload: PowerOnOffPayload, bg: BackgroundTasks):
-    # P1 — 센서 마지막 수신 시각 갱신
+    # 센서 마지막 수신 시각 갱신
     SENSOR_LAST_RECEIVED.labels("power", payload.device_id).set(time.time())
     snapshot = payload.to_snapshot()
     measured_at = now_utc_iso()
-    update_power_state("onoff", snapshot, measured_at)
+    await update_power_state("onoff", snapshot, measured_at)  # 이성현 수정 — async 전환
     bg.add_task(
         post_power_to_drf,
         DRF_POWER_EVENT_PATH,
@@ -89,7 +89,9 @@ async def recv_current(payload: PowerCurrentPayload, bg: BackgroundTasks):
     SENSOR_LAST_RECEIVED.labels("power", payload.device_id).set(ingress_ts)
     channel_values = payload.to_channel_values()
     measured_at = now_utc_iso()
-    update_power_state("current", channel_values, measured_at)
+    await update_power_state(
+        "current", channel_values, measured_at
+    )  # 이성현 수정 — async 전환
     bg.add_task(
         post_power_to_drf,
         DRF_POWER_DATA_PATH,
@@ -118,7 +120,9 @@ async def recv_voltage(payload: PowerVoltagePayload, bg: BackgroundTasks):
     SENSOR_LAST_RECEIVED.labels("power", payload.device_id).set(ingress_ts)
     channel_values = payload.to_channel_values()
     measured_at = now_utc_iso()
-    update_power_state("voltage", channel_values, measured_at)
+    await update_power_state(
+        "voltage", channel_values, measured_at
+    )  # 이성현 수정 — async 전환
     bg.add_task(
         post_power_to_drf,
         DRF_POWER_DATA_PATH,
@@ -151,8 +155,10 @@ async def recv_watt(payload: PowerWattPayload, bg: BackgroundTasks):
     SENSOR_LAST_RECEIVED.labels("power", payload.device_id).set(ingress_ts)
     channel_values = payload.to_channel_values()
     measured_at = now_utc_iso()
-    update_power_state("watt", channel_values, measured_at)
-    # 트랙 1 v2 — IF 추론 + push_alarm + DRF MLAnomalyResult forward (ch1·watt)
+    await update_power_state(
+        "watt", channel_values, measured_at
+    )  # 이성현 수정 — async 전환
+    # IF 추론 + push_alarm + DRF MLAnomalyResult forward.
     # ingress_ts 전달 — AI 알람도 룰 기반과 동일하게 E2E latency 측정에 포함.
     await process_anomaly_inference(
         payload.device_id, channel_values, "watt", measured_at, ingress_ts=ingress_ts

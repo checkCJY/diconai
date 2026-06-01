@@ -1,7 +1,7 @@
 # power/services/equipment_builder.py — 전력 채널 16개 equipment 조립
 #
 # 데이터 흐름:
-#   IN  : websocket.state.power_latest (watt/current/voltage/onoff 채널별 dict)
+#   IN  : power_state dict (snap_store.load_power_snapshot() 결과, broadcast가 전달)
 #         + channel_meta_cache (DRF PowerDevice.channel_meta 의 정격·라벨)
 #   OUT : equipment list[dict] (채널별 측정값 + 3축 risk) + total_kw float
 #         broadcast_loop 가 WebSocket 으로 브라우저에 송신.
@@ -10,7 +10,7 @@
 #   실제 알람 트리거는 DRF apps.monitoring.services.power_alarm 이 담당.
 from core.power_thresholds import POWER_THRESHOLDS
 from power.services.channel_meta_cache import get_channel_entry
-from websocket.state import power_latest
+# (이성현 수정 — 전역 참조 제거, power_state를 인자로 받는 방식으로 변경)
 
 # 정격 % 임계 — DRF facilities.Threshold "power_facility_default" 와 단일 동기.
 _PCT_THRESHOLDS = {
@@ -73,8 +73,9 @@ def _legacy_watt_risk(watt: float | None) -> str:
     return "normal"
 
 
-def build_equipment() -> tuple[list[dict], float]:
-    """power_latest 공유 상태를 읽어 16채널 equipment 목록과 총 전력(kW)을 조립한다.
+def build_equipment(power_state: dict) -> tuple[list[dict], float]:
+    # 이성현 수정 — 전역 power_latest 참조 제거, 인자로 받는 순수 함수로 변경
+    """power_state를 받아 16채널 equipment 목록과 총 전력(kW)을 조립한다.
 
     1. watt/current/voltage 가 모두 None → 통신 불능 (comm_failure, risk=normal)
     2. 채널별 정격 조회 → 3축 (watt/current/voltage) 의 정격 % risk 산출
@@ -84,19 +85,17 @@ def build_equipment() -> tuple[list[dict], float]:
     Returns:
         (equipment list, total_kw) — broadcast_loop 가 WebSocket 으로 송신.
     """
-    if not any(
-        [power_latest["watt"], power_latest["current"], power_latest["voltage"]]
-    ):
+    if not any([power_state["watt"], power_state["current"], power_state["voltage"]]):
         return [], 0.0
 
     equipment = []
     total_w = 0.0
 
     for ch in range(1, 17):
-        watt = power_latest["watt"].get(ch)
-        voltage = power_latest["voltage"].get(ch)
-        current = power_latest["current"].get(ch)
-        onoff = power_latest["onoff"].get(str(ch))
+        watt = power_state["watt"].get(ch)
+        voltage = power_state["voltage"].get(ch)
+        current = power_state["current"].get(ch)
+        onoff = power_state["onoff"].get(str(ch))
 
         is_comm = watt is None and voltage is None and current is None
         sensor_status = "comm_failure" if is_comm else "active"

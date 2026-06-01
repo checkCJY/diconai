@@ -1,11 +1,15 @@
-# gas/services/gas_service.py — 가스 데이터 처리 서비스
+# gas/services/gas_service.py — 가스 측정값 수신 처리 서비스
 #
-# 가스 센서 수신 데이터의 비즈니스 로직을 담당한다.
-#   1. DRF에 측정값을 저장한다 (DRF 내부에서 Celery 알람 태스크를 트리거함).
-#   2. latest_gas_snapshot을 갱신해 다음 WebSocket 틱에 브라우저로 전달한다.
+# 데이터 흐름:
+#   IN  : gas_router 가 넘기는 GasDataPayload (검증된 9종 가스 측정값)
+#   OUT : 1) DRF POST /api/monitoring/gas/ — 측정값 영속화 (DRF 내부에서
+#            임계치 초과 시 Celery 알람 태스크 트리거)
+#         2) latest_gas_snapshot 갱신 — 다음 WebSocket 틱에 브라우저로 전달
+#         3) (AI) IF 이상탐지 적중 시 push_alarm 으로 실시간 알람 직접 push +
+#            forward_inference_e2e 로 ML 결과/AlarmRecord 비동기 저장
 #
-# 알람은 Celery 태스크가 /internal/alarms/push/ 를 통해 직접 active_alarms에 추가한다.
-# HTTP Push(/internal/*) 없이 websocket/state.py를 직접 갱신하는 방식을 사용한다.
+# AI 추론: co+h2s+co2 30틱 슬라이딩 윈도우 → change point 게이트 → IF 추론.
+#          ARIMA 잔차 피처는 모델 존재 시에만 가산.
 import time
 import logging
 import asyncio
@@ -39,20 +43,20 @@ from core.metrics import (
     GAS_AI_RATE_LIMITED_TOTAL,
     GAS_AI_ALARM_FIRED_TOTAL,
 )
-from websocket.state import gas_latest, latest_gas_snapshot
+from websocket.snap_store import store_gas_snapshot  # 이성현 수정 — Redis 이관
 from collections import (
     deque,
-)  # co 값을 최근 30개만 유지하는 버퍼 , 30개 이상 시 오래 된 순으로 자동으로 버림
+)
 from ai.router import (
     _get_or_load,
     _build_multi_feature_row,
-)  # 학습된 ai모델을 가져옴 , co 값 30개를 ai읽을 수 있는 형태로 변환
+)
 
 
 logger = logging.getLogger(__name__)
 
-# 이성현 추가 — ARIMA pkl 모듈 레벨 로드 (실시간 잔차 계산용)
-# 이성현 수정 — statsmodels pickle 임포트 버그 대비 try-except 추가 (실패 시 12피처로 폴백)
+# 이성현 추가 — ARIMA pkl 모듈 레벨 로드 (실시간 잔차 계산용).
+#   statsmodels pickle 임포트 버그 대비 try-except — 실패 시 12피처로 폴백.
 _arima_models: dict = {}
 for _gn in ["co", "h2s", "co2"]:
     _p = Path(settings.ML_MODELS_DIR) / f"arima_{_gn}.pkl"
@@ -79,14 +83,13 @@ def _detect_change_point(values: list[float], penalty: float | None = None) -> b
         return False
 
 
-# 이성현 작업
-# co, h2s, co2값을 담아두는 버퍼 , 최대 30개 , 슬라이딩 윈도우 구현에 맞음
+# 이성현 작업 — co/h2s/co2 슬라이딩 윈도우 버퍼 (각 최대 30틱).
 _co_window: deque = deque(maxlen=30)
 _h2s_window: deque = deque(maxlen=30)
 _co2_window: deque = deque(maxlen=30)
 
-# 이성현 추가 — 같은 센서 60초당 1회만 알람 발화 (전력 서비스와 동일 rate limit 패턴)
-# [M-3] 하드코딩 제거 — settings.GAS_AI_RATE_LIMIT_SEC 로 환경별 조정 가능.
+# 이성현 추가 — 같은 센서 60초당 1회만 알람 발화 (전력 서비스와 동일 rate limit 패턴).
+# 하드코딩 제거 — settings.GAS_AI_RATE_LIMIT_SEC 로 환경별 조정 가능.
 # DRF 의 ALARM_REPOPUP_COOLDOWN_SEC 과 값을 맞추려면 .env 에서 함께 변경할 것.
 _gas_last_fired_at: dict[str, float] = {}
 GAS_RATE_LIMIT_SEC = settings.GAS_AI_RATE_LIMIT_SEC
@@ -95,16 +98,17 @@ DRF_GAS_PATH = "/api/monitoring/gas/"
 
 
 async def process_gas_data(payload: GasDataPayload) -> dict:
-    """
-    가스 데이터 수신 후 전체 처리 흐름을 조율한다.
+    """가스 데이터 수신 후 전체 처리 흐름을 조율한다.
 
     1. 가스별 위험도(individual_risks)를 계산한다.
-    2. DRF에 측정값과 위험도를 저장한다 (DRF → Celery 태스크 → FastAPI /internal/alarms/push/).
-    3. latest_gas_snapshot을 갱신해 WebSocket 브로드캐스트에 포함시킨다.
+    2. (AI) co+h2s+co2 윈도우가 차면 change point 게이트 후 IF 이상탐지 —
+       적중 시 실시간 push_alarm + ML 결과 비동기 저장 (60s rate limit).
+    3. DRF에 측정값과 위험도를 저장한다 (DRF → Celery 태스크 → 알람 push).
+    4. latest_gas_snapshot을 갱신해 WebSocket 브로드캐스트에 포함시킨다.
 
     DRF 통신 실패는 센서 장비에 적절한 HTTP 응답을 돌려주기 위해 예외로 전파한다.
     """
-    # P1 — 센서 마지막 수신 시각 갱신. 5분 이상 갱신 없으면 통신 이상으로 판단.
+    # 센서 마지막 수신 시각 갱신 — 5분 이상 없으면 통신 이상으로 판단.
     SENSOR_LAST_RECEIVED.labels("gas", payload.device_id).set(time.time())
 
     gas_values = {
@@ -121,7 +125,7 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
     }
     individual_risks = calculate_individual_risks(gas_values)
 
-    # 이성현 수정 — co 단변량 → co + h2s + co2 다변량 슬라이딩 윈도우 추론
+    # 이성현 — co+h2s+co2 다변량 슬라이딩 윈도우 추론
     _co_window.append(payload.co)
     _h2s_window.append(payload.h2s)
     _co2_window.append(payload.co2)
@@ -138,14 +142,14 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
             GAS_CP_DETECTED_TOTAL.inc()
             logger.debug("[체인지 포인트] 패턴 변화 감지 — IF 추론 진행")
             try:
-                # 이성현 수정 — sensor_identifier 를 train_anomaly_model 저장 포맷에 맞게 전달 (gas:sensor_{pk}:{gas_label})
+                # 이성현 — train_anomaly_model 저장 포맷과 동일한 식별자 (gas:sensor_{pk}:{gas_label})
                 _model_identifier = "gas:sensor_1:co_h2s_co2"
                 entry = await _get_or_load("gas", sensor_identifier=_model_identifier)
                 if entry is None:
                     # 모델 미등록 — AI 없이 룰 기반으로만 처리. DRF 저장은 아래 로직으로 계속 진행.
                     AI_INFERENCE_FAILED_TOTAL.labels("gas_if", "model_not_loaded").inc()
                     raise RuntimeError("gas IF 모델 미등록")
-                # P2 전 — IF 추론 실행 시간 측정
+                # IF 추론 실행 시간 측정
                 _infer_start = time.time()
                 row = _build_multi_feature_row(
                     {
@@ -200,9 +204,9 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
                                 gas_type=_g,
                                 state=AIInferenceState.FIRED,
                             )
-                    # 이성현 수정 — forward_inference_e2e 시그니처에 맞게 수정 (push_payload/should_fire 제거)
-                    # ML결과 저장은 매번, alarm_payload는 should_fire=True일 때만 전달
-                    # [M-2 수정] create_task 미처리 예외가 "Task exception was never retrieved"
+                    # 이성현 — forward_inference_e2e: ML 결과는 매번 저장,
+                    #   alarm_payload 는 should_fire=True 일 때만 전달.
+                    # create_task 미처리 예외가 "Task exception was never retrieved"
                     # 경고로 조용히 사라지지 않도록 done callback 으로 error 로그 기록.
                     _t = asyncio.create_task(
                         forward_inference_e2e(
@@ -322,8 +326,9 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
         "voc": payload.voc,
         **individual_risks,
     }
-    latest_gas_snapshot.update(gas_snapshot)
-    gas_latest["updated_at"] = datetime.now(timezone.utc).isoformat()
+    await store_gas_snapshot(
+        gas_snapshot, datetime.now(timezone.utc).isoformat()
+    )  # 이성현 수정 — Redis 이관
 
     logger.debug(
         f"[gas_service] action=processed device={payload.device_id} "
