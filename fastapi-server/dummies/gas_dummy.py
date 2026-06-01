@@ -1,14 +1,12 @@
-# dummies/gas_dummy.py — 가스 센서 더미 데이터 전송 스크립트 (v3, IF 학습 데이터용)
+# dummies/gas_dummy.py — 가스 센서 더미 데이터 전송 스크립트 (IF 학습 데이터용)
 #
 # 실제 에어위드 가스 센서 장비 대신 FastAPI 엔드포인트에 더미 데이터를 주기적으로 전송한다.
 # 기동 시 /api/sensors/info 에 장비 식별 정보를 1회 전송하고,
 # 이후 /api/sensors/gas 에 가스 측정값을 반복 전송한다.
 #
-# [v3 변경 — IF 학습 데이터 품질 확보 (전력 Phase 3 패턴 적용)]
-# v2: 시나리오 4종 진입은 했으나 (1) 시계열 자기상관 없음 (2) DB에 라벨 안 남음
-# v3: 상태머신(RAMP_UP/HOLD/RAMP_DOWN) + 가중치 random.choices + anomaly_type 페이로드 동봉
-#     → IF 가 "정상 → 사고 진입 → 회복" 의 연속적 변화를 학습 가능
-#     → DB 의 GasData.is_anomaly/anomaly_type 으로 학습/평가 데이터 추출 가능
+# 상태머신(RAMP_UP/HOLD/RAMP_DOWN) + 가중치 random.choices + anomaly_type 페이로드
+# 동봉으로 IF 가 "정상 → 사고 진입 → 회복" 의 연속적 변화를 학습할 수 있게 하고,
+# DB 의 GasData.is_anomaly/anomaly_type 으로 학습/평가 데이터를 추출 가능하게 한다.
 #
 # 가스 vs 전력 차이:
 # - 전력: 16채널 각자 독립 상태머신 (채널별 시나리오 다를 수 있음)
@@ -103,21 +101,17 @@ _RANGE_BY_LEVEL = {
     "danger": GAS_DANGER_RANGE,
 }
 
-# ---------------------------------------------------------------------------
-# 시나리오 정의 — 실제 사고 유형별 가스 위험도 패턴
+# 시나리오 정의 — 실제 사고 유형별 가스 위험도 패턴.
+# 각 시나리오는 {가스명: 레벨} 매핑 — 명시된 가스만 해당 레벨로, 나머지는 normal 로 샘플링.
 #
-# 각 시나리오는 {가스명: 레벨} 매핑이다.
-# 명시된 가스만 해당 레벨로 샘플링하고, 나머지는 모두 "normal"로 샘플링한다.
-#
-# co_leak     : 일산화탄소 누출 (연소 부족/환기 불량)
-#               co↑(danger) + co2↑(warning, 산소소비) + o2↓(warning, 산소결핍)
-# h2s_leak    : 황화수소 누출 (하수/화학약품)
-#               h2s↑(danger) + o2↓(warning) + so2↑(warning, h2s 산화부산물)
-# fire        : 화재/폭발 전조 (lel 상승 + 연소가스)
-#               lel↑(danger) + co↑(warning) + co2↑(danger) + o2↓(danger) + voc↑(warning)
+# co_leak        : 일산화탄소 누출 (연소 부족/환기 불량)
+#                  co↑(danger) + co2↑(warning, 산소소비) + o2↓(warning, 산소결핍)
+# h2s_leak       : 황화수소 누출 (하수/화학약품)
+#                  h2s↑(danger) + o2↓(warning) + so2↑(warning, h2s 산화부산물)
+# fire           : 화재/폭발 전조 (lel 상승 + 연소가스)
+#                  lel↑(danger) + co↑(warning) + co2↑(danger) + o2↓(danger) + voc↑(warning)
 # chemical_spill : 유해화학물 다중 누출
-#               no2↑(danger) + so2↑(danger) + nh3↑(danger) + o3↑(warning) + voc↑(danger)
-# ---------------------------------------------------------------------------
+#                  no2↑(danger) + so2↑(danger) + nh3↑(danger) + o3↑(warning) + voc↑(danger)
 SCENARIOS: dict[str, dict[str, str]] = {
     "co_leak": {
         "co": "danger",
@@ -154,13 +148,11 @@ SCENARIOS: dict[str, dict[str, str]] = {
 
 _SCENARIO_NAMES = list(SCENARIOS.keys())
 
-# ---------------------------------------------------------------------------
-# v3 — 상태머신 파라미터 (가스 4종 시나리오)
-# ramp_up : 정상→사고 점진 진입 틱 수
-# hold    : 사고 상태 유지 틱 수
+# 상태머신 파라미터 (시나리오별)
+# ramp_up   : 정상→사고 점진 진입 틱 수
+# hold      : 사고 상태 유지 틱 수
 # ramp_down : 사고→정상 점진 회복 틱 수
 # 1틱 = DUMMY_SEND_INTERVAL_SEC 초 (기본 1초)
-# ---------------------------------------------------------------------------
 SCENARIO_PATTERNS: dict[str, dict[str, int]] = {
     # co_leak 만 env override 지원 — 시연 시 격상 흐름 가시화용 (settings 기본 5/30/5).
     "co_leak": {
@@ -310,7 +302,7 @@ def generate_device_info() -> dict:
 def generate_gas_data() -> dict:
     """FastAPI /api/sensors/gas 에 전송할 가스 측정값 페이로드를 생성한다.
 
-    v3: 상태머신 기반 시계열 자기상관 + anomaly_type 페이로드 동봉.
+    상태머신 기반 시계열 자기상관 + anomaly_type 페이로드 동봉.
         - mixed: 가중치 random.choices 로 시나리오 진입 (정상/사고 자연스러운 전이)
         - 단일 시나리오 (co_leak/h2s_leak/fire/chemical_spill): 강제 진입
         - fixed (normal/warning/danger): 상태머신 미사용, 전 가스 동일 레벨
@@ -354,7 +346,7 @@ def run() -> None:
     """더미 전송 루프를 시작한다.
 
     장비 정보를 1회 전송한 뒤 DUMMY_SEND_INTERVAL_SEC 주기로 가스 데이터를 반복 전송한다.
-    v3: 상태머신 + 가중치 + anomaly_type 동봉 (IF 학습용).
+    상태머신 + 가중치 + anomaly_type 동봉 (IF 학습용).
     """
     logger.info(
         "=== 가스 더미 v3 시작 (주기: %ds | 트리거 확률: %d%% | 시나리오: %s | 가중치: %s) ===",

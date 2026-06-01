@@ -57,7 +57,7 @@ _COMMON_RESPONSES = {
     responses=_COMMON_RESPONSES,
 )
 async def recv_onoff(payload: PowerOnOffPayload, bg: BackgroundTasks):
-    # P1 — 센서 마지막 수신 시각 갱신
+    # 센서 마지막 수신 시각 갱신
     SENSOR_LAST_RECEIVED.labels("power", payload.device_id).set(time.time())
     snapshot = payload.to_snapshot()
     measured_at = now_utc_iso()
@@ -152,7 +152,7 @@ async def recv_watt(payload: PowerWattPayload, bg: BackgroundTasks):
     channel_values = payload.to_channel_values()
     measured_at = now_utc_iso()
     update_power_state("watt", channel_values, measured_at)
-    # 트랙 1 v2 — IF 추론 + push_alarm + DRF MLAnomalyResult forward (ch1·watt)
+    # IF 추론 + push_alarm + DRF MLAnomalyResult forward.
     # ingress_ts 전달 — AI 알람도 룰 기반과 동일하게 E2E latency 측정에 포함.
     await process_anomaly_inference(
         payload.device_id, channel_values, "watt", measured_at, ingress_ts=ingress_ts

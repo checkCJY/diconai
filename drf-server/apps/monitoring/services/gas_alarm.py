@@ -36,24 +36,15 @@ _AI_GUARDED_GASES = {"co", "h2s", "co2"}
 
 GAS_FIELDS = ["co", "h2s", "co2", "o2", "no2", "so2", "o3", "nh3", "voc"]
 
-# state_key (`alarm:state:{sensor_id}:{gas}`) 캐시 유지 시간.
-#
-# [Step 4 — 1시간 → 1분 단축, 5번 문서 §9 정렬]
-# 기존 3600s 는 한 번 danger 천이 후 1시간 동안 같은 (sensor, gas) 의 동일 상태
-# 천이를 모두 skip → 운영에서 "한 번 뜨고 그 뒤 1시간 안 뜸" 누락의 직접 원인.
-# settings.ALARM_REPOPUP_COOLDOWN_SEC (event_service, 기본 60s) 와 일치시켜 두 dedup
-# 계층 (try_transition / Event 쿨다운) 시간이 합치되도록 정렬. 산업 안전 도메인에서 위험
-# 지속 시 1분 cadence 는 escalation 트리거 역할도 함 (5번 문서 §9 의 "동일 작업자
-# +센서+구역+위험단계 1분 내 1회"). 추후 1~2주 운영 데이터 보고 재평가.
+# state_key (`alarm:state:{sensor_id}:{gas}`) 캐시 유지 시간 — 60s.
+# settings.ALARM_REPOPUP_COOLDOWN_SEC (event_service 기본 60s) 와 일치시켜
+# try_transition / Event 쿨다운 두 dedup 계층의 시간을 정렬한다. 위험 지속 시
+# 1분 cadence 가 escalation 트리거 역할도 한다 (동일 센서·구역·위험단계 1분 내 1회).
 _CACHE_TTL = 60
 
-# task_key (`alarm:task:{sensor_id}:{gas}`) — WARNING 타이머 진행 신호 키.
-#
-# [Step 5 — TTL 분리·축소]
-# 기존엔 state_key 와 동일한 _CACHE_TTL (1시간) 을 썼다. task 실행 끝나도 키가
-# 잔류해 다음 WARNING 의 cache.add(SETNX) 가 False → 새 타이머 시작 안 됨 → 누락.
-# 카운트다운보다 5초 큰 값으로 두면 race 마진 확보, 정상 종료 시는 tasks.py 가
-# 직접 cache.delete 한다.
+# task_key (`alarm:task:{sensor_id}:{gas}`) — WARNING 타이머 진행 신호 키 TTL.
+# 카운트다운보다 5초 크게 둬 race 마진 확보. 정상 종료 시는 tasks.py 가 직접
+# cache.delete 하고, retry/실패는 자연 만료로 정리된다.
 _TASK_KEY_TTL = WARNING_DURATION_SEC + 5
 
 
@@ -73,8 +64,7 @@ def _revoke(task_id: str) -> None:
 
 
 def trigger_gas_alarms(gas_data, ingress_ts: float | None = None) -> list[dict]:
-    """
-    가스 데이터 수신 시 위험도별 알람 라우팅.
+    """가스 데이터 수신 시 위험도별로 알람을 라우팅한다.
 
     GasDataCreateSerializer.create()에서 호출되며,
     반환값은 빈 리스트 — WS 알람은 Celery 태스크가 FastAPI에 직접 푸시한다.

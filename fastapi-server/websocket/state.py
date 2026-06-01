@@ -1,10 +1,8 @@
 # websocket/state.py — 프로세스 공유 상태
-# 모든 라우터가 이 모듈을 import해 직접 읽고 씀.
-# HTTP /internal/* 엔드포인트 없이 상태를 공유한다.
 #
-# Phase 1 C4 — `active_alarms`(메모리 list) + `alarm_signal`(asyncio.Event) 조합은
-# 재시작 휘발·set/clear race·5개 cap 문제로 Redis LIST(`diconai:ws:alarms`)로 이관됨.
-# 알람 큐 관련 코드는 websocket/services/alarm_queue.py 참조.
+# 모든 라우터가 이 모듈을 import해 직접 읽고 쓴다 (HTTP /internal/* 없이 상태 공유).
+# 알람 큐는 재시작 휘발·race 문제로 메모리에서 Redis LIST 로 이관됨 —
+# websocket/services/alarm_queue.py 참조.
 
 from fastapi import WebSocket
 

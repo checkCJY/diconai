@@ -12,7 +12,7 @@ STEP 4·STEP 5 권고 two-window 비교 방식 (의존성 0, ruptures 미사용)
   5) 상태 머신 STABLE→SHIFT 전이 시점에만 True 반환 (중복 발화 방지).
      SHIFT→STABLE 복귀 시 상태만 갱신 (BACK_TO_STABLE, 발화 X).
 
-[설계 결정 — 2026-05-19, power-zscore-changepoint-apply §1]
+[설계 결정]
 - CP 윈도우는 IF 윈도우 (power_service._power_windows maxlen=30) 와 분리.
   Why: IF 추론은 최근 30개 슬라이딩, CP 는 prev 30 vs curr 30 비교 (2W=60) 필요.
   How: _cp_windows: dict[(channel, data_type), deque(maxlen=60)] 모듈 단위.

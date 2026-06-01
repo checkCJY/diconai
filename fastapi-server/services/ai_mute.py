@@ -16,12 +16,11 @@ mark_ai_recent 는 발화 level '이하' 키만 set (warning 발화 → normal/w
 danger 키 부재). DRF 측 가드는 룰이 발화하려는 level 키만 보므로 격상 케이스
 (AI=warning, 룰=danger) 는 자연 통과.
 
-[T4 — 5-state inference machine]
+[5-state inference machine]
 mark_ai_state / get_ai_state — AI 추론 결과의 5 state (FIRED/INFERRED_NORMAL/
 INFERRED_FAILED/WARMING_UP/DISABLED) 를 (device_id, channel, data_type) 단위 키에
-마킹·조회. T4 sub-plan §4 명세. decide_alarm 매트릭스 분기 (D2 commit) 의 입력.
-기존 mark_ai_recent / ai_fired:* 키 공간과 별도 (ai_state:*) — D2 통합 전까지
-양쪽 키 공간 공존. DRF AI mute 가드는 옛 ai_fired:* 키만 read (호환 유지).
+마킹·조회. decide_alarm 매트릭스 분기의 입력. 기존 mark_ai_recent / ai_fired:* 키
+공간과 별도 (ai_state:*) — DRF AI mute 가드는 옛 ai_fired:* 키만 read (호환 유지).
 """
 
 import logging
@@ -43,9 +42,9 @@ _LEVELS_AT_OR_BELOW: dict[str, list[str]] = {
 
 
 class AIInferenceState(str, Enum):
-    """T4 — AI 추론 결과의 5 state.
+    """AI 추론 결과의 5 state.
 
-    decide_alarm 매트릭스 (plan §5) 의 분기 키. 각 state 가 (정적 fired 여부) 와
+    decide_alarm 매트릭스의 분기 키. 각 state 가 (정적 fired 여부) 와
     조합되어 source 5종 (ai / static_cover_miss / static_cover_inference_fail /
     static_cover_warmup / static_no_ai_available) 중 하나를 결정.
 
@@ -59,7 +58,7 @@ class AIInferenceState(str, Enum):
     DISABLED = "disabled"  # _INFERENCE_ENABLED_CHANNELS 외 채널 — 정적이 주 신호
 
 
-# T4 state machine 키 — (device_id, channel, data_type) scoped. _power_windows 와
+# state machine 키 — (device_id, channel, data_type) scoped. _power_windows 와
 # 동일 차원 — 미래 current/voltage 채널 활성화 시 키 차원 변경 없이 확장 가능.
 _AI_STATE_KEY_TEMPLATE = "ai_state:{device_id}:{channel}:{data_type}"
 
@@ -110,9 +109,9 @@ async def mark_ai_state(
     state: AIInferenceState,
     ttl_sec: int = AI_MUTE_TTL_SEC,
 ) -> None:
-    """T4 — AI 추론 5 state 를 Redis 에 마킹.
+    """AI 추론 5 state 를 Redis 에 마킹.
 
-    decide_alarm 매트릭스 (plan §5) 의 입력. (device_id, channel, data_type)
+    decide_alarm 매트릭스의 입력. (device_id, channel, data_type)
     스코프 키 1개에 state value 를 SET (mark_ai_recent 의 level 별 다중 키와 다름
     — state machine 은 단일 차원).
 
@@ -154,9 +153,9 @@ async def get_ai_state(
     channel: int | None,
     data_type: str | None,
 ) -> AIInferenceState | None:
-    """T4 — Redis 에 마킹된 AI 추론 state 를 조회. 없거나 만료면 None.
+    """Redis 에 마킹된 AI 추론 state 를 조회. 없거나 만료면 None.
 
-    decide_alarm 매트릭스 (plan §5) 가 본 함수 결과 + 정적 평가 결과로 source 5종
+    decide_alarm 매트릭스가 본 함수 결과 + 정적 평가 결과로 source 5종
     결정. None 반환 시 decide_alarm 은 "AI 상태 미지" → fail-safe 로 정적 결과 따름
     (DISABLED 와 동등 취급 — 안전한 보수적 분기).
 
@@ -206,9 +205,8 @@ async def get_ai_state(
         return None
 
 
-# ── 가스 도메인 ─────────────────────────────────────────────────────────────
-# 가스는 channel 개념이 없고 gas_type (str) 으로 식별 — 별도 함수·키 prefix 로
-# power 키 공간과 분리. 추론은 다변량 (co+h2s+co2) 이라 mute 마킹은 3가스 각각
+# 가스 도메인 — channel 개념이 없고 gas_type (str) 으로 식별. 별도 함수·키 prefix
+# 로 power 키 공간과 분리. 추론은 다변량 (co+h2s+co2) 이라 mute 마킹은 3가스 각각
 # 호출 (option B — 추론 가스 3종만 룰 mute).
 
 _GAS_AI_FIRED_KEY_TEMPLATE = "ai_fired_gas:{sensor_id}:{gas_type}:{rule_level}"

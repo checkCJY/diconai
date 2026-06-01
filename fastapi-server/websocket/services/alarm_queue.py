@@ -1,18 +1,14 @@
 # websocket/services/alarm_queue.py — Redis 기반 알람 큐
 #
-# Phase 1 C4 — 기존 메모리 list(`active_alarms`) + asyncio.Event(`alarm_signal`) 조합을
-# 단일 Redis LIST + BRPOP으로 대체한다.
-#
-# 효과:
+# 알람 큐를 단일 Redis LIST + BRPOP으로 운용한다.
 #   - FastAPI 재시작 시에도 큐가 휘발되지 않음
-#   - LPUSH/BRPOP 자체가 원자 명령이라 신호 race(set/clear 손실) 해소
-#   - 5개 슬라이스 cap 제거 — 큐 길이는 LTRIM으로만 제한
+#   - LPUSH/BRPOP 자체가 원자 명령이라 신호 race 해소
+#   - 큐 길이는 LTRIM 으로 제한
 #
 # 키 네임스페이스 `diconai:ws:alarms`는 Django RedisCache와 분리(`:1:` prefix 없음).
 #
-# [Step 1 — fingerprint dedup]
-# Celery `_push_to_ws` max_retries=3 retry 가 fastapi `/internal/alarms/push/` 로 같은
-# payload 를 최대 3 번 보내 Redis 큐에 중복 적재되는 운영 버그를 choke point 에서 차단.
+# fingerprint dedup: Celery `_push_to_ws` 의 retry 가 `/internal/alarms/push/` 로
+# 같은 payload 를 여러 번 보내 큐에 중복 적재되는 것을 choke point 에서 차단한다.
 # 룰 알람은 event_id, AI 알람은 anomaly_meta(device/channel) 가 안정 idempotency key.
 
 import json
@@ -29,14 +25,9 @@ MAX_QUEUE_LEN = 10_000  # 폭주 시 가장 오래된 알람부터 drop (LTRIM)
 
 # fingerprint 키 prefix — `redis-cli KEYS "alarm:push:dedup:*"` 로 모니터링 가능.
 DEDUP_KEY_PREFIX = "alarm:push:dedup:"
-# 기본 dedup TTL — Celery retry 간격 5s × max_retries 3 = 15s 보다 충분히 길고,
-# RENOTIFY_COOLDOWN_MINUTES=1 (event_service) 보다 명확히 짧아야 1분 후 같은
-# fingerprint 의 정상 재발화를 막지 않는다.
-#
-# [hard requirement 아님, 가독성·예측가능성 마진]
-# race 발생해도 결과는 "한 cycle 누락" 이지 "잘못된 알림 발사" 아님 — 최대 1분
-# 지연 수준. 그러나 cooldown(60s) 과 동일 TTL 두면 만료 타이밍 race 가독성 저하
-# 라 30s 로 마진. 운영 데이터 후 재평가.
+# 기본 dedup TTL — Celery retry 총 시간(5s × 3 = 15s)보다 길고, 재알림 cooldown
+# (event_service, 60s)보다 짧아야 1분 후 같은 fingerprint 의 정상 재발화를 막지
+# 않는다. cooldown 과 동일 TTL 이면 만료 타이밍 race 가 생기므로 30s 로 마진.
 PUSH_DEDUP_TTL_SEC = 30
 
 logger = logging.getLogger(__name__)
@@ -66,9 +57,9 @@ def _payload_fingerprint(payload: dict) -> str | None:
 
     event_id = payload.get("event_id")
     if event_id is not None:
-        # 2026-05-15 알람 재설계: RESOLVED 신호는 원래 알람과 같은 (event_id, risk_level)
-        # 조합이라 기본 fingerprint 로는 dedup 차단됨 (운영 버그). 별도 suffix 로 분리해
-        # RESOLVED 신호 자체의 retry 중복은 막되 원래 알람과는 독립 trackin.
+        # RESOLVED 신호는 원래 알람과 같은 (event_id, risk_level) 라 기본
+        # fingerprint 로는 dedup 에 걸린다. 별도 suffix 로 분리해 RESOLVED 신호의
+        # retry 중복만 막고 원래 알람과는 독립 추적.
         if payload.get("event_resolved_at"):
             return f"event:{event_id}:resolved"
         return f"event:{event_id}:{risk_level}"
@@ -92,12 +83,11 @@ def _payload_fingerprint(payload: dict) -> str | None:
             return None
         return f"clear:{alarm_type}:{source_label}"
 
-    # T4 D2 patch — power_overload + T4 source 분기 (static_cover_* / static_no_ai_available).
-    # process_anomaly_inference 가 모든 채널 매 sample 평가 → 같은 (source, channel)
-    # 조합이 매초 push 됐던 폭주 차단. event_id 분기보다 후행이라 룰 알람 (event_id
-    # 있음) 영향 없음. fingerprint key 에 source_label 포함 — 같은 채널 의 같은 risk
-    # 가 30s 안 1회만 통과. AI source (decision.source=='ai') 는 위 anomaly_meta
-    # 분기 (ai:*) 우선이라 본 분기 미진입.
+    # power_overload + source 분기 (static_cover_* / static_no_ai_available).
+    # process_anomaly_inference 가 모든 채널을 매 sample 평가 → 같은 (source,
+    # channel) 가 매초 push 되던 폭주를 차단. event_id 분기보다 후행이라 룰 알람
+    # 영향 없음. source_label 포함 fingerprint 로 같은 채널·같은 risk 가 30s 안 1회만
+    # 통과. AI source 는 위 anomaly_meta 분기(ai:*) 우선이라 본 분기 미진입.
     if alarm_type == "power_overload":
         source = payload.get("source")
         source_label = payload.get("source_label", "")
@@ -135,7 +125,7 @@ async def push_alarm(payload: dict, *, dedup_ttl: int = PUSH_DEDUP_TTL_SEC) -> N
             push_alarm_dedup_hits.inc()
             logger.info("[push_alarm] dedup hit fp=%s", fp)
             return
-    # P1 — LPUSH 실행시간 측정. E2E latency 급등 시 Redis 병목 여부 판단 근거.
+    # LPUSH 실행시간 측정 — E2E latency 급등 시 Redis 병목 여부 판단 근거.
     _t = time.perf_counter()
     await r.lpush(ALARM_QUEUE_KEY, json.dumps(payload, ensure_ascii=False))
     REDIS_COMMAND_DURATION.labels("lpush").observe(time.perf_counter() - _t)

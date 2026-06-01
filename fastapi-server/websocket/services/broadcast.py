@@ -24,14 +24,15 @@ from websocket.state import (
 _prev_total_kw: float | None = None
 
 # 가스 페이로드 키 — stale 시 null 로 채워 프론트가 key 부재로 깨지지 않게 한다.
-# gas/services/gas_service.py 의 gas_snapshot 빌더와 키 목록이 1:1 로 일치해야 한다.
-# [M-4] 필드 추가·제거 시 gas/constants.py 한 곳만 수정하면 된다.
+# gas/services/gas_service.py 의 gas_snapshot 빌더와 키 목록이 1:1 로 일치해야 하며,
+# 필드 추가·제거 시 gas/constants.py 한 곳만 수정한다.
 from gas.constants import GAS_FIELDS as _GAS_VALUE_KEYS  # noqa: E402
+
 _GAS_RISK_KEYS = tuple(f"{g}_risk" for g in _GAS_VALUE_KEYS)
 _GAS_NULL_PAYLOAD = {k: None for k in _GAS_VALUE_KEYS + _GAS_RISK_KEYS}
 
 
-# ── 1. stale 판정 ───────────────────────────────────────────
+# 1. stale 판정
 def is_stale(updated_at_iso: str | None, threshold_sec: float | None = None) -> bool:
     """ISO8601 문자열 기준으로 stale 여부를 반환한다.
 
@@ -50,14 +51,14 @@ def is_stale(updated_at_iso: str | None, threshold_sec: float | None = None) -> 
     return age > threshold
 
 
-# ── 2. AI 예측 필드 ────────────────────────────────────────
+# 2. AI 예측 필드
 def build_ai_prediction_fields(equipment: list[dict]) -> dict:
     """AI 예측 영역. 실제 모델 연동 전까지 수치는 None 송신.
 
     프론트는 None 케이스를 "예측 준비 중" 또는 "-"로 표시한다.
     ai_power_equipment 라벨만 equipment 첫 채널 기준으로 채워 시각 일관성을
     유지하고, 데이터 미수신 시(equipment 빈 리스트)에는 None.
-    전력 AI Phase 2 (un-downgrade) 적용 시 세 수치 필드를 실제 예측값으로 교체.
+    전력 AI 예측 연동 시 세 수치 필드를 실제 예측값으로 교체한다.
     """
     return {
         "ai_power_equipment": equipment[0]["name"] if equipment else None,
@@ -67,7 +68,7 @@ def build_ai_prediction_fields(equipment: list[dict]) -> dict:
     }
 
 
-# ── 3. 통합 페이로드 조립 ─────────────────────────────────────
+# 3. 통합 페이로드 조립
 def build_broadcast_payload(include_alarms: bool = True) -> dict:
     """/ws/sensors/ 틱마다 브라우저로 전송할 통합 페이로드를 반환한다.
 
