@@ -38,6 +38,10 @@ from core.metrics import (
     AI_INFERENCE_DURATION,
     AI_INFERENCE_FAILED_TOTAL,
     SENSOR_LAST_RECEIVED,
+    GAS_AI_INFERENCE_TOTAL,
+    GAS_CP_DETECTED_TOTAL,
+    GAS_AI_RATE_LIMITED_TOTAL,
+    GAS_AI_ALARM_FIRED_TOTAL,
 )
 from websocket.snap_store import store_gas_snapshot  # 이성현 수정 — Redis 이관
 from collections import (
@@ -135,6 +139,7 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
         if not cp_detected:
             logger.debug("[체인지 포인트] 패턴 변화 없음 — 추론 스킵")
         else:
+            GAS_CP_DETECTED_TOTAL.inc()
             logger.debug("[체인지 포인트] 패턴 변화 감지 — IF 추론 진행")
             try:
                 # 이성현 — train_anomaly_model 저장 포맷과 동일한 식별자 (gas:sensor_{pk}:{gas_label})
@@ -162,16 +167,27 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
                 AI_INFERENCE_DURATION.labels("gas_if").observe(
                     time.time() - _infer_start
                 )
+                GAS_AI_INFERENCE_TOTAL.inc()
 
-                if pred == -1:  # IF 규약: -1=이상, 1=정상
-                    # 이성현 — 같은 센서 60초당 1회로 발화 제한 (should_fire 게이트)
-                    sensor_identifier = f"gas:{payload.device_id}:co_h2s_co2"
-                    now_ts = time.time()
-                    last_ts = _gas_last_fired_at.get(sensor_identifier, 0.0)
-                    should_fire = (now_ts - last_ts) >= GAS_RATE_LIMIT_SEC
-                    if should_fire:
-                        _gas_last_fired_at[sensor_identifier] = now_ts
-                        logger.warning(
+                if (
+                    pred == -1
+                ):  # AI가 이상 패턴으로 판단했을 때만 실행 (-1=이상, 1=정상)
+                    # 이성현 수정 — should_fire=True 하드코딩 제거, 60초 rate limit 적용
+                    sensor_identifier = f"gas:{payload.device_id}:co_h2s_co2"  # 이 센서만의 고유 이름 (장치ID + 가스 종류 조합)
+                    now_ts = time.time()  # 지금 이 순간의 시각 (초 단위 숫자)
+                    last_ts = _gas_last_fired_at.get(
+                        sensor_identifier, 0.0
+                    )  # 이 센서가 마지막으로 알람을 쐈던 시각 (처음이면 0.0)
+                    should_fire = (
+                        (now_ts - last_ts) >= GAS_RATE_LIMIT_SEC
+                    )  # 마지막 알람 후 60초 이상 지났으면 True, 아니면 False
+                    if not should_fire:
+                        GAS_AI_RATE_LIMITED_TOTAL.inc()
+                    if should_fire:  # 60초가 지났을 때만 실행
+                        _gas_last_fired_at[sensor_identifier] = (
+                            now_ts  # 방금 쏜 시각 기록 (다음 번 비교에 사용)
+                        )
+                        logger.warning(  # 서버 로그에 이상 감지 출력 (60초 지났을 때만)
                             f"[AI 이상탐지] co+h2s+co2 이상 감지 | device={payload.device_id} | co={payload.co} h2s={payload.h2s} co2={payload.co2}"
                         )
                         # DRF gas_alarm 가드용 mute 마킹 — 추론 가스 3종에 한해 룰 60s 억제.
@@ -232,6 +248,7 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
                     )
                     # 이성현 추가 — 브라우저 실시간 알람 push (should_fire=True일 때만)
                     if should_fire:
+                        GAS_AI_ALARM_FIRED_TOTAL.labels("co", "danger").inc()
                         _p = asyncio.create_task(
                             push_alarm(
                                 {
