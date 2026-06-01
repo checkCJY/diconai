@@ -34,6 +34,19 @@ ALARM_QUEUE_LENGTH = Gauge(
     multiprocess_mode="liveall",
 )
 
+# ── WS 알람 스트림 lag 메트릭 (LIST→Stream 전환) ──────────────────────────────
+# 스트림 말단(가장 최근 entry)과 이 프로세스의 커서(alarm_flush_loop last_id)의
+# 시간차(초). entry ID 의 ms 부분 차이로 계산한다 (XINFO 불필요).
+# 평상시 ≈0. 이 replica 가 알람을 소화 못 하면 증가 → alarm_flush_loop 지연 신호.
+#
+# multiprocess_mode="liveall" + Prometheus 가 pod 별 스크랩 → 멀티레플리카 시
+# replica 별 lag 이 자동 분리되어 "어느 replica 가 뒤처지나"가 바로 보인다.
+ALARM_STREAM_LAG = Gauge(
+    "fastapi_alarm_stream_lag_seconds",
+    "Time gap (s) between stream tail and this process cursor in the WS alarm stream",
+    multiprocess_mode="liveall",
+)
+
 # ── E2E 알람 latency 메트릭 (C7 — 운영 KPI) ──────────────────────────────────
 # IoT 데이터가 FastAPI에 도착한 순간부터 브라우저 WS로 알람이 전송되는 순간까지.
 # 전체 경로: FastAPI 수신 → DRF 저장 → Celery 알람 태스크 → FastAPI WS 전송.
