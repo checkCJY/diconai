@@ -10,7 +10,7 @@
   "panels": [
     {
       "id": 1,
-      "title": "AI 추론 소요시간 p95 (gas_if / power_if, 5m)",
+      "title": "AI 추론 소요시간 p95 (power_if, 5m)",
       "description": "Isolation Forest 추론 실행 시간. E2E latency 급등 시 Celery·DB·Redis가 정상이면 여기를 확인.",
       "type": "timeseries",
       "gridPos": {
@@ -54,7 +54,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, rate(ai_inference_duration_seconds_bucket{job=\"fastapi\"}[5m])) by (model_type)",
+          "expr": "histogram_quantile(0.95, sum by (model_type, le) (rate(ai_inference_duration_seconds_bucket{job=\"fastapi\",model_type=\"power_if\"}[5m])))",
           "legendFormat": "{{model_type}} p95",
           "refId": "A"
         }
@@ -369,6 +369,76 @@
           "expr": "sum by (algorithm_source) (rate(power_ai_alarm_fired_total{job=\"fastapi\"}[5m]))",
           "legendFormat": "{{algorithm_source}}",
           "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "전력 AI — AI vs 임계치 발화 비율 비교 (5m)",
+      "description": "AI 발화(combined ∈ warning/danger)와 임계치 단독 발화(combined=normal이지만 threshold 초과) 비율 비교. AI 라인이 높을수록 predictive maintenance 효과가 크다는 증거. 시나리오 B 시연 시 AI 라인이 먼저 올라온 뒤 threshold가 뒤따르는 패턴을 확인.",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(power_ai_combined_total{job=\"fastapi\",combined=~\"warning|danger\"}[5m]))",
+          "legendFormat": "AI 발화 (warning+danger)",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(power_ai_combined_total{job=\"fastapi\",combined=\"predict_warn\"}[5m]))",
+          "legendFormat": "AI 선제 감지 (predict_warn)",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (risk_level) (rate(alarm_fired_total{job=\"drf\",alarm_type=\"power_overload\"}[5m]))",
+          "legendFormat": "임계치 발화 / {{risk_level}}",
+          "refId": "C"
         }
       ]
     },
