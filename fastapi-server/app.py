@@ -26,6 +26,10 @@ from ai.router import router as ai_router
 from gas.routers.gas_router import router as gas_router
 from internal.routers.alarm_router import router as internal_alarm_router
 from internal.routers.scenario_router import router as internal_scenario_router
+from internal.routers.scenario_router import (
+    ALLOWED_MODES,
+)  # 이성현 추가 — 시나리오 초기화용
+from websocket.snap_store import store_scenario_mode  # 이성현 추가 — 시나리오 초기화용
 from positioning.routers.position_router import router as positioning_router
 from power.routers.power_router import router as power_router
 from power.services.channel_meta_cache import channel_meta_refresh_loop
@@ -51,9 +55,16 @@ async def lifespan(app: FastAPI):
     # threshold_sync_loop 만 띄우면 create_task→yield 사이 첫 요청이 빈 캐시로
     # 처리될 수 있다. 실패해도 loop 가 backoff 재시도하므로 startup 을 막지 않는다.
     await refresh_threshold_meta()
-    task1 = asyncio.create_task(
-        broadcast_loop()
-    )  # 센서 통합 페이로드 주기 브로드캐스트
+    # 이성현 추가 — 서버 시작 시 시나리오 모드를 환경변수 값으로 Redis 초기화
+    # scenario_router.py의 모듈 레벨 초기화 코드를 여기로 이동 (Redis 이관으로 async 필요)
+    # Redis 실패해도 서버 기동 막지 않음 — load_scenario_mode의 default "mixed" 로 폴백
+    try:
+        init_mode = settings.DUMMY_SCENARIO_MODE
+        if init_mode in ALLOWED_MODES:
+            await store_scenario_mode(init_mode)
+    except Exception:
+        logger.warning("[app] scenario_mode Redis 초기화 실패 — default 'mixed' 유지")
+    task1 = asyncio.create_task(broadcast_loop())
     task2 = asyncio.create_task(alarm_flush_loop())  # 신규 알람 즉시 플러시
     task3 = asyncio.create_task(
         channel_meta_refresh_loop()
