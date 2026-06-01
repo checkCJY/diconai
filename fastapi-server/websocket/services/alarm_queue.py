@@ -1,12 +1,16 @@
 # websocket/services/alarm_queue.py — Redis 기반 알람 큐
 #
 # Phase 1 C4 — 기존 메모리 list(`active_alarms`) + asyncio.Event(`alarm_signal`) 조합을
-# 단일 Redis LIST + BRPOP으로 대체한다.
+# Redis 큐로 대체했다. 이후 fan-out 멀티레플리카 대비로 LIST+BRPOP → Stream+XREAD 전환.
+#
+# 현 구조: XADD(MAXLEN ~) 로 적재하고, replica 별 독립 XREAD 가 자기 커서(last_id)로
+# 스트림 전체를 읽는다. BRPOP(경쟁 소비 — 한 알람을 한 소비자만 pop)과 달리 모든 replica
+# 가 모든 알람을 받는 fan-out. Consumer Group 미사용 (그룹은 경쟁 분배라 fan-out 불가).
 #
 # 효과:
 #   - FastAPI 재시작 시에도 큐가 휘발되지 않음
-#   - LPUSH/BRPOP 자체가 원자 명령이라 신호 race(set/clear 손실) 해소
-#   - 5개 슬라이스 cap 제거 — 큐 길이는 LTRIM으로만 제한
+#   - XADD 자체가 원자 명령이라 신호 race(set/clear 손실) 해소
+#   - 큐 길이 cap 은 XADD 의 MAXLEN ~ 로 제한 (별도 트리밍 명령 불필요)
 #
 # 키 네임스페이스 `diconai:ws:alarms`는 Django RedisCache와 분리(`:1:` prefix 없음).
 #
@@ -25,7 +29,7 @@ from core.metrics import ALARM_QUEUE_LENGTH, REDIS_COMMAND_DURATION
 from core.redis_client import get_redis
 
 ALARM_QUEUE_KEY = "diconai:ws:alarms"
-MAX_QUEUE_LEN = 10_000  # 폭주 시 가장 오래된 알람부터 drop (LTRIM)
+MAX_QUEUE_LEN = 10_000  # 폭주 시 가장 오래된 알람부터 drop (XADD MAXLEN ~)
 
 # fingerprint 키 prefix — `redis-cli KEYS "alarm:push:dedup:*"` 로 모니터링 가능.
 DEDUP_KEY_PREFIX = "alarm:push:dedup:"
@@ -109,15 +113,15 @@ def _payload_fingerprint(payload: dict) -> str | None:
 
 
 async def push_alarm(payload: dict, *, dedup_ttl: int = PUSH_DEDUP_TTL_SEC) -> None:
-    """알람 페이로드 1건을 큐 좌측에 push — fingerprint dedup 으로 중복 차단.
+    """알람 페이로드 1건을 스트림에 XADD — fingerprint dedup 으로 중복 차단.
 
     Celery → DRF `/internal/alarms/push/` → 본 함수 경로로 들어온다. Celery
     `_push_to_ws` 의 retry 가 같은 payload 를 여러 번 보내는 운영 버그를 본 함수에서
-    SET NX EX idempotency 키로 막아, 첫 도착자만 LPUSH 하고 후속 retry 는 silently
+    SET NX EX idempotency 키로 막아, 첫 도착자만 XADD 하고 후속 retry 는 silently
     drop 한다. Redis 장애 시 예외는 호출자 (HTTPException 503 등) 에서 처리.
 
-    [SET NX EX 가 LPUSH 보다 먼저 실행되는 이유]
-    첫 set 성공 → LPUSH 성공이 일반 경로. LPUSH 만 부분 실패 (Redis 일시 hang) 시
+    [SET NX EX 가 XADD 보다 먼저 실행되는 이유]
+    첫 set 성공 → XADD 성공이 일반 경로. XADD 만 부분 실패 (Redis 일시 hang) 시
     set 잔류로 retry 가 dedup 되어 알람 누락될 수 있으나, 같은 Redis 인스턴스의 두
     명령이 부분 실패하는 케이스는 매우 드물고 인프라 알람으로 잡혀야 한다. retry
     중복 (자주 발생) 차단 효과가 누락 위험 (희소) 보다 명백히 크다.
@@ -135,44 +139,117 @@ async def push_alarm(payload: dict, *, dedup_ttl: int = PUSH_DEDUP_TTL_SEC) -> N
             push_alarm_dedup_hits.inc()
             logger.info("[push_alarm] dedup hit fp=%s", fp)
             return
-    # P1 — LPUSH 실행시간 측정. E2E latency 급등 시 Redis 병목 여부 판단 근거.
+    # P1 — XADD 실행시간 측정. E2E latency 급등 시 Redis 병목 여부 판단 근거.
+    # MAXLEN ~ 10000 으로 트리밍을 XADD 에 포함 (approximate=True → 별도 LTRIM 불필요).
+    # payload 는 단일 필드 "data" 에 JSON 직렬화해 저장 (read 시 json.loads 복원).
     _t = time.perf_counter()
-    await r.lpush(ALARM_QUEUE_KEY, json.dumps(payload, ensure_ascii=False))
-    REDIS_COMMAND_DURATION.labels("lpush").observe(time.perf_counter() - _t)
-    await r.ltrim(ALARM_QUEUE_KEY, 0, MAX_QUEUE_LEN - 1)
+    await r.xadd(
+        ALARM_QUEUE_KEY,
+        {"data": json.dumps(payload, ensure_ascii=False)},
+        maxlen=MAX_QUEUE_LEN,
+        approximate=True,
+    )
+    REDIS_COMMAND_DURATION.labels("xadd").observe(time.perf_counter() - _t)
     ALARM_QUEUE_LENGTH.set(await queue_len())
 
 
-async def pop_alarm_blocking(timeout: int = 0) -> dict | None:
-    """큐 우측에서 알람 1건을 blocking pop한다 (FIFO).
+async def read_alarms_blocking(
+    last_id: str, timeout: int = 0
+) -> tuple[str, list[dict]]:
+    """커서(last_id) 이후 쌓인 알람을 XREAD BLOCK 으로 한 번에 읽는다 (FIFO).
 
-    timeout=0이면 무한 대기. ConnectionError 등 예외 시 None 반환해
-    호출 루프가 다음 iteration에서 재시도하도록 한다 (slow-retry 패턴).
+    BRPOP(경쟁 소비, 1건씩)과 달리 XREAD 는 커서 이후 누적된 N 건을 배치로 준다.
+    커서는 호출자가 보유한다 — 각 replica 가 자기 last_id 로 스트림 전체를 읽는
+    fan-out 구조의 핵심. timeout=0 이면 무한 대기.
+
+    Args:
+        last_id: 직전까지 읽은 마지막 entry ID. 부팅 직후 신규만 받으려면 "$".
+        timeout: XREAD BLOCK 초. 0 이면 무한 대기 (BRPOP timeout=0 과 동일 시맨틱).
+
+    Returns:
+        (new_last_id, payloads) 튜플.
+        - new_last_id: 배치 마지막 entry ID. 빈 결과/예외면 입력 last_id 그대로
+          (커서 전진 금지 — 다음 iteration 이 같은 지점부터 재시도).
+        - payloads: 배치에 담긴 알람 dict 리스트 (순서 보존). 빈 결과면 [].
+
+    예외(ConnectionError 등) 시 (last_id, []) 반환해 호출 루프가 다음 iteration
+    에서 재시도하도록 한다 (slow-retry 패턴).
     """
     r = get_redis()
     try:
-        # timeout=0 은 무한 대기라 측정값에 알람 도착 대기 시간이 전부 포함된다.
-        # histogram 버킷(최대 0.5s)을 대부분 초과해 +Inf에 쌓이므로 측정하지 않는다.
-        # Redis 병목 진단은 LPUSH 측정값(push_alarm 함수)으로 충분하다.
-        result = await r.brpop(ALARM_QUEUE_KEY, timeout=timeout)
+        # BLOCK 은 ms 단위. timeout=0 → BLOCK 0 → 무한 대기 (BRPOP 과 동일).
+        # XREAD 대기시간은 측정하지 않는다 — BLOCK 대기가 섞여 무의미 (BRPOP 과
+        # 동일 이유, REDIS_COMMAND_DURATION 은 XADD 만 측정).
+        result = await r.xread({ALARM_QUEUE_KEY: last_id}, block=timeout * 1000)
     except Exception as exc:
-        logger.warning(f"[alarm_queue] action=brpop_error error={exc!r}")
-        return None
-    if result is None:
-        return None
-    _, raw = result
+        logger.warning(f"[alarm_queue] action=xread_error error={exc!r}")
+        return last_id, []
+    if not result:
+        # BLOCK timeout (신규 entry 없음) — 커서 유지, 다음 iteration 계속.
+        return last_id, []
+    # result: [(stream_key, [(entry_id, {"data": <json>}), ...])]. 키 1개라 [0].
+    _, entries = result[0]
+    new_last_id = last_id
+    payloads: list[dict] = []
+    for entry_id, fields in entries:
+        new_last_id = entry_id  # 배치 마지막 entry ID 로 커서 전진
+        raw = fields.get("data")
+        try:
+            payloads.append(json.loads(raw))
+        except (json.JSONDecodeError, TypeError) as exc:
+            logger.warning(
+                f"[alarm_queue] action=decode_error id={entry_id} "
+                f"raw={raw!r} error={exc!r}"
+            )
     ALARM_QUEUE_LENGTH.set(await queue_len())
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError as exc:
-        logger.warning(f"[alarm_queue] action=decode_error raw={raw!r} error={exc!r}")
-        return None
+    return new_last_id, payloads
 
 
 async def queue_len() -> int:
-    """관측·모니터링용 — 현재 큐에 적체된 알람 수. 메트릭에 사용."""
+    """관측·모니터링용 — 현재 스트림에 적체된 알람 수 (XLEN). 메트릭에 사용."""
     r = get_redis()
     try:
-        return int(await r.llen(ALARM_QUEUE_KEY))
+        return int(await r.xlen(ALARM_QUEUE_KEY))
     except Exception:
         return -1
+
+
+async def reset_stream_if_wrongtype() -> None:
+    """잔존 LIST 키만 1회 DEL 해 WRONGTYPE 충돌을 방지한다 (lifespan startup 용).
+
+    키 `diconai:ws:alarms` 를 LIST→Stream 으로 재사용하므로, LIST→Stream 첫 배포 시
+    옛 LIST 가 남아 있으면 XADD 가 WRONGTYPE 으로 실패한다. TYPE 이 `list` 일 때만
+    DEL 하고, `stream`/`none` 이면 그대로 둔다 — 무조건 DEL 하면 매 재시작마다
+    스트림이 wipe 된다. 예외는 삼켜 startup 을 막지 않는다 (loop 가 곧 재적재).
+    """
+    r = get_redis()
+    try:
+        key_type = await r.type(ALARM_QUEUE_KEY)
+        if key_type == "list":
+            await r.delete(ALARM_QUEUE_KEY)
+            logger.info(
+                "[alarm_queue] action=reset_legacy_list key=%s", ALARM_QUEUE_KEY
+            )
+    except Exception as exc:
+        logger.warning(f"[alarm_queue] action=reset_stream_error error={exc!r}")
+
+
+async def stream_tail_id() -> str | None:
+    """스트림 말단(가장 최근) entry ID 를 반환한다 (stream lag 계산용).
+
+    XREVRANGE key + - COUNT 1 로 마지막 1건의 ID 만 읽는다. 스트림이 비었거나
+    예외면 None (호출자가 lag=0 처리).
+    """
+    r = get_redis()
+    try:
+        entries = await r.xrevrange(ALARM_QUEUE_KEY, count=1)
+    except Exception:
+        return None
+    if not entries:
+        return None
+    return entries[0][0]  # (entry_id, fields) 의 entry_id
+
+
+def _id_ms(stream_id: str) -> int:
+    """스트림 entry ID `"<ms>-<seq>"` 의 ms 부분을 파싱한다 (lag 시간차 계산용)."""
+    return int(stream_id.split("-")[0])
