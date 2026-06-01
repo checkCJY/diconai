@@ -6,8 +6,7 @@ from apps.core.constants import RiskLevel
 
 
 class GasData(models.Model):
-    """
-    유해가스 센서 측정값 — wide table(고정 컬럼형) 구조
+    """유해가스 센서 측정값 — wide table(고정 컬럼형) 구조.
 
     [설계 원칙]
     - 가스 9종을 개별 FloatField 컬럼으로 저장합니다.
@@ -35,10 +34,8 @@ class GasData(models.Model):
         related_name="gas_data",
     )
 
-    # =====================================================================
     # 가스별 측정값 — 9종 개별 컬럼 (단위: ppm, o2는 %)
     # null=True: 해당 가스 미측정 또는 결측 (GasDataError에 사유 기록)
-    # =====================================================================
     co = models.FloatField(null=True, verbose_name="일산화탄소 (ppm)")
     h2s = models.FloatField(null=True, verbose_name="황화수소 (ppm)")
     co2 = models.FloatField(null=True, verbose_name="이산화탄소 (ppm)")
@@ -49,10 +46,8 @@ class GasData(models.Model):
     nh3 = models.FloatField(null=True, verbose_name="암모니아 (ppm)")
     voc = models.FloatField(null=True, verbose_name="휘발성유기화합물 (ppm)")
 
-    # =====================================================================
     # 가스별 위험도 — 9종 개별 컬럼
     # null=True: 해당 가스 결측 시 위험도 판정 불가
-    # =====================================================================
     co_risk = models.CharField(
         max_length=10, choices=RiskLevel.choices, null=True, verbose_name="CO 위험도"
     )
@@ -97,11 +92,9 @@ class GasData(models.Model):
         verbose_name="원본 수신 페이로드",
     )
 
-    # =====================================================================
     # IF 학습 라벨 — 더미 시뮬레이터에서만 채워서 전송. 운영 센서는 미전송.
     # is_anomaly=False AND anomaly_type=None  ← IF 학습용 정상 데이터 추출 필터
     # is_anomaly=True  AND anomaly_type=...   ← 평가용 (시나리오별 detection rate 측정)
-    # =====================================================================
     is_anomaly = models.BooleanField(
         default=False,
         verbose_name="이상 라벨",
@@ -151,17 +144,15 @@ class GasData(models.Model):
         return max(valid_risks, key=lambda r: self._RISK_ORDER.get(r, 0))
 
     def recalculate_risks_from_thresholds(self) -> None:
-        """
-        Phase 4-c: raw 측정값(co/h2s/...)으로부터 *_risk 9종을 DB Threshold 기반으로 재계산.
+        """raw 측정값(co/h2s/...)으로부터 *_risk 9종을 DB Threshold 기반으로 재계산한다.
 
-        [단일 진실 공급원 정책]
-        이전: fastapi가 risk를 계산해 페이로드로 전송 → DRF가 그대로 저장
-        이후: DRF가 raw 값만 신뢰. risk는 facilities.Threshold DB로 재계산.
-              fastapi와 DRF의 임계치 분기 위험 제거.
+        [단일 진실 공급원]
+        DRF는 raw 값만 신뢰하고 risk는 facilities.Threshold DB로 재계산한다 —
+        fastapi와 DRF의 임계치가 분기될 위험을 제거한다.
 
-        [PR-G facility 우선순위]
-        gas_sensor.facility_id를 evaluate_gas_risk에 전달 → facility specific 정책 우선
-        매칭 후 gas_legal fallback. facility별 보수적 임계치 도입 가능.
+        [facility 우선순위]
+        gas_sensor.facility_id를 evaluate_gas_risk에 전달 → facility specific 정책
+        우선 매칭 후 gas_legal fallback. facility별 보수적 임계치 도입 가능.
 
         측정값이 None인 가스는 *_risk도 None으로 유지(미측정 표시).
         """
@@ -214,8 +205,7 @@ class GasData(models.Model):
 
 
 class GasDataError(models.Model):
-    """
-    가스 측정 에러·결측 기록 테이블
+    """가스 측정 에러·결측 기록 테이블.
 
     [설계 원칙]
     - 1개 GasData row에서 여러 가스가 동시에 결측될 수 있으므로 별도 테이블로 분리합니다.

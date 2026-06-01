@@ -8,15 +8,15 @@ class AlertPolicy(BaseModel):
     """
     알림 정책 — "어떤 이벤트가 누구에게 어떤 채널로 알림"
 
-    [target_user_types JSON 시작]
-    Phase 2: lowercase user_type 배열 (예: ["facility_admin", "worker"]).
-    부모 plan §2-4: 정밀 추적 요구 발생 시 RoleProfile FK/M2M으로 마이그레이션 가능.
+    [target_user_types JSON]
+    lowercase user_type 배열 (예: ["facility_admin", "worker"]).
+    정밀 추적 요구 발생 시 RoleProfile FK/M2M으로 마이그레이션 가능.
 
     [target_facility=NULL]
     NULL이면 전사 정책. 특정 facility 지정 시 해당 공장에만 적용.
 
     [condition_summary]
-    목록 화면 캐시 컬럼. service 레이어에서 갱신 (Phase 4-e policy_matcher).
+    목록 화면 캐시 컬럼. service 레이어(policy_matcher)에서 갱신.
     save() 오버라이드 안 함 — 컨벤션(view → service → model) 유지.
 
     [event_type vs USER_FACING_ALARM_TYPES]
@@ -63,9 +63,9 @@ class AlertPolicy(BaseModel):
         max_length=300,
         blank=True,
         default="",
-        help_text="목록 화면 캐시 — service 레이어에서 갱신 (Phase 4-e)",
+        help_text="목록 화면 캐시 — service 레이어에서 갱신",
     )
-    # Phase 4-f: Notification.message 렌더 템플릿. Django Template 문법.
+    # Notification.message 렌더 템플릿 (Django Template 문법).
     # 예: "{{ source_label }}에서 {% if level == 'danger' %}🚨 긴급{% else %}⚠️ 주의{% endif %} — {{ gas_name }} {{ value }}{{ unit }}"
     # 빈 문자열이면 Event.summary를 그대로 사용 (graceful fallback).
     message_template = models.TextField(

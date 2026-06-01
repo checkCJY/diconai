@@ -2,10 +2,8 @@
 """
 EventAcknowledgement 읽기 전용 조회 헬퍼.
 
-[도입 배경 — 2026-05-15 알람 재설계]
-broadcast 시점에 "이 event 를 어떤 user 가 ack 했나" 를 빠르게 알아내야 함.
-user 마다 SQL 1번씩 치는 N+1 패턴을 피하기 위해, 단일 쿼리로 set 을 반환하는
-헬퍼를 제공.
+broadcast 시점에 "이 event 를 어떤 user 가 ack 했나" 를 빠르게 알아내야 한다.
+user 마다 SQL 1번씩 치는 N+1 을 피하기 위해 단일 쿼리로 set 을 반환한다.
 
 이 모듈은 selectors 레이어 — 단순 읽기 조회만, 비즈니스 로직은 services 로.
 """
@@ -44,10 +42,9 @@ def get_user_unread_event_count(user_id: int) -> int:
     """
     특정 user 가 ack 안 한 active/acknowledged/in_progress Event 개수 반환.
 
-    [도입 배경 — 2026-05-17 D 옵션 헤더 미확인 배지]
     헤더의 "🔔 N" 배지 초기값 — 본인이 아직 확인 완료 안 한 활성 이벤트 수.
-    글로벌 unacknowledged_event_count (Event.status 기반) 와 달리, user-scoped
-    ack (Phase 1 EventAcknowledgement) 을 기준으로 본 사람만 카운트 ↓.
+    글로벌 unacknowledged_event_count (Event.status 기반) 와 달리 user-scoped ack
+    (EventAcknowledgement) 기준이라 본 사람만 카운트가 줄어든다.
 
     [성능]
     NOT EXISTS subquery — EventAcknowledgement.UniqueConstraint(event, user) 인덱스

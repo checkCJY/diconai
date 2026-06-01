@@ -1,20 +1,13 @@
-"""
-apps/alerts/serializers/responses.py
+"""알람·이벤트 도메인의 표준 응답 봉투 Serializer.
 
-알람·이벤트 도메인의 표준 응답 봉투 Serializer.
-
-이 모듈의 클래스들은 (1) Swagger 문서화, (2) 실제 응답 직렬화 양쪽에서 재사용 가능하다.
+(1) Swagger 문서화, (2) 실제 응답 직렬화 양쪽에서 재사용한다.
 공통 봉투 패턴: `{status: "success", code: 200, data: {...}}`
 """
 
 from rest_framework import serializers
 
 
-# ============================================================
 # 작업자 본인 위험도 (MyStatusView)
-# ============================================================
-
-
 class MyStatusDataSerializer(serializers.Serializer):
     worker_id = serializers.IntegerField()
     status = serializers.CharField(help_text="normal / warning / danger")
@@ -29,11 +22,7 @@ class MyStatusResponseSerializer(serializers.Serializer):
     data = MyStatusDataSerializer()
 
 
-# ============================================================
 # 공장 내 작업자 위험도 집계 (WorkerSummaryView)
-# ============================================================
-
-
 class WorkerSummaryDataSerializer(serializers.Serializer):
     facility_id = serializers.IntegerField(allow_null=True)
     total_count = serializers.IntegerField()

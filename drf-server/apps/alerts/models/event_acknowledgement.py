@@ -9,15 +9,13 @@ class EventAcknowledgement(BaseModel):
     """
     Event 의 사용자별(=user-scoped) 확인(ack) 상태 기록.
 
-    [도입 배경 — 2026-05-15 알람 재설계]
-    기존 Event.status = ACKNOWLEDGED 는 글로벌 단일 상태였음.
-    즉 한 명의 운영자가 알람을 확인하면, 같은 Event 가 모든 사용자에게
-    "이미 확인됨" 으로 표시되어 다른 사용자에게 더 이상 알람이 뜨지 않았음.
-
-    팀 요구사항 — "본 사람만 안 보이고, 다른 사용자에게는 계속 뜸".
-    이를 만족하기 위해 (event, user) 쌍별로 ack 기록을 별도 저장하는
-    join 테이블을 신설. 기존 Event.status / acknowledged_by 는 손대지 않고
-    공존시켜 글로벌 워크플로우(active → acknowledged → resolved) 의미는 유지.
+    [도입 배경]
+    Event.status = ACKNOWLEDGED 는 글로벌 단일 상태라, 한 운영자가 확인하면 같은
+    Event 가 모든 사용자에게 "이미 확인됨" 으로 표시돼 다른 사용자에게 알람이 안
+    떴다. "본 사람만 안 보이고 다른 사용자에게는 계속 뜸" 요구를 만족하기 위해
+    (event, user) 쌍별 ack 기록을 별도 저장하는 join 테이블을 둔다. 기존 Event.status
+    / acknowledged_by 는 공존시켜 글로벌 워크플로우 의미(active → acknowledged →
+    resolved)는 유지한다.
 
     [재팝업 정책]
     위험 알람 재발생 시 fastapi broadcast 시점에 user 단위로 분기:
@@ -34,10 +32,9 @@ class EventAcknowledgement(BaseModel):
     - ack 시각은 BaseModel.created_at 으로 조회 (별도 필드 미신설 — 의미 중복 회피).
     - Event/User 삭제 시 CASCADE — ack 기록은 단독 보존 의미 없음.
 
-    [후속 의존성]
-    - selectors.event_selector — user × event ack 조회 헬퍼 (다음 task)
-    - services.event_service — broadcast 결정 시 이 모델 참조 (다음 task)
-    - views.event — POST /alerts/api/events/{id}/ack/ 에서 get_or_create (다음 task)
+    [협력 객체]
+    - selectors.event_ack_selector — user × event ack 조회 헬퍼
+    - views.event — POST /alerts/api/events/{id}/ack/ 에서 get_or_create
     """
 
     event = models.ForeignKey(
