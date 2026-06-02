@@ -21,12 +21,14 @@ class GasData(models.Model):
     """
 
     class AnomalyType(models.TextChoices):
-        """IF 학습 라벨 — gas_dummy SCENARIOS 4종과 1:1 매핑."""
+        """IF 학습 라벨 — gas_dummy SCENARIOS 6종과 1:1 매핑."""
 
         CO_LEAK = "co_leak", "일산화탄소 누출"
         H2S_LEAK = "h2s_leak", "황화수소 누출"
         FIRE = "fire", "화재/폭발 전조"
         CHEMICAL_SPILL = "chemical_spill", "유해화학물 다중 누출"
+        O2_DEPLETION = "o2_depletion", "산소 결핍"  # 이성현 추가 — 9종 확장
+        SENSOR_FAULT = "sensor_fault", "센서 오작동"  # 이성현 추가 — 9종 확장
 
     gas_sensor = models.ForeignKey(
         "facilities.GasSensor",
