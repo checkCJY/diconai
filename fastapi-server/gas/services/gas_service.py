@@ -51,6 +51,7 @@ from ai.router import (
     _get_or_load,
     _build_multi_feature_row,
 )
+from gas.constants import GAS_FIELDS  # 이성현 추가 — 9종 가스 순서 단일 공급원
 
 
 logger = logging.getLogger(__name__)
@@ -58,7 +59,7 @@ logger = logging.getLogger(__name__)
 # 이성현 추가 — ARIMA pkl 모듈 레벨 로드 (실시간 잔차 계산용).
 #   statsmodels pickle 임포트 버그 대비 try-except — 실패 시 12피처로 폴백.
 _arima_models: dict = {}
-for _gn in ["co", "h2s", "co2"]:
+for _gn in GAS_FIELDS:  # 이성현 수정 — 3종 → 9종 ARIMA 로드
     _p = Path(settings.ML_MODELS_DIR) / f"arima_{_gn}.pkl"
     if _p.exists():
         try:
@@ -83,10 +84,8 @@ def _detect_change_point(values: list[float], penalty: float | None = None) -> b
         return False
 
 
-# 이성현 작업 — co/h2s/co2 슬라이딩 윈도우 버퍼 (각 최대 30틱).
-_co_window: deque = deque(maxlen=30)
-_h2s_window: deque = deque(maxlen=30)
-_co2_window: deque = deque(maxlen=30)
+# 이성현 수정 — 3종 개별 변수 → 9종 dict (GAS_FIELDS 순서 보존)
+_gas_windows: dict[str, deque] = {g: deque(maxlen=30) for g in GAS_FIELDS}
 
 # 이성현 추가 — 같은 센서 60초당 1회만 알람 발화 (전력 서비스와 동일 rate limit 패턴).
 # 하드코딩 제거 — settings.GAS_AI_RATE_LIMIT_SEC 로 환경별 조정 가능.
@@ -125,16 +124,13 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
     }
     individual_risks = calculate_individual_risks(gas_values)
 
-    # 이성현 — co+h2s+co2 다변량 슬라이딩 윈도우 추론
-    _co_window.append(payload.co)
-    _h2s_window.append(payload.h2s)
-    _co2_window.append(payload.co2)
-    if len(_co_window) >= 30:
-        # 이성현 추가 — 체인지 포인트 탐지 (패턴 변화 없으면 추론 스킵)
-        cp_detected = (
-            _detect_change_point(list(_co_window))
-            or _detect_change_point(list(_h2s_window))
-            or _detect_change_point(list(_co2_window))
+    # 이성현 수정 — 9종 윈도우 동시 append (gas_values는 위에서 이미 9종 보유)
+    for _g in GAS_FIELDS:
+        _gas_windows[_g].append(gas_values[_g])
+    if len(_gas_windows["co"]) >= 30:
+        # 9종 중 하나라도 패턴 변화 시 추론 진행
+        cp_detected = any(
+            _detect_change_point(list(_gas_windows[_g])) for _g in GAS_FIELDS
         )
         if not cp_detected:
             logger.debug("[체인지 포인트] 패턴 변화 없음 — 추론 스킵")
@@ -142,8 +138,8 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
             GAS_CP_DETECTED_TOTAL.inc()
             logger.debug("[체인지 포인트] 패턴 변화 감지 — IF 추론 진행")
             try:
-                # 이성현 — train_anomaly_model 저장 포맷과 동일한 식별자 (gas:sensor_{pk}:{gas_label})
-                _model_identifier = "gas:sensor_1:co_h2s_co2"
+                # 이성현 수정 — 학습 sensor_identifier와 동일 (gas:sensor_1:co_h2s_co2_o2_..._voc)
+                _model_identifier = "gas:sensor_1:" + "_".join(GAS_FIELDS)
                 entry = await _get_or_load("gas", sensor_identifier=_model_identifier)
                 if entry is None:
                     # 모델 미등록 — AI 없이 룰 기반으로만 처리. DRF 저장은 아래 로직으로 계속 진행.
@@ -151,16 +147,11 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
                     raise RuntimeError("gas IF 모델 미등록")
                 # IF 추론 실행 시간 측정
                 _infer_start = time.time()
+                # 이성현 수정 — 9종 windows를 GAS_FIELDS 순서대로 전달 (학습 피처 순서와 일치)
                 row = _build_multi_feature_row(
-                    {
-                        "co": list(_co_window),
-                        "h2s": list(_h2s_window),
-                        "co2": list(_co2_window),
-                    },
+                    {_g: list(_gas_windows[_g]) for _g in GAS_FIELDS},
                     entry.window,
-                    arima_results=_arima_models
-                    if _arima_models
-                    else None,  # 이성현 추가
+                    arima_results=_arima_models if _arima_models else None,
                 )
                 pred = int(entry.model.predict(row)[0])
                 score = float(entry.model.decision_function(row)[0])
@@ -173,7 +164,24 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
                     pred == -1
                 ):  # AI가 이상 패턴으로 판단했을 때만 실행 (-1=이상, 1=정상)
                     # 이성현 수정 — should_fire=True 하드코딩 제거, 60초 rate limit 적용
-                    sensor_identifier = f"gas:{payload.device_id}:co_h2s_co2"  # 이 센서만의 고유 이름 (장치ID + 가스 종류 조합)
+                    # 이성현 수정 — 9종 식별자 (장치ID + 9종 가스)
+                    sensor_identifier = f"gas:{payload.device_id}:" + "_".join(
+                        GAS_FIELDS
+                    )
+                    # 이성현 추가 — 위험/주의 등급 가스만 추려 알람 메시지·대표 가스로 사용
+                    _risky = [
+                        g
+                        for g in GAS_FIELDS
+                        if individual_risks.get(f"{g}_risk") in ("warning", "danger")
+                    ]
+                    _gas_detail = (
+                        " ".join(f"{g.upper()}:{gas_values[g]}" for g in _risky)
+                        if _risky
+                        else "패턴 이상 (개별 임계 정상)"
+                    )
+                    _lead_gas = (
+                        _risky[0] if _risky else "co"
+                    )  # 대표 가스 (메트릭/payload용)
                     now_ts = time.time()  # 지금 이 순간의 시각 (초 단위 숫자)
                     last_ts = _gas_last_fired_at.get(
                         sensor_identifier, 0.0
@@ -188,12 +196,12 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
                             now_ts  # 방금 쏜 시각 기록 (다음 번 비교에 사용)
                         )
                         logger.warning(  # 서버 로그에 이상 감지 출력 (60초 지났을 때만)
-                            f"[AI 이상탐지] co+h2s+co2 이상 감지 | device={payload.device_id} | co={payload.co} h2s={payload.h2s} co2={payload.co2}"
+                            f"[AI 이상탐지] 9종 이상 감지 | device={payload.device_id} | {_gas_detail}"
                         )
-                        # DRF gas_alarm 가드용 mute 마킹 — 추론 가스 3종에 한해 룰 60s 억제.
+                        # DRF gas_alarm 가드용 mute 마킹 — 추론 가스 9종 룰 60s 억제.
                         # sensor_id 자리에 payload.device_id (mac) — DRF gas_alarm 측은
                         # sensor.device_name (mac) 으로 동일 키 read.
-                        for _g in ("co", "h2s", "co2"):
+                        for _g in GAS_FIELDS:  # 이성현 수정 — 9종 전부 mute
                             await mark_gas_ai_recent(
                                 sensor_id=payload.device_id,
                                 gas_type=_g,
@@ -219,19 +227,19 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
                                 "anomaly_score": score,
                                 "prediction": "anomaly",
                                 "risk_classified": "danger",
+                                # 이성현 수정 — 9종 전부 기록
                                 "feature_snapshot_json": {
-                                    "co": payload.co,
-                                    "h2s": payload.h2s,
-                                    "co2": payload.co2,
+                                    _g: gas_values[_g] for _g in GAS_FIELDS
                                 },
                             },
                             alarm_payload={  # should_fire=True일 때만 AlarmRecord 저장
                                 "alarm_type": "gas_anomaly_ai",
                                 "risk_level": "danger",
                                 "source_sensor_id": payload.device_id,
-                                "gas_type": "co",
-                                "measured_value": payload.co,
-                                "summary": f"가스 이상 감지 (AI) | CO:{payload.co} H2S:{payload.h2s} CO2:{payload.co2}",
+                                # 이성현 수정 — 대표 위험 가스 + 위험 가스 요약 메시지
+                                "gas_type": _lead_gas,
+                                "measured_value": gas_values[_lead_gas],
+                                "summary": f"가스 이상 감지 (AI) | {_gas_detail}",
                                 "detected_at": payload.timestamp.isoformat(),
                                 "source_label": "가스센서 AI 이상탐지",
                             }
@@ -248,18 +256,20 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
                     )
                     # 이성현 추가 — 브라우저 실시간 알람 push (should_fire=True일 때만)
                     if should_fire:
-                        GAS_AI_ALARM_FIRED_TOTAL.labels("co", "danger").inc()
+                        # 이성현 수정 — 대표 위험 가스 라벨로 메트릭 기록
+                        GAS_AI_ALARM_FIRED_TOTAL.labels(_lead_gas, "danger").inc()
                         _p = asyncio.create_task(
                             push_alarm(
                                 {
                                     "alarm_type": "gas_anomaly_ai",
                                     "risk_level": "danger",
                                     "source_label": "가스센서 AI 이상탐지",
-                                    "summary": f"가스 이상 감지 (AI) | CO:{payload.co} H2S:{payload.h2s} CO2:{payload.co2}",
-                                    "message": f"가스 이상 감지 (AI) | CO:{payload.co} H2S:{payload.h2s} CO2:{payload.co2}",
+                                    # 이성현 수정 — 위험 가스 요약 메시지 (9종 중 warning/danger만)
+                                    "summary": f"가스 이상 감지 (AI) | {_gas_detail}",
+                                    "message": f"가스 이상 감지 (AI) | {_gas_detail}",
                                     "is_new_event": True,
-                                    "gas_type": "co",
-                                    "measured_value": payload.co,
+                                    "gas_type": _lead_gas,
+                                    "measured_value": gas_values[_lead_gas],
                                 }
                             )
                         )

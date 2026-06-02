@@ -79,7 +79,17 @@ class GasDataPayload(BaseModel):
     # 값: GasData.AnomalyType code (gas_dummy SCENARIOS 와 1:1).
     # 이 필드가 채워져 있으면 GasData.is_anomaly=True 로 저장된다.
     # Literal 화이트리스트 — 임의 문자열 차단 (DRF 단계 422 회피, fastapi 단에서 cut).
-    anomaly_type: Literal["co_leak", "h2s_leak", "fire", "chemical_spill"] | None = None
+    anomaly_type: (
+        Literal[
+            "co_leak",
+            "h2s_leak",
+            "fire",
+            "chemical_spill",
+            "o2_depletion",
+            "sensor_fault",
+        ]
+        | None
+    ) = None  # 이성현 수정 — 9종 확장 (o2_depletion, sensor_fault 추가)
 
     @field_validator("timestamp")
     @classmethod
