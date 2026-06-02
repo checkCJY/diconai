@@ -132,24 +132,45 @@
       "title": "Redis 연결 클라이언트 수",
       "description": "현재 Redis에 연결된 클라이언트 수. 50 이상이면 연결 풀 점검, 100 이상이면 이상 신호.",
       "type": "stat",
-      "gridPos": { "x": 12, "y": 8, "w": 6, "h": 4 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "short",
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 50 },
-              { "color": "red", "value": 100 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "red",
+                "value": 100
+              }
             ]
           }
         },
         "overrides": []
       },
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
         "orientation": "auto",
         "textMode": "auto",
         "colorMode": "background"
@@ -167,24 +188,45 @@
       "title": "Redis 메모리 사용량",
       "description": "Redis가 현재 사용 중인 메모리. 256MB 이상이면 점검, 512MB 이상이면 maxmemory 정책 확인.",
       "type": "stat",
-      "gridPos": { "x": 18, "y": 8, "w": 6, "h": 4 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "x": 18,
+        "y": 8,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 268435456 },
-              { "color": "red", "value": 536870912 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 268435456
+              },
+              {
+                "color": "red",
+                "value": 536870912
+              }
             ]
           }
         },
         "overrides": []
       },
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
         "orientation": "auto",
         "textMode": "auto",
         "colorMode": "background"
@@ -202,21 +244,42 @@
       "title": "Redis keyspace hit ratio (5m)",
       "description": "Redis 키 조회 중 캐시 히트 비율. 0.8 미만이면 TTL 설정 또는 캐시 워밍 전략 점검.",
       "type": "timeseries",
-      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 4 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "x": 12,
+        "y": 12,
+        "w": 12,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "percentunit",
           "min": 0,
           "max": 1,
-          "color": { "mode": "palette-classic" },
-          "custom": { "lineWidth": 2, "fillOpacity": 10, "spanNulls": false }
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": false
+          }
         },
         "overrides": []
       },
       "options": {
-        "tooltip": { "mode": "multi", "sort": "none" },
-        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
       },
       "targets": [
         {
@@ -231,21 +294,42 @@
       "title": "Cache hit rate — prefix별 (5m)",
       "description": "Django 애플리케이션 캐시(alert_policies, menu_tree)의 히트율. 알람 발화마다 alert_policies를 조회하므로 hit rate가 낮으면 DB 부하 증가.",
       "type": "timeseries",
-      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "percentunit",
           "min": 0,
           "max": 1,
-          "color": { "mode": "palette-classic" },
-          "custom": { "lineWidth": 2, "fillOpacity": 10, "spanNulls": false }
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": false
+          }
         },
         "overrides": []
       },
       "options": {
-        "tooltip": { "mode": "multi", "sort": "none" },
-        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
       },
       "targets": [
         {
@@ -260,28 +344,49 @@
       "title": "Cache hit / miss 건수 — prefix별 (5m)",
       "description": "prefix별 캐시 히트·미스 건수. miss가 급증하면 TTL 만료 또는 캐시 무효화 빈도 점검.",
       "type": "timeseries",
-      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "unit": "cps",
-          "color": { "mode": "palette-classic" },
-          "custom": { "lineWidth": 2, "fillOpacity": 10, "spanNulls": false }
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": false
+          }
         },
         "overrides": []
       },
       "options": {
-        "tooltip": { "mode": "multi", "sort": "none" },
-        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
       },
       "targets": [
         {
-          "expr": "sum by (prefix) (rate(cache_hit_total[5m]))",
+          "expr": "sum by (prefix) (increase(cache_hit_total[5m]))",
           "legendFormat": "{{prefix}} hit",
           "refId": "A"
         },
         {
-          "expr": "sum by (prefix) (rate(cache_miss_total[5m]))",
+          "expr": "sum by (prefix) (increase(cache_miss_total[5m]))",
           "legendFormat": "{{prefix}} miss",
           "refId": "B"
         }
