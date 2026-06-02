@@ -22,7 +22,7 @@ DRF_CALL_FAILED_TOTAL = Counter(
 )
 
 # ── WS 알람 큐 길이 메트릭 ────────────────────────────────────────────────────
-# Redis LIST `diconai:ws:alarms`에 쌓인 알람 수를 push/pop 시점마다 갱신한다.
+# Redis Stream `diconai:ws:alarms`의 적체 길이(XLEN)를 push/read 시점마다 갱신한다.
 # 이 값이 꾸준히 쌓이면 alarm_flush_loop가 소화 못 하는 것 — WS 연결 상태와 함께 확인.
 # (Grafana alert 권장값: 100 이상이 5분 이상 지속이면 WS 브로드캐스트 병목 점검)
 #
@@ -31,6 +31,19 @@ DRF_CALL_FAILED_TOTAL = Counter(
 ALARM_QUEUE_LENGTH = Gauge(
     "fastapi_alarm_queue_length",
     "Number of alarms waiting in the Redis WS alarm queue (diconai:ws:alarms)",
+    multiprocess_mode="liveall",
+)
+
+# ── WS 알람 스트림 lag 메트릭 (LIST→Stream 전환) ──────────────────────────────
+# 스트림 말단(가장 최근 entry)과 이 프로세스의 커서(alarm_flush_loop last_id)의
+# 시간차(초). entry ID 의 ms 부분 차이로 계산한다 (XINFO 불필요).
+# 평상시 ≈0. 이 replica 가 알람을 소화 못 하면 증가 → alarm_flush_loop 지연 신호.
+#
+# multiprocess_mode="liveall" + Prometheus 가 pod 별 스크랩 → 멀티레플리카 시
+# replica 별 lag 이 자동 분리되어 "어느 replica 가 뒤처지나"가 바로 보인다.
+ALARM_STREAM_LAG = Gauge(
+    "fastapi_alarm_stream_lag_seconds",
+    "Time gap (s) between stream tail and this process cursor in the WS alarm stream",
     multiprocess_mode="liveall",
 )
 
@@ -69,17 +82,19 @@ SENSOR_LAST_RECEIVED = Gauge(
 )
 
 # ── Redis 명령 실행시간 메트릭 (P1) ───────────────────────────────────────────
-# LPUSH / BRPOP 명령 실행 시간을 Histogram으로 기록한다.
+# XADD / XREAD 명령 실행 시간을 Histogram으로 기록한다.
 # E2E latency가 급등했을 때 Redis 병목 여부를 판단하는 근거로 사용한다.
 #   e2e_alarm_latency 급등
 #     → celery_task_duration 정상 + db_save_duration 정상
 #     → redis_command_duration 급등 → Redis 병목 확정
 #
 # 레이블:
-#   command : "lpush" | "brpop"
+#   command : "xadd"  — alarm 적재 (push_alarm 에서 측정)
+#             "xread" — alarm 소비. BLOCK 대기시간이 섞여 무의미하므로 측정하지 않는다
+#                       (옛 brpop 과 동일 이유, parity). 라벨 정의만 남겨둠.
 REDIS_COMMAND_DURATION = Histogram(
     "redis_command_duration_seconds",
-    "Redis command execution time (lpush/brpop in alarm queue)",
+    "Redis command execution time (xadd/xread in alarm queue)",
     ["command"],
     buckets=[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.5],
 )

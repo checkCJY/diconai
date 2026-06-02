@@ -67,6 +67,13 @@ class CustomUser(AbstractUser):
         validators=[phone_validator],
         verbose_name="비상 연락처",
     )
+    discord_id = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        verbose_name="Discord 사용자 ID",
+        help_text="Discord 개인 멘션용 숫자 ID. 비어 있으면 멘션 대상 제외.",
+    )
 
     # 보안 필드
     failed_login_count = models.PositiveSmallIntegerField(
