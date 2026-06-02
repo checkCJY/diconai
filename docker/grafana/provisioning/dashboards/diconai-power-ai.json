@@ -106,7 +106,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(ai_inference_failed_total{job=\"fastapi\"}[5m])",
+          "expr": "increase(ai_inference_failed_total{job=\"fastapi\"}[5m])",
           "legendFormat": "{{model_type}} / {{reason}}",
           "refId": "A"
         }
@@ -158,7 +158,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (reason) (rate(power_ai_quality_skip_total{job=\"fastapi\"}[5m]))",
+          "expr": "sum by (reason) (increase(power_ai_quality_skip_total{job=\"fastapi\"}[5m]))",
           "legendFormat": "{{reason}}",
           "refId": "A"
         }
@@ -210,7 +210,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (axis) (rate(power_ai_axis_fired_total{job=\"fastapi\"}[5m]))",
+          "expr": "sum by (axis) (increase(power_ai_axis_fired_total{job=\"fastapi\"}[5m]))",
           "legendFormat": "{{axis}}",
           "refId": "A"
         }
@@ -218,7 +218,7 @@
     },
     {
       "id": 5,
-      "title": "전력 AI — 추론 실행 횟수 (5m)",
+      "title": "전력 AI — 추론 실행 빈도 (req/s, 5m)",
       "description": "quality_guard·윈도우 warmup을 통과해 실제로 추론이 실행된 횟수. 센서 수신(sensor_last_received) 대비 이 값이 낮으면 skip이 많다는 신호. 갑자기 0이 되면 FastAPI 재시작으로 윈도우가 초기화된 것.",
       "type": "timeseries",
       "gridPos": {
@@ -366,7 +366,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (algorithm_source) (rate(power_ai_alarm_fired_total{job=\"fastapi\"}[5m]))",
+          "expr": "sum by (algorithm_source) (increase(power_ai_alarm_fired_total{job=\"fastapi\"}[5m]))",
           "legendFormat": "{{algorithm_source}}",
           "refId": "A"
         }
@@ -418,7 +418,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(power_ai_combined_total{job=\"fastapi\",combined=~\"warning|danger\"}[5m]))",
+          "expr": "sum(increase(power_ai_combined_total{job=\"fastapi\",combined=~\"warning|danger\"}[5m]))",
           "legendFormat": "AI 발화 (warning+danger)",
           "refId": "A"
         },
@@ -427,7 +427,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(power_ai_combined_total{job=\"fastapi\",combined=\"predict_warn\"}[5m]))",
+          "expr": "sum(increase(power_ai_combined_total{job=\"fastapi\",combined=\"predict_warn\"}[5m]))",
           "legendFormat": "AI 선제 감지 (predict_warn)",
           "refId": "B"
         },
@@ -436,7 +436,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (risk_level) (rate(alarm_fired_total{job=\"drf\",alarm_type=\"power_overload\"}[5m]))",
+          "expr": "sum by (risk_level) (increase(alarm_fired_total{job=\"drf\",alarm_type=\"power_overload\"}[5m]))",
           "legendFormat": "임계치 발화 / {{risk_level}}",
           "refId": "C"
         }
@@ -488,7 +488,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(power_ai_rate_limited_total{job=\"fastapi\"}[5m])",
+          "expr": "increase(power_ai_rate_limited_total{job=\"fastapi\"}[5m])",
           "legendFormat": "rate limit 억제",
           "refId": "A"
         }
@@ -539,7 +539,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(power_danger_confirm_total[5m])) by (outcome)",
+          "expr": "sum(increase(power_danger_confirm_total[5m])) by (outcome)",
           "legendFormat": "{{outcome}}",
           "refId": "A"
         }
