@@ -7,7 +7,7 @@
 # │  종합 위험도 │  동작                                            │
 # ├──────────────────────────────────────────────────────────────┤
 # │  DANGER     │  즉각 알람 (fire_power_danger_task.delay)         │
-# │  WARNING    │  3초 타이머 (apply_async countdown=3)             │
+# │  WARNING    │  5초 타이머 (apply_async countdown=5)             │
 # │  NORMAL     │  타이머 취소 + 정상화 알림 (이전 경보 시)           │
 # └──────────────────────────────────────────────────────────────┘
 #
@@ -27,6 +27,7 @@ from django.utils import timezone
 
 from apps.alerts.services.alarm_dedupe import (
     clear_state,
+    confirm_consecutive,
     get_state,
     is_ai_mute_active,
     try_transition,
@@ -95,6 +96,11 @@ def _task_key(device_id: int, channel: int) -> str:
 def _axis_risk_key(device_id: int, channel: int, axis: str) -> str:
     """축(W/A/V)별 마지막 위험도 캐시 키. _state_key와 sibling 네임스페이스."""
     return f"alarm:power:risk:{device_id}:{channel}:{axis}"
+
+
+def _dcount_key(device_id: int, channel: int) -> str:
+    """danger 연속 틱 카운터 키 — watt 축에서만 증가 (사이클당 1회). _state_key sibling."""
+    return f"alarm:power:state:{device_id}:{channel}:dcount"
 
 
 def _revoke(task_id: str) -> None:
@@ -233,9 +239,21 @@ def trigger_power_alarms(objs: list, device, ingress_ts: float | None = None) ->
 
         state_key = _state_key(device_id, channel)
         task_key = _task_key(device_id, channel)
+        dcount_key = _dcount_key(device_id, channel)
         label = _channel_label(device, channel)
 
         if aggregate == RiskLevel.DANGER:
+            # danger 2틱 confirm — watt 축에서만 카운트. trigger_power_alarms 가 축별로
+            # 호출돼 1사이클에 3~4회 평가되므로, current/voltage 축은 stale watt 캐시로
+            # 조기 발화할 수 있어 skip 한다. aggregate 는 watt 도착 시 3축 최신값을
+            # 반영하므로 누락 없음. DANGER_CONFIRM_TICKS=1 이면 첫 틱 즉시 발화(기존 동작).
+            if axis_name != "watt":
+                continue
+            if not confirm_consecutive(
+                dcount_key, settings.DANGER_CONFIRM_TICKS, _CACHE_TTL
+            ):
+                continue
+
             # 진행 중인 WARNING 타이머가 있으면 먼저 취소 — AI mute 가드 이전에 수행.
             # 그렇지 않으면 AI mute 가 활성일 때 룰 fire 만 suppress 되고 stale WARNING
             # 타이머가 카운트다운 끝나면 발화해 화면에 룰 알람이 등장 (AI 1순위 위반).
@@ -262,6 +280,7 @@ def trigger_power_alarms(objs: list, device, ingress_ts: float | None = None) ->
                 )
 
         elif aggregate == RiskLevel.WARNING:
+            cache.delete(dcount_key)  # danger 스트릭 끊김 — confirm 카운터 리셋
             prev_state = get_state(state_key)
             if prev_state in (RiskLevel.WARNING, RiskLevel.DANGER):
                 continue
@@ -290,6 +309,7 @@ def trigger_power_alarms(objs: list, device, ingress_ts: float | None = None) ->
             try_transition(state_key, RiskLevel.WARNING, _CACHE_TTL)
 
         else:  # normal
+            cache.delete(dcount_key)  # danger 스트릭 끊김 — confirm 카운터 리셋
             # WARNING 타이머가 있으면 취소하고 이전 경보 시 정상화 알림 발송
             pending = cache.get(task_key)
             if pending:

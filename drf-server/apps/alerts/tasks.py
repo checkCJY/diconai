@@ -22,9 +22,9 @@ from apps.core.metrics import ALARM_FIRED_TOTAL, ALARM_WS_PUSH_FAILED_TOTAL
 logger = logging.getLogger(__name__)
 
 # WARNING 타이머 — gas_alarm.py / power_alarm.py가 import해서 쓰므로 이 값만
-# 바꾸면 두 도메인의 countdown이 함께 변경된다. 더미 시나리오에서 WARNING 구간이
-# 빠르게 DANGER로 점프해 거의 발화되지 않아 3초로 짧게 둔다.
-WARNING_DURATION_SEC = 3
+# 바꾸면 두 도메인의 countdown이 함께 변경된다. WARNING 은 이 시간만큼 지속돼야
+# 발화하고(중간에 normal/danger 로 바뀌면 revoke), 임계 부근 일시 진동의 과발화를 억제.
+WARNING_DURATION_SEC = 5
 
 # FastAPI 내부 알람 푸시 엔드포인트.
 # 호스트는 settings.FASTAPI_INTERNAL_URL (env 주입) — 도커에선 `http://fastapi:8001`,
