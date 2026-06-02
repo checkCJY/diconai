@@ -56,6 +56,20 @@ def clear_state(state_key: str) -> None:
     cache.delete(state_key)
 
 
+def confirm_consecutive(count_key: str, threshold: int, ttl: int) -> bool:
+    """연속 발생 카운터를 1 증가시키고, threshold 도달 시 True.
+
+    "N틱 연속 초과해야 발화"(danger 2틱 confirm 등) 게이트용 — 단일 틱 센서
+    스파이크가 즉시 경보가 되는 것을 막는다. try_transition 과 달리 raw redis 가
+    아닌 표준 cache.get/set 을 써서 LocMemCache 테스트에서도 동작한다. 스트릭이
+    끊기면(위험도가 danger 가 아니게 되면) 호출자가 cache.delete(count_key) 로 리셋.
+    threshold<=1 이면 첫 틱에 True (즉시 발화 — 기존 동작과 동일).
+    """
+    count = (cache.get(count_key) or 0) + 1
+    cache.set(count_key, count, ttl)
+    return count >= threshold
+
+
 # AI 발화 시 룰 mute 가드
 
 # 룰 위험도의 순서 — 격상 bypass 키 설계용.

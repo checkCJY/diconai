@@ -34,25 +34,26 @@ Prometheus / Grafana ← 양 서버 /metrics
 | 결정 | 이유 |
 |---|---|
 | **DRF + FastAPI 2서버 분리** | DRF는 인증·DB 영속성·HTML 렌더링 (동기 모델 최적), FastAPI는 센서 수신·WebSocket broadcast (async 최적). 책임 분리로 한쪽 부하가 다른쪽에 전이되지 않음 |
-| **Redis List 큐 (Pub/Sub 아님)** | Pub/Sub는 구독자 없을 때 메시지 유실. List 큐(`BRPOP`)는 fastapi 재시작 중에도 알람이 큐에 남음. 상세: [docs/infra/redis-celery-guide.md](infra/redis-celery-guide.md) |
+| **Redis Stream(XADD / replica별 독립 XREAD 커서, fan-out)** | Pub/Sub는 구독자 없을 때 메시지 유실 — Stream은 fastapi 재시작 중에도 알람이 적체. BRPOP은 경쟁 소비라 다중 replica fan-out 불가 — replica별 독립 XREAD 커서로 모든 replica가 모든 알람 수신. 상세: [docs/infra/redis-celery-guide.md](infra/redis-celery-guide.md) |
 | **Celery 큐 alarm/metric 분리** | 알람 태스크가 주기적 메트릭 수집과 같은 워커를 쓰면 알람 지연 발생. 큐 분리로 알람 우선순위 보장. 실제 분리 코드: [docker-compose.yml:154-220](../docker-compose.yml#L154-L220) |
 | **PostgreSQL (SQLite 폐기)** | 2026-05-14 SQLite 락 + 12GB 폭증 사고. PG16 컨테이너로 전환. 상세: [docs/migration/2026-05-22-postgres.md](migration/2026-05-22-postgres.md) |
 | **K8s manifest 미적용** | 5개월차 팀의 위험 관리 — 다중 인스턴스가 필요한 시점에 도입. Compose로 시연·운영 충분. 설계 자료는 별도 보관 |
 
 ## 어떻게 구현했는가
 
-7-서비스 Docker Compose 구조:
+Docker Compose 구조 (10 컨테이너):
 
 | 서비스 | 포트 | 책임 |
 |---|---|---|
 | `drf` | 8000 | Django + DRF — 인증, 대시보드 HTML, REST API, 알람 생성 |
 | `fastapi` | 8001 | 센서 수신, WebSocket broadcast, 알람 push 엔드포인트 |
 | `postgres` | 5432 | 영속 저장소 (PG16, shared_buffers 256MB) |
-| `redis` | 6379 | Celery 브로커 + `active_alarms` List 큐 |
+| `redis` | 6379 | Celery 브로커 + WS 알람 Stream(`diconai:ws:alarms`, XADD/XREAD) |
+| `redis_exporter` | 9121 | Redis 메트릭 익스포터 (Prometheus scrape) |
 | `celery-worker-alarm` | - | alarm 큐 전용 (`-Q alarm`, concurrency=2) |
 | `celery-worker-metric` | - | metric 큐 전용 (`-Q metric`, concurrency=1) |
 | `celery-beat` | - | 주기 스케줄러 |
-| `prometheus` / `grafana` | 9090 / 3000 | 메트릭 수집 + 5개 대시보드 |
+| `prometheus` / `grafana` | 9090 / 3000 | 메트릭 수집 + 6개 대시보드 |
 
 Django 앱 레이어 ([drf-server/apps/](../drf-server/apps/)):
 - `models/` — DB 스키마

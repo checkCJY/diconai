@@ -344,3 +344,8 @@ CACHES = {
 # 동일 활성 Event에 알람 재팝업 최소 간격 (초)
 # 운영: 60초, 시연: 15초 (짧은 데모 시간 안에 재팝업 동작을 보여주기 위함)
 ALARM_REPOPUP_COOLDOWN_SEC = env.int("ALARM_REPOPUP_COOLDOWN_SEC", default=60)
+
+# DANGER 발화 전 연속 초과 틱 수 — 단일 틱 센서 스파이크/전력 인러시의 false danger
+# 억제. 1=즉시 발화(기존 동작), 2=2틱 confirm(≈송신주기×2). 시연 직전 1로 되돌리면
+# 즉시성 복원. 가스/전력 룰 danger 분기(gas_alarm/power_alarm)에서 사용.
+DANGER_CONFIRM_TICKS = env.int("DANGER_CONFIRM_TICKS", default=2)

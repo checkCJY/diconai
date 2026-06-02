@@ -22,9 +22,9 @@ from apps.core.metrics import ALARM_FIRED_TOTAL, ALARM_WS_PUSH_FAILED_TOTAL
 logger = logging.getLogger(__name__)
 
 # WARNING 타이머 — gas_alarm.py / power_alarm.py가 import해서 쓰므로 이 값만
-# 바꾸면 두 도메인의 countdown이 함께 변경된다. 더미 시나리오에서 WARNING 구간이
-# 빠르게 DANGER로 점프해 거의 발화되지 않아 3초로 짧게 둔다.
-WARNING_DURATION_SEC = 3
+# 바꾸면 두 도메인의 countdown이 함께 변경된다. WARNING 은 이 시간만큼 지속돼야
+# 발화하고(중간에 normal/danger 로 바뀌면 revoke), 임계 부근 일시 진동의 과발화를 억제.
+WARNING_DURATION_SEC = 5
 
 # FastAPI 내부 알람 푸시 엔드포인트.
 # 호스트는 settings.FASTAPI_INTERNAL_URL (env 주입) — 도커에선 `http://fastapi:8001`,
@@ -632,18 +632,33 @@ def fire_power_clear_task(
             },
             raise_on_failure=False,
         )
-        # 관련 ACTIVE 전력 Event 자동 RESOLVED — 운영자 수동 클릭 없이 정리.
+        # 관련 ACTIVE 전력 Event 자동 RESOLVED — 단, 마지막 활성 채널이 정상화될
+        # 때만. 한 채널 정상복귀가 디바이스 공유 Event 를 RESOLVE 하면 아직 위험한
+        # 다른 채널의 Event 까지 닫혀, 다음 발화가 새 event_id 로 생성돼 프론트 60s
+        # dedup(event_id 키)을 통과 → 폭주. 가스 cleared_gases 가 막는 race 의 전력판.
         from apps.alerts.services.event_service import auto_resolve_active_events
+        from apps.facilities.models import PowerDevice
+        from apps.monitoring.services.power_alarm import has_other_active_channel
 
-        resolved = auto_resolve_active_events(
-            event_type_prefix="power", power_device_id=device_id
-        )
-        logger.info(
-            "전력 정상화 알림 | device=%s ch=%s resolved=%d",
-            device_id,
-            channel,
-            resolved,
-        )
+        device = PowerDevice.objects.filter(pk=device_id).first()
+        channel_count = device.channel_count if device else 16
+        if has_other_active_channel(device_id, channel, channel_count):
+            # 다른 채널 위험 지속 → Event 유지 (마지막 채널이 닫는다). 폭주 차단 지점.
+            logger.info(
+                "전력 정상화 알림 | device=%s ch=%s — 다른 채널 위험 지속, Event 유지",
+                device_id,
+                channel,
+            )
+        else:
+            resolved = auto_resolve_active_events(
+                event_type_prefix="power", power_device_id=device_id
+            )
+            logger.info(
+                "전력 정상화 알림 | device=%s ch=%s resolved=%d",
+                device_id,
+                channel,
+                resolved,
+            )
     except Exception as exc:
         logger.error("전력 정상화 알림 실패: %s", exc)
         raise self.retry(exc=exc)

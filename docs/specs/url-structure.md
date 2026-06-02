@@ -1,6 +1,6 @@
 # URL 구조
 
-> 기준일: 2026-05-19 / 브랜치: feature/power_zscore_cp
+> 기준일: 2026-06-02 / 브랜치: feature/0602_power_alarm_flood
 
 URL 분리 원칙:
 - **페이지** (HTML): 루트 경로 (`/dashboard/...`, `/admin-panel/...`)
@@ -47,6 +47,7 @@ URL 분리 원칙:
 | GET | `/admin-panel/gas-sensors/` | 유해가스 센서 관리 페이지 |
 | GET | `/admin-panel/data/gas/` | 유해가스 데이터 관리 페이지 |
 | GET | `/admin-panel/data/power/` | 전력 데이터 관리 페이지 |
+| GET | `/admin-panel/data/retention-policy/` | 데이터 보관 정책 관리 페이지 |
 | GET | `/admin-panel/safety/checklist/` | 작업 전 안전 점검 관리 (★ 신규) |
 | GET | `/admin-panel/safety/vr-training/` | VR 교육 콘텐츠 관리 (★ 신규) |
 | GET | `/admin-panel/notices/` | 공지사항 목록 (★ 신규) |
@@ -57,6 +58,11 @@ URL 분리 원칙:
 | GET | `/admin-panel/logs/activity/` | 사용자 활동 로그 (★ 신규) |
 | GET | `/admin-panel/logs/integration/` | 통합 로그 (★ 신규) |
 | GET | `/admin-panel/logs/map-edit/` | 지도 편집 로그 (★ 신규) |
+| GET | `/admin-panel/alerts/policies/` | 알림 정책 관리 페이지 |
+| GET | `/admin-panel/events/history/` | 이벤트 이력 조회 페이지 |
+| GET | `/admin-panel/common-codes/` | 공통 코드 관리 페이지 |
+| GET | `/admin-panel/thresholds/` | 임계치 기준 관리 페이지 |
+| GET | `/admin-panel/risk-standards/` | 위험 기준 관리 페이지 |
 
 ### 1.3 인증 API (`/api/auth/` 프리픽스)
 
@@ -186,19 +192,66 @@ URL 분리 원칙:
 | GET | `/api/ml/models/active/` | 활성 MLModel 메타 (sensor_type, algorithm, sensor_identifier 3축 매칭) |
 | POST | `/api/ml/anomaly-results/` | MLAnomalyResult 생성 (FastAPI 추론 결과 영속화) |
 
-### 1.15 센서 데이터 수신 API (FastAPI → DRF 내부 통신)
+### 1.15 어드민 API — 알림정책·이벤트이력 (`/api/admin/alerts/` 프리픽스) ★ 신규
+
+| Method | Path | 설명 |
+|--------|------|------|
+| GET/POST | `/api/admin/alerts/policies/` | 알림 정책 목록·생성 |
+| GET/PATCH/DELETE | `/api/admin/alerts/policies/<pk>/` | 알림 정책 상세·수정·삭제 |
+| GET | `/api/admin/alerts/events/` | 이벤트 이력 조회 (읽기 전용) |
+
+### 1.16 어드민 API — 위험기준 (`/api/admin/` 프리픽스, apps.core) ★ 신규
+
+| Method | Path | 설명 |
+|--------|------|------|
+| GET/POST | `/api/admin/risk-standards/` | 위험 기준 목록·생성 |
+| GET/PATCH/DELETE | `/api/admin/risk-standards/<pk>/` | 위험 기준 상세·수정·삭제 |
+
+### 1.17 어드민 API — 임계치 (`/api/admin/` 프리픽스, apps.facilities) ★ 신규
+
+| Method | Path | 설명 |
+|--------|------|------|
+| GET/POST | `/api/admin/threshold-groups/` | 임계치 분류 그룹 목록·생성 |
+| GET/PATCH/DELETE | `/api/admin/threshold-groups/<pk>/` | 임계치 그룹 상세·수정·삭제 |
+| GET/POST | `/api/admin/threshold-groups/<group_id>/thresholds/` | 그룹별 임계치 목록·생성 |
+| GET/PATCH/DELETE | `/api/admin/thresholds/<pk>/` | 임계치 상세·수정·삭제 |
+| POST | `/api/admin/thresholds/bulk-deactivate/` | 임계치 일괄 미사용 전환 |
+
+### 1.18 어드민 API — 공통코드 (`/api/admin/` 프리픽스, apps.reference) ★ 신규
+
+| Method | Path | 설명 |
+|--------|------|------|
+| GET/POST | `/api/admin/code-groups/` | 코드 그룹 목록·생성 |
+| GET/PATCH/DELETE | `/api/admin/code-groups/<pk>/` | 코드 그룹 상세·수정·삭제 |
+| GET/POST | `/api/admin/code-groups/<group_id>/codes/` | 그룹별 코드 목록·생성 |
+| GET/PATCH/DELETE | `/api/admin/codes/<pk>/` | 코드 상세·수정·삭제 |
+| POST | `/api/admin/codes/bulk-deactivate/` | 코드 일괄 미사용 전환 |
+
+### 1.19 어드민 API — 데이터 보관 (`/api/admin/` 프리픽스, apps.operations) ★ 신규
+
+| Method | Path | 설명 |
+|--------|------|------|
+| GET/POST | `/api/admin/retention-policies/` | 보관 정책 목록·생성 |
+| GET/PATCH | `/api/admin/retention-policies/<pk>/` | 보관 정책 상세·수정 |
+| GET | `/api/admin/retention-policies/<pk>/preview/` | 보관 정책 적용 미리보기 |
+| POST | `/api/admin/retention-policies/run/` | 보관 배치 즉시 실행 (dry_run 지원) |
+
+### 1.20 센서 데이터 수신 API (FastAPI → DRF 내부 통신)
 
 | Method | Path | 호출 주체 | 설명 |
 |--------|------|----------|------|
 | POST | `/api/monitoring/gas/` | FastAPI gas_service | 가스 측정값 저장 |
 | GET | `/api/monitoring/power/thresholds/` | FastAPI | 전력 임계치 조회 |
+| GET | `/api/monitoring/power/threshold-meta/` | FastAPI | 정격 % 임계치(power_facility_default) 동기화 |
+| GET | `/api/monitoring/gas/thresholds/` | FastAPI | 가스 임계치 조회 |
 | POST | `/api/monitoring/power/channel-meta/` | FastAPI channel_meta_cache | 채널 메타 동기화 (★ 신규) |
 | POST | `/api/monitoring/power/event/` | FastAPI power_service | 전력 ON/OFF 스냅샷 저장 |
 | POST | `/api/monitoring/power/data/` | FastAPI power_service | 전력 측정값 저장 |
+| GET | `/api/internal/workers/` | FastAPI | worker 목록 내부 조회 (apps.operations) |
 | POST | `/api/positioning/receive/` | FastAPI position_router | 작업자 위치 수신·저장 |
 | POST | `/api/internal/integration-logs/` | FastAPI | 통합 로그 적재 (★ 신규) |
 
-### 1.16 설비·장치 관리 API (`/api/` 프리픽스)
+### 1.21 설비·장치 관리 API (`/api/` 프리픽스)
 
 | Method | Path | 설명 |
 |--------|------|------|
@@ -231,7 +284,7 @@ URL 분리 원칙:
 | GET | `/api/departments/select/` | 부서 드롭다운용 목록 |
 | GET | `/api/managers/select/` | 관리자 드롭다운용 목록 |
 
-### 1.17 OpenAPI / 스키마
+### 1.22 OpenAPI / 스키마
 
 | Method | Path | 설명 |
 |--------|------|------|

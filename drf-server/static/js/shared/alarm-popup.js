@@ -393,6 +393,11 @@ const _ACTION_TEXT = {
 const _AUTO_CLOSE_MS = { danger: 15000, warning: 30000 };
 const _PULSE_COUNT_THRESHOLD = 10;  // 그룹 카운트 ≥ 이 값이면 펄스 애니메이션
 
+// 수동 ack/✕ 로 팝업을 닫을 때 다음 팝업까지 두는 최소 텀(ms). 0ms 동기 연쇄
+// (확인 클릭 즉시 다음 팝업 + 비프) 가 "버튼 누르면 폭격" 체감을 주던 문제 완화.
+// 자동닫힘은 이미 _AUTO_CLOSE_MS 만큼 떨어져 있어 본 텀과 무관. 격상은 immediate 로 우회.
+const _PROCESS_GAP_MS = 700;
+
 // 위험도별 비프음 — Web Audio API로 합성 (외부 mp3 의존 없음).
 // danger: 880Hz × 3펄스 / warning: 660Hz × 2펄스.
 // 브라우저 자동재생 정책 — AudioContext는 user gesture 후에만 시작되므로
@@ -402,9 +407,16 @@ const _SOUND_CFG = {
   warning: { freq: 660, repeat: 2, interval: 0.28, duration: 0.20, volume: 0.22 },
 };
 let _audioCtx = null;
+// 연속 팝업 시 비프 폭격 방지 — 마지막 재생 후 이 간격(ms) 안이면 skip.
+const _BEEP_THROTTLE_MS = 1500;
+let _lastBeepAt = 0;
 function _playAlarmSound(level) {
   const cfg = _SOUND_CFG[level];
   if (!cfg) return;
+  // 연속 팝업 비프 폭격 방지 — 마지막 재생 후 _BEEP_THROTTLE_MS 안이면 skip.
+  const _nowMs = Date.now();
+  if (_nowMs - _lastBeepAt < _BEEP_THROTTLE_MS) return;
+  _lastBeepAt = _nowMs;
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return;
   try {
@@ -493,7 +505,7 @@ const AlarmPopup = {
       && (sameEvent || sameChannelFallback)
     ) {
       this.queue.unshift(data);          // 큐 맨 앞에 — close 후 _process 가 즉시 픽업
-      this.close({ acknowledged: false });
+      this.close({ acknowledged: false, immediate: true });  // 격상은 텀 없이 즉시
       return;
     }
 
@@ -697,8 +709,9 @@ const AlarmPopup = {
 
   // acknowledged=true (확인 버튼): 운영자가 알람을 인지했다는 신호 → drop 카운트 reset.
   // acknowledged=false (✕ 또는 자동닫힘): 다음 팝업까지 carry-over (운영자 미인지).
-  close({ acknowledged = false } = {}) {
+  close({ acknowledged = false, immediate = false } = {}) {
     clearTimeout(this._autoCloseTimer);
+    clearTimeout(this._gapTimer);
     if (acknowledged) {
       this.droppedCount = 0;
       this._renderDropBadge();
@@ -714,7 +727,26 @@ const AlarmPopup = {
       popup.classList.remove('level-danger', 'level-warning');
     }
     this.isOpen = false;
-    this._process();
+    // 격상(immediate)은 즉시, 그 외(수동 ack/✕/자동닫힘)는 _PROCESS_GAP_MS 텀 후
+    // 다음 팝업 — 확인 클릭이 다음 팝업+비프를 0ms 로 들이밀던 "폭격" 체감 제거.
+    if (immediate) {
+      this._process();
+    } else {
+      this._scheduleProcess();
+    }
+  },
+
+  // 다음 팝업을 _PROCESS_GAP_MS 텀 후 표시. 텀 동안 isOpen=true 로 잡아둬 들어오는
+  // show() 가 큐에만 쌓이고 갭을 건너뛰어 즉시 뜨지 않게 한다 (show 의
+  // `if(!this.isOpen) this._process()` 가드 우회 방지). 큐가 비어 있으면 idle 복귀.
+  _scheduleProcess() {
+    if (this.queue.length === 0) { this.isOpen = false; return; }
+    this.isOpen = true;
+    clearTimeout(this._gapTimer);
+    this._gapTimer = setTimeout(() => {
+      this.isOpen = false;
+      this._process();
+    }, _PROCESS_GAP_MS);
   },
 
   // RESOLVED 신호 처리 — 같은 event_id 떠있는 팝업 close + 큐 제거 + 위험 해소 토스트.
@@ -790,6 +822,7 @@ const AlarmPopup = {
     // 큐는 유지한 채 현재 팝업만 닫고 상세 페이지로 이동.
     // 누락 카운트는 reset — 운영자가 이력 페이지에서 확인 의사.
     clearTimeout(this._autoCloseTimer);
+    clearTimeout(this._gapTimer);
     this._currentId = null;
     this._currentLevel = null;
     this._currentChannel = null;

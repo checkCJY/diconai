@@ -7,7 +7,7 @@
 # │  종합 위험도 │  동작                                            │
 # ├──────────────────────────────────────────────────────────────┤
 # │  DANGER     │  즉각 알람 (fire_power_danger_task.delay)         │
-# │  WARNING    │  3초 타이머 (apply_async countdown=3)             │
+# │  WARNING    │  5초 타이머 (apply_async countdown=5)             │
 # │  NORMAL     │  타이머 취소 + 정상화 알림 (이전 경보 시)           │
 # └──────────────────────────────────────────────────────────────┘
 #
@@ -27,6 +27,7 @@ from django.utils import timezone
 
 from apps.alerts.services.alarm_dedupe import (
     clear_state,
+    confirm_consecutive,
     get_state,
     is_ai_mute_active,
     try_transition,
@@ -39,6 +40,7 @@ from apps.alerts.tasks import (
 )
 from apps.core.constants import RiskLevel
 from apps.core.metrics import (
+    POWER_DANGER_CONFIRM_TOTAL,
     RULE_FIRE_SUPPRESSED_BY_AI_TOTAL,
     STATIC_AUDIT_MISMATCH_TOTAL,
     STATIC_FIRE_SUPPRESSED_BY_FASTAPI_TOTAL,
@@ -97,6 +99,24 @@ def _axis_risk_key(device_id: int, channel: int, axis: str) -> str:
     return f"alarm:power:risk:{device_id}:{channel}:{axis}"
 
 
+def _dcount_key(device_id: int, channel: int) -> str:
+    """danger 연속 틱 카운터 키 — watt 축에서만 증가 (사이클당 1회). _state_key sibling."""
+    return f"alarm:power:state:{device_id}:{channel}:dcount"
+
+
+def _reset_confirm_streak(dcount_key: str) -> None:
+    """danger 스트릭이 끊겼을 때 confirm 카운터를 리셋한다.
+
+    임계 도달 전(dcount 1~threshold-1)에 끊긴 경우 = 단일 틱 스파이크/인러시를
+    confirm 게이트가 실제로 걸러낸 것 → outcome="reset" 카운트. 이미 확정된
+    (dcount>=threshold) 스트릭이 정상 해소되는 것은 reset 이 아니므로 제외한다.
+    """
+    dcount = cache.get(dcount_key)
+    if dcount and dcount < settings.DANGER_CONFIRM_TICKS:
+        POWER_DANGER_CONFIRM_TOTAL.labels(outcome="reset").inc()
+    cache.delete(dcount_key)
+
+
 def _revoke(task_id: str) -> None:
     """진행 중인 WARNING 타이머 Celery 태스크를 강제 취소한다."""
     from config.celery import app as celery_app
@@ -128,6 +148,32 @@ def _aggregate_risk(device_id: int, channel: int, axis: str, this_risk: str) -> 
     cached = cache.get_many(list(keys_by_axis.values()))
     levels = [cached.get(keys_by_axis[ax], RiskLevel.NORMAL) for ax in keys_by_axis]
     return _max_risk(levels)
+
+
+def has_other_active_channel(
+    device_id: int, exclude_channel: int, channel_count: int = 16
+) -> bool:
+    """device 의 exclude_channel 외 채널 중 하나라도 WARNING/DANGER 상태인지.
+
+    전력 정상화(clear) 시 디바이스 공유 Event 를 곧장 RESOLVE 하면, 아직 위험한
+    다른 채널의 Event 까지 닫혀 다음 발화가 새 event_id 로 폭주한다 (가스
+    cleared_gases 가 막는 race 의 전력판). fire_power_clear_task 가 이 헬퍼로
+    "마지막 활성 채널이 정상화될 때만" resolve 하도록 게이팅한다.
+
+    state 키(`alarm:power:state:{device}:{channel}`)는 try_transition 이 raw redis
+    로 pickle SET 하지만 cache.make_key/unpickle 경로가 동일해 cache.get_many 로
+    그대로 읽힌다. 키 없음(=정상/만료)은 결과에서 자연 제외. 정상 분기는
+    clear_state 로 키를 지우므로 present 키는 항상 WARNING/DANGER 중 하나.
+    """
+    keys = [
+        _state_key(device_id, ch)
+        for ch in range(1, channel_count + 1)
+        if ch != exclude_channel
+    ]
+    if not keys:
+        return False
+    states = cache.get_many(keys)
+    return any(s in (RiskLevel.WARNING, RiskLevel.DANGER) for s in states.values())
 
 
 def _shadow_audit(device_id: int, channel: int, would_fire_level: str) -> None:
@@ -207,9 +253,29 @@ def trigger_power_alarms(objs: list, device, ingress_ts: float | None = None) ->
 
         state_key = _state_key(device_id, channel)
         task_key = _task_key(device_id, channel)
+        dcount_key = _dcount_key(device_id, channel)
         label = _channel_label(device, channel)
 
         if aggregate == RiskLevel.DANGER:
+            # danger 2틱 confirm — watt 축에서만 카운트. trigger_power_alarms 가 축별로
+            # 호출돼 1사이클에 3~4회 평가되므로, current/voltage 축은 stale watt 캐시로
+            # 조기 발화할 수 있어 skip 한다. aggregate 는 watt 도착 시 3축 최신값을
+            # 반영하므로 누락 없음. DANGER_CONFIRM_TICKS=1 이면 첫 틱 즉시 발화(기존 동작).
+            if axis_name != "watt":
+                continue
+            gate_passed = confirm_consecutive(
+                dcount_key, settings.DANGER_CONFIRM_TICKS, _CACHE_TTL
+            )
+            # confirm_consecutive 직후라 dcount = 현재 스트릭 길이
+            dcount = cache.get(dcount_key) or 0
+            if not gate_passed:
+                # 임계 미달 — 발화 보류 (단일 틱 스파이크/인러시 억제)
+                POWER_DANGER_CONFIRM_TOTAL.labels(outcome="held").inc()
+                continue
+            if dcount == settings.DANGER_CONFIRM_TICKS:
+                # 임계 도달하는 그 틱에만 1회 — 지속 danger 의 후속 틱 중복 제외
+                POWER_DANGER_CONFIRM_TOTAL.labels(outcome="confirmed").inc()
+
             # 진행 중인 WARNING 타이머가 있으면 먼저 취소 — AI mute 가드 이전에 수행.
             # 그렇지 않으면 AI mute 가 활성일 때 룰 fire 만 suppress 되고 stale WARNING
             # 타이머가 카운트다운 끝나면 발화해 화면에 룰 알람이 등장 (AI 1순위 위반).
@@ -236,6 +302,8 @@ def trigger_power_alarms(objs: list, device, ingress_ts: float | None = None) ->
                 )
 
         elif aggregate == RiskLevel.WARNING:
+            # danger 스트릭 끊김 — confirm 카운터 리셋
+            _reset_confirm_streak(dcount_key)
             prev_state = get_state(state_key)
             if prev_state in (RiskLevel.WARNING, RiskLevel.DANGER):
                 continue
@@ -264,6 +332,8 @@ def trigger_power_alarms(objs: list, device, ingress_ts: float | None = None) ->
             try_transition(state_key, RiskLevel.WARNING, _CACHE_TTL)
 
         else:  # normal
+            # danger 스트릭 끊김 — confirm 카운터 리셋
+            _reset_confirm_streak(dcount_key)
             # WARNING 타이머가 있으면 취소하고 이전 경보 시 정상화 알림 발송
             pending = cache.get(task_key)
             if pending:
