@@ -130,6 +130,32 @@ def _aggregate_risk(device_id: int, channel: int, axis: str, this_risk: str) -> 
     return _max_risk(levels)
 
 
+def has_other_active_channel(
+    device_id: int, exclude_channel: int, channel_count: int = 16
+) -> bool:
+    """device 의 exclude_channel 외 채널 중 하나라도 WARNING/DANGER 상태인지.
+
+    전력 정상화(clear) 시 디바이스 공유 Event 를 곧장 RESOLVE 하면, 아직 위험한
+    다른 채널의 Event 까지 닫혀 다음 발화가 새 event_id 로 폭주한다 (가스
+    cleared_gases 가 막는 race 의 전력판). fire_power_clear_task 가 이 헬퍼로
+    "마지막 활성 채널이 정상화될 때만" resolve 하도록 게이팅한다.
+
+    state 키(`alarm:power:state:{device}:{channel}`)는 try_transition 이 raw redis
+    로 pickle SET 하지만 cache.make_key/unpickle 경로가 동일해 cache.get_many 로
+    그대로 읽힌다. 키 없음(=정상/만료)은 결과에서 자연 제외. 정상 분기는
+    clear_state 로 키를 지우므로 present 키는 항상 WARNING/DANGER 중 하나.
+    """
+    keys = [
+        _state_key(device_id, ch)
+        for ch in range(1, channel_count + 1)
+        if ch != exclude_channel
+    ]
+    if not keys:
+        return False
+    states = cache.get_many(keys)
+    return any(s in (RiskLevel.WARNING, RiskLevel.DANGER) for s in states.values())
+
+
 def _shadow_audit(device_id: int, channel: int, would_fire_level: str) -> None:
     """DRF 정적 평가 결과를 fastapi 결정과 비교한다 (활성화 모드 전용).
 

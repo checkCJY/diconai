@@ -632,12 +632,22 @@ def fire_power_clear_task(
             },
             raise_on_failure=False,
         )
-        # 관련 ACTIVE 전력 Event 자동 RESOLVED — 운영자 수동 클릭 없이 정리.
+        # 관련 ACTIVE 전력 Event 자동 RESOLVED — 단, 마지막 활성 채널이 정상화될
+        # 때만. 한 채널 정상복귀가 디바이스 공유 Event 를 RESOLVE 하면 아직 위험한
+        # 다른 채널의 Event 까지 닫혀, 다음 발화가 새 event_id 로 생성돼 프론트 60s
+        # dedup(event_id 키)을 통과 → 폭주. 가스 cleared_gases 가 막는 race 의 전력판.
         from apps.alerts.services.event_service import auto_resolve_active_events
+        from apps.facilities.models import PowerDevice
+        from apps.monitoring.services.power_alarm import has_other_active_channel
 
-        resolved = auto_resolve_active_events(
-            event_type_prefix="power", power_device_id=device_id
-        )
+        device = PowerDevice.objects.filter(pk=device_id).first()
+        channel_count = device.channel_count if device else 16
+        if has_other_active_channel(device_id, channel, channel_count):
+            resolved = 0  # 다른 채널 위험 지속 → Event 유지 (마지막 채널이 닫는다)
+        else:
+            resolved = auto_resolve_active_events(
+                event_type_prefix="power", power_device_id=device_id
+            )
         logger.info(
             "전력 정상화 알림 | device=%s ch=%s resolved=%d",
             device_id,
