@@ -9,7 +9,7 @@
 
 [Redis mock]
 실제 Redis 안 띄움. `core.redis_client.get_redis` 를 patch 하고 AsyncMock 으로
-set/lpush/ltrim 호출만 추적. SET NX EX 의 반환값은 `set.side_effect` 로 시나리오별
+set/xadd 호출만 추적. SET NX EX 의 반환값은 `set.side_effect` 로 시나리오별
 제어. counter 는 prometheus_client `_value.get()` 로 직접 검증.
 """
 
@@ -21,15 +21,18 @@ from websocket.services import alarm_queue
 
 
 def _make_redis_mock(set_returns: list[bool]) -> AsyncMock:
-    """fake redis client — set 은 side_effect 리스트, lpush/ltrim 은 정상 응답.
+    """fake redis client — set 은 side_effect 리스트, xadd 는 정상 응답.
+
+    LIST→Stream 전환 후 push_alarm 은 LPUSH/LTRIM 대신 XADD(MAXLEN ~) 1회를 쓴다.
+    dedup 게이트(SET NX EX)는 그대로라 본 테스트들은 "첫 도착만 큐 적재" 동작을
+    xadd.await_count 로 확인한다.
 
     Args:
         set_returns: r.set NX EX 의 순차 반환값. True=첫 도착자, False=이미 set.
     """
     redis = AsyncMock()
     redis.set = AsyncMock(side_effect=set_returns)
-    redis.lpush = AsyncMock(return_value=1)
-    redis.ltrim = AsyncMock(return_value=True)
+    redis.xadd = AsyncMock(return_value="1-0")
     return redis
 
 
@@ -49,9 +52,8 @@ async def test_rule_alarm_duplicate_fingerprint_dedups():
         await alarm_queue.push_alarm(payload)
         await alarm_queue.push_alarm(payload)
 
-    # 첫 도착자만 LPUSH, 두 번째는 dedup 으로 skip
-    assert redis.lpush.await_count == 1
-    assert redis.ltrim.await_count == 1
+    # 첫 도착자만 XADD, 두 번째는 dedup 으로 skip
+    assert redis.xadd.await_count == 1
     assert redis.set.await_count == 2
     # counter +1
     assert alarm_queue.push_alarm_dedup_hits._value.get() - before == 1
@@ -68,7 +70,7 @@ async def test_distinct_fingerprints_both_push():
         await alarm_queue.push_alarm(payload_a)
         await alarm_queue.push_alarm(payload_b)
 
-    assert redis.lpush.await_count == 2
+    assert redis.xadd.await_count == 2
 
 
 @pytest.mark.asyncio
@@ -92,7 +94,7 @@ async def test_ai_alarm_fingerprint_includes_device_channel():
         await alarm_queue.push_alarm(payload)
 
     # 같은 (device, channel, risk_level) → 두 번째 dedup
-    assert redis.lpush.await_count == 1
+    assert redis.xadd.await_count == 1
     # set 키에 device/channel 포함됐는지 확인
     set_call_key = redis.set.call_args_list[0].args[0]
     assert "device_63200c3afd12" in set_call_key
@@ -120,7 +122,7 @@ async def test_unrecognized_payload_skips_dedup():
         await alarm_queue.push_alarm(payload)
 
     assert redis.set.await_count == 0  # dedup 검사 자체 skip
-    assert redis.lpush.await_count == 2  # 둘 다 LPUSH
+    assert redis.xadd.await_count == 2  # 둘 다 LPUSH
 
 
 @pytest.mark.asyncio
@@ -142,7 +144,7 @@ async def test_push_alarm_dedupes_gas_clear_by_source_label():
         await alarm_queue.push_alarm(payload)
         await alarm_queue.push_alarm(payload)
 
-    assert redis.lpush.await_count == 1
+    assert redis.xadd.await_count == 1
     assert redis.set.await_count == 2
     # fingerprint 키에 source_label 과 alarm_type 포함
     set_call_key = redis.set.call_args_list[0].args[0]
@@ -168,7 +170,7 @@ async def test_push_alarm_does_not_dedupe_gas_clear_across_sources():
         await alarm_queue.push_alarm(payload_a)
         await alarm_queue.push_alarm(payload_b)
 
-    assert redis.lpush.await_count == 2
+    assert redis.xadd.await_count == 2
 
 
 @pytest.mark.asyncio
@@ -182,7 +184,7 @@ async def test_ai_alarm_without_meta_skips_dedup():
         await alarm_queue.push_alarm(payload)
 
     assert redis.set.await_count == 0
-    assert redis.lpush.await_count == 2
+    assert redis.xadd.await_count == 2
 
 
 @pytest.mark.asyncio
@@ -323,7 +325,7 @@ async def test_push_alarm_dedupes_cover_same_source_label_channel():
 
     # SET NX 두 번 시도, LPUSH 는 첫 통과 시 1회만.
     assert redis_mock.set.await_count == 2
-    assert redis_mock.lpush.await_count == 1
+    assert redis_mock.xadd.await_count == 1
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -381,7 +383,7 @@ async def test_resolved_signal_pushes_even_when_original_in_dedup_window():
         await alarm_queue.push_alarm(resolved)
 
     # 둘 다 LPUSH — 별도 fingerprint
-    assert redis.lpush.await_count == 2
+    assert redis.xadd.await_count == 2
     assert redis.set.await_count == 2
     # 두 set 키의 suffix 가 다름 — "danger" vs "resolved"
     fp1 = redis.set.call_args_list[0].args[0]
@@ -404,4 +406,4 @@ async def test_resolved_signal_retry_still_deduped():
         await alarm_queue.push_alarm(resolved)
         await alarm_queue.push_alarm(resolved)  # retry
 
-    assert redis.lpush.await_count == 1  # 첫 도착자만 LPUSH
+    assert redis.xadd.await_count == 1  # 첫 도착자만 LPUSH

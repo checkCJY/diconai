@@ -2,8 +2,8 @@
 #
 # 데이터 흐름:
 #   IN  : DRF Celery 태스크의 POST /internal/alarms/push/ (AlarmPayload)
-#   OUT : 1) Redis 알람 큐(`diconai:ws:alarms`)에 LPUSH — alarm_flush_loop 이
-#            BRPOP 으로 즉시 소비해 브라우저로 broadcast
+#   OUT : 1) Redis 알람 스트림(`diconai:ws:alarms`)에 XADD (Phase 1 C4 → Stream 전환)
+#            — alarm_flush_loop 이 XREAD 로 즉시 소비해 브라우저로 broadcast
 #         2) geofence_intrusion + worker_id 지정 시 해당 작업자 ws 개인 전송
 #
 # 보안: INTERNAL_SERVICE_TOKEN 검증, 미설정 시 127.0.0.1(localhost) 한정.
@@ -53,6 +53,10 @@ class AlarmPayload(BaseModel):
     measured_value: float | None = None
     threshold_value: float | None = None
     worker_id: int | None = None  # 지오펜스 알람 시 타겟 작업자
+    # 가스/전력 DANGER 대피 알림 수신 작업자 id 목록 — DRF가 소속 시설 기준으로
+    # 계산해 전달. FastAPI는 이 목록의 worker_clients 에만 전송(전체 broadcast 아님).
+    # 브라우저 broadcast 엔 불필요·민감하므로 스트림 push 전 pop 한다.
+    target_worker_ids: list[int] = []
     # 서버(DRF Celery) 발신 시각 — 클라이언트가 우선 사용 (JS 03 R3).
     # 누락 시 클라이언트는 도착 시각(new Date())으로 fallback.
     created_at: str | None = None
@@ -133,8 +137,11 @@ async def push_alarm_handler(request: Request, alarm: AlarmPayload):
             raise HTTPException(status_code=403, detail="내부 전용 엔드포인트입니다.")
 
     payload = alarm.model_dump(exclude_none=True)
+    # target_worker_ids 는 작업자 개인 분배 계산에만 쓰고 스트림(브라우저 broadcast)
+    # 에는 싣지 않는다 — 대상 id 목록 노출·payload bloat 방지.
+    payload.pop("target_worker_ids", None)
 
-    # Redis LIST에 LPUSH. 장애 시 503으로 Celery retry 유도.
+    # Phase 1 C4 → Stream — Redis Stream에 XADD. 장애 시 503으로 Celery retry 유도.
     try:
         await push_alarm(payload)
     except Exception as exc:
@@ -149,5 +156,19 @@ async def push_alarm_handler(request: Request, alarm: AlarmPayload):
                 await ws.send_json({"type": "worker_alert", **payload})
             except Exception:
                 worker_clients.pop(alarm.worker_id, None)
+
+    # 가스/전력 DANGER 는 소속 시설 작업자에게도 대피 알림 — DRF가 시설 기준으로
+    # 계산한 target_worker_ids 중 접속 작업자에게만 전송(전체 broadcast 아님).
+    # 동일 event_id 는 프론트(alarm-popup) dedup 이 관리자 대시보드 중복 표시 흡수.
+    elif alarm.alarm_type in ("gas_threshold", "power_overload") and (
+        alarm.risk_level == "danger"
+    ):
+        for worker_id in alarm.target_worker_ids:
+            ws = worker_clients.get(worker_id)
+            if ws:
+                try:
+                    await ws.send_json({"type": "worker_alert", **payload})
+                except Exception:
+                    worker_clients.pop(worker_id, None)
 
     return {"ok": True}

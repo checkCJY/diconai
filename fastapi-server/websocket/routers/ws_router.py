@@ -13,15 +13,19 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from core.config import settings
-from core.metrics import E2E_ALARM_LATENCY, WS_CONNECTIONS
+from core.metrics import ALARM_STREAM_LAG, E2E_ALARM_LATENCY, WS_CONNECTIONS
 from services.drf_client import post_to_drf
 from websocket.auth import verify_jwt_from_ws_query
-from websocket.services.alarm_queue import pop_alarm_blocking
+from websocket.services.alarm_queue import (
+    _id_ms,
+    read_alarms_blocking,
+    stream_tail_id,
+)
 from websocket.services.broadcast import (
     build_broadcast_payload,
     fetch_broadcast_state,
-)  # 이성현 수정
-from websocket.snap_store import store_worker_position  # 이성현 수정
+)
+from websocket.snap_store import store_worker_position
 from websocket.state import (
     sensor_clients,
     worker_clients,
@@ -49,40 +53,58 @@ async def _send_to_all(payload: dict) -> None:
 
 
 async def alarm_flush_loop():
-    """Redis 큐(diconai:ws:alarms)에서 알람을 즉시 소비해 브로드캐스트한다.
+    """Redis 스트림(diconai:ws:alarms)을 XREAD로 소비해 브로드캐스트한다.
 
-    Phase 1 C4 — 기존 asyncio.Event 신호는 set/clear race로 알람 손실 가능했고,
-    is_new_event 필터로 정상화 알림이 silent drop되었다. BRPOP은 큐에 원소가
-    들어오는 순간 깨어나며 pop과 소비가 한 연산이라 race가 구조적으로 제거된다.
-    페이로드 형식은 호환 모드 — `{"alarms": [payload], ...}` shape 유지로 프론트 무수정.
+    LIST→Stream 전환 (fan-out 대비): BRPOP(경쟁 소비 — 한 알람을 한 replica만 pop)을
+    replica별 독립 XREAD로 바꿔 모든 replica가 모든 알람을 받는다. 커서(last_id)는 이
+    루프가 메모리로 보유하고, 부팅 직후 "$"(이후 신규만)에서 시작해 과거 알람 무한
+    replay를 막는다. 페이로드 형식은 호환 모드 — `{"alarms": [payload], ...}` shape
+    유지로 프론트 무수정.
 
-    [M-1 수정] 클라이언트가 없는 상태에서 BRPOP으로 pop하면 알람이 영구 소실된다.
-    pop 전에 sensor_clients를 먼저 확인하고, 없으면 1초 대기 후 재시도한다.
-    timeout=1로 제한해 클라이언트 연결 직후 즉시 소비가 재개되도록 한다.
+    [M-1 보존] 클라이언트가 없으면 XREAD를 호출하지 않고 커서를 동결한 채 대기한다.
+    스트림은 데이터가 지워지지 않으므로, 클라이언트 재접속 시 last_id 이후 누적분이
+    다음 XREAD에서 배치로 한 번에 전달된다 (BRPOP 시절 "pop하면 영구 소실" 문제 해소).
+
+    [배치 처리] XREAD는 커서 이후 쌓인 N건을 배치로 준다. 반환 payload 전부를 순회하며
+    각각 broadcast하고, 커서는 배치 마지막 entry ID로 전진한다 (단건 가정 시 누락·순서
+    꼬임 — 가장 버그 나기 쉬운 곳).
+
+    [stream lag] iteration 말미에 스트림 말단 ID와 커서의 시간차를 메트릭으로 노출한다.
+    평상시 ≈0, 이 replica가 소화 못 하면 증가 → 멀티레플리카 시 뒤처지는 replica 식별.
     """
+    last_id = "$"  # 부팅 이후 신규 알람만 (과거 무한 replay 방지)
     while True:
-        # [M-1] 클라이언트 없으면 pop 중단 — 큐에 알람을 보존한 채 대기
+        # [M-1] 클라이언트 없으면 읽지 않고 커서 동결 — 스트림에 알람 보존
         if not sensor_clients:
             await asyncio.sleep(1)
             continue
-        payload = await pop_alarm_blocking(timeout=1)
-        if payload is None:
-            # timeout 만료(클라이언트 연결 상태 재확인) 또는 Redis 일시 장애
-            continue
-        ingress_ts = payload.pop("ingress_ts", None)
-        if ingress_ts is not None:
-            risk_level = payload.get("risk_level", "unknown")
-            E2E_ALARM_LATENCY.labels(risk_level=risk_level).observe(
-                time.time() - ingress_ts
-            )
-        try:  # 이성현 수정 — Redis 읽기 실패 시 tick 스킵
-            state = await fetch_broadcast_state()
-        except Exception:
-            logger.warning("[alarm_flush_loop] Redis 읽기 실패 — tick 스킵")
-            continue
-        base = build_broadcast_payload(state, include_alarms=False)
-        base["alarms"] = [payload]
-        await _send_to_all(base)
+        new_last_id, payloads = await read_alarms_blocking(last_id, timeout=1)
+        if payloads:
+            # 배치 broadcast 전 state 1회 조회 (develop 시그니처). Redis 읽기 실패 시
+            # 커서 미전진으로 continue → 다음 tick 재처리(알람 보존).
+            try:
+                state = await fetch_broadcast_state()
+            except Exception:
+                logger.warning("[alarm_flush_loop] Redis 읽기 실패 — tick 스킵")
+                continue
+            for payload in payloads:
+                ingress_ts = payload.pop("ingress_ts", None)
+                if ingress_ts is not None:
+                    risk_level = payload.get("risk_level", "unknown")
+                    E2E_ALARM_LATENCY.labels(risk_level=risk_level).observe(
+                        time.time() - ingress_ts
+                    )
+                base = build_broadcast_payload(state, include_alarms=False)
+                base["alarms"] = [payload]
+                await _send_to_all(base)
+        last_id = new_last_id  # 배치 마지막 ID로 커서 전진 (빈 결과면 그대로 유지)
+        # stream lag — 말단과 커서의 시간차(초). last_id가 아직 "$"(미처리)거나
+        # 스트림이 비었으면 0 (ms 파싱 불가).
+        tail = await stream_tail_id()
+        if tail is not None and last_id != "$":
+            ALARM_STREAM_LAG.set((_id_ms(tail) - _id_ms(last_id)) / 1000)
+        else:
+            ALARM_STREAM_LAG.set(0)
 
 
 async def broadcast_loop():
