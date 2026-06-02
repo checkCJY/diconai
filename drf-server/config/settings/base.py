@@ -114,7 +114,9 @@ if DATABASES["default"]["ENGINE"] == "django.db.backends.sqlite3":
 
 # ── 비밀번호 검증 ─────────────────────────────────────────────
 AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"
+    },
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
@@ -154,8 +156,8 @@ SIMPLE_JWT = {
         days=env.int("JWT_REFRESH_TOKEN_LIFETIME_DAYS", default=30)
     ),
     "AUTH_HEADER_TYPES": ("Bearer",),
-    "ROTATE_REFRESH_TOKENS": True,       # refresh 사용 시 새 토큰 발급 (1회용)
-    "BLACKLIST_AFTER_ROTATION": True,    # 회전된 refresh 재사용 차단
+    "ROTATE_REFRESH_TOKENS": True,  # refresh 사용 시 새 토큰 발급 (1회용)
+    "BLACKLIST_AFTER_ROTATION": True,  # 회전된 refresh 재사용 차단
     # JWT_SIGNING_KEY 미설정 시 SECRET_KEY 폴백 — 운영에서는 반드시 독립 키 사용
     "SIGNING_KEY": env("JWT_SIGNING_KEY", default=SECRET_KEY),
 }
@@ -189,6 +191,12 @@ STATIC_THRESHOLD_AT_FASTAPI = env.bool("STATIC_THRESHOLD_AT_FASTAPI", default=Fa
 # 브라우저가 FastAPI에 접속할 때 사용하는 공개 주소
 FRONTEND_API_BASE_URL = env("FRONTEND_API_BASE_URL", default="")
 FRONTEND_WS_BASE_URL = env("FRONTEND_WS_BASE_URL", default="ws://127.0.0.1:8001")
+
+# ── Discord 알람 연동 ─────────────────────────────────────────
+# 알람을 외부 Discord 채널로도 발송. 미설정(기본 False / 빈 webhook)이면 미발송.
+DISCORD_ALARM_ENABLED = env.bool("DISCORD_ALARM_ENABLED", default=False)
+DISCORD_WEBHOOK_ADMIN = env("DISCORD_WEBHOOK_ADMIN", default="")  # 관리자 채널
+DISCORD_WEBHOOK_WORKER = env("DISCORD_WEBHOOK_WORKER", default="")  # 작업자 채널
 
 # ── 파일 경로 ─────────────────────────────────────────────────
 MEDIA_URL = "/media/"
@@ -285,8 +293,8 @@ LOGGING = {
 # ── Redis & Celery ────────────────────────────────────────────
 REDIS_URL = env("REDIS_URL", default="redis://localhost:6379/0")
 
-CELERY_BROKER_URL = REDIS_URL       # 태스크 전달 채널
-CELERY_RESULT_BACKEND = REDIS_URL   # 태스크 결과 저장
+CELERY_BROKER_URL = REDIS_URL  # 태스크 전달 채널
+CELERY_RESULT_BACKEND = REDIS_URL  # 태스크 결과 저장
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"

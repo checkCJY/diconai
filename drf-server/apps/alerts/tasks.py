@@ -128,6 +128,18 @@ def _push_to_ws(alarm_data: dict, *, raise_on_failure: bool = True) -> None:
     except Exception:
         pass  # broker 다운 silent fail — 본 흐름 비차단
 
+    # WS 푸시 성공 시에만 Discord 미러 — 실패 시 retry 가 같은 알람을 재발송하면
+    # Discord 엔 dedup 이 없어 중복되므로, 성공 tick 1회만 발송한다.
+    if pushed:
+        try:
+            from apps.notifications.services.discord_service import (
+                send_alarm_to_discord,
+            )
+
+            send_alarm_to_discord(alarm_data)
+        except Exception:
+            pass  # Discord 실패는 알람 본류 비차단
+
     if not pushed and raise_on_failure:
         # 호출자(fire_*_task)의 except에서 self.retry(exc=exc)로 흡수
         raise RuntimeError("FastAPI WS push failed")
@@ -144,6 +156,7 @@ def fire_danger_alarm_task(
     ingress_ts: float | None = None,
 ):
     """DANGER 즉각 알람 — AlarmRecord/Event 생성 후 FastAPI WS 큐에 푸시."""
+    from apps.alerts.selectors.alarm_targets import get_facility_worker_ids
     from apps.alerts.services.event_service import create_alarm_and_event
     from apps.core.constants import AlarmType
     from apps.monitoring.utils.gas_thresholds import GAS_UNITS, get_threshold_value
@@ -191,8 +204,11 @@ def fire_danger_alarm_task(
                     "source_label": source_label,
                     "summary": summary,
                     "message": alarm.get_short_message(),
-                    # 활성 Event 의 EventAck 사용자명 list — 다중 관리자 환경에서
-                    # 토스트에 "(N 확인 중)" 시그널 표시용.
+                    # 소속 시설 작업자에게도 대피 알림 — FastAPI가 이 목록으로만
+                    # worker_clients 분배(전체 broadcast 아님). 누락 시 작업자 미전송.
+                    "target_worker_ids": get_facility_worker_ids(facility_id),
+                    # T3 (2026-05-19) — 활성 Event 의 EventAck 사용자명 list.
+                    # 다중 관리자 환경에서 토스트에 "(N 확인 중)" 시그널 표시용.
                     "event_ack_users": _get_event_ack_names(event.id),
                     "is_new_event": alarm is not None,
                     "ingress_ts": ingress_ts,
@@ -434,6 +450,7 @@ def fire_power_danger_task(
     ingress_ts: float | None = None,
 ):
     """전력 DANGER 즉각 알람 — AlarmRecord/Event 생성 후 FastAPI WS 큐에 푸시."""
+    from apps.alerts.selectors.alarm_targets import get_facility_worker_ids
     from apps.alerts.services.event_service import create_alarm_and_event
     from apps.core.constants import AlarmType
     from apps.facilities.services.threshold_service import get_threshold
@@ -477,8 +494,11 @@ def fire_power_danger_task(
                     "source_label": source_label,
                     "summary": summary,
                     "message": alarm.get_short_message(),
-                    # 활성 Event 의 EventAck 사용자명 list — 다중 관리자 환경에서
-                    # 토스트에 "(N 확인 중)" 시그널 표시용.
+                    # 소속 시설 작업자에게도 대피 알림 — FastAPI가 이 목록으로만
+                    # worker_clients 분배(전체 broadcast 아님). 누락 시 작업자 미전송.
+                    "target_worker_ids": get_facility_worker_ids(facility_id),
+                    # T3 (2026-05-19) — 활성 Event 의 EventAck 사용자명 list.
+                    # 다중 관리자 환경에서 토스트에 "(N 확인 중)" 시그널 표시용.
                     "event_ack_users": _get_event_ack_names(event.id),
                     "is_new_event": alarm is not None,
                     "ingress_ts": ingress_ts,

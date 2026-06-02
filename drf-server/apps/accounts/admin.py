@@ -42,6 +42,7 @@ class CustomUserAdmin(UserAdmin):
                     "position",
                     "facility",
                     "phone",
+                    "discord_id",
                     "failed_login_count",
                     "account_locked_until",
                     "deactivated_at",
