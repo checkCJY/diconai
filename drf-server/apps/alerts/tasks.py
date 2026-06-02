@@ -643,17 +643,22 @@ def fire_power_clear_task(
         device = PowerDevice.objects.filter(pk=device_id).first()
         channel_count = device.channel_count if device else 16
         if has_other_active_channel(device_id, channel, channel_count):
-            resolved = 0  # 다른 채널 위험 지속 → Event 유지 (마지막 채널이 닫는다)
+            # 다른 채널 위험 지속 → Event 유지 (마지막 채널이 닫는다). 폭주 차단 지점.
+            logger.info(
+                "전력 정상화 알림 | device=%s ch=%s — 다른 채널 위험 지속, Event 유지",
+                device_id,
+                channel,
+            )
         else:
             resolved = auto_resolve_active_events(
                 event_type_prefix="power", power_device_id=device_id
             )
-        logger.info(
-            "전력 정상화 알림 | device=%s ch=%s resolved=%d",
-            device_id,
-            channel,
-            resolved,
-        )
+            logger.info(
+                "전력 정상화 알림 | device=%s ch=%s resolved=%d",
+                device_id,
+                channel,
+                resolved,
+            )
     except Exception as exc:
         logger.error("전력 정상화 알림 실패: %s", exc)
         raise self.retry(exc=exc)
