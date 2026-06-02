@@ -218,7 +218,7 @@
     },
     {
       "id": 5,
-      "title": "전력 AI — 추론 실행 횟수 (5m)",
+      "title": "전력 AI — 추론 실행 빈도 (req/s, 5m)",
       "description": "quality_guard·윈도우 warmup을 통과해 실제로 추론이 실행된 횟수. 센서 수신(sensor_last_received) 대비 이 값이 낮으면 skip이 많다는 신호. 갑자기 0이 되면 FastAPI 재시작으로 윈도우가 초기화된 것.",
       "type": "timeseries",
       "gridPos": {

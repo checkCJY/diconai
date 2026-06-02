@@ -16,7 +16,7 @@
   "panels": [
     {
       "id": 1,
-      "title": "가스 AI — 추론 실행 횟수 (5m)",
+      "title": "가스 AI — 추론 실행 빈도 (req/s, 5m)",
       "description": "change point 감지 후 IF 추론이 실제로 실행된 횟수. 0이 되면 change point가 감지 안 되거나 윈도우(30틱) 미충족 상태 — 더미 프로세스 확인.",
       "type": "timeseries",
       "gridPos": {

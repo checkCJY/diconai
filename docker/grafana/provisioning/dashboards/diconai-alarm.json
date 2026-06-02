@@ -208,7 +208,7 @@
     },
     {
       "id": 4,
-      "title": "FastAPI → DRF 호출 실패 횟수 (A1 — 에러 타입별, 5m)",
+      "title": "FastAPI → DRF 호출 실패 빈도 (req/s, 5m)",
       "type": "timeseries",
       "gridPos": {
         "x": 12,
