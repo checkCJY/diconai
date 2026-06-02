@@ -38,6 +38,8 @@ ALLOWED_MODES = {
     "h2s_leak",
     "fire",
     "chemical_spill",
+    "o2_depletion",  # 이성현 추가 — 9종 확장 (산소 결핍)
+    "sensor_fault",  # 이성현 추가 — 9종 확장 (센서 오작동)
 }
 
 
