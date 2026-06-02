@@ -40,6 +40,7 @@ from apps.alerts.tasks import (
 )
 from apps.core.constants import RiskLevel
 from apps.core.metrics import (
+    POWER_DANGER_CONFIRM_TOTAL,
     RULE_FIRE_SUPPRESSED_BY_AI_TOTAL,
     STATIC_AUDIT_MISMATCH_TOTAL,
     STATIC_FIRE_SUPPRESSED_BY_FASTAPI_TOTAL,
@@ -101,6 +102,19 @@ def _axis_risk_key(device_id: int, channel: int, axis: str) -> str:
 def _dcount_key(device_id: int, channel: int) -> str:
     """danger 연속 틱 카운터 키 — watt 축에서만 증가 (사이클당 1회). _state_key sibling."""
     return f"alarm:power:state:{device_id}:{channel}:dcount"
+
+
+def _reset_confirm_streak(dcount_key: str) -> None:
+    """danger 스트릭이 끊겼을 때 confirm 카운터를 리셋한다.
+
+    임계 도달 전(dcount 1~threshold-1)에 끊긴 경우 = 단일 틱 스파이크/인러시를
+    confirm 게이트가 실제로 걸러낸 것 → outcome="reset" 카운트. 이미 확정된
+    (dcount>=threshold) 스트릭이 정상 해소되는 것은 reset 이 아니므로 제외한다.
+    """
+    dcount = cache.get(dcount_key)
+    if dcount and dcount < settings.DANGER_CONFIRM_TICKS:
+        POWER_DANGER_CONFIRM_TOTAL.labels(outcome="reset").inc()
+    cache.delete(dcount_key)
 
 
 def _revoke(task_id: str) -> None:
@@ -249,10 +263,18 @@ def trigger_power_alarms(objs: list, device, ingress_ts: float | None = None) ->
             # 반영하므로 누락 없음. DANGER_CONFIRM_TICKS=1 이면 첫 틱 즉시 발화(기존 동작).
             if axis_name != "watt":
                 continue
-            if not confirm_consecutive(
+            gate_passed = confirm_consecutive(
                 dcount_key, settings.DANGER_CONFIRM_TICKS, _CACHE_TTL
-            ):
+            )
+            # confirm_consecutive 직후라 dcount = 현재 스트릭 길이
+            dcount = cache.get(dcount_key) or 0
+            if not gate_passed:
+                # 임계 미달 — 발화 보류 (단일 틱 스파이크/인러시 억제)
+                POWER_DANGER_CONFIRM_TOTAL.labels(outcome="held").inc()
                 continue
+            if dcount == settings.DANGER_CONFIRM_TICKS:
+                # 임계 도달하는 그 틱에만 1회 — 지속 danger 의 후속 틱 중복 제외
+                POWER_DANGER_CONFIRM_TOTAL.labels(outcome="confirmed").inc()
 
             # 진행 중인 WARNING 타이머가 있으면 먼저 취소 — AI mute 가드 이전에 수행.
             # 그렇지 않으면 AI mute 가 활성일 때 룰 fire 만 suppress 되고 stale WARNING
@@ -280,7 +302,8 @@ def trigger_power_alarms(objs: list, device, ingress_ts: float | None = None) ->
                 )
 
         elif aggregate == RiskLevel.WARNING:
-            cache.delete(dcount_key)  # danger 스트릭 끊김 — confirm 카운터 리셋
+            # danger 스트릭 끊김 — confirm 카운터 리셋
+            _reset_confirm_streak(dcount_key)
             prev_state = get_state(state_key)
             if prev_state in (RiskLevel.WARNING, RiskLevel.DANGER):
                 continue
@@ -309,7 +332,8 @@ def trigger_power_alarms(objs: list, device, ingress_ts: float | None = None) ->
             try_transition(state_key, RiskLevel.WARNING, _CACHE_TTL)
 
         else:  # normal
-            cache.delete(dcount_key)  # danger 스트릭 끊김 — confirm 카운터 리셋
+            # danger 스트릭 끊김 — confirm 카운터 리셋
+            _reset_confirm_streak(dcount_key)
             # WARNING 타이머가 있으면 취소하고 이전 경보 시 정상화 알림 발송
             pending = cache.get(task_key)
             if pending:

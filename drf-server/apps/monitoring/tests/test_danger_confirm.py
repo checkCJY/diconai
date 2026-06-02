@@ -136,3 +136,95 @@ def test_power_danger_non_watt_axis_does_not_fire(power_device, settings, monkey
     power_alarm.trigger_power_alarms(objs, power_device)
     power_alarm.trigger_power_alarms(objs, power_device)
     assert fire_delay.call_count == 0  # 비-watt 축은 confirm 카운트 안 함 → 미발화
+
+
+# ── confirm 게이트 메트릭 (held / confirmed / reset) ──────────────────────────
+
+
+def _patch_power_metric(monkeypatch, risks):
+    """종합 위험도 시퀀스(risks)로 트리거하도록 patch 하고 (fire_delay, metric) 반환.
+
+    분기 결정자인 _aggregate_risk 를 risks 이터레이터로 patch → 틱별 종합위험도 제어.
+    (evaluate_power_risk 는 _EVALUATORS dict 가 import 시점에 캡처하므로 patch 무효라
+    한 단계 아래인 _aggregate_risk 를 잡는다.) redis/Celery 의존(try_transition /
+    is_ai_mute_active / fire)과 메트릭 객체는 MagicMock 으로 격리.
+    """
+    fire_delay = MagicMock()
+    metric = MagicMock()
+    risk_iter = iter(risks)
+    monkeypatch.setattr(
+        "apps.monitoring.services.power_alarm._aggregate_risk",
+        lambda *a, **k: next(risk_iter),
+    )
+    monkeypatch.setattr(
+        "apps.monitoring.services.power_alarm.try_transition", lambda *a, **k: True
+    )
+    monkeypatch.setattr(
+        "apps.monitoring.services.power_alarm.is_ai_mute_active", lambda *a, **k: False
+    )
+    monkeypatch.setattr(
+        "apps.monitoring.services.power_alarm.fire_power_danger_task",
+        MagicMock(delay=fire_delay),
+    )
+    monkeypatch.setattr(
+        "apps.monitoring.services.power_alarm.POWER_DANGER_CONFIRM_TOTAL", metric
+    )
+    return fire_delay, metric
+
+
+def _outcomes(metric):
+    """metric.labels(outcome=...) 호출에 쓰인 outcome 값 순서 리스트."""
+    return [c.kwargs.get("outcome") for c in metric.labels.call_args_list]
+
+
+@pytest.mark.django_db
+def test_power_confirm_metric_held_then_confirmed(power_device, settings, monkeypatch):
+    """1틱 held → 2틱째 confirmed(1회) → 3틱째는 중복 카운트 안 함."""
+    settings.DANGER_CONFIRM_TICKS = 2
+    cache.clear()
+    danger3 = [RiskLevel.DANGER, RiskLevel.DANGER, RiskLevel.DANGER]
+    _, metric = _patch_power_metric(monkeypatch, danger3)
+    from apps.monitoring.services import power_alarm
+
+    objs = [SimpleNamespace(channel=1, value=4000.0, data_type="watt")]
+    for _ in range(3):
+        power_alarm.trigger_power_alarms(objs, power_device)
+
+    # 지속 danger 여도 confirmed 는 임계 도달 틱에 1회만 (try_transition 발화는 별도 검증)
+    assert _outcomes(metric) == ["held", "confirmed"]
+
+
+@pytest.mark.django_db
+def test_power_confirm_metric_reset_on_spike(power_device, settings, monkeypatch):
+    """단일 틱 danger → 정상 복귀 = 스파이크. confirm 전 끊김이라 reset 카운트."""
+    settings.DANGER_CONFIRM_TICKS = 2
+    cache.clear()
+    spike = [RiskLevel.DANGER, RiskLevel.NORMAL]
+    fire_delay, metric = _patch_power_metric(monkeypatch, spike)
+    from apps.monitoring.services import power_alarm
+
+    objs = [SimpleNamespace(channel=1, value=4000.0, data_type="watt")]
+    power_alarm.trigger_power_alarms(objs, power_device)  # held (dcount=1)
+    power_alarm.trigger_power_alarms(objs, power_device)  # normal → reset
+
+    assert _outcomes(metric) == ["held", "reset"]
+    assert fire_delay.call_count == 0  # 스파이크는 발화 안 함
+
+
+@pytest.mark.django_db
+def test_power_confirm_metric_no_reset_after_confirmed(
+    power_device, settings, monkeypatch
+):
+    """확정(2틱)된 danger 가 정상 해소되는 것은 스파이크 아님 → reset 미카운트."""
+    settings.DANGER_CONFIRM_TICKS = 2
+    cache.clear()
+    seq = [RiskLevel.DANGER, RiskLevel.DANGER, RiskLevel.NORMAL]
+    fire_delay, metric = _patch_power_metric(monkeypatch, seq)
+    from apps.monitoring.services import power_alarm
+
+    objs = [SimpleNamespace(channel=1, value=4000.0, data_type="watt")]
+    for _ in range(3):
+        power_alarm.trigger_power_alarms(objs, power_device)
+
+    assert _outcomes(metric) == ["held", "confirmed"]  # reset 없음
+    assert "reset" not in _outcomes(metric)
