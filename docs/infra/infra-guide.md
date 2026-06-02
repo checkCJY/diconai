@@ -116,12 +116,12 @@
 | 서비스 | 포트 | 담당 | 왜 필요 |
 |---|---|---|---|
 | **Prometheus** | 9090 | 각 서비스의 `/metrics`를 주기적으로 긁어 시계열로 저장 | "지금 시스템이 어떤 상태인가"의 원천 데이터 |
-| **Grafana** | 3000 | Prometheus 데이터를 **대시보드 그래프**로 시각화 | 사람이 보기 쉬운 모니터링 화면 (5종 구성) |
+| **Grafana** | 3000 | Prometheus 데이터를 **대시보드 그래프**로 시각화 | 사람이 보기 쉬운 모니터링 화면 (6종 구성) |
 | **redis_exporter** | 9121 | Redis 내부 상태를 Prometheus가 읽을 수 있는 형식으로 변환 | Redis는 자체 `/metrics`가 없어 통역기가 필요 |
 
 - **설정:** `docker/prometheus/prometheus.yml`, `docker/grafana/provisioning/**`,
   k8s는 `k8s/prometheus.yaml`·`grafana.yaml`·`grafana-cm.yaml`·`redis-exporter.yaml`
-- **Grafana 대시보드 5종:** overview / sensor / alarm / power-ai / db-redis
+- **Grafana 대시보드 6종:** overview / sensor / alarm / power-ai / gas-ai / db-redis
   (`docker/grafana/provisioning/dashboards/*.json`)
 
 ---
@@ -219,6 +219,7 @@ kubectl get pods -n diconai          # 상태 확인
 - Docker/Compose 설정 전부 git에 커밋되어 있고, 두 Dockerfile 모두 정상 동작.
 - YAML 18개 전부 문법 OK. 빌드에 필요한 파일(entrypoint·requirements·gunicorn 설정) 모두 존재.
 - **Compose ↔ k8s가 서로 일치**: 이미지 태그·포트·셀렉터·ConfigMap/Secret 키·네임스페이스 정합.
+  단, Grafana 대시보드는 Compose 6종 / k8s grafana-cm 5종(gas-ai 미포함) — k8s 반영 필요.
 - 모니터링 연결 정상: Prometheus가 drf:8000 / fastapi:8001 수집, Grafana 데이터소스 `http://prometheus:9090`.
 - 핵심 제약(FastAPI 1개)이 양쪽에 올바르게 박혀 있음.
 

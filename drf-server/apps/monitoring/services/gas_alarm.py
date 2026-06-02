@@ -14,10 +14,12 @@
 #   alarm:state:{sensor_id}:{gas}  → "normal" | "warning" | "danger"
 #   alarm:task:{sensor_id}:{gas}   → Celery task ID (revoke용)
 
+from django.conf import settings
 from django.core.cache import cache
 
 from apps.alerts.services.alarm_dedupe import (
     clear_state,
+    confirm_consecutive,
     get_state,
     is_gas_ai_mute_active,
     try_transition,
@@ -56,6 +58,11 @@ def _task_key(sensor_id: int, gas: str) -> str:
     return f"alarm:task:{sensor_id}:{gas}"
 
 
+def _dcount_key(sensor_id: int, gas: str) -> str:
+    """danger 연속 틱 카운터 키 — _state_key 와 sibling 네임스페이스."""
+    return f"alarm:state:{sensor_id}:{gas}:dcount"
+
+
 def _revoke(task_id: str) -> None:
     """진행 중인 Celery 태스크를 취소한다."""
     from config.celery import app as celery_app
@@ -83,8 +90,17 @@ def trigger_gas_alarms(gas_data, ingress_ts: float | None = None) -> list[dict]:
 
         state_key = _state_key(sensor_id, gas)
         task_key = _task_key(sensor_id, gas)
+        dcount_key = _dcount_key(sensor_id, gas)
 
         if risk == "danger":
+            # danger 2틱 confirm — 단일 틱 센서 스파이크 억제. 미확정 틱엔 아무 동작도
+            # 안 함(state/타이머 불변)이라 1틱 블립이 경보를 만들지 않는다.
+            # settings.DANGER_CONFIRM_TICKS=1 이면 첫 틱 즉시 발화(기존 동작).
+            if not confirm_consecutive(
+                dcount_key, settings.DANGER_CONFIRM_TICKS, _CACHE_TTL
+            ):
+                continue
+
             # 진행 중인 WARNING 타이머가 있으면 취소
             pending_task_id = cache.get(task_key)
             if pending_task_id:
@@ -110,6 +126,7 @@ def trigger_gas_alarms(gas_data, ingress_ts: float | None = None) -> list[dict]:
                 )
 
         elif risk == "warning":
+            cache.delete(dcount_key)  # danger 스트릭 끊김 — confirm 카운터 리셋
             prev_state = get_state(state_key)
             if prev_state in ("warning", "danger"):
                 continue
@@ -132,6 +149,7 @@ def trigger_gas_alarms(gas_data, ingress_ts: float | None = None) -> list[dict]:
             try_transition(state_key, "warning", _CACHE_TTL)
 
         else:  # normal
+            cache.delete(dcount_key)  # danger 스트릭 끊김 — confirm 카운터 리셋
             # 타이머가 있으면 취소
             pending_task_id = cache.get(task_key)
             if pending_task_id:

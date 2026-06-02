@@ -197,6 +197,26 @@ STATIC_AUDIT_MISMATCH_TOTAL = Counter(
     ["device_id", "channel", "would_fire"],
 )
 
+# ── danger N틱 confirm 게이트 메트릭 ──────────────────────────────────────────
+# feature/0602_power_alarm_flood — 단일 틱 센서 스파이크/인러시가 즉시 danger 경보가
+# 되는 것을 막는 "N틱 연속 confirm" 게이트(settings.DANGER_CONFIRM_TICKS, 기본 2)의
+# 거동을 추적한다. 게이트가 진짜 위험을 지연시키는지(confirmed) vs 스파이크만 걸러
+# 내는지(reset)를 시계열로 보고 DANGER_CONFIRM_TICKS 값을 감이 아니라 정량 튜닝한다.
+#
+# 레이블:
+#   outcome :
+#     "held"      — danger 틱이 임계 미달이라 발화 보류 (스트릭당 threshold-1 회)
+#     "confirmed" — 스트릭이 임계 도달해 발화 게이트 통과 (스트릭당 1회)
+#     "reset"     — 임계 도달 전 스트릭이 끊김 = 스파이크/인러시를 실제로 걸러냄
+#                   → reset / (confirmed + reset) = 게이트가 걸러낸 비율
+# 라벨 1개라 cardinality 무시 가능 (글로벌 튜닝 목적). 장비별 분석이 필요해지면
+# device_id/channel 라벨만 추가 (RULE_FIRE_SUPPRESSED_BY_AI_TOTAL 스타일).
+POWER_DANGER_CONFIRM_TOTAL = Counter(
+    "power_danger_confirm_total",
+    "Power danger N-tick confirm gate outcomes (held / confirmed / reset)",
+    ["outcome"],
+)
+
 # ── Celery 태스크 실패 / 재시도 메트릭 (P2 전) ───────────────────────────────
 # task_postrun은 성공/실패 무관하게 호출되므로 실패 여부를 구분할 수 없다.
 # task_failure / task_retry 시그널로 각각 카운트한다.

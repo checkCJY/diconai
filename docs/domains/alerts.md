@@ -216,7 +216,169 @@ def _invalidate(...): invalidate_policy_cache(instance.event_type)
 4. **정상화 9종 폭주**: 가스 정상화는 9가스가 각각 task 발화 → fastapi 가 source_label 단위 dedup 으로 패널 1줄만 노출. drf 단에서 막는 게 아님.
 5. **on_commit 누락 주의**: Notification 을 트랜잭션 안에서 바로 생성하면 롤백 시 유령 참조. 반드시 `transaction.on_commit`.
 
-## 9. 관련 문서
+## 9. 알람 룰·문구 인벤토리 (운영자 화면 문구 SoT)
+
+"어떤 룰로 발화하고, 화면에 어떤 글자가 박히는가"의 단일 진실 공급원.
+모든 문구는 코드 verbatim (placeholder `{…}` 는 런타임 치환값).
+
+> ⚠️ **모달 본문은 `message` 우선** — `_process()` 의 `const msg = data.message || data.summary`.
+> 백엔드의 긴 `summary`("…즉시 대피하고 관리자에게 보고하세요")는 **Discord·알림·DB 용**이지
+> **모달 본문이 아니다.** 모달엔 짧은 `message`(get_short_message) + `action`(행동 안내)이 뜬다.
+
+### 9.1 팝업 anatomy — 어느 문구가 어디에
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ 발생 시간 2026-06-02 11:12:28 KST                    [ ✕ ] │①②
+│                          ⚠                                 │
+│                      긴급 알림                              │③ typeLabel
+│   ┌────┐                                                   │
+│   │위험│   메인 전력반                                      │④ badge | ⑤ sensor_name
+│   └────┘                                                   │
+│   메인 전력반 이상 수치·패턴 동시 탐지 (14,187.2 W)         │⑥ message
+│   위험 기준 3700 초과 (측정 3860)            ← 룰 알람만    │⑦ threshold 줄
+│   설비 정지 후 정밀 점검 (AI 이상 패턴)                     │⑧ action (굵게)
+│   [ AI 미탐 의심 ]                           ← 전력 cover만 │⑨ cover 배지+사유
+│   (홍길동 외 2명 확인 중)                    ← 다중 관리자  │⑩ ack 시그널
+│   ┌───────────┐   ┌───────────┐                            │
+│   │  상세 보기  │   │  확인 완료  │                          │⑪ 버튼
+│   └───────────┘   └───────────┘                            │
+└──────────────────────────────────────────────────────────┘
+  테두리·펄스·비프음:  danger=빨강 880Hz×3 / warning=노랑 660Hz×2
+  자동닫힘:           danger 15s / warning 30s   (normal 은 모달 아님 → 우하단 토스트 5s)
+```
+
+| # | 화면 칸 | 데이터 필드 | 코드 출처 |
+|---|---|---|---|
+| ① | 발생 시간(KST) | `timestamp` | `TimeFormat.abs()` |
+| ③ | 헤더 라벨 | (레벨 고정) | `_POPUP_CFG[level].typeLabel` |
+| ④ | 위험도 배지 | (레벨 고정) | `_POPUP_CFG[level].badgeText` |
+| ⑤ | 센서·설비명 | `sensor_name`/`source_label` | `Event.source_label` |
+| ⑥ | **본문** | `message` (>`summary`) | `AlarmRecord.get_short_message()` / fastapi push |
+| ⑦ | 임계 줄 | `threshold_value`+`measured_value` | 룰 알람 push payload (둘 다 있을 때만) |
+| ⑧ | **행동 안내** | (`alarm_type`×`level`) | `_ACTION_TEXT[type][level]` → 없으면 `_POPUP_CFG` |
+| ⑨ | cover 배지·사유 | `alarm_source` | `ALARM_SOURCE_BADGE`/`REASON` |
+| ⑩ | 확인 시그널 | `event_ack_users` | `_formatAckSignal` |
+
+### 9.2 무엇이 팝업을 띄우나 (레벨별)
+
+| 레벨 | 표시 | 헤더 | 배지 | 자동닫힘 | 비프 |
+|---|---|---|---|---|---|
+| **danger** | 중앙 모달(빨강) | `긴급 알림` | `위험` | 15s | 880Hz×3 |
+| **warning** | 중앙 모달(노랑) | `주의 알림` | `주의` | 30s | 660Hz×2 |
+| **normal** | ❌모달 X → 우하단 토스트 | — | — | 5s | 없음 |
+
+---
+
+### 9.3 LIVE 알람별 — 발화 룰 + 문구 (verbatim)
+
+#### ① gas_threshold (가스 경보) — 룰
+**룰:** 가스 농도 임계 초과 → `danger` 즉시 / `warning` 3초 지속 후. (60s dedup, AI mute co/h2s/co2)
+
+| 칸 | danger | warning |
+|---|---|---|
+| 본문(message) | `{GAS} 임계치 초과 ({value} ppm)` | `{GAS} 임계치 초과 ({value} ppm)` |
+| 임계 줄 | `위험 기준 {임계} 초과 (측정 {value})` | `주의 기준 {임계} 초과 (측정 {value})` |
+| 행동(action) | `작업자 즉시 대피 / 외부 환기 가동 · 책임자 통보` | `작업 중단 + 환기 / 농도 추이 확인` |
+| summary(알림용) | `[긴급] {가스명} 위험 수준 초과 ({value} {unit}) — 즉시 대피하고 관리자에게 보고하세요.` | `[주의] {가스명} 주의 수준 3초 지속 ({value} {unit}) — 작업을 중단하고 환기 후 관리자에게 보고하세요.` |
+
+#### ② gas_anomaly_ai (가스 AI 이상) — AI(IF)
+**룰:** CO·H2S·CO2 30틱 change-point 게이트 + IF `pred==-1` + 60s rate limit → `danger`.
+
+| 칸 | danger |
+|---|---|
+| 본문·summary | `가스 이상 감지 (AI) \| CO:{co} H2S:{h2s} CO2:{co2}` ← fastapi 직접 push |
+| 행동(action) | `해당 구역 작업자 대피 / AI 누출 의심 — 센서 위치 확인` |
+
+> ⚠️ 본문 톤이 거침(디버그성). DRF `get_short_message` 엔 `{GAS} {IF|ARIMA} 이상 감지 ({value} ppm)` 깔끔본이 있으나 실제 팝업은 fastapi push 문구가 노출됨. → 다듬을 거리.
+
+#### ③ power_overload (전력 이상) — 룰
+**룰:** 채널 3축 max. **W·A: 정격 ≥80% warning / ≥100% danger. V: ±5% warning / ±10% danger.** danger 즉시 / warning 3초 후.
+
+| 칸 | danger | warning |
+|---|---|---|
+| 본문(message) | `{채널라벨} 임계치 초과 ({value:,.1f} W)` | `{채널라벨} 임계치 초과 ({value:,.1f} W)` |
+| 행동(action) | `해당 설비 즉시 정지 / 부하·발열 점검` | `설비 부하·온도 확인` |
+| summary(알림용) | `[긴급] {라벨} 전력 과부하 ({value}W) — 즉시 확인하고 관리자에게 보고하세요.` | `[주의] {라벨} 전력 경고 수준 3초 지속 ({value}W) — 설비 상태를 확인하세요.` |
+
+#### ④ power_anomaly_ai (전력 AI 이상) — AI(5축)
+**룰:** combined_risk `caution/predict_warn/warning`→**warning**, `danger`→**danger**. 60s rate limit. 채널 (1,9,14,15).
+
+| 칸 | danger | warning |
+|---|---|---|
+| 본문·summary | `{채널라벨} {phrase} ({value:,.1f} W)` | `{채널라벨} {phrase} ({value:,.1f} W)` |
+| 행동(action) | `설비 정지 후 정밀 점검 (AI 이상 패턴)` | `부하·발열 추이 확인 / 이상 지속 시 정지` |
+
+`{phrase}` = 알고리즘별 → **9.5 표** 참조 (예: combined = `이상 수치·패턴 동시 탐지`).
+
+#### ⑤ 정상화 (gas_clear / power_clear) — normal (모달 아님, 우하단 토스트)
+
+| | 본문(message) | summary(알림용) |
+|---|---|---|
+| gas_clear | `{GAS} 정상 복귀` / `정상 복귀` | `[안전] {source_label} — {가스들} 농도가 정상 범위로 복귀했습니다. 관리자 확인 후 작업을 재개하세요.` |
+| power_clear | `{채널라벨} 정상 복귀` | `[안전] {source_label} — 전력이 정상 범위로 복귀했습니다. 관리자 확인 후 작업을 재개하세요.` |
+
+---
+
+### 9.4 전력 정적 cover (AI 공백을 룰이 보완) — source별 문구·배지·톤
+
+AI가 못 잡을 때 룰이 대신 발화. 모달 톤이 노랑으로 진정되고 배지가 붙는다.
+
+| source | 언제 (decide_alarm) | summary 꼬리말 | 배지(⑨) | 톤 |
+|---|---|---|---|---|
+| `ai` | AI FIRED | — | (없음) | **risk** (빨강/노랑) |
+| `static_cover_miss` | AI=정상인데 룰 발화 | `… — AI 미탐 의심 — 정적 임계치 초과` | `AI 미탐 의심` | **cover** (노랑) |
+| `static_cover_inference_fail` | AI 추론 실패 | `… — AI 추론 실패 보완` | `AI 추론 실패 보완` | **cover** |
+| `static_cover_warmup` | AI 워밍업 중 | `… (AI 윈도우 빌드 중 — 정적룰 보완)` | `AI 준비 중 보완` | **cover** |
+| `static_no_ai_available` | AI 비활성 채널 | — | (없음) | **risk** |
+| `static_legacy` | T4 이전 데이터 | — | (없음) | **risk** (신규 미발화) |
+
+### 9.5 AI 알고리즘 → 본문 phrase (`ALGORITHM_SOURCE_PHRASE`)
+
+| algorithm_source | 본문 phrase | 배지 라벨(`_LABEL`) |
+|---|---|---|
+| `isolation_forest` | `이상 수치 탐지` | IF |
+| `arima` | `이상 패턴 탐지` | ARIMA |
+| `combined` | `이상 수치·패턴 동시 탐지` | IF+ARIMA |
+| `zscore` | `통계 이상 수치` | Z-score |
+| `change_point` | `패턴 변화 탐지` | 급변 |
+| `night_abnormal` | `야간 이상 가동` | 야간 가동 |
+
+### 9.6 임계치 표 (현재값)
+
+**가스** (출처: `monitoring/utils/gas_thresholds.py`) — `danger` 발화 기준 / `warning` 구간:
+
+| 가스 | warning 구간 | **danger** |
+|---|---|---|
+| CO | 25 ~ 200 ppm | ≥ 200 ppm |
+| H2S | 10 ~ 15 ppm | ≥ 15 ppm |
+| CO2 | 1000 ~ 5000 ppm | ≥ 5000 ppm |
+| O2 | 16.0 ~ 18.0 % | **< 16.0 %** (저산소) |
+| NO2 | 3 ~ 5 ppm | ≥ 5 ppm |
+| SO2 | 2 ~ 5 ppm | ≥ 5 ppm |
+| O3 | 0.06 ~ 0.12 ppm | ≥ 0.12 ppm |
+| NH3 | 25 ~ 35 ppm | ≥ 35 ppm |
+| VOC | 0.5 ~ 1.0 ppm | ≥ 1.0 ppm |
+
+**전력** (출처: `power/services/threshold_eval.py`) — 채널 정격(`channel_meta`) 대비 %:
+
+| 축 | warning | danger |
+|---|---|---|
+| W (전력) | ≥ 80 % | ≥ 100 % |
+| A (전류) | ≥ 80 % | ≥ 100 % |
+| V (전압, 양방향) | ±5% 이탈 (95~105%) | ±10% 이탈 (90~110%) |
+
+→ 채널 종합 위험도 = `max(W, A, V)`.
+
+### 9.7 action 미정의 fallback + 미발화(dormant) 타입
+
+- `_ACTION_TEXT` 에 없는 type → `_POPUP_CFG` 기본값: danger `즉시 대피하세요!` / warning `주의하세요!`
+- **정의돼 있으나 현재 발화 경로 없음(팝업 안 뜸):** `geofence_intrusion`(task만 있고 호출부 없음), `sensor_fault`, `ppe_violation`, `vr_training_not_done`, `safety_check_pending`, `inspection_scheduled`, `batch_failed`, `storage_overdue`.
+  - 이 중 일부는 `_ACTION_TEXT` 에 행동 안내가 미리 등록돼 있으나(향후 확장용 자리), 백엔드 push 가 없어 실제로는 미노출.
+
+---
+
+## 10. 관련 문서
 - 센서 진입: [gas.md](gas.md) / [power.md](power.md) / [positioning.md](positioning.md)
 - WS 전달: [websocket.md](websocket.md)
 - AI mute 상세: [ai-ml.md](ai-ml.md)
