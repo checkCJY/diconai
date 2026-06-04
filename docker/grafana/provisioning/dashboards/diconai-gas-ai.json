@@ -120,7 +120,7 @@
     },
     {
       "id": 5,
-      "title": "가스 AI — 추론 소요시간 p95 (5m)",
+      "title": "가스 AI — 추론 소요시간 p95 / p99 (5m)",
       "description": "gas_if 모델 추론 실행 시간. 100ms 이상 지속이면 모델 로드 이슈 또는 윈도우 크기 문제.",
       "type": "timeseries",
       "gridPos": {
@@ -133,6 +133,11 @@
         {
           "expr": "histogram_quantile(0.95, rate(ai_inference_duration_seconds_bucket{job=\"fastapi\",model_type=\"gas_if\"}[5m]))",
           "legendFormat": "gas_if p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(ai_inference_duration_seconds_bucket{job=\"fastapi\",model_type=\"gas_if\"}[5m]))",
+          "legendFormat": "gas_if p99",
+          "refId": "B"
         }
       ],
       "fieldConfig": {

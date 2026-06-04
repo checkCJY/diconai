@@ -132,7 +132,7 @@
         "h": 8
       },
       "id": 4,
-      "title": "DRF — 응답시간 p95 (5m)",
+      "title": "DRF — 응답시간 p95 / p99 (5m)",
       "description": "상위 5% 느린 요청의 응답시간. 평균보다 실제 사용자가 체감하는 속도에 가깝다. 이 값이 올라가면 특정 API에 병목이 생긴 것.",
       "type": "timeseries",
       "targets": [
@@ -140,6 +140,11 @@
           "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"drf\"}[5m])))",
           "legendFormat": "p95",
           "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"drf\"}[5m])))",
+          "legendFormat": "p99",
+          "refId": "B"
         }
       ]
     },
@@ -161,7 +166,7 @@
         "h": 8
       },
       "id": 5,
-      "title": "FastAPI — 응답시간 p95 (5m)",
+      "title": "FastAPI — 응답시간 p95 / p99 (5m)",
       "description": "FastAPI 응답시간 p95. 센서 ingest는 1초 간격으로 들어오므로 여기가 느려지면 데이터 수신 지연으로 이어진다.",
       "type": "timeseries",
       "targets": [
@@ -169,6 +174,11 @@
           "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"fastapi\"}[5m])))",
           "legendFormat": "p95",
           "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"fastapi\"}[5m])))",
+          "legendFormat": "p99",
+          "refId": "B"
         }
       ]
     },
@@ -252,7 +262,7 @@
         "h": 8
       },
       "id": 8,
-      "title": "DRF vs FastAPI — 응답시간 비교 p95 (5m)",
+      "title": "DRF vs FastAPI — 응답시간 비교 p95 / p99 (5m)",
       "description": "두 서버의 p95 응답시간을 같은 그래프에 표시. Django가 느린지 FastAPI가 느린지 한눈에 구분 — 병목 서버 특정에 사용한다.",
       "type": "timeseries",
       "targets": [
@@ -260,6 +270,11 @@
           "expr": "histogram_quantile(0.95, sum by (le, job) (rate(http_request_duration_seconds_bucket[5m])))",
           "legendFormat": "{{job}}",
           "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, job) (rate(http_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{job}} p99",
+          "refId": "B"
         }
       ]
     },

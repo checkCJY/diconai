@@ -264,6 +264,30 @@ services:
       - "9121:9121"
     restart: unless-stopped
 
+  postgres_exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    environment:
+      DATA_SOURCE_NAME: postgresql://diconai:diconai1234@postgres:5432/diconai?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "9187:9187"
+    restart: unless-stopped
+
+  node_exporter:
+    image: prom/node-exporter:v1.8.2
+    command:
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+    ports:
+      - "9100:9100"
+    restart: unless-stopped
+
   prometheus:
     image: prom/prometheus:v2.55.1
     command:

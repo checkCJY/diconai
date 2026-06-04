@@ -10,7 +10,7 @@
   "panels": [
     {
       "id": 1,
-      "title": "AI 추론 소요시간 p95 (power_if, 5m)",
+      "title": "AI 추론 소요시간 p95 / p99 (power_if, 5m)",
       "description": "Isolation Forest 추론 실행 시간. E2E latency 급등 시 Celery·DB·Redis가 정상이면 여기를 확인.",
       "type": "timeseries",
       "gridPos": {
@@ -57,6 +57,15 @@
           "expr": "histogram_quantile(0.95, sum by (model_type, le) (rate(ai_inference_duration_seconds_bucket{job=\"fastapi\",model_type=\"power_if\"}[5m])))",
           "legendFormat": "{{model_type}} p95",
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.99, sum by (model_type, le) (rate(ai_inference_duration_seconds_bucket{job=\"fastapi\",model_type=\"power_if\"}[5m])))",
+          "legendFormat": "{{model_type}} p99",
+          "refId": "B"
         }
       ]
     },

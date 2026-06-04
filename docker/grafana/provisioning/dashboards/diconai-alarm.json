@@ -10,7 +10,7 @@
   "panels": [
     {
       "id": 1,
-      "title": "E2E 알람 latency p95 — danger / warning 분리 (C7, 5m)",
+      "title": "E2E 알람 latency p95 / p99 — danger / warning 분리 (C7, 5m)",
       "description": "danger SLO: p95 ≤ 1.5s. warning은 countdown=3s 설계상 항상 3.5s 이상 — 참고용.",
       "type": "timeseries",
       "gridPos": {
@@ -82,6 +82,15 @@
           },
           "expr": "histogram_quantile(0.95, sum(rate(e2e_alarm_latency_seconds_bucket{risk_level=\"warning\"}[5m])) by (le))",
           "legendFormat": "warning p95 (참고용)",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.99, sum(rate(e2e_alarm_latency_seconds_bucket{risk_level=\"danger\"}[5m])) by (le))",
+          "legendFormat": "danger p99",
           "refId": "B"
         }
       ]
@@ -465,7 +474,7 @@
         "h": 8
       },
       "id": 9,
-      "title": "Celery — 태스크 실행시간 p95 (task별, 5m)",
+      "title": "Celery — 태스크 실행시간 p95 / p99 (task별, 5m)",
       "description": "워커가 태스크를 실제로 처리한 시간. p95 ≥ 500ms이면 태스크 로직 자체가 느린 것 — DB 락·외부 API 지연 등 원인 점검. 큐 길이(패널 ⑬)가 정상인데 알람이 늦게 오면 여기를 확인한다.",
       "type": "timeseries",
       "targets": [
@@ -473,6 +482,11 @@
           "expr": "histogram_quantile(0.95, sum by (le, task_name) (rate(celery_task_duration_seconds_bucket[5m])))",
           "legendFormat": "{{task_name}}",
           "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, task_name) (rate(celery_task_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{task_name}} p99",
+          "refId": "B"
         }
       ]
     },
@@ -494,7 +508,7 @@
         "h": 8
       },
       "id": 10,
-      "title": "Celery — 태스크 대기시간 p95 (task별, 5m)",
+      "title": "Celery — 태스크 대기시간 p95 / p99 (task별, 5m)",
       "description": "태스크가 큐에 들어간 후 워커가 꺼낼 때까지 기다린 시간. p95 ≥ 1s이면 worker가 태스크 생성 속도를 따라가지 못하는 것 → worker 증설. 실행시간(패널 ⑮)과 함께 보면 병목 원인을 구분할 수 있다.",
       "type": "timeseries",
       "targets": [
@@ -502,6 +516,11 @@
           "expr": "histogram_quantile(0.95, sum by (le, task_name) (rate(celery_task_queued_seconds_bucket[5m])))",
           "legendFormat": "{{task_name}}",
           "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, task_name) (rate(celery_task_queued_seconds_bucket[5m])))",
+          "legendFormat": "{{task_name}} p99",
+          "refId": "B"
         }
       ]
     },
