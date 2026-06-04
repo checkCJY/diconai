@@ -26,7 +26,7 @@
         "h": 8
       },
       "id": 1,
-      "title": "센서 데이터 ingest 건수 (가스, 5m)",
+      "title": "센서 데이터 ingest 빈도 (req/s, 5m)",
       "description": "FastAPI가 수신하는 가스 센서 데이터 초당 건수. 센서 1개가 1초 간격으로 전송하므로 센서 수와 비례해야 한다. 뚝 떨어지면 센서 연결 끊김 또는 FastAPI 수신 장애.",
       "type": "timeseries",
       "targets": [

@@ -208,7 +208,7 @@
     },
     {
       "id": 4,
-      "title": "FastAPI → DRF 호출 실패 횟수 (A1 — 에러 타입별, 5m)",
+      "title": "FastAPI → DRF 호출 실패 빈도 (req/s, 5m)",
       "type": "timeseries",
       "gridPos": {
         "x": 12,
@@ -264,7 +264,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "cps"
+          "unit": "short"
         },
         "overrides": []
       },
@@ -280,7 +280,7 @@
       "type": "timeseries",
       "targets": [
         {
-          "expr": "sum by (alarm_type, risk_level) (rate(alarm_fired_total[5m]))",
+          "expr": "sum by (alarm_type, risk_level) (increase(alarm_fired_total[5m]))",
           "legendFormat": "{{alarm_type}} / {{risk_level}}",
           "refId": "A"
         }
@@ -293,7 +293,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "cps"
+          "unit": "short"
         },
         "overrides": []
       },
@@ -309,7 +309,7 @@
       "type": "timeseries",
       "targets": [
         {
-          "expr": "sum by (alarm_type) (rate(alarm_ws_push_failed_total[5m]))",
+          "expr": "sum by (alarm_type) (increase(alarm_ws_push_failed_total[5m]))",
           "legendFormat": "{{alarm_type}}",
           "refId": "A"
         }
@@ -432,7 +432,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(celery_task_failed_total{job=\"drf\"}[5m]) by (task_name)",
+          "expr": "sum by (task_name)(increase(celery_task_failed_total{job=\"drf\"}[5m]))",
           "legendFormat": "실패 — {{task_name}}",
           "refId": "A"
         },
@@ -441,7 +441,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(celery_task_retried_total{job=\"drf\"}[5m]) by (task_name)",
+          "expr": "sum by (task_name)(increase(celery_task_retried_total{job=\"drf\"}[5m]))",
           "legendFormat": "재시도 — {{task_name}}",
           "refId": "B"
         }
@@ -522,7 +522,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "cps",
+          "unit": "short",
           "color": {
             "mode": "palette-classic"
           },
@@ -551,7 +551,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (gas_type, risk_level) (rate(gas_ai_alarm_fired_total{job=\"fastapi\"}[5m]))",
+          "expr": "sum by (gas_type, risk_level) (increase(gas_ai_alarm_fired_total{job=\"fastapi\"}[5m]))",
           "legendFormat": "gas_anomaly_ai / {{gas_type}} / {{risk_level}}",
           "refId": "A"
         }
