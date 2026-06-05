@@ -39,16 +39,18 @@ router = APIRouter(tags=["websocket"])
 
 
 async def _send_to_all(payload: dict) -> None:
-    """연결된 모든 클라이언트에 페이로드를 전송하고 끊긴 클라이언트를 정리한다."""
-    dead: list[WebSocket] = []
-    for ws in list(sensor_clients):
+    """연결된 모든 클라이언트에 페이로드를 병렬 전송하고 끊긴 클라이언트를 정리한다."""
+    async def _send(ws: WebSocket) -> WebSocket | None:
         try:
             await ws.send_json(payload)
+            return None
         except Exception as exc:
             logger.warning(f"[ws/sensors] action=send_failed error={exc!r}")
-            dead.append(ws)
-    for ws in dead:
-        if ws in sensor_clients:
+            return ws
+
+    results = await asyncio.gather(*[_send(ws) for ws in list(sensor_clients)])
+    for ws in results:
+        if ws is not None and ws in sensor_clients:
             sensor_clients.remove(ws)
 
 

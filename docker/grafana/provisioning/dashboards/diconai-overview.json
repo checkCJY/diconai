@@ -311,6 +311,40 @@
           "refId": "B"
         }
       ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 44,
+        "w": 24,
+        "h": 8
+      },
+      "id": 10,
+      "title": "FastAPI — /api/sensors/gas 응답시간 p95 / p99 (5m)",
+      "description": "가스 센서 ingest 엔드포인트 응답시간. DRF 저장 비동기 분리 전후 비교용.",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"fastapi\", path=\"/api/sensors/gas\"}[5m])))",
+          "legendFormat": "p95",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"fastapi\", path=\"/api/sensors/gas\"}[5m])))",
+          "legendFormat": "p99",
+          "refId": "B"
+        }
+      ]
     }
   ],
   "schemaVersion": 39,

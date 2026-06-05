@@ -29,11 +29,10 @@ from websocket.services.alarm_queue import (
 )  # 이성현 추가 — 브라우저 실시간 알람 push
 from datetime import datetime, timezone
 
-from fastapi import HTTPException
 
 from core.gas_thresholds import calculate_individual_risks
 from gas.schemas.gas import GasDataPayload
-from services.drf_client import DrfClientError, post_to_drf
+from services.drf_client import post_to_drf
 from core.metrics import (
     AI_INFERENCE_DURATION,
     AI_INFERENCE_FAILED_TOTAL,
@@ -305,24 +304,21 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
         "anomaly_type": payload.anomaly_type,
     }
 
-    try:
-        res = await post_to_drf(
+    # DRF 저장을 fire-and-forget으로 분리 — E2E latency 개선
+    # 기존: await post_to_drf()가 DRF 응답을 기다리는 동안(~200ms) 이벤트 루프 블로킹.
+    #       alarm_flush_loop 지연 → E2E latency 상승의 주요 원인.
+    # 변경: asyncio.create_task()로 백그라운드 실행.
+    #       FastAPI는 저장 완료를 기다리지 않고 즉시 Redis 스냅샷·응답 반환으로 진행.
+    # 트레이드오프: DRF 저장 실패 시 503/502 대신 로그(logger.warning/error)만 기록됨.
+    async def _save_to_drf() -> None:
+        await post_to_drf(
             DRF_GAS_PATH,
             drf_payload,
-            raise_on_error=True,
+            raise_on_error=False,
             log_category="gas_service",
         )
-    except DrfClientError as exc:
-        # 통신 실패는 503, 4xx는 그대로, 그 외 비성공은 502로 매핑.
-        if exc.status is None:
-            raise HTTPException(status_code=503, detail=exc.detail) from exc
-        if exc.status == 404:
-            raise HTTPException(
-                status_code=404, detail="등록되지 않은 장치입니다."
-            ) from exc
-        raise HTTPException(
-            status_code=502, detail="데이터 저장에 실패했습니다."
-        ) from exc
+
+    asyncio.create_task(_save_to_drf())
 
     gas_snapshot = {
         "co": payload.co,
@@ -342,7 +338,7 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
 
     logger.debug(
         f"[gas_service] action=processed device={payload.device_id} "
-        f"saved_id={res.json().get('id') if res else '?'}"
+        f"saved_id=async(fire-and-forget)"
     )
     return {
         "received": True,
