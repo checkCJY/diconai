@@ -28,6 +28,7 @@ from django.core.cache import cache
 
 from apps.core.constants import RiskLevel
 
+_MISS = object()  # 이성현 추가 — negative caching용 sentinel (None과 "캐시 미스" 구분)
 _CACHE_PREFIX = "threshold"
 _CACHE_TTL = 3600  # 1시간
 
@@ -57,9 +58,9 @@ def get_threshold(
     또는 미존재 시 None.
     """
     key = _cache_key(group_code, item, facility_id)
-    cached = cache.get(key)
-    if cached is not None:
-        return cached
+    cached = cache.get(key, _MISS)  # 이성현 수정 — None도 캐시에서 구분
+    if cached is not _MISS:
+        return cached  # None이어도 캐시 히트면 반환
 
     from apps.facilities.models import Threshold
 
@@ -74,6 +75,7 @@ def get_threshold(
         threshold = qs.filter(facility__isnull=True).first()
 
     if threshold is None:
+        cache.set(key, None, _CACHE_TTL)  # 이성현 수정 — 없음(None)도 캐시
         return None
 
     payload = {
