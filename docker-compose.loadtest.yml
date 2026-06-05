@@ -1,0 +1,21 @@
+# docker-compose.loadtest.yml — 부하 측정 전용 override
+# 이성현 추가 — B-2: DRF workers 1→3 (병렬 처리) + --reload 제거
+#
+# 배경: 단일 워커(workers=1)가 대시보드 조회 + 센서 수신을 직렬 처리해
+#       부하 시 요청이 밀림 (2026-05-14 대시보드 멈춤 사고). 워커를 늘려 병렬화.
+#       단 --reload는 multi-worker에서 불안정하므로 측정 전용 override로 분리.
+#
+# 사용 (측정 시):
+#   docker compose -f docker-compose.yml -f docker-compose.loadtest.yml up -d drf
+# 원복 (평소 개발):
+#   docker compose up -d drf
+services:
+  drf:
+    command:
+      - gunicorn
+      - config.wsgi:application
+      - --bind=0.0.0.0:8000
+      - --workers=3
+      - --threads=4
+      - --access-logfile=-
+      - --config=/app/gunicorn.conf.py

@@ -94,6 +94,10 @@ if env("POSTGRES_HOST", default=""):
             "PASSWORD": env("POSTGRES_PASSWORD"),
             "HOST": env("POSTGRES_HOST"),
             "PORT": env("POSTGRES_PORT", default="5432"),
+            # 이성현 추가 — 연결 60초 재사용 (매 요청 새 PG 연결 비용 제거)
+            "CONN_MAX_AGE": 60,
+            # 이성현 추가 — 재사용 전 죽은 연결 자동 감지 (끊긴 연결로 인한 에러 방지)
+            "CONN_HEALTH_CHECKS": True,
         }
     }
 else:
