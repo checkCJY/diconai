@@ -91,7 +91,7 @@
           },
           "expr": "histogram_quantile(0.99, sum(rate(e2e_alarm_latency_seconds_bucket{risk_level=\"danger\"}[5m])) by (le))",
           "legendFormat": "danger p99",
-          "refId": "B"
+          "refId": "C"
         }
       ]
     },
