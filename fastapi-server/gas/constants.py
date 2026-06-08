@@ -20,3 +20,8 @@ GAS_FIELDS: tuple[str, ...] = (
 
 # ARIMA 잔차 피처를 사용하는 가스 항목 (모델이 존재하는 경우에만 적재).
 ARIMA_GAS_FIELDS: tuple[str, ...] = ("co", "h2s", "co2")
+
+# 파일 끝에 추가
+# 이성현 추가 — 등록된 가스센서 device_id Set 캐시 키
+# (info 수신 시 등록 / 가스 수신 시 404 1차 검증에 공용)
+REGISTERED_GAS_SENSORS_KEY = "registered:gas:sensors"

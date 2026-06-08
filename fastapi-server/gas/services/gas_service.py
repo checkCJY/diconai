@@ -18,6 +18,7 @@ import numpy as np
 import ruptures as rpt
 from pathlib import Path
 from core.config import settings
+from core.redis_client import get_redis  # 이성현 추가 — 센서 등록 검증
 from services.ai_mute import (
     AIInferenceState,
     mark_gas_ai_recent,
@@ -31,8 +32,12 @@ from datetime import datetime, timezone
 
 
 from core.gas_thresholds import calculate_individual_risks
+from fastapi import HTTPException  # 이성현 추가 — 미등록 센서 404
 from gas.schemas.gas import GasDataPayload
-from services.drf_client import post_to_drf
+from services.drf_client import (
+    post_to_drf,
+    DrfClientError,
+)  # 이성현 수정 — fallback 404 판정용
 from core.metrics import (
     AI_INFERENCE_DURATION,
     AI_INFERENCE_FAILED_TOTAL,
@@ -50,7 +55,10 @@ from ai.router import (
     _get_or_load,
     _build_multi_feature_row,
 )
-from gas.constants import GAS_FIELDS  # 이성현 추가 — 9종 가스 순서 단일 공급원
+from gas.constants import (
+    GAS_FIELDS,
+    REGISTERED_GAS_SENSORS_KEY,
+)  # 이성현 수정 — 등록 검증 키 추가
 
 
 logger = logging.getLogger(__name__)
@@ -304,12 +312,10 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
         "anomaly_type": payload.anomaly_type,
     }
 
-    # DRF 저장을 fire-and-forget으로 분리 — E2E latency 개선
-    # 기존: await post_to_drf()가 DRF 응답을 기다리는 동안(~200ms) 이벤트 루프 블로킹.
-    #       alarm_flush_loop 지연 → E2E latency 상승의 주요 원인.
-    # 변경: asyncio.create_task()로 백그라운드 실행.
-    #       FastAPI는 저장 완료를 기다리지 않고 즉시 Redis 스냅샷·응답 반환으로 진행.
-    # 트레이드오프: DRF 저장 실패 시 503/502 대신 로그(logger.warning/error)만 기록됨.
+    # 이성현 수정 — #114 비동기 저장에 누락된 404(미등록 센서) 검증 복원.
+    # Redis Set으로 등록 여부 1차 확인 → DRF 블로킹 없이 즉시 판정.
+    #   · 캐시 히트(등록)   → fire-and-forget 비동기 저장 (E2E latency 유지)
+    #   · 캐시 미스(명단 X) → 동기 저장으로 404 판정 겸 fallback, 성공 시 캐시 보충
     async def _save_to_drf() -> None:
         await post_to_drf(
             DRF_GAS_PATH,
@@ -318,7 +324,32 @@ async def process_gas_data(payload: GasDataPayload) -> dict:
             log_category="gas_service",
         )
 
-    asyncio.create_task(_save_to_drf())
+    r = get_redis()
+    is_registered = await r.sismember(REGISTERED_GAS_SENSORS_KEY, payload.device_id)
+
+    if is_registered:
+        asyncio.create_task(_save_to_drf())
+    else:
+        try:
+            await post_to_drf(
+                DRF_GAS_PATH,
+                drf_payload,
+                raise_on_error=True,
+                log_category="gas_service",
+            )
+            await r.sadd(REGISTERED_GAS_SENSORS_KEY, payload.device_id)
+        except DrfClientError as exc:
+            if exc.status is None:
+                raise HTTPException(status_code=503, detail=exc.detail) from exc
+            # 이성현 수정 — DRF serializer가 미등록 센서를 ValidationError(400)로 응답.
+            # 404가 아니라 400이므로 400/404 둘 다 "등록되지 않은 장치"로 매핑.
+            if exc.status in (400, 404):
+                raise HTTPException(
+                    status_code=404, detail="등록되지 않은 장치입니다."
+                ) from exc
+            raise HTTPException(
+                status_code=502, detail="데이터 저장에 실패했습니다."
+            ) from exc
 
     gas_snapshot = {
         "co": payload.co,
