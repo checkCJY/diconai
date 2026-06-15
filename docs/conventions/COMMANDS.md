@@ -33,11 +33,11 @@ cd fastapi-server
 uv pip install -r requirements.txt
 uvicorn app:app --reload --port 8001
 
-# Celery worker (Redis가 떠 있어야 함)
+# Celery worker (Redis가 떠 있어야 함; alarm·metric 큐 모두 소비)
 cd drf-server
-celery -A config worker -l info
+celery -A config worker -Q alarm,metric -l info
 
-# Celery beat (선택, 매일 새벽 3시 데이터 보관 배치)
+# Celery beat (선택, 매일 09:30 데이터 보관 배치 등 주기 태스크)
 cd drf-server
 celery -A config beat -l info
 
@@ -55,7 +55,7 @@ sudo service redis-server start
 ### 빌드 / 기동 / 정지
 
 ```bash
-docker compose build                    # 7개 이미지 빌드 (캐시 사용)
+docker compose build                    # drf·fastapi 2개 이미지 빌드 (나머지는 pull, 캐시 사용)
 docker compose build --no-cache         # 캐시 무시 (의존성 충돌 의심 시)
 docker compose build drf                # 한 서비스만 재빌드
 docker compose up -d                    # 백그라운드 기동
@@ -69,7 +69,7 @@ docker compose down -v                  # 볼륨까지 제거 (데이터 삭제!
 ### 상태 / 로그 / 진입
 
 ```bash
-docker compose ps                       # 7개 상태 (healthy/Up)
+docker compose ps                       # 12개 상태 (healthy/Up)
 docker compose logs -f drf              # drf 로그 실시간
 docker compose logs --tail=50 fastapi   # fastapi 최근 50줄
 docker compose exec drf sh              # drf 컨테이너 쉘 진입
@@ -87,7 +87,7 @@ docker compose exec drf python manage.py shell    # Django shell
 | 타깃 | 동작 | 인자 |
 |---|---|---|
 | `make help` | 전체 타깃 + 시나리오 출력 | — |
-| `make up` | 7-서비스 전체 기동 (백그라운드) | — |
+| `make up` | 12-서비스 전체 기동 (백그라운드) | — |
 | `make down` | 컨테이너 제거 (볼륨 유지) | — |
 | `make start` | 정지된 컨테이너 재기동 | `s=` |
 | `make stop` | 컨테이너 정지 | `s=` |
@@ -103,9 +103,9 @@ docker compose exec drf python manage.py shell    # Django shell
 | `make logs` | 전체 또는 한 서비스 stdout | `s=` |
 | `make logs-drf` | drf 단독 (gunicorn + Django) | — |
 | `make logs-fastapi` | fastapi 단독 (uvicorn + IoT + WS) | — |
-| `make logs-celery` | celery-worker 단독 | — |
+| `make logs-celery` | celery 워커 2종 (alarm / metric) | — |
 | `make logs-beat` | celery-beat 단독 | — |
-| `make logs-all` | drf + fastapi + celery 4개 통합 | — |
+| `make logs-all` | drf + fastapi + celery-worker-alarm + beat | — |
 
 ### 📁 파일 로그 (영속 — RotatingFileHandler)
 
@@ -124,7 +124,7 @@ docker compose exec drf python manage.py shell    # Django shell
 
 | 타깃 | 동작 | 인자 |
 |---|---|---|
-| `make logs-locks` | celery `database is locked` 감시 | — |
+| `make logs-locks` | DB 락/데드락 감시 (PG `deadlock`·`lock timeout`) | — |
 | `make logs-timeouts` | fastapi `action=timeout` 감시 | — |
 | `make logs-errors` | DRF 4xx/5xx + ERROR + Forbidden 감시 | — |
 | `make logs-ai` | AI 추론 로그 (`anomaly_inference`) 감시 | — |
@@ -167,12 +167,26 @@ docker compose exec drf python manage.py shell    # Django shell
 | `make dummies-list` | 실행 중 더미 프로세스 확인 | — |
 | `make dummies-restart` | 더미 재기동 (stop → 2초 → start) | `s=` |
 
-### 💾 DB 상태 진단
+### 🎬 시연 시나리오 (가스 co_leak / 전력 overload)
 
 | 타깃 | 동작 | 인자 |
 |---|---|---|
-| `make db-size` | DB 파일 + WAL/SHM 크기 (12GB 비대화 감지) | — |
-| `make db-pragma` | PRAGMA 설정 (`busy_timeout`/`journal_mode`) | — |
+| `make scenario` | 현재 시나리오 모드 조회 | — |
+| `make scenario-set` | 시나리오 모드 변경 | `mode=co_leak\|overload\|normal\|mixed` |
+| `make scenario-reset` | normal 복귀 (시연 안전 상태) | — |
+| `make scenario-clean` | 알람 큐 + dedup/상태 Redis 키 정리 | — |
+| `make demo-prep` | 시연 직전 셋업 (normal + 키 정리 + 안정화 대기) | — |
+| `make demo-check` | 시연 환경 한방 점검 (모드 + env + 큐 길이) | — |
+| `make demo-gas` | 가스 1 사이클 (co_leak 60s → normal) | — |
+| `make demo-power` | 전력 1 사이클 (overload 60s → normal) | — |
+| `make demo-cycle` | 가스 + 전력 통합 시연 (~2분 30초) | — |
+
+### 💾 DB 상태 진단 (PostgreSQL)
+
+| 타깃 | 동작 | 인자 |
+|---|---|---|
+| `make db-size` | DB 총 크기 + 상위 테이블 크기 (비대화 감지) | — |
+| `make db-pragma` | PG 주요 설정 (`statement_timeout`·isolation 등) | — |
 | `make db-counts` | 주요 테이블 row count + 시간 범위 | — |
 
 ### 🧹 정리
@@ -240,11 +254,11 @@ done
 ### Docker 환경
 
 ```bash
-make showmigrations              # 53개 모두 [X] 인지
+make showmigrations              # 마이그레이션 모두 [X] 인지
 make migrate                     # 미적용분 수동 실행 (entrypoint가 자동 처리하지만 명시적으로)
 make super                       # 슈퍼유저 생성
 make seed                        # Worker × 4, GasSensor, PowerDevice 더미 마스터
-make exec s=drf cmd="python manage.py dbshell"   # SQLite CLI
+make exec s=drf cmd="python manage.py dbshell"   # DB CLI (PostgreSQL psql)
 make exec s=drf cmd="python manage.py dumpdata --natural-foreign --natural-primary --exclude=contenttypes --exclude=auth.permission > /app/dump.json"
 ```
 
