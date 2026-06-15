@@ -24,7 +24,7 @@
 │     CP 없으면 IF 스킵            │     부족 → WARMING_UP        │
 │                                  │                              │
 │  3. IF 다변량 추론               │  3. 5축 추론 (병렬)          │
-│     (CO+H2S+CO2 = 12 or 15피처)  │     · IF                     │
+│     (9종 = 36 or 39피처)         │     · IF                     │
 │                                  │     · ARIMA (95% CI 위반)    │
 │  4. pred == -1 + rate_limit_ok   │     · Z-score                │
 │     → push_alarm                 │     · ChangePoint            │
@@ -66,20 +66,20 @@
    │     calculate_individual_risks() → {gas}_risk: normal|warning|danger
    │     → DRF 저장 + DRF Celery 측 정적 룰 알람 트리거
    │
-   ├─ ② CO/H2S/CO2 윈도우 누적 (deque maxlen=30 × 3)
-   │     ※ 다른 7가스는 윈도우 없음 — AI 추론 대상 아님
+   ├─ ② 9종 윈도우 누적 (deque maxlen=30 × 9, GAS_FIELDS 순서)
+   │     ※ lel 제외 — raw_payload 에만 보관, AI 추론 대상 아님
    │
    ├─ ③ ChangePoint 게이트 (ruptures.Pelt model="rbf")
-   │     3가스 중 하나라도 변화점 감지 → 통과
+   │     9가스 중 하나라도 변화점 감지 → 통과
    │     모두 안정 → IF 추론 스킵 (CPU 절약)
    │
    ├─ ④ IF 모델 로드
-   │     sensor_identifier = "gas:sensor_1:co_h2s_co2" (고정)
+   │     sensor_identifier = "gas:sensor_1:co_h2s_co2_o2_no2_so2_o3_nh3_voc" (고정)
    │     ※ 가스는 모든 센서가 같은 모델 공유 (전력은 채널별 학습)
    │
    ├─ ⑤ 다변량 피처 빌드 (_build_multi_feature_row)
-   │     ARIMA pkl 없으면 12피처: 각 가스 [value, roll_mean, roll_std, diff]
-   │     ARIMA pkl 있으면 15피처: 위 4피처 + arima_resid (가스당)
+   │     ARIMA pkl 없으면 36피처: 9가스 각 [value, roll_mean, roll_std, diff]
+   │     ARIMA pkl 있으면 최대 39피처: 위 + arima_resid (CO/H2S/CO2 한정)
    │
    ├─ ⑥ pred = model.predict(row)[0]     ← 1 정상, -1 이상
    │     score = model.decision_function(row)[0]
@@ -89,8 +89,9 @@
    │
    └─ ⑧ pred == -1 AND (now - last_fired >= 30s) 일 때만 발화
          │
-         ├─ Redis mute 마킹 × 3가스 (CO/H2S/CO2 각각)
+         ├─ Redis mute 마킹 × 9가스 (GAS_FIELDS 전부)
          │   · mark_gas_ai_recent  → DRF 정적 룰 60s mute
+         │     (단, DRF 측 _AI_GUARDED_GASES={co,h2s,co2}만 mute 적용 → 실효 3종)
          │   · mark_gas_ai_state(FIRED)
          │
          ├─ push_alarm (gas_anomaly_ai, danger)
@@ -104,13 +105,15 @@
 
 | 변수 | 값 | 위치 |
 |---|---|---|
-| 윈도우 길이 | 30 (1Hz → 30초) | [`gas_service.py:77-79`](../../fastapi-server/gas/services/gas_service.py#L77-L79) |
-| CP 패널티 (`penalty`) | 3.0 (↑ 보수적 / ↓ 민감) | [`gas_service.py:63`](../../fastapi-server/gas/services/gas_service.py#L63) |
-| CP 커널 | `"rbf"` (ruptures.Pelt) | 동 |
-| Rate limit | 30s | [`core/config.py:69`](../../fastapi-server/core/config.py#L69) `GAS_AI_RATE_LIMIT_SEC` |
-| 발화 단위 키 | `gas:{device_id}:co_h2s_co2` | sensor 1개당 1키 — 3가스 묶어서 한 알람 |
-| ARIMA pkl | `arima_{co,h2s,co2}.pkl` (모듈 로드) | [`gas_service.py:52-59`](../../fastapi-server/gas/services/gas_service.py#L52-L59) |
-| 발화 시 risk_level | `danger` 고정 | [`gas_service.py:215`](../../fastapi-server/gas/services/gas_service.py#L215) |
+| 가스 항목 | 9종 (`GAS_FIELDS`: co/h2s/co2/o2/no2/so2/o3/nh3/voc, lel 제외) | [`gas/constants.py`](../../fastapi-server/gas/constants.py) |
+| 윈도우 길이 | 30 (1Hz → 30초) × 9종 | [`gas_service.py:95`](../../fastapi-server/gas/services/gas_service.py#L95) `_gas_windows` |
+| CP 패널티 (`penalty`) | `DEMO_GAS_CP_PENALTY` 기본 3.0 (env override, 시연 1.0) | [`config.py:75`](../../fastapi-server/core/config.py#L75) |
+| CP 커널 | `"rbf"` (ruptures.Pelt) | [`gas_service.py:86`](../../fastapi-server/gas/services/gas_service.py#L86) |
+| Rate limit | 30s | [`config.py:90`](../../fastapi-server/core/config.py#L90) `GAS_AI_RATE_LIMIT_SEC` |
+| 발화 단위 키 | `gas:{device_id}:co_h2s_co2_o2_no2_so2_o3_nh3_voc` | sensor 1개당 1키 — 9종 묶어서 한 알람 |
+| IF 모델 식별자 | `gas:sensor_1:co_h2s_co2_o2_no2_so2_o3_nh3_voc` | [`gas_service.py:149`](../../fastapi-server/gas/services/gas_service.py#L149) (전 센서 공유) |
+| ARIMA pkl | `arima_{co,h2s,co2}.pkl` (`ARIMA_GAS_FIELDS` 한정, 존재 시만 적재) | [`gas_service.py:69`](../../fastapi-server/gas/services/gas_service.py#L69) |
+| 발화 시 risk_level | `danger` 고정 | [`gas_service.py:244`](../../fastapi-server/gas/services/gas_service.py#L244) |
 
 ### 가스 임계치 (정적 룰, AI 와 무관)
 
@@ -170,30 +173,27 @@ if not cp_detected:
 # 적어도 한 가스에서 패턴 변화 감지 → IF 진행
 ```
 
-**왜 게이트?** 3가스가 모두 평탄하면 IF 가 어차피 normal 반환. 매 패킷마다 12~15차원 IF 추론은 CPU 비용. CP 가 cheap pre-filter 역할.
+**왜 게이트?** 9가스가 모두 평탄하면 IF 가 어차피 normal 반환. 매 패킷마다 36~39차원 IF 추론은 CPU 비용. CP 가 cheap pre-filter 역할.
 
-### 다변량 피처 빌드 (12 vs 15)
+### 다변량 피처 빌드 (36 vs 39)
 
-ARIMA pkl 로드 성공 여부에 따라 피처 차원 변동.
+ARIMA pkl 로드 성공 여부에 따라 피처 차원 변동. 기본 피처는 9가스 × 4 = 36, ARIMA 잔차는 `ARIMA_GAS_FIELDS`(CO/H2S/CO2)에 pkl 이 있을 때만 가스당 1개 추가 → 최대 39.
 
 ```
-ARIMA pkl 없음 (12피처):
+ARIMA pkl 없음 (36피처): GAS_FIELDS(9종) 각 [value, roll_mean, roll_std, diff]
   [CO_value,  CO_roll_mean,  CO_roll_std,  CO_diff,
    H2S_value, H2S_roll_mean, H2S_roll_std, H2S_diff,
-   CO2_value, CO2_roll_mean, CO2_roll_std, CO2_diff]
+   ... (CO2, O2, NO2, SO2, O3, NH3, VOC 동일) ]
 
-ARIMA pkl 있음 (15피처):
-  [CO_value,  ..., CO_diff,  CO_arima_resid,
-   H2S_value, ..., H2S_diff, H2S_arima_resid,
-   CO2_value, ..., CO2_diff, CO2_arima_resid]
+ARIMA pkl 있음 (최대 39피처): 위 36 + CO/H2S/CO2 각 arima_resid 1개씩
 ```
 
-⚠ IF 학습 시 피처 개수와 추론 시 피처 개수가 일치해야 한다. 현재 운영 모델 (`gas_if_v3.pkl`) 의 피처 개수 = 학습 명령에서 결정.
+⚠ IF 학습 시 피처 개수와 추론 시 피처 개수가 일치해야 한다 (학습·추론 모두 `GAS_FIELDS` 순서 고정). 운영 모델 피처 개수 = 학습 명령에서 결정.
 
 ### 가스만의 특징 (전력과 비교)
 
-- **공통 IF 1개**: 가스는 모든 sensor 가 같은 모델 공유 (`sensor_identifier="gas:sensor_1:co_h2s_co2"` 고정). 전력은 채널별 학습.
-- **ARIMA 사전 로드**: 모듈 import 시점에 3가스 ARIMA pkl 을 메모리에 로드. 전력은 lazy 로드 (첫 요청 시).
+- **공통 IF 1개**: 가스는 모든 sensor 가 같은 모델 공유 (`sensor_identifier="gas:sensor_1:co_h2s_co2_o2_no2_so2_o3_nh3_voc"` 고정). 전력은 채널별 학습.
+- **ARIMA 사전 로드**: 모듈 import 시점에 CO/H2S/CO2 ARIMA pkl 을 메모리에 로드. 전력은 lazy 로드 (첫 요청 시).
 - **5축 결합 미사용**: `combine_risk_5axis` 안 거친다. IF `pred=-1` 이면 무조건 `danger`.
 - **AI state 매트릭스 없음**: `decide_alarm` 없음. AI 발화 = 단순 push.
 - **CP 가 알람 신호 아님**: 게이트 역할만. 전력에서는 CP 가 직접 발화 신호.
@@ -201,7 +201,7 @@ ARIMA pkl 있음 (15피처):
 ### 발화 페이로드 (예시)
 
 ```python
-# gas_service.py:238 push_alarm payload
+# gas_service.py push_alarm payload (대표 위험 가스 _lead_gas 기준)
 {
     "alarm_type": "gas_anomaly_ai",
     "risk_level": "danger",
@@ -209,12 +209,12 @@ ARIMA pkl 있음 (15피처):
     "summary": "가스 이상 감지 (AI) | CO:35 H2S:8 CO2:1200",
     "message": "가스 이상 감지 (AI) | CO:35 H2S:8 CO2:1200",
     "is_new_event": True,
-    "gas_type": "co",          # ※ 대표 가스로 CO 고정
-    "measured_value": 35,
+    "gas_type": "co",          # ※ _lead_gas = 위험 가스 중 첫 번째 (없으면 "co")
+    "measured_value": 35,      # gas_values[_lead_gas]
 }
 ```
 
-⚠ `gas_type` 이 항상 `"co"` 인 이유: 다변량 IF 는 3가스 동시 이상 신호. 알람 UI 는 단일 가스 라벨 필요 → CO 를 대표로 고정. summary 에는 3가스 값 모두 표기.
+⚠ `gas_type` 결정: 다변량 IF 는 9가스 동시 이상 신호. 알람 UI 는 단일 가스 라벨이 필요해, `individual_risks`에서 warning/danger 인 가스(`_risky`) 중 **첫 번째를 대표(`_lead_gas`)** 로 쓰고 위험 가스가 없으면 `"co"` 로 fallback. `summary` 에는 위험 가스 값을 모두 표기 (`_gas_detail`).
 
 ---
 
@@ -300,11 +300,11 @@ features = [
 ]
 ```
 
-**가스 (다변량, 12 또는 15피처):**
+**가스 (다변량, 36 또는 최대 39피처):**
 ```python
-# ai/router.py:316
-# 각 가스(co, h2s, co2)별 4피처 + (선택) ARIMA 잔차
-# → 4×3 = 12피처, 또는 5×3 = 15피처
+# ai/router.py _build_multi_feature_row
+# GAS_FIELDS(9종)별 4피처 + (선택) CO/H2S/CO2 ARIMA 잔차
+# → 4×9 = 36피처, ARIMA pkl 있으면 +3 = 최대 39피처
 ```
 
 **판정:** `model.predict(row)[0]` → `1` 정상, `-1` 이상
@@ -332,7 +332,7 @@ arima_violation = actual < ci_lower or actual > ci_upper
 # ai/router.py:266
 new_result = arima_result.apply(endog=values)
 resid = float(new_result.resid[-1])
-# → 12피처 IF 에 추가하면 15피처 IF
+# → 36피처 IF 에 CO/H2S/CO2 잔차 추가 시 최대 39피처 IF
 ```
 
 ---

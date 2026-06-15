@@ -156,6 +156,7 @@ Dummy(IoT)  ──HTTPS POST──▶  FastAPI  ──HTTPS POST──▶  DRF
 | `y` | float | ✅ | `≥ 0` | Y 좌표 (px) |
 | `movement_status` | str | ❌ | default `"moving"` | 이동 상태 |
 | `measured_at` | datetime | ✅ | ISO 8601 | 측정 시각 |
+| `node_id` | str \| null | ❌ | default `null` | 측위 노드 device_id (예: `"NODE-001"`). 펌웨어 갱신 전 `null` |
 
 > **루트 타입**: 배열 — `list[WorkerPositionSchema]`
 
@@ -182,27 +183,26 @@ Dummy(IoT)  ──HTTPS POST──▶  FastAPI  ──HTTPS POST──▶  DRF
 
 ### 2-1. 메인 통합 스트림 (`WS /ws/sensors/`)
 
-- **주기**: `BROADCAST_INTERVAL_SEC` (기본 1초)
+- **주기**: `BROADCAST_INTERVAL_SEC` (기본 5초, [`core/config.py`](../fastapi-server/core/config.py))
 - **조립부**: [`build_broadcast_payload`](../fastapi-server/websocket/services/broadcast.py)
 
 | 필드 | 타입 | 설명 |
 |---|---|---|
-| `device_id` | str | 고정값 `"sensor-01"` |
 | `timestamp` | str | 페이로드 조립 시각 (ISO 8601) |
-| `level` | str | `"정상"` / `"위험"` (시연용 더미 확률) |
 | `total_power_kw` | float \| null | 16채널 합산 전력 (kW). stale 시 `null` |
 | `power_change_pct` | float \| null | 직전 틱 대비 증감률 (%) |
 | `equipment` | array | 16개 설비 채널 현황 (아래 표) |
-| `power_loading` | bool | 전력 데이터 로딩 중 여부 |
-| `gas_loading` | bool | 가스 데이터 로딩 중 여부 |
-| `ai_power_equipment` | str | AI 예측 — 최대 부하 설비명 |
-| `ai_eta_min` | int | AI 예측 — 도달 ETA (분) |
-| `ai_max_load_kw` | float | AI 예측 — 최대 부하 (kW) |
-| `ai_max_load_pct` | int | AI 예측 — 최대 부하 비율 (%) |
-| `worker_positions` | object | `{worker_id: {x, y, ...}}` 매핑 |
-| `alarms` | array | 새 알람 큐 (최대 5건, 송출 후 즉시 비움) |
+| `power_loading` | bool | 전력 데이터 로딩 중(stale) 여부 |
+| `gas_loading` | bool | 가스 데이터 로딩 중(stale) 여부 |
+| `ai_power_equipment` | str \| null | AI 예측 — 최대 부하 설비명 (현재 `equipment` 첫 채널명, 미수신 시 `null`) |
+| `ai_eta_min` | int \| null | AI 예측 — 도달 ETA (분). **모델 연동 전까지 항상 `null`** |
+| `ai_max_load_kw` | float \| null | AI 예측 — 최대 부하 (kW). **모델 연동 전까지 항상 `null`** |
+| `ai_max_load_pct` | int \| null | AI 예측 — 최대 부하 비율 (%). **모델 연동 전까지 항상 `null`** |
+| `alarms` | array | 주기 broadcast에서는 **항상 빈 배열** — 실제 알람은 `alarm_flush_loop`이 별도 즉시 송신 (아래 표는 그 항목 구조) |
 | `co`~`voc` | float | 가스 9종 측정값 (스프레드) |
 | `co_risk`~`voc_risk` | str | 가스별 위험도 (스프레드) |
+
+> 작업자 위치(`worker_positions`)는 이 스트림에서 **제거**되어 위치 전용 스트림(2-2 `/ws/positions/`, 1초 주기)이 단독 담당함. 5초 broadcast에 포함 시 1초 갱신을 덮어써 마커 순간이동이 발생했기 때문.
 
 **`equipment[]` 항목 구조**:
 
@@ -216,23 +216,11 @@ Dummy(IoT)  ──HTTPS POST──▶  FastAPI  ──HTTPS POST──▶  DRF
 | `sensor_status` | str | `"active"` / `"comm_failure"` |
 | `risk_level` | str | `"normal"` / `"warning"` / `"danger"` |
 
-**`worker_positions[worker_id]` 항목 구조**:
+**`alarms[]` 항목 구조** (Celery → `/internal/alarms/push/` → 큐 적재 → `alarm_flush_loop`이 송신):
 
 | 필드 | 타입 | 설명 |
 |---|---|---|
-| `x`, `y` | float | 좌표 |
-| `facility_id` | int | 설비 ID |
-| `worker_name` | str | 작업자 이름 |
-| `movement_status` | str | 이동 상태 |
-| `updated_at` | str | 갱신 시각 (ISO 8601) |
-| `risk_level` | str | DRF 응답 기반 위험도 |
-| `zone_name` | str \| null | 진입 지오펜스명 |
-
-**`alarms[]` 항목 구조** (Celery → `/internal/alarms/push/` → 큐 적재):
-
-| 필드 | 타입 | 설명 |
-|---|---|---|
-| `alarm_type` | str | `"gas"` / `"power"` / `"geofence_intrusion"` 등 |
+| `alarm_type` | str | `"gas_threshold"` / `"power_overload"` / `"geofence_intrusion"` / `"gas_anomaly_ai"` / `"power_anomaly_ai"` ([`AlarmType`](../drf-server/apps/core/constants.py)) |
 | `risk_level` | str | `"warning"` / `"danger"` |
 | `source_label` | str | 알람 출처 라벨 |
 | `summary` | str | 알람 요약 메시지 |
@@ -243,11 +231,11 @@ Dummy(IoT)  ──HTTPS POST──▶  FastAPI  ──HTTPS POST──▶  DRF
 | `threshold_value` | float \| null | 임계값 |
 | `worker_id` | int \| null | 지오펜스 알람 시 타겟 작업자 |
 
+> 아래 예시의 `alarms[]`는 **항목 구조 참고용**임. 주기 broadcast 페이로드의 `alarms`는 실제로는 항상 `[]`이고, 채워진 알람은 `alarm_flush_loop`이 같은 `/ws/sensors/`로 별도 송신함.
+
 ```json
 {
-  "device_id": "sensor-01",
-  "timestamp": "2026-05-07T17:00:00.123456",
-  "level": "정상",
+  "timestamp": "2026-05-07T17:00:00.123456+00:00",
   "total_power_kw": 18.42,
   "power_change_pct": 1.3,
   "equipment": [
@@ -259,20 +247,12 @@ Dummy(IoT)  ──HTTPS POST──▶  FastAPI  ──HTTPS POST──▶  DRF
   "power_loading": false,
   "gas_loading": false,
   "ai_power_equipment": "압연기",
-  "ai_eta_min": 22,
-  "ai_max_load_kw": 21.5,
-  "ai_max_load_pct": 117,
-  "worker_positions": {
-    "1": {
-      "x": 150.32, "y": 120.18, "facility_id": 1,
-      "worker_name": "작업자 A", "movement_status": "moving",
-      "updated_at": "2026-05-07T08:00:00+00:00",
-      "risk_level": "normal", "zone_name": null
-    }
-  },
+  "ai_eta_min": null,
+  "ai_max_load_kw": null,
+  "ai_max_load_pct": null,
   "alarms": [
     {
-      "alarm_type": "gas", "risk_level": "danger",
+      "alarm_type": "gas_threshold", "risk_level": "danger",
       "source_label": "가스센서 #63200c3afd12",
       "summary": "CO 농도 위험 (210ppm)",
       "is_new_event": true, "event_id": 1234,
@@ -452,6 +432,7 @@ Dummy(IoT)  ──HTTPS POST──▶  FastAPI  ──HTTPS POST──▶  DRF
 | `y` | float | ✅ | `≥ 0` | Y 좌표 |
 | `movement_status` | str | ❌ | `moving/stationary/idle`, default `moving` | 이동 상태 |
 | `measured_at` | datetime | ✅ | - | 측정 시각 |
+| `node_id` | str \| null | ❌ | `max_length=50`, default `null` | 측위 노드 device_id (예: `"NODE-001"`) |
 
 > **루트 타입**: 배열. `worker_name`은 1단계와 달리 **포함되지 않음** (DRF는 `worker_id`로 조회).
 

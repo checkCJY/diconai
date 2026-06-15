@@ -47,7 +47,6 @@ drf-server/
 ├── gunicorn.conf.py                  # gunicorn 워커 설정
 ├── conftest.py · pytest.ini          # 테스트 설정
 ├── requirements.txt · requirements-dev.txt
-├── _eval_*.py                        # AI 오프라인 평가 스크립트 (5axis/arima/if)
 ├── config/                           # Django 프로젝트 설정
 │   ├── settings/                     # 설정 패키지 (base.py · dev.py · prod.py)
 │   ├── urls.py                       # 루트 URL 라우터
@@ -359,7 +358,9 @@ fastapi-server/
 │                                     #          o2_depletion/sensor_fault
 │
 ├── services/                         # 외부 호출
-│   └── drf_client.py                 # post_to_drf 비동기 헬퍼
+│   ├── drf_client.py                 # post_to_drf 비동기 헬퍼
+│   ├── ai_mute.py                    # AI mute 상태 관리
+│   └── anomaly_alarm.py              # 이상 알람 전송
 │
 ├── docs/                             # fastapi-server 전용 문서
 ├── tests/

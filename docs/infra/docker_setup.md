@@ -29,8 +29,8 @@
 | 항목 | 이전 (수동) | 이후 (Docker) |
 |---|---|---|
 | Redis 시작 | `sudo service redis-server start` | `make up` (자동) |
-| DRF 시작 | `cd drf-server && python manage.py runserver` | `make up` (자동, gunicorn 3-worker) |
-| FastAPI 시작 | `cd fastapi-server && uvicorn app:app --port 8001` | `make up` (자동, uvicorn 2-worker) |
+| DRF 시작 | `cd drf-server && python manage.py runserver` | `make up` (자동, gunicorn 1-worker / 4-thread, compose command override) |
+| FastAPI 시작 | `cd fastapi-server && uvicorn app:app --port 8001` | `make up` (자동, uvicorn 1-worker, Dockerfile 기본값) |
 | Celery worker | 별도 터미널: `celery -A config worker` | `make up` (자동) |
 | Celery beat | 거의 미실행 (배치 누락 위험) | `make up` (자동 시간 배치) |
 | 마이그레이션 적용 | 수동 `python manage.py migrate` | drf 컨테이너 entrypoint 자동 |
@@ -138,8 +138,8 @@ python -c "import secrets; print(secrets.token_urlsafe(32))"   # ③ JWT_SIGNING
 
 ```yaml
 drf:
+  env_file: ./.env.docker   # POSTGRES_* (DB 접속 정보) 등은 여기서 주입
   environment:
-    DATABASE_URL: sqlite:////app/db.sqlite3
     REDIS_URL:    redis://redis:6379/0
     FASTAPI_INTERNAL_URL: http://fastapi:8001
 ```
@@ -424,7 +424,7 @@ wscat -c "ws://localhost:8001/ws/worker/1/?token=$JWT"
 ```bash
 make sh s=drf            # /bin/sh 진입
 make shell-drf           # Django shell (manage.py shell)
-make exec s=drf cmd="python manage.py dbshell"   # SQLite CLI
+make exec s=drf cmd="python manage.py dbshell"   # psql CLI (PostgreSQL)
 ```
 
 #### 로그 모니터링
@@ -513,7 +513,7 @@ docker compose up -d --force-recreate fastapi celery-worker
 
 ## 11. 알려진 한계
 
-- **SQLite 다중 writer**: drf + celery-worker + celery-beat가 같은 SQLite 파일에 접근. 부하 시 `SQLITE_BUSY` 가능. 다음 스프린트 Postgres 전환에서 해소.
+- **SQLite 다중 writer**: drf + celery-worker + celery-beat가 같은 SQLite 파일에 접근. 부하 시 `SQLITE_BUSY` 가능. 다음 스프린트 Postgres 전환에서 해소. (✅ 2026-05-22 완료 — PostgreSQL 16 전환됨)
 - **단일 호스트**: 모든 서비스가 한 머신. 멀티 노드 필요 시 K8s 검토.
 - **TLS 없음**: HTTP만. 도메인/공개 노출 시 nginx + Let's Encrypt 필요.
 - **WSL 의존**: Windows 환경은 Docker Desktop + WSL2 필수. 사내 보안정책으로 Docker Desktop 사용 불가하면 Rancher Desktop 또는 podman 대안 검토.
@@ -531,7 +531,7 @@ docker compose up -d --force-recreate fastapi celery-worker
 
 ### Next (다음 스프린트, 1~3주)
 
-- **Postgres 전환** (트리거: SQLite 락 발생 시. 공수: 1~2일) — `DATABASE_URL` 교체, `docker-compose.yml`에 postgres 서비스 추가, 데이터 이전 절차 (`dumpdata` → `loaddata`)
+- **Postgres 전환** (트리거: SQLite 락 발생 시. 공수: 1~2일) — `DATABASE_URL` 교체, `docker-compose.yml`에 postgres 서비스 추가, 데이터 이전 절차 (`dumpdata` → `loaddata`) (✅ 2026-05-22 완료 — PostgreSQL 16 전환됨)
 - **AI 시계열 분석 컨테이너** (트리거: 메모리 `ai_anomaly_scope_2026_05_11.md` 범위. 공수: 1주) — 가스 STEP 1~4 + multivariate IF
 - **nginx + TLS** (트리거: 도메인 도입 시. 공수: 1~2일) — 정적/미디어 서빙 + WS 프록시 + Let's Encrypt
 - **dev/prod compose 분리** (트리거: 운영 환경 구분 필요 시. 공수: 반나절) — `docker-compose.dev.yml` (hot reload, DEBUG=True), `docker-compose.prod.yml` (replicas, restart=always)

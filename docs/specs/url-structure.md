@@ -70,7 +70,7 @@ URL 분리 원칙:
 |--------|------|------|
 | POST | `/api/auth/login/` | 로그인 (JWT 발급) |
 | GET | `/api/auth/me/` | 내 정보 조회 |
-| GET/PATCH | `/api/auth/profile/` | 내 프로필 조회·수정 |
+| GET | `/api/auth/profile/` | 내 프로필 조회 |
 | POST | `/api/auth/password/change/` | 비밀번호 변경 |
 | POST | `/api/auth/logout/` | 로그아웃 |
 | POST | `/api/auth/token/refresh/` | JWT 토큰 갱신 |
@@ -98,7 +98,7 @@ URL 분리 원칙:
 | GET/PATCH/DELETE | `/alerts/api/alarms/<pk>/` | AlarmRecord 상세·수정·삭제 |
 | GET | `/alerts/api/events/` | Event 목록 (`?status=` 필터) |
 | GET | `/alerts/api/events/<pk>/` | Event 상세 |
-| PATCH | `/alerts/api/events/<pk>/update-status/` | 이벤트 상태 전환 (active → acknowledged → in_progress → resolved) |
+| PATCH | `/alerts/api/events/<pk>/update_status/` | 이벤트 상태 전환 (active → acknowledged → in_progress → resolved) |
 
 ### 1.6 지오펜스 API (`/api/` 프리픽스)
 
@@ -106,8 +106,8 @@ URL 분리 원칙:
 |--------|------|------|
 | GET/POST | `/api/geofences/` | 지오펜스 목록·생성 |
 | GET/PUT/PATCH/DELETE | `/api/geofences/<pk>/` | 지오펜스 상세·수정·삭제 |
-| GET | `/api/admin/geofences/` | 관리자용 지오펜스 목록 |
-| GET/PUT | `/api/admin/geofences/<pk>/` | 관리자용 지오펜스 상세 |
+| GET/POST | `/api/admin/geofences/` | 관리자용 지오펜스 목록 |
+| GET/PUT/DELETE | `/api/admin/geofences/<pk>/` | 관리자용 지오펜스 상세 |
 
 ### 1.7 어드민 API — 사용자·조직 (`/api/admin/` 프리픽스)
 
@@ -389,7 +389,7 @@ URL 분리 원칙:
                   worker_clients[worker_id] 에 1:1 push (/ws/worker/{id}/)
 
 [운영자가 알람 팝업 확인]
-  PATCH :8000/alerts/api/events/<id>/update-status/
+  PATCH :8000/alerts/api/events/<id>/update_status/
     └→ 같은 event_id 로 ANOMALY 알람 재push (event_resolved_at 박힘)
         → 클라가 팝업 닫고 "위험 해소" 토스트
 ```

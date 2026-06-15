@@ -36,7 +36,7 @@ shared/ws-client.js  (WSClient)          ★ new WebSocket 은 여기 단 1곳
 |---|---|
 | `?token=` 쿼리 부착 | `websocket/auth.py` verify_jwt_from_ws_query |
 | close 1008 수신 → refresh | auth 실패 시 `close(1008, "unauthenticated")` |
-| /ws/sensors/ 구독 | `ws_router.py` broadcast_loop (1초 틱) + alarm_flush_loop (즉시) |
+| /ws/sensors/ 구독 | `ws_router.py` broadcast_loop (5초 틱, `BROADCAST_INTERVAL_SEC` 기본 5.0) + alarm_flush_loop (즉시) |
 | catch-up 폴링 | drf `AlarmRecordViewSet.catch_up` (since 이후 24h, 최대 100건) |
 
 → 전체 broadcast 메커니즘은 백엔드 [gas.md](gas.md) §1 / [alerts.md](alerts.md) §5 와 연결.
