@@ -4,6 +4,9 @@ __pycache__/
 *.pyo
 *.pyd
 
+# Windows 복사 메타데이터 (NTFS ADS)
+*:Zone.Identifier
+
 # Virtual environments
 drf-server/.venv/
 fastapi-server/.venv/
