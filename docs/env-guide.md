@@ -1,6 +1,8 @@
 # 환경변수 가이드
 
-> 7-서비스 Compose가 공유하는 환경변수 정리.
+> Compose 전체 서비스(12종: redis · postgres · drf · fastapi · celery-worker-alarm ·
+> celery-worker-metric · celery-beat · redis_exporter · postgres_exporter · node_exporter ·
+> prometheus · grafana)가 공유하는 환경변수 정리.
 > 실제 예시 파일: [.env.docker.example](../.env.docker.example) — 신규 머신 진입 시 `cp .env.docker.example .env.docker` 후 값 채움.
 
 ---
@@ -41,6 +43,7 @@
 | `DRF_SERVICE_TOKEN` | fastapi → drf 호출 시 헤더에 부착 |
 | `JWT_SIGNING_KEY` | WebSocket JWT 검증 (drf SimpleJWT ↔ fastapi WS 공유). 위 토큰과 별개 시크릿 |
 | `JWT_ALGORITHM` | `HS256` |
+| `DRF_REQUEST_TIMEOUT_SEC` | fastapi → drf 호출 timeout (초, 기본 `5.0`) |
 
 ⚠️ **`INTERNAL_SERVICE_TOKEN`과 `DRF_SERVICE_TOKEN`은 반드시 같은 값.** 다르면 fastapi 가스 더미가 모두 502 발생 (drf가 401 반환). 진단: [docs/troubleshooting.md §4](troubleshooting.md).
 
@@ -62,6 +65,7 @@
 
 | 변수 | 예시 | 의미 |
 |---|---|---|
+| `LOG_LEVEL` | `INFO` | FastAPI 로그 레벨 (drf의 `DJANGO_LOG_LEVEL`과 별개) |
 | `BROADCAST_INTERVAL_SEC` | `5.0` | WS broadcast 주기 (참고: 알람은 즉시 push) |
 | `DATA_STALE_THRESHOLD_SEC` | `8.0` | 센서 데이터 stale 판정 임계 |
 | `POWER_THRESHOLD_CAUTION` | `2200` | 전력 경고 임계 (W) |
@@ -76,6 +80,11 @@
 | `DUMMY_SEND_INTERVAL_SEC` | `1.0` | 송출 주기 |
 | `DUMMY_RISK_PROBABILITY` | `0.1` | 위험값 발생 확률 (시연: 0, IF 학습: 0.005~0.1) |
 | `DUMMY_SCENARIO_MODE` | `normal` | `normal`=시연 안전 / `mixed`=IF 학습용 |
+
+**시연용 선택 override (미설정 시 코드 기본값):** `.env.docker.example`에 주석으로 제공.
+- 가스 `co_leak`: `DEMO_CO_LEAK_RAMP_UP_TICKS` / `_HOLD_TICKS` / `_RAMP_DOWN_TICKS` (기본 5/30/5)
+- 가스 AI: `DEMO_GAS_CP_PENALTY` (Change Point penalty, 기본 3.0 — 낮추면 부드러운 RAMP도 감지)
+- 전력 `overload`: `DEMO_OVERLOAD_RAMP_UP_TICKS` / `_HOLD_TICKS` / `_RAMP_DOWN_TICKS` (기본 5/60/10)
 
 ### 7. PostgreSQL
 
@@ -97,11 +106,24 @@
 | `NOTIFICATION_DELAY_THRESHOLD_MINUTES` | `5` | 알림 지연 임계 |
 | `GRAFANA_PASSWORD` | `admin` | Grafana admin 비밀번호 (초기값) |
 
+### 9. Discord 알람 연동
+
+알람을 외부 Discord 채널로도 발송. `DISCORD_ALARM_ENABLED`가 `False`거나 webhook이 비면 미발송.
+
+| 변수 | 예시 | 의미 |
+|---|---|---|
+| `DISCORD_ALARM_ENABLED` | `False` | Discord 발송 on/off |
+| `DISCORD_WEBHOOK_ADMIN` | (빈 문자열) | 관리자 채널 webhook URL |
+| `DISCORD_WEBHOOK_WORKER` | (빈 문자열) | 작업자 채널 webhook URL |
+
+webhook URL 발급: Discord 채널 설정 → 연동 → 웹훅 → 새 웹훅 → URL 복사.
+소비처: [drf-server/apps/notifications/services/discord_service.py](../drf-server/apps/notifications/services/discord_service.py).
+
 ## 작성 시 주의사항
 
 - 실제 비밀번호, API Key, Secret은 GitHub에 올리지 않는다
 - `.env.docker.example`에는 **어떤 변수가 필요한지** 알 수 있는 예시값만 작성
-- 토큰 변경 시 7-서비스 전체 재기동 (`make down && make up`)
+- 토큰 변경 시 Compose 전체 재기동 (`make down && make up`)
 
 ## 증빙자료 추천
 
