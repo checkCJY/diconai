@@ -45,13 +45,13 @@
 
 1. **재현성** — 누구나 같은 이미지로 같은 동작. WSL/macOS/Linux 어디서 띄워도 동일.
 2. **격리** — 호스트 시스템에 Python·Redis·Postgres 안 깔아도 됨. 다른 프로젝트와 의존성 충돌 없음.
-3. **헬스체크** — 컨테이너가 자기 상태를 알림. `make ps` 한 줄로 7개 모두 OK인지 확인.
+3. **헬스체크** — 컨테이너가 자기 상태를 알림. `make ps` 한 줄로 12개 모두 OK인지 확인.
 4. **메트릭** — `http_requests_total`, p95 latency가 자동으로 Grafana에 차트로 그려짐. 장애 전조 감지.
 5. **의존성 관리** — `depends_on: condition: service_healthy`로 fastapi는 drf가 healthy 된 후에만 뜸. 시작 순서 자동.
 
 ---
 
-## 4. 7-서비스 구조
+## 4. 12-서비스 구조
 
 ```
 ┌───────────────────────── 호스트 (WSL2) ──────────────────────────┐
@@ -63,33 +63,39 @@
 │                                                                  │
 │  ┌─ Docker compose network (서비스명으로 통신) ────────────────┐ │
 │  │                                                             │ │
-│  │   drf ──HTTP──► fastapi   (FASTAPI_INTERNAL_URL=http://     │ │
-│  │    │                                  fastapi:8001)         │ │
-│  │    │                                                        │ │
-│  │   celery-worker ──► fastapi (/internal/alarms/push/)        │ │
-│  │   celery-beat   ──► drf DB (Django ORM)                     │ │
 │  │   fastapi  ──HTTP──► drf  (DRF_BASE_URL=http://drf:8000)    │ │
+│  │   drf      ──HTTP──► fastapi (FASTAPI_INTERNAL_URL=http://  │ │
+│  │                                       fastapi:8001)         │ │
+│  │   celery-worker-alarm  ──► fastapi (/internal/alarms/push/) │ │
+│  │   celery-worker-metric ──► drf DB·redis (주기 메트릭)       │ │
+│  │   celery-beat          ──► 큐에 주기 태스크 발행            │ │
 │  │                                                             │ │
-│  │   drf/celery×2 ──► redis  (REDIS_URL=redis://redis:6379)    │ │
-│  │   prometheus  ──► drf:8000/metrics, fastapi:8001/metrics    │ │
+│  │   drf/celery×3 ──► postgres (POSTGRES_HOST=postgres:5432)   │ │
+│  │   drf/celery×3 ──► redis    (REDIS_URL=redis://redis:6379)  │ │
+│  │   prometheus  ──► drf·fastapi /metrics + exporter×3         │ │
 │  │   grafana     ──► prometheus:9090                           │ │
 │  │                                                             │ │
 │  └─────────────────────────────────────────────────────────────┘ │
 │                                                                  │
-│  bind mount: drf-server/db.sqlite3  ←→  drf/celery 컨테이너      │
-│  bind mount: drf-server/media       ←→  drf 컨테이너             │
+│  volume: postgres_data (DB 영속) · drf_static · redis_data       │
+│  bind mount: ./drf-server:/app (소스) · media · ml_models(ro)    │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
 | # | 서비스 | 이미지 | 역할 |
 |---|---|---|---|
-| 1 | `drf` | 자체 빌드 (Django + gunicorn) | REST API, 어드민, DB, 인증 |
+| 1 | `drf` | 자체 빌드 (Django + gunicorn) | REST API, 어드민, 인증, HTML 렌더링 |
 | 2 | `fastapi` | 자체 빌드 (FastAPI + uvicorn) | 센서 수신, WebSocket 브로드캐스트 |
-| 3 | `redis` | `redis:7-alpine` | Celery 브로커 + Django 캐시 |
-| 4 | `celery-worker` | drf 이미지 재사용 | 알람 영속화, 알람 push 트리거 |
-| 5 | `celery-beat` | drf 이미지 재사용 | 매일 새벽 3시 데이터 보관 배치 |
-| 6 | `prometheus` | `prom/prometheus` | 15초마다 /metrics scrape |
-| 7 | `grafana` | `grafana/grafana` | 시각화 + 알림 (예정) |
+| 3 | `postgres` | `postgres:16-alpine` | 영속 저장소 (2026-05-22 SQLite→PG 전환) |
+| 4 | `redis` | `redis:7-alpine` | Celery 브로커 + Django 캐시 |
+| 5 | `celery-worker-alarm` | drf 이미지 재사용 | 알람 영속화·이벤트 변환·push 트리거 (alarm 큐) |
+| 6 | `celery-worker-metric` | drf 이미지 재사용 | 보관정책·큐 길이·DB 상태 등 주기 메트릭 (metric 큐) |
+| 7 | `celery-beat` | drf 이미지 재사용 | 주기 태스크 스케줄링 (데이터 보관 매일 09:30 등) |
+| 8 | `prometheus` | `prom/prometheus` | 15초마다 /metrics scrape |
+| 9 | `grafana` | `grafana/grafana` | 메트릭 시각화 대시보드 |
+| 10 | `redis_exporter` | `oliver006/redis_exporter` | Redis 메트릭 노출 (:9121) |
+| 11 | `postgres_exporter` | `prometheuscommunity/postgres-exporter` | PostgreSQL 메트릭 노출 (:9187) |
+| 12 | `node_exporter` | `prom/node-exporter` | 호스트 리소스 메트릭 노출 (:9100) |
 
 ---
 
@@ -283,7 +289,7 @@ grep -E "^(DJANGO_SECRET_KEY|INTERNAL_SERVICE_TOKEN|DRF_SERVICE_TOKEN|JWT_SIGNIN
 ```bash
 make build       # 첫 빌드는 5~10분 (이후 캐시로 1분 내외)
 make up          # 백그라운드 기동
-make ps          # 7개 모두 (healthy)/Up 인지
+make ps          # 12개 모두 (healthy)/Up 인지
 ```
 
 ### 8-6. 검증
@@ -356,7 +362,7 @@ make restart s=drf
 # 2) celery-worker만 재기동 (코드는 drf 이미지에 들어있으므로 재빌드 필요)
 make rebuild s=drf      # 또는 모든 drf 기반 컨테이너
 make up
-# beat 스케줄 추가했다면 config/settings.py CELERY_BEAT_SCHEDULE 수정 후 같은 절차
+# beat 스케줄 추가했다면 config/settings/base.py CELERY_BEAT_SCHEDULE 수정 후 같은 절차
 ```
 
 #### 정적파일 변경
@@ -424,7 +430,7 @@ make exec s=drf cmd="python manage.py dbshell"   # SQLite CLI
 #### 로그 모니터링
 
 ```bash
-make logs              # 7개 컨테이너 전체
+make logs              # 12개 컨테이너 전체
 make logs s=fastapi    # fastapi만
 docker compose logs -f --since=10m fastapi | grep -i error   # 최근 10분 에러만
 ```
