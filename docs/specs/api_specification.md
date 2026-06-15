@@ -1,7 +1,7 @@
 # API 명세서 — diconai 산재 예방 통합 관제 시스템
 
-> 마지막 갱신: 2026-05-06
-> 버전: 1.0.0
+> 마지막 갱신: 2026-06-15
+> 버전: 1.1.0
 > 대상 독자: 신규 합류 개발자 / 외부 평가자 / IoT 센서 벤더
 
 ---
@@ -15,9 +15,11 @@ API 명세는 **3가지 형태**로 제공됩니다 — 용도에 맞게 골라 
 | **DRF Swagger UI** | `http://localhost:8000/api/schema/swagger-ui/` | 대화형 — "Try it out"으로 실제 호출 가능 |
 | **DRF ReDoc** | `http://localhost:8000/api/schema/redoc/` | 읽기 전용 — 깔끔한 명세 페이지 |
 | **DRF OpenAPI YAML** | [docs/api/openapi-drf.yaml](../api/openapi-drf.yaml) | 정적 스냅샷 — Postman/Stoplight import 용 |
+| **DRF HTML (Redoc)** | [docs/api/drf-api.html](../api/drf-api.html) | 오프라인 단일 파일 — 서버 없이 브라우저로 열람 |
 | **FastAPI Swagger** | `http://localhost:8001/docs` | 실시간 처리 서버 (IoT 인입·WS) 대화형 |
 | **FastAPI ReDoc** | `http://localhost:8001/redoc` | 실시간 처리 서버 읽기 전용 |
 | **FastAPI OpenAPI JSON** | [docs/api/openapi-fastapi.json](../api/openapi-fastapi.json) | 정적 스냅샷 |
+| **FastAPI HTML (Redoc)** | [docs/api/fastapi-api.html](../api/fastapi-api.html) | 오프라인 단일 파일 — 서버 없이 브라우저로 열람 |
 | **이 문서** | `docs/specs/api_specification.md` | 아키텍처·인증·WebSocket·IoT 통합 안내 (자동 생성으로는 표현 불가한 부분) |
 
 **평가자/리뷰어 시연 흐름**:
@@ -116,8 +118,10 @@ POST /api/auth/token/refresh/
 | `POST /api/monitoring/gas/` | FastAPI → DRF ingest | **현재: 무인증**. Phase 5+에서 `DRF_SERVICE_TOKEN` 또는 IP 화이트리스트 |
 | `POST /api/monitoring/power/event/` | FastAPI → DRF ingest | 동일 |
 | `POST /api/monitoring/power/data/` | FastAPI → DRF ingest | 동일 |
-| `GET /api/monitoring/power/thresholds/` | 공개 상수 | 보호 불필요 |
+| `GET /api/monitoring/power/thresholds/`, `.../threshold-meta/`, `.../channel-meta/`, `/api/monitoring/gas/thresholds/` | 공개 상수·메타 | 보호 불필요 |
 | `POST /api/positioning/receive/` | FastAPI → DRF ingest | 동일 |
+| `POST /api/ml/anomaly-results/`, `GET /api/ml/models/active/` | FastAPI AI ↔ DRF | 동일 |
+| `POST /api/internal/integration-logs/`, `GET /api/internal/workers/` | 내부 서비스 통신 | 사설망 한정 |
 | `/api/schema/...` | 문서 | 보호 불필요 |
 | `POST /internal/alarms/push/` (FastAPI) | Celery → FastAPI 브리지 | **localhost(127.0.0.1/::1)에서만 호출 가능** — 외부 호출 시 403 |
 
@@ -175,16 +179,25 @@ DRF 측 글로벌 변환은 [`apps/core/exceptions.py`](../../drf-server/apps/co
 
 | 도메인 | URL 프리픽스 | 주요 동작 |
 |---|---|---|
-| Auth | `/api/auth/...` | 로그인/로그아웃/내정보/프로필/비밀번호변경 |
-| Geofence | `/api/geofences/` | 지오펜스 CRUD (ViewSet) |
-| Monitoring | `/api/monitoring/...` | **FastAPI ingest 전용** + 임계치 조회 (공개) |
-| Admin | `/api/admin/...` | 어드민 전용 — 계정/조직/가스데이터/전력데이터/지오펜스 |
-| Facilities | `/api/facilities/`, `/api/factories/`, `/api/equipments/`, `/api/gas-sensors/`, `/api/power-devices/` | 공장·설비·장비 CRUD |
+| Auth | `/api/auth/...` | 로그인/로그아웃/내정보/프로필/비밀번호변경/토큰갱신 |
+| Geofence | `/api/geofences/` | 지오펜스 CRUD (ViewSet) + `by_facility` |
+| Monitoring | `/api/monitoring/...` | **FastAPI ingest 전용** + 임계치·채널메타 조회 (공개) |
+| Facilities | `/api/facilities/`, `/api/equipments/`, `/api/gas-sensors/`, `/api/power-devices/` | 공장·설비·장비·센서 CRUD + 점검(inspections) |
 | Positioning | `/api/positioning/...` | 작업자 위치 인입 (FastAPI → DRF) |
-| Alerts | `/alerts/api/...` | 알람·이벤트 ViewSet |
-| Dashboard | `/dashboard/api/...` | 메뉴/안전확인/이력/새로고침 |
+| Alerts | `/alerts/api/...` | 알람·이벤트 ViewSet (`catch-up`, `ack`, `update_status`, `anomaly-alarm-records`) |
+| Dashboard | `/dashboard/api/...` | 메뉴/안전확인/이력/새로고침/VR진도·콘텐츠 |
+| Safety | `/api/safety/...`, `/api/admin/safety/...` | 안전점검 체크리스트 — 섹션·아이템·리비전·발행 |
+| ML | `/api/ml/...` | 활성 모델 조회 + 이상탐지 결과 인입 (FastAPI AI → DRF) |
+| Admin · 계정/조직 | `/api/admin/accounts/`, `/api/admin/departments/`, `/api/admin/organizations/...` | 계정·부서·조직 트리 |
+| Admin · 데이터 | `/api/admin/gas-data/`, `/api/admin/power-data/` | 센서 데이터 조회·CSV export |
+| Admin · 알람 | `/api/admin/alerts/policies/`, `/api/admin/alerts/events/` | 알람 정책 CRUD + 이벤트 이력 |
+| Admin · 임계치 | `/api/admin/threshold-groups/`, `/api/admin/thresholds/` | 임계치 그룹·항목 관리 |
+| Admin · 공통코드 | `/api/admin/code-groups/`, `/api/admin/codes/` | 코드 그룹·공통코드 |
+| Admin · 공지/교육 | `/api/admin/notices/`, `/api/admin/training/vr-training/` | 공지사항(첨부) + VR 교육 콘텐츠 |
+| Admin · 운영 | `/api/admin/system-logs/`, `/api/admin/integration-logs/`, `/api/admin/activity-logs/`, `/api/admin/map-edit-logs/`, `/api/admin/retention-policies/`, `/api/admin/risk-standards/` | 로그 조회·보존정책·위험기준 |
+| Internal | `/api/internal/...` | 내부 서비스 통신 (통합로그 인입, 작업자 목록) |
 
-총 **78개 path** (HTTP method 합산 시 더 많음). 전체 표는 [url-structure.md](url-structure.md).
+총 **132개 path** (HTTP method 합산 시 더 많음). 전체 표는 [url-structure.md](url-structure.md).
 
 ### 4.2 FastAPI 서버 (:8001)
 
@@ -199,9 +212,11 @@ DRF 측 글로벌 변환은 [`apps/core/exceptions.py`](../../drf-server/apps/co
 | positioning | `/api/positioning/receive` | POST | 작업자 좌표 배열 |
 | internal | `/internal/alarms/push/` | POST | Celery → WS 브리지 (**localhost 전용**) |
 | internal | `/internal/scenario/mode` | GET / POST | 시연 시나리오 모드 |
+| ai | `/ai/predict` | POST | IF 이상탐지 추론 |
+| ai | `/ai/reload` | POST | 모델 캐시 무효화(재로드) |
 | health | `/health/` | GET | 헬스체크 |
 
-총 **10개 path / 11개 operation**. WebSocket은 §5 별도.
+총 **12개 path / 13개 operation**. WebSocket은 §5 별도, `/metrics`(Prometheus)는 스키마 비노출.
 
 ---
 
@@ -409,6 +424,7 @@ GET /api/admin/accounts/?page=1&page_size=20
 | 2026-05-04 | drf-spectacular 도입 + 글로벌 예외 핸들러 + 응답 봉투 표준 | [phase4_drf_layer_exceptions_swagger.md](changelog/phase4_drf_layer_exceptions_swagger.md) |
 | 2026-05-04 | FastAPI 정리 + 양 서버 로거 통일 | [phase5_fastapi_cleanup.md](changelog/phase5_fastapi_cleanup.md) |
 | 2026-05-06 | 본 명세서 작성 + Tier 1 `@extend_schema` + FastAPI `response_model` 보강 | (별도 변경기록 작성 예정) |
+| 2026-06-15 | OpenAPI 스냅샷 재생성 (DRF 78→132 path, FastAPI 10→12 path: `ai` 태그 추가). 카탈로그·인증우회 목록 갱신 | — |
 
 자세한 변경 이력은 [docs/changelog/](changelog/) 참조.
 
@@ -423,12 +439,19 @@ GET /api/admin/accounts/?page=1&page_size=20
 - [docs/api/openapi-drf.yaml](../api/openapi-drf.yaml) — DRF OpenAPI 3.0 스냅샷
 - [docs/api/openapi-fastapi.json](../api/openapi-fastapi.json) — FastAPI OpenAPI 3.0 스냅샷
 
-OpenAPI YAML/JSON은 다음 명령으로 재생성:
+OpenAPI YAML/JSON은 다음 명령으로 재생성 (런타임은 Docker Compose이므로 컨테이너에서 생성):
 ```bash
-# DRF
-cd drf-server && uv run python manage.py spectacular --file ../docs/api/openapi-drf.yaml
+# DRF — 실행 중 컨테이너에서 spectacular 관리 명령
+docker exec diconai-drf-1 python manage.py spectacular --format openapi --file /tmp/openapi-drf.yaml
+docker cp diconai-drf-1:/tmp/openapi-drf.yaml docs/api/openapi-drf.yaml
 
-# FastAPI
-cd fastapi-server && uv run python -c "import json; from app import app; \
-  json.dump(app.openapi(), open('../docs/api/openapi-fastapi.json','w'), ensure_ascii=False, indent=2)"
+# FastAPI — 실행 중 서버의 /openapi.json (2-space indent, 한글 보존)
+curl -s localhost:8001/openapi.json | python3 -c \
+  "import json,sys; d=json.load(sys.stdin); open('docs/api/openapi-fastapi.json','w').write(json.dumps(d,indent=2,ensure_ascii=False)+'\n')"
+```
+
+오프라인 HTML(Redoc 단일 파일)은 다음으로 재생성:
+```bash
+npx @redocly/cli build-docs docs/api/openapi-drf.yaml     -o docs/api/drf-api.html
+npx @redocly/cli build-docs docs/api/openapi-fastapi.json -o docs/api/fastapi-api.html
 ```

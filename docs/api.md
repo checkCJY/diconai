@@ -26,54 +26,59 @@
 | Method | Path | 역할 |
 |---|---|---|
 | POST | `/api/auth/login/` | JWT 발급 |
-| POST | `/api/auth/refresh/` | 토큰 갱신 |
+| POST | `/api/auth/token/refresh/` | 토큰 갱신 |
 | POST | `/api/auth/logout/` | 토큰 폐기 |
+| GET | `/api/auth/me/`, `/api/auth/profile/` | 내 정보·프로필 |
 
-JWT는 SimpleJWT 기반, access 2h / refresh 7d. WebSocket 검증에도 동일 키 사용.
+JWT는 SimpleJWT 기반. WebSocket 검증에도 동일 키 사용.
 
 ### 2. 센서 수신 (fastapi:8001 → drf 내부 전달)
 
 | Method | Path | 역할 |
 |---|---|---|
-| POST | `/gas/` | 유해가스 JSON 수신 |
-| POST | `/power/` | 전력 JSON 수신 |
-| POST | `/position/` | 작업자 위치 수신 |
+| POST | `/api/sensors/gas` | 유해가스 9종 JSON 수신 |
+| POST | `/api/power/{onoff,current,voltage,watt}` | 전력 16채널 4종 분리 수신 |
+| POST | `/api/positioning/receive` | 작업자 위치 배열 수신 |
 
-수신 직후 검증 → DRF 내부 API 호출 → DB 저장 → 임계치 초과 시 알람 생성.
+수신 직후 검증 → DRF 내부 ingest(`/api/monitoring/...`, `/api/positioning/receive/`) 호출 → DB 저장 → 임계치 초과 시 알람 생성.
 
 ### 3. 데이터 조회 (drf:8000)
 
 | Method | Path | 역할 |
 |---|---|---|
-| GET | `/api/gas-data/` | 가스 시계열 조회 (filter: device, period) |
-| GET | `/api/power-data/` | 전력 시계열 조회 |
-| GET | `/api/alarms/` | 알람 이력 |
-| GET | `/api/events/` | 위험 이벤트 |
-| GET | `/api/ml-results/` | AI 분석 결과 |
+| GET | `/api/admin/gas-data/` | 가스 시계열 조회 (filter: sensor, period) · `export/`로 CSV |
+| GET | `/api/admin/power-data/` | 전력 시계열 조회 · `export/`로 CSV |
+| GET | `/alerts/api/alarms/` | 알람 이력 (`summary/`, `catch-up/`) |
+| GET | `/alerts/api/events/` | 위험 이벤트 (`{id}/ack/`, `{id}/update_status/`) |
+| GET | `/api/ml/models/active/` | 활성 AI 모델 메타 |
 
 ### 4. 내부 API (서비스 간)
 
 | Method | Path | 호출자 → 수신자 | 역할 |
 |---|---|---|---|
-| POST | `/internal/alarms/push/` | drf Celery → fastapi | 알람을 `active_alarms` 큐에 push |
-| POST | drf 내부 sensor save | fastapi → drf | 수신 검증 후 영속 저장 |
+| POST | `/internal/alarms/push/` (fastapi) | drf Celery → fastapi | 알람을 `active_alarms` 큐에 push (**localhost 전용**) |
+| POST | `/api/monitoring/gas/` 등 (drf) | fastapi → drf | 수신 검증 후 영속 저장 |
+| POST | `/api/ml/anomaly-results/` (drf) | fastapi AI → drf | 이상탐지 결과 영속 |
+| GET | `/api/internal/workers/` (drf) | 내부 서비스 | 작업자 목록 조회 |
 
-내부 호출은 `INTERNAL_SERVICE_TOKEN` 헤더로 인증. drf와 fastapi가 같은 값 공유.
+`/internal/alarms/push/`는 localhost(127.0.0.1/::1)에서만 호출 가능 — 외부 호출 시 403.
 
 ### 5. WebSocket (fastapi:8001)
 
 | Path | 역할 |
 |---|---|
-| `/ws/sensors/` | 센서 데이터 실시간 broadcast |
-| `/ws/alarms/` | 알람 실시간 push |
+| `/ws/sensors/` | 센서 데이터 + 활성 알람 통합 broadcast |
+| `/ws/worker/{user_id}/` | 작업자 개인 알림 채널 |
+| `/ws/positions/` | 작업자 위치 broadcast (1초 주기) |
+| `/ws/position/` | IoT 위치 장비 인바운드 수신 |
 
-JWT 쿼리스트링으로 인증. `alarm_flush_loop`이 1초 간격으로 `active_alarms` 큐를 비워 broadcast.
+JWT 쿼리스트링으로 인증. 알람은 별도 WS가 아니라 `/ws/sensors/` payload의 `alarms` 필드로 전달되며, `alarm_flush_loop`이 1초 간격으로 `active_alarms` 큐를 비워 broadcast.
 
 ### 6. 메트릭 (Prometheus 스크레이프 대상)
 
 | Path | 서버 |
 |---|---|
-| `/metrics/` | drf:8000 |
+| `/metrics` | drf:8000 |
 | `/metrics` | fastapi:8001 |
 
 Celery worker 메트릭은 `prometheus_multiproc/celery-{alarm,metric}/` 하위 파일을 합산해 노출.
@@ -83,10 +88,10 @@ Celery worker 메트릭은 `prometheus_multiproc/celery-{alarm,metric}/` 하위 
 ```
 Browser → POST /api/auth/login/ (id/pw)
          ↓ access + refresh JWT
-Browser → GET /api/alarms/  (Authorization: Bearer <access>)
+Browser → GET /alerts/api/alarms/  (Authorization: Bearer <access>)
          ↓
-Browser → WS /ws/alarms/?token=<access>
-         ↓ broadcast 수신
+Browser → WS /ws/sensors/?token=<access>
+         ↓ broadcast 수신 (payload.alarms 포함)
 ```
 
 ## 증빙자료 추천
@@ -95,9 +100,9 @@ Browser → WS /ws/alarms/?token=<access>
 |---|---|---|
 | **API 명세 전체** | [docs/specs/api_specification.md](specs/api_specification.md) | `[부록] 전체 API 명세서` |
 | **JWT 발급 요청·응답** | Postman/Insomnia로 `/api/auth/login/` 호출 → access·refresh 토큰 캡처 | `[그림 1] JWT 발급 요청/응답` |
-| **센서 수신 요청·응답** | `POST /gas/`에 가스 JSON 전송 → 200 + DB row 캡처 | `[그림 2] 가스 데이터 수신 API` |
-| **알람 조회 응답** | `GET /api/alarms/?status=ACTIVE` 결과 | `[그림 3] 활성 알람 조회 응답` |
-| **WebSocket 연결 로그** | 브라우저 DevTools Network → WS → Messages 탭 캡처 | `[그림 4] WebSocket 실시간 메시지 수신` |
+| **센서 수신 요청·응답** | `POST /api/sensors/gas`에 가스 JSON 전송 → 200 + DB row 캡처 | `[그림 2] 가스 데이터 수신 API` |
+| **알람 조회 응답** | `GET /alerts/api/alarms/` 결과 | `[그림 3] 활성 알람 조회 응답` |
+| **WebSocket 연결 로그** | 브라우저 DevTools Network → WS(`/ws/sensors/`) → Messages 탭 캡처 | `[그림 4] WebSocket 실시간 메시지 수신` |
 | **내부 API 토큰 인증 실패 케이스** | 잘못된 토큰 → 401 응답 | `[그림 5] 내부 API 인증 검증 동작` |
 
 ## 참고 문서

@@ -49,11 +49,49 @@ paths:
               schema:
                 $ref: '#/components/schemas/AlarmRecord'
           description: ''
+  /alerts/api/alarms/catch-up/:
+    get:
+      operationId: alerts_api_alarms_catch_up_retrieve
+      description: 클라이언트가 WS 끊김 후 재연결할 때 localStorage 의 last_seen_ts 를 since 로 전달해
+        미수신 알람을 보충. fastapi 거치지 않고 클라가 drf 직접 호출 — simplicity. 응답 모양은 fastapi broadcast
+        payload 와 동일해 클라 측 mapper 공용 처리 가능. since=24h 이상 과거면 24h 까지로 클램프. 최대 100건
+        응답.
+      summary: WS 재연결 catch-up — since 이후 24h 내 미수신 알람
+      parameters:
+      - in: query
+        name: since
+        schema:
+          type: number
+          format: double
+        description: unix timestamp (초 단위). 누락/잘못된 값이면 빈 list 반환.
+        required: true
+      tags:
+      - Alerts
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlarmCatchUpResponse'
+          description: ''
+        '401':
+          description: 인증 필요
   /alerts/api/alarms/summary/:
     get:
       operationId: alerts_api_alarms_summary_retrieve
-      description: 최근 24시간 AlarmRecord 요약
-      summary: 최근 24시간 알람 요약
+      description: |-
+        최근 24시간 AlarmRecord 누적 + 현재 미확인 Event 건수.
+
+        24h 누적 (last_24h_*) 은 운영 통계용, 미확인 (unacknowledged_event_count) 은
+        "지금 운영자가 처리해야 할 사건 수". Event.status ∈ {active, acknowledged,
+        in_progress} 가 미확인 (resolved 는 처리 완료라 제외).
+
+        user_unread_event_count — 본인이 아직 ack 안 한 활성 이벤트 수
+        (EventAcknowledgement 활용). 헤더 미확인 배지의 초기값. 글로벌 unacknowledged
+        와 달리 본 사람만 줄어드는 카운트.
+      summary: 최근 24시간 알람 요약 + 현재 미확인 이벤트 건수
       tags:
       - Alerts
       security:
@@ -67,12 +105,52 @@ paths:
               schema:
                 $ref: '#/components/schemas/AlarmSummaryResponse'
           description: ''
+  /alerts/api/anomaly-alarm-records/:
+    post:
+      operationId: alerts_api_anomaly_alarm_records_create
+      description: AI 이상탐지 알람 INSERT. 내부 API — fastapi 만 호출.
+      summary: AI 이상탐지 알람 INSERT (FastAPI → DRF)
+      tags:
+      - Internal
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnomalyAlarmRecordPayloadRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AnomalyAlarmRecordPayloadRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AnomalyAlarmRecordPayloadRequest'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnomalyAlarmRecordCreateResponse'
+          description: ''
+        '404':
+          description: 발생원 장비/센서를 찾을 수 없음
   /alerts/api/events/:
     get:
       operationId: alerts_api_events_list
       description: '`status` 쿼리로 pending/in_progress/resolved 필터링 가능.'
       summary: 이벤트 목록 조회 (읽기 전용)
       parameters:
+      - name: page
+        required: false
+        in: query
+        description: 페이지네이션된 결과 집합 내의 페이지 번호.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: 페이지당 반환할 결과 수.
+        schema:
+          type: integer
       - in: query
         name: status
         schema:
@@ -87,9 +165,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/EventList'
+                $ref: '#/components/schemas/PaginatedEventListList'
           description: ''
   /alerts/api/events/{id}/:
     get:
@@ -113,6 +189,35 @@ paths:
               schema:
                 $ref: '#/components/schemas/EventDetail'
           description: ''
+  /alerts/api/events/{id}/ack/:
+    post:
+      operationId: alerts_api_events_ack_create
+      description: '프론트 알람 팝업의 ''확인 완료'' 클릭이 호출. (request.user, event) 쌍의 EventAcknowledgement
+        를 get_or_create — 이미 있으면 noop (idempotent). Event.status 는 건드리지 않음 (글로벌 워크플로우와
+        user-scoped 표시 관리 분리). 재팝업 정책: 이 행이 있는 user 에게는 broadcast 시점에 push 생략.'
+      summary: 이벤트 사용자별 확인(ack) 기록 — user-scoped
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: event을 식별하는 고유한 정수 값.
+        required: true
+      tags:
+      - Events
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventAcknowledgementResponse'
+          description: ''
+        '401':
+          description: 인증 필요 (토큰 누락/만료)
+        '404':
+          description: 이벤트 없음
   /alerts/api/events/{id}/update_status/:
     patch:
       operationId: alerts_api_events_update_status_partial_update
@@ -452,6 +557,576 @@ paths:
           description: 잘못된 action 값
         '404':
           description: 사용자 없음
+  /api/admin/activity-logs/:
+    get:
+      operationId: admin_activity_logs_list
+      description: SystemLog 기반. 관리자의 생성·수정·삭제·권한 변경 등 행위 이력을 조회한다. 지도 편집(MAP_ 계열)
+        action은 제외된다.
+      summary: 사용자 활동 로그 목록 조회
+      parameters:
+      - in: query
+        name: action_type
+        schema:
+          type: string
+        description: 'SystemLog.ActionType 코드값 (예: user_create)'
+      - in: query
+        name: actor
+        schema:
+          type: string
+        description: 행위자 username 또는 email (부분 일치)
+      - in: query
+        name: date_from
+        schema:
+          type: string
+        description: YYYY-MM-DD
+      - in: query
+        name: date_to
+        schema:
+          type: string
+        description: YYYY-MM-DD
+      - in: query
+        name: keyword
+        schema:
+          type: string
+        description: description 검색 (부분 일치)
+      - in: query
+        name: page
+        schema:
+          type: integer
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+      - in: query
+        name: result
+        schema:
+          type: string
+        description: success | failure
+      tags:
+      - Admin — Logs
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SystemLogAdmin'
+          description: ''
+        '401':
+          description: 인증 필요
+        '403':
+          description: 관리자 권한 필요
+  /api/admin/alerts/events/:
+    get:
+      operationId: admin_alerts_events_list
+      description: |-
+        GET /api/admin/alerts/events/ — 이벤트 이력 목록 (읽기 전용).
+
+        어드민 이벤트 이력 조회 페이지 전용. 기존 EventViewSet(/alerts/api/events/)은
+        대시보드 모니터링용이라 어드민 필터(날짜·구분·상태)가 없음 — 별도 뷰로 분리.
+
+        [쿼리 파라미터]
+        - date       : YYYY-MM-DD — 발생시간 날짜 필터 (미입력 시 전체)
+        - event_type : AlarmType 값 (예: gas_threshold) — 미입력 시 전체
+        - status     : EventStatus 값 (예: active) — 미입력 시 전체
+        - page, page_size : AdminPagination 기본값 (20건/페이지)
+      summary: 이벤트 이력 목록
+      parameters:
+      - in: query
+        name: date
+        schema:
+          type: string
+        description: YYYY-MM-DD
+      - in: query
+        name: event_type
+        schema:
+          type: string
+      - in: query
+        name: page
+        schema:
+          type: integer
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+      - in: query
+        name: status
+        schema:
+          type: string
+      tags:
+      - Admin — Events
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EventHistoryAdmin'
+          description: ''
+  /api/admin/alerts/policies/:
+    get:
+      operationId: admin_alerts_policies_list
+      description: |-
+        GET  /api/admin/alerts/policies/  — 정책 목록 (필터·정렬·페이지네이션)
+        POST /api/admin/alerts/policies/  — 정책 신규 등록
+
+        [GET 쿼리]
+        - name        : 정책명 부분검색 (icontains)
+        - event_type  : AlarmType 값 (예: gas_threshold)
+        - is_active   : true / false
+        - sort        : updated_desc / updated_asc / name_asc / name_desc /
+                       event_asc / event_desc / active_first / inactive_first
+        - page, page_size : 페이지네이션
+      summary: 알림 정책 목록
+      parameters:
+      - in: query
+        name: event_type
+        schema:
+          type: string
+      - in: query
+        name: is_active
+        schema:
+          type: string
+      - in: query
+        name: name
+        schema:
+          type: string
+      - in: query
+        name: page
+        schema:
+          type: integer
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+      - in: query
+        name: sort
+        schema:
+          type: string
+      tags:
+      - Admin — AlertPolicy
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AlertPolicyList'
+          description: ''
+        '401':
+          description: 인증 필요
+    post:
+      operationId: admin_alerts_policies_create
+      description: |-
+        GET  /api/admin/alerts/policies/  — 정책 목록 (필터·정렬·페이지네이션)
+        POST /api/admin/alerts/policies/  — 정책 신규 등록
+
+        [GET 쿼리]
+        - name        : 정책명 부분검색 (icontains)
+        - event_type  : AlarmType 값 (예: gas_threshold)
+        - is_active   : true / false
+        - sort        : updated_desc / updated_asc / name_asc / name_desc /
+                       event_asc / event_desc / active_first / inactive_first
+        - page, page_size : 페이지네이션
+      summary: 알림 정책 신규 등록
+      tags:
+      - Admin — AlertPolicy
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertPolicyWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AlertPolicyWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AlertPolicyWriteRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertPolicyDetail'
+          description: ''
+        '400':
+          description: 검증 실패
+        '401':
+          description: 인증 필요
+  /api/admin/alerts/policies/{id}/:
+    get:
+      operationId: admin_alerts_policies_retrieve
+      description: |-
+        GET    /api/admin/alerts/policies/<id>/  — 상세 조회 (폼 prefill)
+        PATCH  /api/admin/alerts/policies/<id>/  — 정책 수정 (partial)
+        DELETE /api/admin/alerts/policies/<id>/  — 정책 삭제 (Hard delete; 시연 단계)
+      summary: 알림 정책 상세 조회
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — AlertPolicy
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertPolicyDetail'
+          description: ''
+        '404':
+          description: 정책 없음
+    patch:
+      operationId: admin_alerts_policies_partial_update
+      description: |-
+        GET    /api/admin/alerts/policies/<id>/  — 상세 조회 (폼 prefill)
+        PATCH  /api/admin/alerts/policies/<id>/  — 정책 수정 (partial)
+        DELETE /api/admin/alerts/policies/<id>/  — 정책 삭제 (Hard delete; 시연 단계)
+      summary: 알림 정책 수정 (Partial)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — AlertPolicy
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAlertPolicyWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAlertPolicyWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAlertPolicyWriteRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertPolicyDetail'
+          description: ''
+        '400':
+          description: 검증 실패
+        '404':
+          description: 정책 없음
+    delete:
+      operationId: admin_alerts_policies_destroy
+      description: |-
+        GET    /api/admin/alerts/policies/<id>/  — 상세 조회 (폼 prefill)
+        PATCH  /api/admin/alerts/policies/<id>/  — 정책 수정 (partial)
+        DELETE /api/admin/alerts/policies/<id>/  — 정책 삭제 (Hard delete; 시연 단계)
+      summary: 알림 정책 삭제
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — AlertPolicy
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: 삭제 완료
+        '404':
+          description: 정책 없음
+  /api/admin/code-groups/:
+    get:
+      operationId: admin_code_groups_list
+      description: |-
+        GET  /api/admin/code-groups/ — 그룹 목록 (이름·코드 검색 지원)
+        POST /api/admin/code-groups/ — 그룹 생성
+      summary: 코드 그룹 목록
+      parameters:
+      - in: query
+        name: q
+        schema:
+          type: string
+        description: 그룹명 또는 그룹코드 부분 검색
+      tags:
+      - Admin — 공통코드
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CodeGroup'
+          description: ''
+    post:
+      operationId: admin_code_groups_create
+      description: |-
+        GET  /api/admin/code-groups/ — 그룹 목록 (이름·코드 검색 지원)
+        POST /api/admin/code-groups/ — 그룹 생성
+      summary: 코드 그룹 생성
+      tags:
+      - Admin — 공통코드
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CodeGroupWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CodeGroupWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CodeGroupWriteRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CodeGroup'
+          description: ''
+  /api/admin/code-groups/{group_id}/codes/:
+    get:
+      operationId: admin_code_groups_codes_list
+      description: |-
+        GET  /api/admin/code-groups/<group_id>/codes/ — 코드 목록
+        POST /api/admin/code-groups/<group_id>/codes/ — 코드 생성
+      summary: 공통코드 목록
+      parameters:
+      - in: path
+        name: group_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — 공통코드
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CommonCode'
+          description: ''
+        '404':
+          description: 코드 그룹을 찾을 수 없음
+    post:
+      operationId: admin_code_groups_codes_create
+      description: |-
+        GET  /api/admin/code-groups/<group_id>/codes/ — 코드 목록
+        POST /api/admin/code-groups/<group_id>/codes/ — 코드 생성
+      summary: 공통코드 생성
+      parameters:
+      - in: path
+        name: group_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — 공통코드
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonCodeWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CommonCodeWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CommonCodeWriteRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonCode'
+          description: ''
+        '404':
+          description: 코드 그룹을 찾을 수 없음
+  /api/admin/code-groups/{id}/:
+    patch:
+      operationId: admin_code_groups_partial_update
+      description: |-
+        PATCH  /api/admin/code-groups/<id>/ — 그룹 수정
+        DELETE /api/admin/code-groups/<id>/ — 그룹 삭제
+
+        삭제 시 PROTECT 정책: 하위 CommonCode 가 있으면 400 반환.
+      summary: 코드 그룹 수정
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — 공통코드
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCodeGroupWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCodeGroupWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCodeGroupWriteRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CodeGroup'
+          description: ''
+        '404':
+          description: 코드 그룹을 찾을 수 없음
+    delete:
+      operationId: admin_code_groups_destroy
+      description: |-
+        PATCH  /api/admin/code-groups/<id>/ — 그룹 수정
+        DELETE /api/admin/code-groups/<id>/ — 그룹 삭제
+
+        삭제 시 PROTECT 정책: 하위 CommonCode 가 있으면 400 반환.
+      summary: 코드 그룹 삭제
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — 공통코드
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: 삭제 성공
+        '400':
+          description: 하위 코드가 있어 삭제 불가
+        '404':
+          description: 코드 그룹을 찾을 수 없음
+  /api/admin/codes/{id}/:
+    patch:
+      operationId: admin_codes_partial_update
+      description: |-
+        PATCH  /api/admin/codes/<id>/ — 코드 수정
+        DELETE /api/admin/codes/<id>/ — 코드 삭제
+      summary: 공통코드 수정
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — 공통코드
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCommonCodeWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCommonCodeWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCommonCodeWriteRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonCode'
+          description: ''
+        '404':
+          description: 코드를 찾을 수 없음
+    delete:
+      operationId: admin_codes_destroy
+      description: |-
+        PATCH  /api/admin/codes/<id>/ — 코드 수정
+        DELETE /api/admin/codes/<id>/ — 코드 삭제
+      summary: 공통코드 삭제
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — 공통코드
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: 삭제 성공
+        '404':
+          description: 코드를 찾을 수 없음
+  /api/admin/codes/bulk-deactivate/:
+    post:
+      operationId: admin_codes_bulk_deactivate_create
+      description: |-
+        POST /api/admin/codes/bulk-deactivate/
+
+        선택된 코드들을 일괄 미사용으로 전환한다.
+        body: { "ids": [1, 2, 3] }
+      summary: 공통코드 일괄 미사용 전환
+      tags:
+      - Admin — 공통코드
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonCodeBulkDeactivateRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CommonCodeBulkDeactivateRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CommonCodeBulkDeactivateRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonCodeBulkDeactivateResponse'
+          description: ''
   /api/admin/departments/:
     post:
       operationId: admin_departments_create
@@ -1054,6 +1729,462 @@ paths:
           description: 삭제 완료
         '404':
           description: 없음
+  /api/admin/integration-logs/:
+    get:
+      operationId: admin_integration_logs_list
+      description: 시스템 간 연동 이력(수집/전송/동기화)을 조회한다.
+      summary: 연동 로그 목록 조회
+      parameters:
+      - in: query
+        name: date_from
+        schema:
+          type: string
+        description: YYYY-MM-DD
+      - in: query
+        name: date_to
+        schema:
+          type: string
+        description: YYYY-MM-DD
+      - in: query
+        name: integration_type
+        schema:
+          type: string
+        description: collect | transmit | sync
+      - in: query
+        name: keyword
+        schema:
+          type: string
+        description: target_system 또는 description 검색
+      - in: query
+        name: page
+        schema:
+          type: integer
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+      - in: query
+        name: result
+        schema:
+          type: string
+        description: success | failure | delay
+      tags:
+      - Admin — Logs
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/IntegrationLogAdmin'
+          description: ''
+        '401':
+          description: 인증 필요
+        '403':
+          description: 관리자 권한 필요
+  /api/admin/map-edit-logs/:
+    get:
+      operationId: admin_map_edit_logs_list
+      description: SystemLog 중 MAP_ 계열 action_type만 반환한다. (map_geofence_create / map_sensor_move
+        / map_facility_update / map_position_node_register / map_object_delete)
+      summary: 지도 편집 로그 목록 조회
+      parameters:
+      - in: query
+        name: action_type
+        schema:
+          type: string
+        description: map_geofence_create | map_sensor_move | map_facility_update |
+          map_position_node_register | map_object_delete
+      - in: query
+        name: actor
+        schema:
+          type: string
+        description: 행위자 username 또는 email (부분 일치)
+      - in: query
+        name: date_from
+        schema:
+          type: string
+        description: YYYY-MM-DD
+      - in: query
+        name: date_to
+        schema:
+          type: string
+        description: YYYY-MM-DD
+      - in: query
+        name: keyword
+        schema:
+          type: string
+        description: target_name 또는 description 검색 (부분 일치)
+      - in: query
+        name: page
+        schema:
+          type: integer
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+      tags:
+      - Admin — Logs
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SystemLogAdmin'
+          description: ''
+        '401':
+          description: 인증 필요
+        '403':
+          description: 관리자 권한 필요
+  /api/admin/notices/:
+    get:
+      operationId: admin_notices_list
+      description: |-
+        흐름:
+          1. 쿼리 파라미터로 필터 조건 수집
+          2. ORM 쿼리 빌드 (필터 + 정렬)
+          3. AdminPagination으로 페이지 자름
+          4. NoticeListSerializer로 직렬화
+          5. 페이지네이션 응답 반환
+      summary: 공지사항 목록 조회
+      parameters:
+      - in: query
+        name: category
+        schema:
+          type: string
+        description: general | urgent | maintenance
+      - in: query
+        name: is_pinned
+        schema:
+          type: boolean
+        description: 상단 고정 여부 필터
+      - in: query
+        name: keyword
+        schema:
+          type: string
+        description: 제목 검색 키워드
+      - in: query
+        name: page
+        schema:
+          type: integer
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+      tags:
+      - Admin — Notices
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NoticeList'
+          description: ''
+        '401':
+          description: 인증 필요
+        '403':
+          description: 관리자 권한 필요
+    post:
+      operationId: admin_notices_create
+      description: |-
+        흐름:
+          1. NoticeCreateUpdateSerializer로 입력값 유효성 검사
+          2. 검사 통과 → author, updated_by를 request.user로 주입해 저장
+          3. 저장된 객체를 NoticeDetailSerializer로 직렬화해 201 반환
+      summary: 공지사항 등록
+      tags:
+      - Admin — Notices
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NoticeCreateUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NoticeCreateUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NoticeCreateUpdateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NoticeDetail'
+          description: ''
+        '400':
+          description: 입력값 오류
+        '401':
+          description: 인증 필요
+        '403':
+          description: 관리자 권한 필요
+  /api/admin/notices/{id}/:
+    get:
+      operationId: admin_notices_retrieve
+      description: |-
+        흐름:
+          1. pk로 Notice 조회 (없으면 404)
+          2. NoticeDetailSerializer로 직렬화 (첨부파일 포함)
+          3. 200 반환
+      summary: 공지사항 상세 조회
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — Notices
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NoticeDetail'
+          description: ''
+        '404':
+          description: 공지사항 없음
+    patch:
+      operationId: admin_notices_partial_update
+      description: |-
+        흐름:
+          1. pk로 Notice 조회
+          2. partial=True로 NoticeCreateUpdateSerializer 유효성 검사
+             partial=True 이유: PATCH는 일부 필드만 수정 가능.
+             partial=False(PUT)이면 모든 필드를 보내야 해서 불편함.
+          3. updated_by를 request.user로 갱신해 저장
+          4. 수정된 객체를 NoticeDetailSerializer로 직렬화해 200 반환
+      summary: 공지사항 수정
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — Notices
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedNoticeCreateUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedNoticeCreateUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedNoticeCreateUpdateRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NoticeDetail'
+          description: ''
+        '400':
+          description: 입력값 오류
+        '404':
+          description: 공지사항 없음
+    delete:
+      operationId: admin_notices_destroy
+      description: |-
+        흐름:
+          1. pk로 Notice 조회 (소프트 삭제된 공지는 404)
+          2. 소프트 삭제 — is_deleted=True, deleted_at, deleted_by 기록
+          3. SystemLog에 삭제 행위 기록
+          4. 204 No Content 반환
+
+        소프트 삭제로 전환한 이유:
+          관리자가 공지를 삭제했을 때 "누가, 언제, 무엇을 삭제했는가" 추적 가능.
+          실수 삭제 시 복구 가능.
+          is_active=False는 "비공개 처리"용으로 구분하고,
+          is_deleted=True는 "완전 삭제 의도"로 구분.
+      summary: 공지사항 삭제
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — Notices
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: 삭제 성공
+        '404':
+          description: 공지사항 없음
+  /api/admin/notices/{id}/attachments/:
+    post:
+      operationId: admin_notices_attachments_create
+      description: |-
+        흐름:
+          1. pk로 Notice 조회 (없으면 404)
+          2. request.FILES["file"]로 업로드된 파일 꺼내기
+          3. validators(10MB 제한, 확장자 검사)는 모델 필드에서 자동 실행됨
+          4. NoticeAttachment 저장
+          5. 저장된 첨부파일 정보를 201로 반환
+
+        첨부파일 업로드를 공지사항 등록(POST /notices/)과 분리한 이유:
+          - 등록 시 파일을 함께 보내면 요청 구조가 복잡해짐(JSON + 파일 혼합).
+          - 파일은 multipart/form-data, 공지 정보는 JSON이 자연스러움.
+          - 등록 후 파일을 별도로 추가하는 UX 패턴이 일반적.
+      summary: 첨부파일 업로드
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — Notices
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NoticeAttachmentUploadRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NoticeAttachmentUploadRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NoticeAttachment'
+          description: ''
+        '400':
+          description: 파일 없음 또는 유효성 오류
+        '404':
+          description: 공지사항 없음
+    delete:
+      operationId: admin_notices_attachments_destroy
+      description: |-
+        흐름:
+          1. pk(공지사항)와 att_id(첨부파일) 모두 확인
+             notice_id=pk 조건을 추가하는 이유:
+             다른 공지사항의 첨부파일 id를 넣어도 삭제되는 것을 막기 위함.
+          2. storage에서 실제 파일 삭제 + DB 레코드 삭제
+          3. 204 반환
+      summary: 첨부파일 삭제
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — Notices
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: 삭제 성공
+        '404':
+          description: 첨부파일 없음
+  /api/admin/notices/{id}/attachments/{att_id}/:
+    post:
+      operationId: admin_notices_attachments_create_2
+      description: |-
+        흐름:
+          1. pk로 Notice 조회 (없으면 404)
+          2. request.FILES["file"]로 업로드된 파일 꺼내기
+          3. validators(10MB 제한, 확장자 검사)는 모델 필드에서 자동 실행됨
+          4. NoticeAttachment 저장
+          5. 저장된 첨부파일 정보를 201로 반환
+
+        첨부파일 업로드를 공지사항 등록(POST /notices/)과 분리한 이유:
+          - 등록 시 파일을 함께 보내면 요청 구조가 복잡해짐(JSON + 파일 혼합).
+          - 파일은 multipart/form-data, 공지 정보는 JSON이 자연스러움.
+          - 등록 후 파일을 별도로 추가하는 UX 패턴이 일반적.
+      summary: 첨부파일 업로드
+      parameters:
+      - in: path
+        name: att_id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — Notices
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NoticeAttachmentUploadRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NoticeAttachmentUploadRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NoticeAttachment'
+          description: ''
+        '400':
+          description: 파일 없음 또는 유효성 오류
+        '404':
+          description: 공지사항 없음
+    delete:
+      operationId: admin_notices_attachments_destroy_2
+      description: |-
+        흐름:
+          1. pk(공지사항)와 att_id(첨부파일) 모두 확인
+             notice_id=pk 조건을 추가하는 이유:
+             다른 공지사항의 첨부파일 id를 넣어도 삭제되는 것을 막기 위함.
+          2. storage에서 실제 파일 삭제 + DB 레코드 삭제
+          3. 204 반환
+      summary: 첨부파일 삭제
+      parameters:
+      - in: path
+        name: att_id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — Notices
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: 삭제 성공
+        '404':
+          description: 첨부파일 없음
   /api/admin/organizations/tree/:
     get:
       operationId: admin_organizations_tree_retrieve
@@ -1201,6 +2332,1042 @@ paths:
           description: 인증 필요 (토큰 누락/만료)
         '200':
           description: CSV 파일 (text/csv)
+  /api/admin/retention-policies/:
+    get:
+      operationId: admin_retention_policies_retrieve
+      description: 데이터 카테고리별 보관 기간·삭제 주기·활성 여부 전체 목록.
+      summary: 보관 정책 목록
+      tags:
+      - Admin — 데이터 보관 정책
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RetentionPolicyListResponse'
+          description: ''
+  /api/admin/retention-policies/{id}/:
+    get:
+      operationId: admin_retention_policies_retrieve_2
+      description: 편집 모달 진입 시 호출. affected_rows 필드에 현재 기준 삭제 예정 행 수 포함.
+      summary: 보관 정책 단건 조회 (삭제 예정 행 수 포함)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — 데이터 보관 정책
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataRetentionPolicy'
+          description: ''
+        '404':
+          description: 정책을 찾을 수 없음
+    patch:
+      operationId: admin_retention_policies_partial_update
+      description: '수정 가능: raw_retention_days, history_retention_days, delete_cycle,
+        is_active, memo. device_type, data_category는 수정 불가. history_retention_days
+        < raw_retention_days 이면 400.'
+      summary: 보관 정책 수정
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — 데이터 보관 정책
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedDataRetentionPolicyRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedDataRetentionPolicyRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedDataRetentionPolicyRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataRetentionPolicy'
+          description: ''
+        '400':
+          description: 유효성 오류
+        '404':
+          description: 정책을 찾을 수 없음
+  /api/admin/retention-policies/{id}/preview/:
+    get:
+      operationId: admin_retention_policies_preview_retrieve
+      description: |-
+        GET /api/admin/retention-policies/{id}/preview/?raw_days=N
+
+        저장 없이 raw_days 기준 삭제 예정 행 수만 반환.
+        편집 모달에서 raw_retention_days 입력값이 바뀔 때마다 debounce 호출.
+        SimpleNamespace mock으로 _delete_for_policy 재활용 — DB 쿼리 로직 동기화 유지.
+      summary: 보관 기간 변경 미리보기 (삭제 예정 행 수)
+      parameters:
+      - in: query
+        name: history_days
+        schema:
+          type: integer
+        description: 미리볼 이력 보관 기간(일). 생략 시 현재 정책값 사용.
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      - in: query
+        name: raw_days
+        schema:
+          type: integer
+        description: 미리볼 원천 보관 기간(일).
+      tags:
+      - Admin — 데이터 보관 정책
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RetentionPreviewResponse'
+          description: ''
+  /api/admin/retention-policies/run/:
+    post:
+      operationId: admin_retention_policies_run_create
+      description: |-
+        POST /api/admin/retention-policies/run/
+
+        배치를 즉시 실행하거나 dry_run으로 삭제 예정 행 수를 미리 확인.
+
+        body: { "dry_run": true | false }
+
+        반환: {
+          "dry_run": bool,
+          "results": [ { "policy_id": N, "category": "...", "category_display": "...", "count": N }, ... ],
+          "total": N
+        }
+
+        [dry_run=true]  실제 삭제 없이 대상 행 수만 반환 — 미리보기 용도.
+        [dry_run=false] 실제 삭제 실행 — 확인창 후 호출.
+      summary: 보관 배치 즉시 실행 (dry_run 지원)
+      tags:
+      - Admin — 데이터 보관 정책
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RetentionRunRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RetentionRunRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RetentionRunRequestRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RetentionRunResponse'
+          description: ''
+  /api/admin/risk-standards/:
+    get:
+      operationId: admin_risk_standards_list
+      description: |-
+        GET /api/admin/risk-standards/ — 위험 기준 목록.
+
+        [쿼리 파라미터]
+        - code        : 단계코드 (normal / warning / danger)
+        - is_active   : true / false
+        - display_color : 색상 토큰 문자열 (부분 일치)
+      summary: 위험 기준 목록
+      parameters:
+      - in: query
+        name: code
+        schema:
+          type: string
+      - in: query
+        name: display_color
+        schema:
+          type: string
+      - in: query
+        name: is_active
+        schema:
+          type: string
+      tags:
+      - Admin — RiskStandard
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RiskStandardList'
+          description: ''
+  /api/admin/risk-standards/{id}/:
+    patch:
+      operationId: admin_risk_standards_partial_update
+      description: |-
+        PATCH /api/admin/risk-standards/<id>/ — 위험 기준 수정.
+
+        code 필드를 제외한 나머지 필드만 수정 가능.
+      summary: 위험 기준 수정
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — RiskStandard
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedRiskStandardUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedRiskStandardUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedRiskStandardUpdateRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskStandardList'
+          description: ''
+        '400':
+          description: 검증 실패
+        '404':
+          description: 항목 없음
+  /api/admin/safety/checklist/publish/:
+    post:
+      operationId: admin_safety_checklist_publish_create
+      description: |-
+        [반영 저장]: 현재 section/item 상태를 active SafetyChecklistRevision 스냅샷으로 발행.
+
+        노-옵 발행을 방지하기 위해 서비스 레이어가 직전 active와 비교해 동일하면
+        `NoChangesToPublishError`를 발생시키며, 본 view는 이를 400 + `code:no_changes`로
+        응답해 클라이언트가 "반영 보류" 안내를 표시할 수 있게 한다.
+      summary: 반영 저장 — 현재 섹션/문항 상태를 스냅샷으로 발행
+      tags:
+      - Admin — Safety Checklist
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevisionDetail'
+          description: ''
+        '400':
+          description: 변경 사항 없음 (active revision과 동일)
+  /api/admin/safety/checklist/revisions/:
+    get:
+      operationId: admin_safety_checklist_revisions_list
+      description: 반영 이력 모달 좌측의 일시 리스트(신규순). detail은 별도 view 호출.
+      summary: 반영 이력 (일시) 리스트
+      tags:
+      - Admin — Safety Checklist
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RevisionListItem'
+          description: ''
+  /api/admin/safety/checklist/revisions/{id}/:
+    get:
+      operationId: admin_safety_checklist_revisions_retrieve
+      description: 반영 이력 모달 우측의 스냅샷 읽기. 직전 버전 대비 변경 요약(`change_summary`) 동봉.
+      summary: 특정 시점 스냅샷 (읽기 전용)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — Safety Checklist
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevisionDetail'
+          description: ''
+  /api/admin/safety/checklist/state/:
+    get:
+      operationId: admin_safety_checklist_state_retrieve
+      description: 어드민 페이지 헤더용 메타 — 최근 반영일/발행자/편집 중 배지 활성화 신호.
+      summary: 체크리스트 헤더 메타 (최근 반영일, 편집 중 여부)
+      tags:
+      - Admin — Safety Checklist
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChecklistState'
+          description: ''
+  /api/admin/safety/items/{id}/:
+    patch:
+      operationId: admin_safety_items_partial_update
+      description: 문항 단건 수정/삭제. 삭제는 soft-delete (이력 보존).
+      summary: 문항 수정
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — Safety Checklist
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedChecklistItemUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedChecklistItemUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedChecklistItemUpdateRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChecklistSection'
+          description: ''
+    delete:
+      operationId: admin_safety_items_destroy
+      description: 문항 단건 수정/삭제. 삭제는 soft-delete (이력 보존).
+      summary: 문항 비활성화 (Soft Delete)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — Safety Checklist
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: 삭제 완료
+  /api/admin/safety/items/{id}/duplicate/:
+    post:
+      operationId: admin_safety_items_duplicate_create
+      description: 원본 바로 다음 순번에 동일 문항 사본 생성. 이후 항목은 order 한 칸씩 밀림.
+      summary: 문항 복제 (같은 섹션 내 바로 다음 순번)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — Safety Checklist
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChecklistSection'
+          description: ''
+  /api/admin/safety/items/reorder/:
+    post:
+      operationId: admin_safety_items_reorder_create
+      description: 드래그앤드롭 결과 반영. section_id 검증 후 ordered_ids 인덱스로 order 갱신.
+      summary: 문항 순서 변경
+      tags:
+      - Admin — Safety Checklist
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChecklistItemReorderRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ChecklistItemReorderRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ChecklistItemReorderRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: ok
+  /api/admin/safety/sections/:
+    get:
+      operationId: admin_safety_sections_list
+      description: 'GET: 좌측 패널 + 우측 편집기에 동시 사용되는 섹션·문항 트리. POST: 섹션 신규.'
+      summary: 섹션 + 문항 트리 조회
+      tags:
+      - Admin — Safety Checklist
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChecklistSection'
+          description: ''
+    post:
+      operationId: admin_safety_sections_create
+      description: 'GET: 좌측 패널 + 우측 편집기에 동시 사용되는 섹션·문항 트리. POST: 섹션 신규.'
+      summary: 섹션 신규 추가
+      tags:
+      - Admin — Safety Checklist
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChecklistSectionCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ChecklistSectionCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ChecklistSectionCreateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChecklistSection'
+          description: ''
+  /api/admin/safety/sections/{id}/:
+    patch:
+      operationId: admin_safety_sections_partial_update
+      description: 섹션 단건 수정/삭제. 삭제는 soft-delete + 하위 문항 cascade.
+      summary: 섹션 수정
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — Safety Checklist
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedChecklistSectionUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedChecklistSectionUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedChecklistSectionUpdateRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChecklistSection'
+          description: ''
+    delete:
+      operationId: admin_safety_sections_destroy
+      description: 섹션 단건 수정/삭제. 삭제는 soft-delete + 하위 문항 cascade.
+      summary: 섹션 비활성화 (Soft Delete) — 하위 문항도 함께 비활성화
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — Safety Checklist
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: 삭제 완료
+  /api/admin/safety/sections/{section_id}/items/:
+    post:
+      operationId: admin_safety_sections_items_create
+      description: 선택 섹션에 문항 추가. 응답은 해당 섹션 전체 트리(클라이언트 재렌더용).
+      summary: 문항 추가
+      parameters:
+      - in: path
+        name: section_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — Safety Checklist
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChecklistItemCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ChecklistItemCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ChecklistItemCreateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChecklistSection'
+          description: ''
+  /api/admin/safety/sections/reorder/:
+    post:
+      operationId: admin_safety_sections_reorder_create
+      description: 드래그앤드롭 후 호출. `ordered_ids` 인덱스 기준으로 일괄 order 갱신.
+      summary: 섹션 순서 변경
+      tags:
+      - Admin — Safety Checklist
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChecklistReorderRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ChecklistReorderRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ChecklistReorderRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: ok
+  /api/admin/system-logs/:
+    get:
+      operationId: admin_system_logs_list
+      description: AppLog 기반. 운영 중 발생한 오류·배치·서비스 로그를 조회한다.
+      summary: 시스템 로그 목록 조회
+      parameters:
+      - in: query
+        name: date_from
+        schema:
+          type: string
+        description: YYYY-MM-DD
+      - in: query
+        name: date_to
+        schema:
+          type: string
+        description: YYYY-MM-DD
+      - in: query
+        name: keyword
+        schema:
+          type: string
+        description: message 또는 service_module 검색
+      - in: query
+        name: level
+        schema:
+          type: string
+        description: ERROR | WARNING | INFO
+      - in: query
+        name: log_category
+        schema:
+          type: string
+        description: error | batch | service
+      - in: query
+        name: page
+        schema:
+          type: integer
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+      tags:
+      - Admin — Logs
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AppLog'
+          description: ''
+        '401':
+          description: 인증 필요
+        '403':
+          description: 관리자 권한 필요
+  /api/admin/threshold-groups/:
+    get:
+      operationId: admin_threshold_groups_list
+      description: |-
+        GET  /api/admin/threshold-groups/ — 그룹 목록 (이름/코드 검색 지원)
+        POST /api/admin/threshold-groups/ — 그룹 생성
+      summary: 임계치 그룹 목록
+      parameters:
+      - in: query
+        name: q
+        schema:
+          type: string
+        description: 그룹명 또는 그룹코드 부분 검색
+      tags:
+      - Admin — 임계치
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ThresholdGroup'
+          description: ''
+    post:
+      operationId: admin_threshold_groups_create
+      description: |-
+        GET  /api/admin/threshold-groups/ — 그룹 목록 (이름/코드 검색 지원)
+        POST /api/admin/threshold-groups/ — 그룹 생성
+      summary: 임계치 그룹 생성
+      tags:
+      - Admin — 임계치
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ThresholdGroupWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ThresholdGroupWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ThresholdGroupWriteRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThresholdGroup'
+          description: ''
+  /api/admin/threshold-groups/{group_id}/thresholds/:
+    get:
+      operationId: admin_threshold_groups_thresholds_list
+      description: |-
+        GET  /api/admin/threshold-groups/<group_id>/thresholds/ — 임계치 목록
+        POST /api/admin/threshold-groups/<group_id>/thresholds/ — 임계치 생성
+
+        facility=null (전사 기준)만 조회·생성.
+      summary: 임계치 목록 (전사 기준)
+      parameters:
+      - in: path
+        name: group_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — 임계치
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Threshold'
+          description: ''
+        '404':
+          description: 그룹을 찾을 수 없음
+    post:
+      operationId: admin_threshold_groups_thresholds_create
+      description: |-
+        GET  /api/admin/threshold-groups/<group_id>/thresholds/ — 임계치 목록
+        POST /api/admin/threshold-groups/<group_id>/thresholds/ — 임계치 생성
+
+        facility=null (전사 기준)만 조회·생성.
+      summary: 임계치 생성 (전사 기준)
+      parameters:
+      - in: path
+        name: group_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — 임계치
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ThresholdWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ThresholdWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ThresholdWriteRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Threshold'
+          description: ''
+        '404':
+          description: 그룹을 찾을 수 없음
+  /api/admin/threshold-groups/{id}/:
+    patch:
+      operationId: admin_threshold_groups_partial_update
+      description: |-
+        PATCH  /api/admin/threshold-groups/<id>/ — 그룹 수정
+        DELETE /api/admin/threshold-groups/<id>/ — 그룹 삭제
+
+        삭제 시 PROTECT 제약 — 하위 Threshold 가 있으면 400 반환.
+      summary: 임계치 그룹 수정
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — 임계치
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedThresholdGroupWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedThresholdGroupWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedThresholdGroupWriteRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThresholdGroup'
+          description: ''
+        '404':
+          description: 그룹을 찾을 수 없음
+    delete:
+      operationId: admin_threshold_groups_destroy
+      description: |-
+        PATCH  /api/admin/threshold-groups/<id>/ — 그룹 수정
+        DELETE /api/admin/threshold-groups/<id>/ — 그룹 삭제
+
+        삭제 시 PROTECT 제약 — 하위 Threshold 가 있으면 400 반환.
+      summary: 임계치 그룹 삭제
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — 임계치
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: 삭제 성공
+        '400':
+          description: 하위 임계치가 있어 삭제 불가
+        '404':
+          description: 그룹을 찾을 수 없음
+  /api/admin/thresholds/{id}/:
+    patch:
+      operationId: admin_thresholds_partial_update
+      description: |-
+        PATCH  /api/admin/thresholds/<id>/ — 임계치 수정
+        DELETE /api/admin/thresholds/<id>/ — 임계치 삭제
+      summary: 임계치 수정
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — 임계치
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedThresholdWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedThresholdWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedThresholdWriteRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Threshold'
+          description: ''
+        '404':
+          description: 임계치를 찾을 수 없음
+    delete:
+      operationId: admin_thresholds_destroy
+      description: |-
+        PATCH  /api/admin/thresholds/<id>/ — 임계치 수정
+        DELETE /api/admin/thresholds/<id>/ — 임계치 삭제
+      summary: 임계치 삭제
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — 임계치
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: 삭제 성공
+        '404':
+          description: 임계치를 찾을 수 없음
+  /api/admin/thresholds/bulk-deactivate/:
+    post:
+      operationId: admin_thresholds_bulk_deactivate_create
+      description: |-
+        POST /api/admin/thresholds/bulk-deactivate/
+
+        선택된 임계치 항목들을 일괄 미사용으로 전환한다.
+        body: { "ids": [1, 2, 3] }
+      summary: 임계치 일괄 미사용 전환
+      tags:
+      - Admin — 임계치
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ThresholdBulkDeactivateRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ThresholdBulkDeactivateRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ThresholdBulkDeactivateRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThresholdBulkDeactivateResponse'
+          description: ''
+  /api/admin/training/vr-training/:
+    get:
+      operationId: admin_training_vr_training_retrieve
+      description: |-
+        facility별 활성 단일 VR 콘텐츠 조회.
+
+        [응답 분기]
+        - 콘텐츠 있음: `VRContentDetailSerializer` 정상 응답
+        - 콘텐츠 없음: `{empty: true, facility_id, facility_name}` — 화면 빈 상태용
+
+        [super_admin 다른 공장 조회]
+        `?facility_id=` 쿼리로 다른 공장 콘텐츠 조회 가능. 시설관리자는 본인
+        facility에 강제 매핑되어 쿼리 파라미터가 무시된다.
+      summary: VR 교육 단일 콘텐츠 조회 (facility별)
+      tags:
+      - Admin — VR Training
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VRContentDetail'
+          description: ''
+        '400':
+          description: facility_id 없음
+  /api/admin/training/vr-training/{id}/:
+    patch:
+      operationId: admin_training_vr_training_partial_update
+      description: |-
+        영상 파일을 동반하지 않는 메타 수정 (이름/설명/운영 메모).
+
+        [권한 가드]
+        `pk + facility_id` AND 조건으로 조회 → 다른 공장 콘텐츠의 pk를 직접
+        지정해도 404로 거부. facility 간 격리를 URL 레벨에서 강제.
+      summary: VR 메타 수정 (영상 미수반)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — VR Training
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedVRMetaUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedVRMetaUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedVRMetaUpdateRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VRContentDetail'
+          description: ''
+  /api/admin/training/vr-training/{id}/revisions/:
+    get:
+      operationId: admin_training_vr_training_revisions_list
+      description: |-
+        VR 콘텐츠 교체 이력 리스트.
+
+        [현재 UI 미사용]
+        화면에는 노출하지 않지만 산재 감사 요건상 "언제·누가 교체했는가"를
+        추적 가능하도록 API는 완비해 둔다. 추후 어드민 모달이 추가될 때 그대로 사용.
+
+        [권한 가드]
+        `pk + facility_id` AND 조건으로 콘텐츠 존재 확인 후 revisions만 직렬화.
+        다른 공장 콘텐츠의 이력에 접근하려는 시도는 404.
+      summary: 교체 이력 리스트
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin — VR Training
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VRRevisionList'
+          description: ''
+  /api/admin/training/vr-training/replace/:
+    post:
+      operationId: admin_training_vr_training_replace_create
+      description: |-
+        영상 교체 또는 최초 등록 — multipart 업로드.
+
+        [요청 처리 흐름]
+        1) facility_id 해석 + 파일/메타 검증
+        2) 트랜잭션 진입 전 `default_storage.save`로 새 파일 저장
+        3) `probe_duration_seconds`로 ffprobe 호출 (실패 시 None fallback)
+        4) `request.build_absolute_uri`로 절대 URL 구성 → `content_url`에 기록
+        5) `replace_vr_content` 서비스 호출 (DB만 트랜잭션, 파일 삭제는 on_commit)
+        6) service 예외 발생 시 새로 저장한 파일을 청소 후 재전파
+
+        [트랜잭션 경계가 service인 이유]
+        파일 I/O는 트랜잭션 밖에서 수행해야 롤백 시 파일 상태가 망가지지 않는다.
+        View가 파일을 먼저 저장하고, service가 DB 작업만 transaction.atomic으로
+        감싼다.
+
+        [200 OK with warning 패턴 미사용]
+        duration 추출 실패는 응답에 별도 경고 키 없이 단순히 `duration_seconds: null`로
+        반환. 클라이언트는 `<video>.loadedmetadata`로 시간 표시를 보강 가능.
+      summary: 영상 교체 — multipart 업로드, duration 자동 추출
+      tags:
+      - Admin — VR Training
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/VRVideoUploadRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/VRVideoUploadRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VRContentDetail'
+          description: ''
   /api/auth/login/:
     post:
       operationId: auth_login_create
@@ -1252,11 +3419,24 @@ paths:
   /api/auth/logout/:
     post:
       operationId: auth_logout_create
-      description: LoginLog에 LOGOUT 이력 기록 + Django 세션 초기화. JWT는 stateless라 서버 측에서
-        토큰을 폐기하지 않으므로 클라이언트가 직접 토큰을 삭제해야 한다.
+      description: |-
+        LoginLog에 LOGOUT 이력 기록 + Django 세션 초기화 + refresh 토큰 블랙리스트(옵션).
+
+        **body** `{ refresh: <token> }` 동봉 시 서버 측에서 refresh를 무효화한다 (SIMPLE_JWT.BLACKLIST_AFTER_ROTATION 설정 필요). 누락·무효 시도 200 반환.
       summary: 로그아웃
       tags:
       - Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LogoutRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LogoutRequestRequest'
       security:
       - jwtAuth: []
       responses:
@@ -2581,6 +4761,69 @@ paths:
           description: ''
         '400':
           description: facility_id 누락
+  /api/internal/integration-logs/:
+    post:
+      operationId: internal_integration_logs_create
+      description: |-
+        POST /api/internal/integration-logs/  — FastAPI → DRF IntegrationLog 기록
+
+        [보안]
+        INTERNAL_SERVICE_TOKEN 헤더 검증. IP 화이트리스트 대신 토큰 인증 사용.
+        Docker 네트워크 환경에서 FastAPI 컨테이너 IP가 달라도 정상 작동.
+
+        [부하 정책]
+        fire-and-forget 권장 (호출 측에서 raise_on_error=False로 본 흐름 비차단).
+      summary: IntegrationLog 기록 (FastAPI → DRF)
+      tags:
+      - Internal
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IntegrationLogCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/IntegrationLogCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/IntegrationLogCreateRequest'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntegrationLogCreateResponse'
+          description: ''
+  /api/internal/workers/:
+    get:
+      operationId: internal_workers_list
+      description: |-
+        GET /api/internal/workers/  — FastAPI → DRF worker 목록 조회
+
+        [보안]
+        INTERNAL_SERVICE_TOKEN 헤더 검증. IP 화이트리스트 대신 토큰 인증 사용.
+        Docker 네트워크 환경에서 FastAPI 컨테이너 IP가 달라도 정상 작동.
+
+        [응답]
+        [{"id": 3, "username": "worker_a"}, ...]
+        user_type=worker 인 유저만 반환.
+      summary: worker 목록 조회 (FastAPI → DRF)
+      tags:
+      - Internal
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InternalWorkerListResponse'
+          description: ''
   /api/managers/select/:
     get:
       operationId: managers_select_list
@@ -2662,6 +4905,60 @@ paths:
           description: ''
         '400':
           description: 검증 실패
+  /api/ml/anomaly-results/:
+    post:
+      operationId: ml_anomaly_results_create
+      description: |-
+        IF 추론 결과 저장.
+
+        POST /api/ml/anomaly-results/
+        Body: ml_model, model_version_snapshot, sensor_type, sensor_identifier,
+              measured_at, anomaly_score, prediction, risk_classified, feature_snapshot_json
+        Returns: 201 + 생성된 row
+
+        호출자 (추론 트리거): fastapi /predict 응답을 받아 threshold_risk 와 함께
+        combine_risk 계산 후 risk_classified 채워서 POST. 본 view 는 단순 INSERT 만 담당.
+      tags:
+      - ml
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/_MLAnomalyResultCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/_MLAnomalyResultCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/_MLAnomalyResultCreateRequest'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/_MLAnomalyResultCreate'
+          description: ''
+  /api/ml/models/active/:
+    get:
+      operationId: ml_models_active_retrieve
+      description: |-
+        (sensor_type, algorithm, sensor_identifier) 매칭 단위 활성 ML 모델 메타 조회.
+
+        GET /api/ml/models/active/?sensor_type=power
+          → 기본값 algorithm=isolation_forest, sensor_identifier="" 매칭 (기존 IF 회귀 0)
+        GET /api/ml/models/active/?sensor_type=power&algorithm=arima
+            &sensor_identifier=power:device_1:ch1:watt
+          → ARIMA 단일 시계열 모델 매칭 (W2.5 학습 결과)
+      tags:
+      - ml
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/_ActiveMLModel'
+          description: ''
   /api/monitoring/gas/:
     post:
       operationId: monitoring_gas_create
@@ -2701,6 +4998,8 @@ paths:
             schema:
               $ref: '#/components/schemas/GasDataCreateRequest'
         required: true
+      security:
+      - {}
       responses:
         '201':
           content:
@@ -2727,6 +5026,32 @@ paths:
           description: ''
         '400':
           description: 검증 실패
+  /api/monitoring/gas/thresholds/:
+    get:
+      operationId: monitoring_gas_thresholds_retrieve
+      description: gas_legal 그룹의 9종 임계치를 gas_code → dict 매핑으로 반환.
+      summary: 가스 9종 임계치 조회
+      tags:
+      - Monitoring (Public)
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: gas_code → threshold dict
+  /api/monitoring/power/channel-meta/:
+    get:
+      operationId: monitoring_power_channel_meta_retrieve
+      description: 활성 PowerDevice의 channel_meta JSON을 device_id 단위로 묶어 반환.
+      summary: 전력 채널 메타 조회 (라벨 + 정격)
+      tags:
+      - Monitoring (Public)
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: device_id → channel_meta 매핑
   /api/monitoring/power/data/:
     post:
       operationId: monitoring_power_data_create
@@ -2765,7 +5090,6 @@ paths:
               $ref: '#/components/schemas/PowerDataBulkIngestRequest'
         required: true
       security:
-      - jwtAuth: []
       - {}
       responses:
         '201':
@@ -2802,7 +5126,6 @@ paths:
               $ref: '#/components/schemas/PowerEventIngestRequest'
         required: true
       security:
-      - jwtAuth: []
       - {}
       responses:
         '201':
@@ -2813,10 +5136,24 @@ paths:
           description: ''
         '400':
           description: 검증 실패
+  /api/monitoring/power/threshold-meta/:
+    get:
+      operationId: monitoring_power_threshold_meta_retrieve
+      description: power_facility_default 그룹의 정격 % 임계치 3종 (power_w/current/voltage).
+        fastapi-server 가 5분 주기로 sync 해 알람 판정에 사용.
+      summary: 전력 임계치 메타 조회 (정격 % — fastapi sync 용)
+      tags:
+      - Monitoring (Public)
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: 항목명 → 임계치 dict
   /api/monitoring/power/thresholds/:
     get:
       operationId: monitoring_power_thresholds_retrieve
-      description: 채널별 주의/위험 임계치(W). 프론트 차트 주석 라인 및 위험도 판정에 사용.
+      description: 채널별 주의/위험 임계치(W) + 차트 Y축 최대값. DB Threshold 기반 응답.
       summary: 전력 임계치(W) 조회
       tags:
       - Monitoring (Public)
@@ -2857,7 +5194,6 @@ paths:
                 $ref: '#/components/schemas/WorkerPositionReceiveRequest'
         required: true
       security:
-      - jwtAuth: []
       - {}
       responses:
         '201':
@@ -3228,6 +5564,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/PowerDeviceNextCode'
           description: ''
+  /api/safety/checklist/active/:
+    get:
+      operationId: safety_checklist_active_retrieve
+      description: 사용자의 facility_id 기준 활성 SafetyChecklistRevision의 스냅샷을 반환한다. super_admin은
+        ?facility_id= 쿼리로 다른 공장 조회 가능.
+      summary: 현재 active 체크리스트 (운영자 공용)
+      tags:
+      - Safety
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: active revision 스냅샷
+        '404':
+          description: 활성 체크리스트 없음
   /dashboard/api/menu/:
     get:
       operationId: dashboard_api_menu_retrieve
@@ -3346,9 +5697,49 @@ paths:
           description: ''
         '400':
           description: 허용되지 않은 key값
+  /dashboard/api/vr-content/active/:
+    get:
+      operationId: dashboard_api_vr_content_active_retrieve
+      description: |-
+        작업자 페이지용 VR 콘텐츠 조회 — 인증 사용자 누구나.
+
+        [JWT 인증 + 작업자 공용]
+        `safety_vr_page`(SSR)가 JWT-only 환경에서 `request.user`가 비어 발생한
+        버그를 회피하기 위해, 페이지 렌더는 빈 셸만 보내고 클라이언트가 본 API로
+        실제 URL을 가져간다. 어드민 API(`/api/admin/training/...`)와 달리
+        `IsAuthenticated`만 요구하므로 worker도 호출 가능.
+
+        [facility 해석]
+        `user.facility_id || default` 폴백. 다중 공장 전환 시 worker 폴백은
+        제거해야 함 (후속 과제 — 본 PR에서는 단일 공장 단계에 맞춤).
+      summary: 작업자 페이지용 VR 콘텐츠 1건 조회
+      tags:
+      - Dashboard
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkerVRContent'
+          description: ''
   /dashboard/api/vr-progress/:
     get:
       operationId: dashboard_api_vr_progress_retrieve
+      description: |-
+        VR 시청 위치 임시 저장 (세션).
+
+        [user_id 가드]
+        Django 세션은 브라우저 단위라 같은 PC에서 사용자 A가 보던 위치가 사용자 B
+        로그인 후에도 남아 즉시 ended로 점프하는 버그가 있다. 세션에 user_id를
+        함께 저장하고, GET 시 현재 인증 사용자와 일치하지 않으면 빈 값으로 응답해
+        누설을 차단한다.
+
+        [content_id 가드]
+        어드민이 영상을 교체했을 때 이전 영상의 position이 새 영상에 잘못 적용되어
+        검은 화면이나 즉시 종료가 일어나는 버그를 막는다. 클라이언트가 페이지의
+        현재 content_id와 응답의 content_id가 일치할 때만 position을 복원한다.
       summary: VR 안전교육 시청 위치 조회 (세션)
       tags:
       - Dashboard
@@ -3364,6 +5755,19 @@ paths:
           description: ''
     post:
       operationId: dashboard_api_vr_progress_create
+      description: |-
+        VR 시청 위치 임시 저장 (세션).
+
+        [user_id 가드]
+        Django 세션은 브라우저 단위라 같은 PC에서 사용자 A가 보던 위치가 사용자 B
+        로그인 후에도 남아 즉시 ended로 점프하는 버그가 있다. 세션에 user_id를
+        함께 저장하고, GET 시 현재 인증 사용자와 일치하지 않으면 빈 값으로 응답해
+        누설을 차단한다.
+
+        [content_id 가드]
+        어드민이 영상을 교체했을 때 이전 영상의 position이 새 영상에 잘못 적용되어
+        검은 화면이나 즉시 종료가 일어나는 버그를 막는다. 클라이언트가 페이지의
+        현재 content_id와 응답의 content_id가 일치할 때만 position을 복원한다.
       summary: VR 안전교육 시청 위치 저장 (세션)
       tags:
       - Dashboard
@@ -3392,8 +5796,8 @@ paths:
   /dashboard/api/workers-list/:
     get:
       operationId: dashboard_api_workers_list_retrieve
-      description: facility_admin은 자기 공장 작업자만, super_admin은 전체. 오늘 위치 데이터 유무로 `is_present`
-        자동 계산.
+      description: facility_admin은 자기 공장 사용자만, super_admin은 전체 활성 사용자. 오늘 LoginLog
+        성공 기록 유무로 `is_present` 자동 계산.
       summary: 작업자 목록 + 부서 드롭다운 (관리자 전용)
       parameters:
       - in: query
@@ -3447,6 +5851,9 @@ components:
         department_id:
           type: integer
           nullable: true
+        facility_id:
+          type: integer
+          nullable: true
         position:
           type: integer
           nullable: true
@@ -3484,6 +5891,9 @@ components:
           title: 이메일 주소
           maxLength: 254
         department_id:
+          type: integer
+          nullable: true
+        facility_id:
           type: integer
           nullable: true
         position:
@@ -3535,6 +5945,12 @@ components:
         department_name:
           type: string
           readOnly: true
+        facility_id:
+          type: string
+          readOnly: true
+        facility_name:
+          type: string
+          readOnly: true
         position_id:
           type: string
           readOnly: true
@@ -3556,6 +5972,8 @@ components:
       required:
       - department_id
       - department_name
+      - facility_id
+      - facility_name
       - id
       - position_id
       - position_name
@@ -3581,6 +5999,9 @@ components:
         department:
           type: string
           readOnly: true
+        facility_name:
+          type: string
+          readOnly: true
         position:
           type: string
         user_type:
@@ -3604,10 +6025,99 @@ components:
           title: 등록일
       required:
       - department
+      - facility_name
       - id
       - last_login_at
       - status
       - username
+    ActionTypeEnum:
+      enum:
+      - user_create
+      - user_deactivate
+      - user_update
+      - permission_change
+      - device_create
+      - device_deactivate
+      - device_status_change
+      - geofence_create
+      - geofence_update
+      - geofence_deactivate
+      - threshold_update
+      - checklist_update
+      - manual_event_action
+      - dept_create
+      - dept_update
+      - dept_delete
+      - member_add
+      - member_remove
+      - member_move
+      - leader_assign
+      - map_geofence_create
+      - map_sensor_move
+      - map_facility_update
+      - map_position_node_register
+      - map_object_delete
+      - policy_created
+      - policy_updated
+      - policy_deactivated
+      - notice_create
+      - notice_update
+      - notice_delete
+      - vr_content_created
+      - vr_content_replaced
+      - vr_content_toggled
+      - checklist_revision_published
+      - checklist_section_created
+      - checklist_item_deactivated
+      type: string
+      description: |-
+        * `user_create` - 사용자 생성
+        * `user_deactivate` - 사용자 비활성화
+        * `user_update` - 사용자 정보 변경
+        * `permission_change` - 권한 변경
+        * `device_create` - 장비 등록
+        * `device_deactivate` - 장비 비활성화
+        * `device_status_change` - 장비 상태 변경
+        * `geofence_create` - 구역 생성
+        * `geofence_update` - 구역 수정
+        * `geofence_deactivate` - 구역 비활성화
+        * `threshold_update` - 임계치 변경
+        * `checklist_update` - 체크리스트 변경
+        * `manual_event_action` - 이벤트 수동 조치
+        * `dept_create` - 부서 생성
+        * `dept_update` - 부서 수정
+        * `dept_delete` - 부서 삭제
+        * `member_add` - 구성원 추가
+        * `member_remove` - 소속 제외
+        * `member_move` - 부서 이동
+        * `leader_assign` - 조직장 임명
+        * `map_geofence_create` - 위험구역 생성 (지도)
+        * `map_sensor_move` - 센서 이동
+        * `map_facility_update` - 설비 수정
+        * `map_position_node_register` - 위치 노드 등록
+        * `map_object_delete` - 객체 삭제
+        * `policy_created` - 알림 정책 생성
+        * `policy_updated` - 알림 정책 수정
+        * `policy_deactivated` - 알림 정책 비활성화
+        * `notice_create` - 공지 생성
+        * `notice_update` - 공지 수정
+        * `notice_delete` - 공지 삭제
+        * `vr_content_created` - VR 콘텐츠 등록
+        * `vr_content_replaced` - VR 콘텐츠 교체
+        * `vr_content_toggled` - VR 콘텐츠 활성화 전환
+        * `checklist_revision_published` - 체크리스트 개정 발행
+        * `checklist_section_created` - 체크리스트 섹션 생성
+        * `checklist_item_deactivated` - 체크리스트 항목 비활성화
+    AlarmCatchUpResponse:
+      type: object
+      properties:
+        alarms:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+      required:
+      - alarms
     AlarmRecord:
       type: object
       properties:
@@ -3616,7 +6126,7 @@ components:
           readOnly: true
         alarm_type:
           allOf:
-          - $ref: '#/components/schemas/AlarmTypeEnum'
+          - $ref: '#/components/schemas/AlarmTypeBb8Enum'
           title: 알람 유형
         risk_level:
           allOf:
@@ -3662,6 +6172,14 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: 생성일
+        algorithm_source:
+          type: string
+          nullable: true
+          title: AI 알고리즘 출처
+          description: power/gas anomaly_ai 알람만 채움. isolation_forest / arima / combined
+            / night_abnormal. 룰 알람은 빈 문자열 또는 NULL.
+          maxLength: 30
       required:
       - alarm_level
       - alarm_type
@@ -3682,25 +6200,457 @@ components:
           type: integer
         last_24h_warning:
           type: integer
+        unacknowledged_event_count:
+          type: integer
+        user_unread_event_count:
+          type: integer
       required:
       - last_24h_danger
       - last_24h_total
       - last_24h_warning
-    AlarmTypeEnum:
+      - unacknowledged_event_count
+      - user_unread_event_count
+    AlarmTypeBb8Enum:
       enum:
       - gas_threshold
       - power_overload
       - geofence_intrusion
       - sensor_fault
+      - ppe_violation
+      - vr_training_not_done
+      - safety_check_pending
+      - inspection_scheduled
+      - batch_failed
+      - storage_overdue
+      - power_anomaly_ai
+      - gas_anomaly_ai
       type: string
       description: |-
-        * `gas_threshold` - 가스 임계치 초과
-        * `power_overload` - 전력 과부하
+        * `gas_threshold` - 가스 경보
+        * `power_overload` - 전력 이상
         * `geofence_intrusion` - 위험구역 진입
-        * `sensor_fault` - 센서 오류
+        * `sensor_fault` - 센서 이상
+        * `ppe_violation` - PPE 미착용
+        * `vr_training_not_done` - VR 교육 미이수
+        * `safety_check_pending` - 작업 안전 체크리스트 미완료
+        * `inspection_scheduled` - 점검 예정
+        * `batch_failed` - 배치 실패
+        * `storage_overdue` - 보관 주기 실패
+        * `power_anomaly_ai` - 전력 AI 이상 감지
+        * `gas_anomaly_ai` - 가스 AI 이상 감지
+    AlertIntensityEnum:
+      enum:
+      - normal
+      - warning
+      - urgent
+      type: string
+      description: |-
+        * `normal` - 정상
+        * `warning` - 주의
+        * `urgent` - 긴급
+    AlertPolicyDetail:
+      type: object
+      description: 상세 조회 — 등록·수정 폼이 prefill 할 전체 필드.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 100
+        event_type:
+          allOf:
+          - $ref: '#/components/schemas/EventTypeEnum'
+          title: 대상 이벤트
+        event_type_display:
+          type: string
+          readOnly: true
+        policy_kind:
+          $ref: '#/components/schemas/PolicyKindEnum'
+        policy_kind_display:
+          type: string
+          readOnly: true
+        target_facility:
+          type: integer
+          nullable: true
+          description: NULL이면 전사 정책
+        target_user_types:
+          description: 'lowercase user_type 배열, 예: ["facility_admin", "worker"]'
+        target_sensor_ids: {}
+        target_device_ids: {}
+        target_geofence_ids: {}
+        channels:
+          description: 'Notification.Channel.values 부분집합, 예: ["popup", "sms"]'
+        condition_summary:
+          type: string
+          readOnly: true
+        message_template:
+          type: string
+          title: 알림 메시지 템플릿
+          description: Django Template 문법. 빈 값이면 Event.summary 사용
+        recommended_actions:
+          title: 권고 조치
+          description: 'risk_level별 단계 리스트. 예: {"danger": [...], "warning": [...]}
+            또는 {"default": [...]}'
+        is_active:
+          type: boolean
+        description:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: 생성일
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: 최근 수정일
+      required:
+      - condition_summary
+      - created_at
+      - event_type
+      - event_type_display
+      - id
+      - name
+      - policy_kind_display
+      - updated_at
+    AlertPolicyList:
+      type: object
+      description: |-
+        목록 테이블 1행 직렬화 — 화면 컬럼: 정책명·이벤트 상세·발송 채널·수신 대상·
+        사용 여부·적용 조건 요약.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 100
+        event_type:
+          allOf:
+          - $ref: '#/components/schemas/EventTypeEnum'
+          title: 대상 이벤트
+        event_type_display:
+          type: string
+          readOnly: true
+        channels:
+          description: 'Notification.Channel.values 부분집합, 예: ["popup", "sms"]'
+        target_user_types:
+          description: 'lowercase user_type 배열, 예: ["facility_admin", "worker"]'
+        is_active:
+          type: boolean
+        condition_summary:
+          type: string
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: 최근 수정일
+      required:
+      - condition_summary
+      - event_type
+      - event_type_display
+      - id
+      - name
+      - updated_at
+    AlertPolicyWriteRequest:
+      type: object
+      description: |-
+        Create/Update 공용 — partial=True 로 PATCH 처리.
+
+        저장 시 [[policy_matcher.save_policy]] 경유 → condition_summary 자동 갱신 +
+        매처 캐시 무효화 (운영자 변경 즉시 반영).
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        event_type:
+          allOf:
+          - $ref: '#/components/schemas/EventTypeEnum'
+          title: 대상 이벤트
+        policy_kind:
+          $ref: '#/components/schemas/PolicyKindEnum'
+        target_facility:
+          type: integer
+          nullable: true
+          description: NULL이면 전사 정책
+        target_user_types:
+          description: 'lowercase user_type 배열, 예: ["facility_admin", "worker"]'
+        target_sensor_ids: {}
+        target_device_ids: {}
+        target_geofence_ids: {}
+        channels:
+          description: 'Notification.Channel.values 부분집합, 예: ["popup", "sms"]'
+        message_template:
+          type: string
+          title: 알림 메시지 템플릿
+          description: Django Template 문법. 빈 값이면 Event.summary 사용
+        recommended_actions:
+          title: 권고 조치
+          description: 'risk_level별 단계 리스트. 예: {"danger": [...], "warning": [...]}
+            또는 {"default": [...]}'
+        is_active:
+          type: boolean
+        description:
+          type: string
+      required:
+      - event_type
+      - name
+    AlgorithmEnum:
+      enum:
+      - isolation_forest
+      - arima
+      type: string
+      description: |-
+        * `isolation_forest` - Isolation Forest
+        * `arima` - ARIMA
+    AnomalyAlarmRecordCreateResponse:
+      type: object
+      properties:
+        alarm_id:
+          type: integer
+          nullable: true
+        event_id:
+          type: integer
+          nullable: true
+      required:
+      - alarm_id
+      - event_id
+    AnomalyAlarmRecordPayloadAlarmTypeEnum:
+      enum:
+      - power_anomaly_ai
+      - gas_anomaly_ai
+      type: string
+      description: |-
+        * `power_anomaly_ai` - power_anomaly_ai
+        * `gas_anomaly_ai` - gas_anomaly_ai
+    AnomalyAlarmRecordPayloadRequest:
+      type: object
+      properties:
+        alarm_type:
+          $ref: '#/components/schemas/AnomalyAlarmRecordPayloadAlarmTypeEnum'
+        risk_level:
+          $ref: '#/components/schemas/RiskLevel1beEnum'
+        source_device_id:
+          type: string
+          nullable: true
+          minLength: 1
+        source_sensor_id:
+          type: string
+          nullable: true
+          minLength: 1
+        gas_type:
+          oneOf:
+          - $ref: '#/components/schemas/GasTypeEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        measured_value:
+          type: number
+          format: double
+          nullable: true
+        summary:
+          type: string
+          minLength: 1
+        detected_at:
+          type: string
+          format: date-time
+        source_label:
+          type: string
+        ml_anomaly_result_id:
+          type: integer
+          nullable: true
+        channel:
+          type: integer
+          maximum: 255
+          minimum: 1
+          nullable: true
+        algorithm_source:
+          type: string
+          default: ''
+          maxLength: 30
+        source:
+          type: string
+          default: ''
+          maxLength: 30
+      required:
+      - alarm_type
+      - detected_at
+      - risk_level
+      - source_label
+      - summary
+    AppLog:
+      type: object
+      description: |-
+        흐름 위치: SystemLogAdminListView → AdminPagination → [이 시리얼라이저] → JSON.
+        역할: AppLog 1건을 JSON으로 변환.
+
+        level_display를 추가하는 이유:
+          - level은 DB에 "ERROR", "WARNING", "INFO" 같은 문자열로 저장된다.
+          - AppLog.level은 TextChoices가 아닌 자유 문자열(CharField)이라
+            get_level_display()가 없다.
+          - 화면에서 색상 뱃지를 구분하려면 level 원본값이 필요하므로 그대로 내린다.
+
+        log_category_display를 추가하는 이유:
+          - log_category는 TextChoices("error"/"batch"/"service")라
+            DB에는 코드값이 저장된다.
+          - 화면에 "오류"/"배치"/"서비스"(한글)를 보여주려면 display값이 필요하다.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        log_category:
+          allOf:
+          - $ref: '#/components/schemas/LogCategoryEnum'
+          title: 로그 분류
+        log_category_display:
+          type: string
+          readOnly: true
+        service_module:
+          type: string
+          title: 서비스 모듈
+          description: '예: "celery.tasks.fire_alarm", "apps.alerts.services"'
+          maxLength: 100
+        level:
+          type: string
+          title: 로그 레벨
+          description: ERROR/WARNING/INFO
+          maxLength: 10
+        message:
+          type: string
+        extra:
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - level
+      - log_category
+      - log_category_display
+      - message
+      - service_module
     BlankEnum:
       enum:
       - ''
+    CategoryEnum:
+      enum:
+      - general
+      - urgent
+      - maintenance
+      type: string
+      description: |-
+        * `general` - 일반 공지
+        * `urgent` - 긴급 공지
+        * `maintenance` - 점검 안내
+    ChecklistItemCreateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          default: ''
+          maxLength: 1000
+        is_required:
+          type: boolean
+          default: true
+      required:
+      - title
+    ChecklistItemReorderRequest:
+      type: object
+      properties:
+        section_id:
+          type: integer
+          minimum: 1
+        ordered_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+      required:
+      - ordered_ids
+      - section_id
+    ChecklistReorderRequest:
+      type: object
+      properties:
+        ordered_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+      required:
+      - ordered_ids
+    ChecklistSection:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          title: 섹션 이름
+          maxLength: 100
+        description:
+          type: string
+          title: 섹션 설명
+        order:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          title: 섹션 순서
+        items:
+          type: string
+          readOnly: true
+        item_count:
+          type: string
+          readOnly: true
+      required:
+      - id
+      - item_count
+      - items
+      - name
+    ChecklistSectionCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          default: ''
+          maxLength: 1000
+      required:
+      - name
+    ChecklistState:
+      type: object
+      properties:
+        facility_id:
+          type: integer
+        last_published_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_published_by:
+          type: string
+          nullable: true
+        last_version:
+          type: integer
+          nullable: true
+        has_unpublished_changes:
+          type: boolean
+      required:
+      - facility_id
+      - has_unpublished_changes
+      - last_published_at
+      - last_published_by
+      - last_version
     Co2RiskEnum:
       enum:
       - normal
@@ -3721,11 +6671,255 @@ components:
         * `normal` - 정상
         * `warning` - 주의
         * `danger` - 위험
+    CodeGroup:
+      type: object
+      description: 코드 그룹 읽기용 — 목록·상세 응답에 사용.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        code:
+          type: string
+          title: 그룹 코드
+          maxLength: 50
+        name:
+          type: string
+          title: 그룹 명
+          maxLength: 100
+        scope:
+          type: string
+          title: 관리 범위
+          maxLength: 200
+        description:
+          type: string
+        is_active:
+          type: boolean
+        code_count:
+          type: integer
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: 최근 수정일
+      required:
+      - code
+      - code_count
+      - id
+      - name
+      - updated_at
+    CodeGroupWriteRequest:
+      type: object
+      description: 코드 그룹 쓰기용 — 등록·수정 요청 본문 검증에 사용.
+      properties:
+        code:
+          type: string
+          minLength: 1
+          title: 그룹 코드
+          maxLength: 50
+        name:
+          type: string
+          minLength: 1
+          title: 그룹 명
+          maxLength: 100
+        scope:
+          type: string
+          title: 관리 범위
+          maxLength: 200
+        description:
+          type: string
+        is_active:
+          type: boolean
+      required:
+      - code
+      - name
+    CommonCode:
+      type: object
+      description: 공통 코드 읽기용 — 목록·상세 응답에 사용.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        group_code:
+          type: string
+          readOnly: true
+        code:
+          type: string
+          title: 코드
+          maxLength: 50
+        name:
+          type: string
+          title: 코드 명
+          maxLength: 200
+        description:
+          type: string
+        sort_order:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        is_active:
+          type: boolean
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: 최근 수정일
+      required:
+      - code
+      - group_code
+      - id
+      - name
+      - updated_at
+    CommonCodeBulkDeactivateRequestRequest:
+      type: object
+      properties:
+        ids:
+          type: array
+          items:
+            type: integer
+      required:
+      - ids
+    CommonCodeBulkDeactivateResponse:
+      type: object
+      properties:
+        updated:
+          type: integer
+      required:
+      - updated
+    CommonCodeWriteRequest:
+      type: object
+      description: |-
+        공통 코드 쓰기용 — 등록·수정 요청 본문 검증에 사용.
+
+        group 은 URL 에서 받으므로 여기서는 선언하지 않음.
+        (뷰에서 serializer.save(group=group) 으로 주입)
+      properties:
+        code:
+          type: string
+          minLength: 1
+          title: 코드
+          maxLength: 50
+        name:
+          type: string
+          minLength: 1
+          title: 코드 명
+          maxLength: 200
+        description:
+          type: string
+        sort_order:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        is_active:
+          type: boolean
+      required:
+      - code
+      - name
+    ConditionTypeEnum:
+      enum:
+      - gt
+      - gte
+      - lt
+      - lte
+      type: string
+      description: |-
+        * `gt` - 초과
+        * `gte` - 이상
+        * `lt` - 미만
+        * `lte` - 이하
     DashboardRefreshResponse:
       type: object
       properties:
         admin_url:
           type: string
+    DataCategoryEnum:
+      enum:
+      - gas_raw
+      - gas_anomaly
+      - gas_hourly
+      - power_raw
+      - power_agg
+      - power_hourly
+      - position_hist
+      - ml_result
+      - ml_model
+      - system_log
+      - integration_log
+      - app_log
+      - login_log
+      - notification
+      type: string
+      description: |-
+        * `gas_raw` - 가스 원천 데이터
+        * `gas_anomaly` - 가스 이상 이력
+        * `gas_hourly` - 가스 시간 집계
+        * `power_raw` - 전력 원천 데이터
+        * `power_agg` - 전력 집계 이력
+        * `power_hourly` - 전력 시간 집계
+        * `position_hist` - 위치 이력
+        * `ml_result` - AI 추론 결과
+        * `ml_model` - AI 모델 파일
+        * `system_log` - 시스템 로그
+        * `integration_log` - 연동 로그
+        * `app_log` - 앱 로그
+        * `login_log` - 로그인 로그
+        * `notification` - 알림 이력
+    DataRetentionPolicy:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        device_type:
+          allOf:
+          - $ref: '#/components/schemas/DeviceTypeEnum'
+          readOnly: true
+          title: 장비 유형
+        device_type_display:
+          type: string
+          readOnly: true
+        data_category:
+          allOf:
+          - $ref: '#/components/schemas/DataCategoryEnum'
+          readOnly: true
+          title: 데이터 분류
+        data_category_display:
+          type: string
+          readOnly: true
+        raw_retention_days:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          title: 원천 보관 기간(일)
+        history_retention_days:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          title: 이력 보관 기간(일)
+        delete_cycle:
+          allOf:
+          - $ref: '#/components/schemas/DeleteCycleEnum'
+          title: 삭제 주기
+        delete_cycle_display:
+          type: string
+          readOnly: true
+        is_active:
+          type: boolean
+        memo:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: 최근 수정일
+      required:
+      - data_category
+      - data_category_display
+      - delete_cycle_display
+      - device_type
+      - device_type_display
+      - id
+      - updated_at
     DataTypeEnum:
       enum:
       - current
@@ -3736,6 +6930,20 @@ components:
         * `current` - 전류 (A)
         * `voltage` - 전압 (V)
         * `watt` - 전력 (W)
+    DeleteCycleEnum:
+      enum:
+      - daily
+      - monthly_1
+      - monthly_15
+      - monthly_last
+      - quarterly
+      type: string
+      description: |-
+        * `daily` - 매일
+        * `monthly_1` - 매월 1일
+        * `monthly_15` - 매월 15일
+        * `monthly_last` - 매월 말일
+        * `quarterly` - 분기 말
     DepartmentSelectItem:
       type: object
       properties:
@@ -3946,6 +7154,20 @@ components:
       - id
       - x
       - y
+    DeviceTypeEnum:
+      enum:
+      - gas_sensor
+      - power
+      - position_node
+      - ml
+      - system
+      type: string
+      description: |-
+        * `gas_sensor` - 유해가스 센서
+        * `power` - 전력
+        * `position_node` - 위치 노드
+        * `ml` - AI/ML
+        * `system` - 시스템
     EquipmentAdminList:
       type: object
       properties:
@@ -3993,6 +7215,7 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: 생성일
       required:
       - created_at
       - device_id
@@ -4046,6 +7269,24 @@ components:
           type: integer
       required:
       - deleted
+    EventAcknowledgementResponse:
+      type: object
+      properties:
+        event_id:
+          type: integer
+        user_id:
+          type: integer
+        acknowledged_at:
+          type: string
+          format: date-time
+        created:
+          type: boolean
+          description: True 면 신규 ack 생성, False 면 이미 ack 된 상태
+      required:
+      - acknowledged_at
+      - created
+      - event_id
+      - user_id
     EventDetail:
       type: object
       properties:
@@ -4111,6 +7352,12 @@ components:
           items:
             $ref: '#/components/schemas/AlarmRecord'
           readOnly: true
+        recommended_actions:
+          type: string
+          readOnly: true
+        source_connection_status:
+          type: string
+          readOnly: true
       required:
       - acknowledged_by_name
       - alarm_count
@@ -4119,13 +7366,74 @@ components:
       - first_detected_at
       - id
       - last_detected_at
+      - recommended_actions
       - resolved_by_name
       - risk_level
       - risk_level_display
+      - source_connection_status
       - source_label
       - status_display
       - summary
       - worker_name
+    EventHistoryAdmin:
+      type: object
+      description: |-
+        어드민 이벤트 이력 조회 전용 시리얼라이저.
+
+        EventListSerializer 와 달리 연결 정책명·해제시간·상세본문·상태메모를
+        포함한다. 목록(테이블)과 상세 팝업 양쪽을 하나의 시리얼라이저로 커버.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        event_type:
+          allOf:
+          - $ref: '#/components/schemas/EventTypeEnum'
+          title: 이벤트 유형
+        event_type_display:
+          type: string
+          readOnly: true
+        source_label:
+          type: string
+          title: 발생원 이름 캐시 (UI 표시용)
+          maxLength: 100
+        policy_name:
+          type: string
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusB5cEnum'
+          title: 상태
+        status_display:
+          type: string
+          readOnly: true
+        first_detected_at:
+          type: string
+          format: date-time
+          title: 최초 감지
+        resolved_at:
+          type: string
+          format: date-time
+          nullable: true
+        summary:
+          type: string
+          title: 이벤트 요약
+          maxLength: 200
+        description:
+          type: string
+          title: 상세 본문
+        status_note:
+          type: string
+          title: 상태 메모
+      required:
+      - event_type
+      - event_type_display
+      - first_detected_at
+      - id
+      - policy_name
+      - source_label
+      - status_display
+      - summary
     EventList:
       type: object
       properties:
@@ -4190,12 +7498,28 @@ components:
       - power_overload
       - geofence_intrusion
       - sensor_fault
+      - ppe_violation
+      - vr_training_not_done
+      - safety_check_pending
+      - inspection_scheduled
+      - batch_failed
+      - storage_overdue
+      - power_anomaly_ai
+      - gas_anomaly_ai
       type: string
       description: |-
-        * `gas_threshold` - 가스 임계치 초과
-        * `power_overload` - 전력 과부하
+        * `gas_threshold` - 가스 경보
+        * `power_overload` - 전력 이상
         * `geofence_intrusion` - 위험구역 진입
-        * `sensor_fault` - 센서 오류
+        * `sensor_fault` - 센서 이상
+        * `ppe_violation` - PPE 미착용
+        * `vr_training_not_done` - VR 교육 미이수
+        * `safety_check_pending` - 작업 안전 체크리스트 미완료
+        * `inspection_scheduled` - 점검 예정
+        * `batch_failed` - 배치 실패
+        * `storage_overdue` - 보관 주기 실패
+        * `power_anomaly_ai` - 전력 AI 이상 감지
+        * `gas_anomaly_ai` - 가스 AI 이상 감지
     FacilityAdminList:
       type: object
       properties:
@@ -4233,6 +7557,7 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: 생성일
       required:
       - address
       - created_at
@@ -4339,13 +7664,45 @@ components:
       - facility_code
       - id
       - name
+    GasDataCreateAnomalyTypeEnum:
+      enum:
+      - co_leak
+      - h2s_leak
+      - fire
+      - chemical_spill
+      - o2_depletion
+      - sensor_fault
+      type: string
+      description: |-
+        * `co_leak` - 일산화탄소 누출
+        * `h2s_leak` - 황화수소 누출
+        * `fire` - 화재/폭발 전조
+        * `chemical_spill` - 유해화학물 다중 누출
+        * `o2_depletion` - 산소 결핍
+        * `sensor_fault` - 센서 오작동
     GasDataCreateRequest:
       type: object
+      description: |-
+        FastAPI → DRF: GasData 수신 시리얼라이저.
+
+        필드:
+          device_id              : GasSensor.device_id → FK 매핑
+          measured_at            : 장치 측정 시각 (UTC ISO 문자열)
+          9종 가스 측정값         : co/h2s/co2/o2/no2/so2/o3/nh3/voc
+          9종 위험도              : *_risk (FastAPI 가 임계치 기준으로 계산)
+          raw_payload            : 원본(lel 포함)
+          is_anomaly/anomaly_type: 더미 시뮬레이터 시나리오 라벨 (IF 학습 평가용).
+                                   운영 센서 페이로드는 비워서 기본값(False/None) 저장.
       properties:
         device_id:
           type: string
           writeOnly: true
           minLength: 1
+        ingress_ts:
+          type: number
+          format: double
+          writeOnly: true
+          nullable: true
         measured_at:
           type: string
           format: date-time
@@ -4452,6 +7809,26 @@ components:
         raw_payload:
           nullable: true
           title: 원본 수신 페이로드
+        is_anomaly:
+          type: boolean
+          title: 이상 라벨
+          description: 더미 시뮬레이터/운영자 라벨링용
+        anomaly_type:
+          nullable: true
+          title: 이상 시나리오
+          description: |-
+            더미 시뮬레이터 시나리오 라벨 — IF 학습 평가용
+
+            * `co_leak` - 일산화탄소 누출
+            * `h2s_leak` - 황화수소 누출
+            * `fire` - 화재/폭발 전조
+            * `chemical_spill` - 유해화학물 다중 누출
+            * `o2_depletion` - 산소 결핍
+            * `sensor_fault` - 센서 오작동
+          oneOf:
+          - $ref: '#/components/schemas/GasDataCreateAnomalyTypeEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
       required:
       - device_id
       - measured_at
@@ -4590,9 +7967,8 @@ components:
           maxLength: 45
         port:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
           nullable: true
           title: 통신 PORT
         connection_checked_at:
@@ -4628,6 +8004,7 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: 생성일
       required:
       - connection_status
       - created_at
@@ -4687,9 +8064,8 @@ components:
           maxLength: 45
         port:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
           nullable: true
           title: 통신 PORT
         connection_checked_at:
@@ -4824,6 +8200,7 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: 생성일
       required:
       - action_user_name
       - created_at
@@ -4902,7 +8279,6 @@ components:
       - o3
       - nh3
       - voc
-      - lel
       type: string
       description: |-
         * `co` - CO (일산화탄소)
@@ -4914,7 +8290,6 @@ components:
         * `o3` - O3 (오존)
         * `nh3` - NH3 (암모니아)
         * `voc` - VOC (휘발성유기화합물)
-        * `lel` - LEL (폭발하한계)
     GeoFence:
       type: object
       description: GeoFence 직렬화 — 상세 조회용
@@ -4943,10 +8318,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: 생성일
         updated_at:
           type: string
           format: date-time
           readOnly: true
+          title: 최근 수정일
       required:
       - created_at
       - facility
@@ -4984,6 +8361,7 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: 생성일
         worker_count:
           type: string
           readOnly: true
@@ -5068,7 +8446,7 @@ components:
           type: string
           maxLength: 50
         risk_level:
-          $ref: '#/components/schemas/GeoFenceSaveRiskLevelEnum'
+          $ref: '#/components/schemas/RiskLevelA12Enum'
         shape_type:
           allOf:
           - $ref: '#/components/schemas/ShapeTypeEnum'
@@ -5101,16 +8479,6 @@ components:
       - facility_id
       - name
       - risk_level
-    GeoFenceSaveRiskLevelEnum:
-      enum:
-      - danger
-      - warning
-      - normal
-      type: string
-      description: |-
-        * `danger` - danger
-        * `warning` - warning
-        * `normal` - normal
     H2sRiskEnum:
       enum:
       - normal
@@ -5137,6 +8505,111 @@ components:
       description: |-
         * `regular` - 정기 점검
         * `abnormal` - 이상 점검
+    IntegrationLogAdmin:
+      type: object
+      description: |-
+        흐름 위치: IntegrationLogAdminListView → AdminPagination → [이 시리얼라이저] → JSON.
+        역할: IntegrationLog 1건을 JSON으로 변환.
+
+        기존 IntegrationLogCreateSerializer(입력용)와 이름이 다른 이유:
+          - 기존 것은 FastAPI → DRF 연동 기록 생성(쓰기)용이다.
+          - 이 시리얼라이저는 관리자 화면 조회(읽기)용이다.
+          - 같은 이름을 쓰면 import할 때 어느 용도인지 구분이 안 된다.
+
+        integration_type_display, result_display를 추가하는 이유:
+          - 두 필드 모두 TextChoices라 DB에는 코드값("collect", "success")으로 저장된다.
+          - 화면에서는 "수집", "성공" 같은 한글이 필요하다.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        integration_type:
+          allOf:
+          - $ref: '#/components/schemas/IntegrationTypeEnum'
+          title: 연동 유형
+        integration_type_display:
+          type: string
+          readOnly: true
+        target_system:
+          type: string
+          title: 대상 시스템
+          description: '형식: "FastAPI→DRF" 또는 "GasSensor:GS-001"'
+          maxLength: 100
+        result:
+          $ref: '#/components/schemas/Result7caEnum'
+        result_display:
+          type: string
+          readOnly: true
+        description:
+          type: string
+        extra:
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - integration_type
+      - integration_type_display
+      - result
+      - result_display
+      - target_system
+    IntegrationLogCreateRequest:
+      type: object
+      properties:
+        integration_type:
+          allOf:
+          - $ref: '#/components/schemas/IntegrationTypeEnum'
+          title: 연동 유형
+        target_system:
+          type: string
+          minLength: 1
+          title: 대상 시스템
+          description: '형식: "FastAPI→DRF" 또는 "GasSensor:GS-001"'
+          maxLength: 100
+        result:
+          $ref: '#/components/schemas/Result7caEnum'
+        description:
+          type: string
+        extra:
+          nullable: true
+      required:
+      - integration_type
+      - result
+      - target_system
+    IntegrationLogCreateResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - created_at
+      - id
+    IntegrationTypeEnum:
+      enum:
+      - collect
+      - transmit
+      - sync
+      type: string
+      description: |-
+        * `collect` - 수집
+        * `transmit` - 전송
+        * `sync` - 동기화
+    InternalWorkerListResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+      required:
+      - id
+      - username
     KeyEnum:
       enum:
       - checklist
@@ -5161,6 +8634,16 @@ components:
           type: integer
       required:
       - deleted
+    LogCategoryEnum:
+      enum:
+      - error
+      - batch
+      - service
+      type: string
+      description: |-
+        * `error` - 오류
+        * `batch` - 배치
+        * `service` - 서비스
     LoginRequest:
       type: object
       properties:
@@ -5199,6 +8682,12 @@ components:
           type: boolean
       required:
       - ok
+    LogoutRequestRequest:
+      type: object
+      properties:
+        refresh:
+          type: string
+          minLength: 1
     ManagerSelectItem:
       type: object
       properties:
@@ -5456,6 +8945,234 @@ components:
         * `normal` - 정상
         * `warning` - 주의
         * `danger` - 위험
+    NoticeAttachment:
+      type: object
+      description: |-
+        흐름 위치: NoticeDetailSerializer 안에 중첩되어 사용됨.
+        역할: 첨부파일 1건을 JSON으로 변환.
+
+        file_url을 SerializerMethodField로 만드는 이유:
+          - FileField는 "/media/notices/1/test.pdf" 같은 상대경로만 반환함.
+          - 프론트가 바로 <a href>에 쓰려면 "http://localhost:8000/media/..." 전체 URL이 필요함.
+          - request.build_absolute_uri()로 절대 URL을 만들어 반환함.
+          - request는 뷰에서 context={"request": request}로 전달받음.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        filename:
+          type: string
+          title: 원본 파일명
+          maxLength: 200
+        size:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          title: 파일 크기(byte)
+        file_url:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: 생성일
+      required:
+      - created_at
+      - file_url
+      - filename
+      - id
+      - size
+    NoticeAttachmentUploadRequestRequest:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+      required:
+      - file
+    NoticeCreateUpdateRequest:
+      type: object
+      description: |-
+        흐름 위치: 요청 JSON → [이 시리얼라이저.is_valid()] → validated_data → DB 저장.
+        역할: 등록(POST) / 수정(PATCH) 요청 데이터 유효성 검사.
+
+        응답 직렬화(읽기)와 입력 직렬화(쓰기)를 분리하는 이유:
+          - 응답에는 author_name(계산된 값)이 필요하지만 입력에는 불필요.
+          - 입력에는 title, content 같은 쓰기 가능 필드만 선언해야 명확함.
+          - 하나의 시리얼라이저에 read_only/write_only를 섞으면 코드가 복잡해짐.
+
+        author를 입력 필드로 두지 않는 이유:
+          - 클라이언트가 author를 임의 지정하면 다른 사람 이름으로 공지 등록 가능 → 보안 문제.
+          - author는 뷰의 perform_create()에서 request.user로 강제 주입함.
+
+        published_at 기본값 처리:
+          - 클라이언트가 보내지 않으면 None → validate_published_at()에서 현재 시각으로 변환.
+          - 미래 시각을 보내면 예약 발행이 가능한 구조.
+
+        target_facility allow_null=True인 이유:
+          - NULL = 전사 공지, 값 있음 = 특정 공장 공지.
+          - 전사 공지를 만들 때는 이 필드를 비우면 되므로 null 허용.
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        content:
+          type: string
+          minLength: 1
+        category:
+          $ref: '#/components/schemas/CategoryEnum'
+        is_pinned:
+          type: boolean
+          title: 상단 고정
+        target_facility:
+          type: integer
+          nullable: true
+        is_active:
+          type: boolean
+        published_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - content
+      - title
+    NoticeDetail:
+      type: object
+      description: |-
+        흐름 위치: NoticeDetailView.get() → [이 시리얼라이저] → JSON 응답.
+                   NoticeListView.post() 등록 성공 후 → [이 시리얼라이저] → 201 응답.
+        역할: 공지사항 1건을 첨부파일 포함 전체 직렬화.
+
+        목록 시리얼라이저와 다른 점:
+          - content(본문) 포함
+          - attachments(첨부파일 배열) 포함 — NoticeAttachmentSerializer 중첩
+          - target_facility 포함
+
+        attachments에 read_only=True를 붙이는 이유:
+          - 첨부파일 업로드는 별도 엔드포인트(/notices/{id}/attachments/)에서 처리.
+          - 이 시리얼라이저는 응답(읽기)에만 첨부파일을 보여주고,
+            입력(쓰기)에서는 첨부파일을 받지 않음.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          maxLength: 200
+        content:
+          type: string
+        category:
+          $ref: '#/components/schemas/CategoryEnum'
+        category_display:
+          type: string
+          readOnly: true
+        is_pinned:
+          type: boolean
+          title: 상단 고정
+        author_name:
+          type: string
+          readOnly: true
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/NoticeAttachment'
+          readOnly: true
+        target_facility:
+          type: integer
+          nullable: true
+          description: NULL이면 전사 공지
+        is_active:
+          type: boolean
+        published_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: 생성일
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: 최근 수정일
+      required:
+      - attachments
+      - author_name
+      - category_display
+      - content
+      - created_at
+      - id
+      - title
+      - updated_at
+    NoticeList:
+      type: object
+      description: |-
+        흐름 위치: NoticeListView.get() → AdminPagination → [이 시리얼라이저] → JSON 응답.
+        역할: 공지사항 목록 1건을 가볍게 직렬화.
+
+        content(본문)와 attachments(첨부파일 배열)를 제외하는 이유:
+          - 목록은 수십~수백 건이 한 번에 내려감.
+          - 본문은 길 수 있고, 첨부파일은 중첩 배열이라 건수만큼 쿼리가 늘어남.
+          - 목록 화면에서는 제목, 카테고리, 작성자 정도만 필요하므로 제외가 맞음.
+
+        author_name을 SerializerMethodField로 만드는 이유:
+          - author는 FK(외래키)라 그대로 내리면 숫자 id만 반환됨.
+          - 프론트에서 "홍길동 관리자"를 보여주려면 추가 API 호출이 필요해짐.
+          - 미리 이름을 문자열로 합쳐서 내리면 프론트가 바로 표시 가능.
+
+        category_display를 추가하는 이유:
+          - category는 DB에 "general" 같은 코드값으로 저장됨.
+          - 화면에서는 "일반 공지"(한글)를 보여줘야 하므로 display값도 함께 내림.
+          - get_category_display()는 Django TextChoices가 자동으로 만들어주는 메서드.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          maxLength: 200
+        category:
+          $ref: '#/components/schemas/CategoryEnum'
+        category_display:
+          type: string
+          readOnly: true
+        is_pinned:
+          type: boolean
+          title: 상단 고정
+        author_name:
+          type: string
+          readOnly: true
+        attachment_count:
+          type: string
+          readOnly: true
+        is_active:
+          type: boolean
+        published_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: 생성일
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: 최근 수정일
+      required:
+      - attachment_count
+      - author_name
+      - category_display
+      - created_at
+      - id
+      - title
+      - updated_at
     NullEnum:
       enum:
       - null
@@ -5506,6 +9223,29 @@ components:
       required:
       - companies
       - no_dept_count
+    PaginatedEventListList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventList'
     PasswordChangeRequest:
       type: object
       properties:
@@ -5542,6 +9282,9 @@ components:
         department_id:
           type: integer
           nullable: true
+        facility_id:
+          type: integer
+          nullable: true
         position:
           type: integer
           nullable: true
@@ -5560,6 +9303,138 @@ components:
           allOf:
           - $ref: '#/components/schemas/StatusE64Enum'
           writeOnly: true
+    PatchedAlertPolicyWriteRequest:
+      type: object
+      description: |-
+        Create/Update 공용 — partial=True 로 PATCH 처리.
+
+        저장 시 [[policy_matcher.save_policy]] 경유 → condition_summary 자동 갱신 +
+        매처 캐시 무효화 (운영자 변경 즉시 반영).
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        event_type:
+          allOf:
+          - $ref: '#/components/schemas/EventTypeEnum'
+          title: 대상 이벤트
+        policy_kind:
+          $ref: '#/components/schemas/PolicyKindEnum'
+        target_facility:
+          type: integer
+          nullable: true
+          description: NULL이면 전사 정책
+        target_user_types:
+          description: 'lowercase user_type 배열, 예: ["facility_admin", "worker"]'
+        target_sensor_ids: {}
+        target_device_ids: {}
+        target_geofence_ids: {}
+        channels:
+          description: 'Notification.Channel.values 부분집합, 예: ["popup", "sms"]'
+        message_template:
+          type: string
+          title: 알림 메시지 템플릿
+          description: Django Template 문법. 빈 값이면 Event.summary 사용
+        recommended_actions:
+          title: 권고 조치
+          description: 'risk_level별 단계 리스트. 예: {"danger": [...], "warning": [...]}
+            또는 {"default": [...]}'
+        is_active:
+          type: boolean
+        description:
+          type: string
+    PatchedChecklistItemUpdateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 1000
+        is_required:
+          type: boolean
+    PatchedChecklistSectionUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 1000
+    PatchedCodeGroupWriteRequest:
+      type: object
+      description: 코드 그룹 쓰기용 — 등록·수정 요청 본문 검증에 사용.
+      properties:
+        code:
+          type: string
+          minLength: 1
+          title: 그룹 코드
+          maxLength: 50
+        name:
+          type: string
+          minLength: 1
+          title: 그룹 명
+          maxLength: 100
+        scope:
+          type: string
+          title: 관리 범위
+          maxLength: 200
+        description:
+          type: string
+        is_active:
+          type: boolean
+    PatchedCommonCodeWriteRequest:
+      type: object
+      description: |-
+        공통 코드 쓰기용 — 등록·수정 요청 본문 검증에 사용.
+
+        group 은 URL 에서 받으므로 여기서는 선언하지 않음.
+        (뷰에서 serializer.save(group=group) 으로 주입)
+      properties:
+        code:
+          type: string
+          minLength: 1
+          title: 코드
+          maxLength: 50
+        name:
+          type: string
+          minLength: 1
+          title: 코드 명
+          maxLength: 200
+        description:
+          type: string
+        sort_order:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        is_active:
+          type: boolean
+    PatchedDataRetentionPolicyRequest:
+      type: object
+      properties:
+        raw_retention_days:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          title: 원천 보관 기간(일)
+        history_retention_days:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          title: 이력 보관 기간(일)
+        delete_cycle:
+          allOf:
+          - $ref: '#/components/schemas/DeleteCycleEnum'
+          title: 삭제 주기
+        is_active:
+          type: boolean
+        memo:
+          type: string
     PatchedDeptUpdateRequest:
       type: object
       properties:
@@ -5602,6 +9477,183 @@ components:
           title: 설명
         is_active:
           type: boolean
+    PatchedNoticeCreateUpdateRequest:
+      type: object
+      description: |-
+        흐름 위치: 요청 JSON → [이 시리얼라이저.is_valid()] → validated_data → DB 저장.
+        역할: 등록(POST) / 수정(PATCH) 요청 데이터 유효성 검사.
+
+        응답 직렬화(읽기)와 입력 직렬화(쓰기)를 분리하는 이유:
+          - 응답에는 author_name(계산된 값)이 필요하지만 입력에는 불필요.
+          - 입력에는 title, content 같은 쓰기 가능 필드만 선언해야 명확함.
+          - 하나의 시리얼라이저에 read_only/write_only를 섞으면 코드가 복잡해짐.
+
+        author를 입력 필드로 두지 않는 이유:
+          - 클라이언트가 author를 임의 지정하면 다른 사람 이름으로 공지 등록 가능 → 보안 문제.
+          - author는 뷰의 perform_create()에서 request.user로 강제 주입함.
+
+        published_at 기본값 처리:
+          - 클라이언트가 보내지 않으면 None → validate_published_at()에서 현재 시각으로 변환.
+          - 미래 시각을 보내면 예약 발행이 가능한 구조.
+
+        target_facility allow_null=True인 이유:
+          - NULL = 전사 공지, 값 있음 = 특정 공장 공지.
+          - 전사 공지를 만들 때는 이 필드를 비우면 되므로 null 허용.
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        content:
+          type: string
+          minLength: 1
+        category:
+          $ref: '#/components/schemas/CategoryEnum'
+        is_pinned:
+          type: boolean
+          title: 상단 고정
+        target_facility:
+          type: integer
+          nullable: true
+        is_active:
+          type: boolean
+        published_at:
+          type: string
+          format: date-time
+          nullable: true
+    PatchedRiskStandardUpdateRequest:
+      type: object
+      description: |-
+        수정 전용 시리얼라이저 — code 필드 제외.
+
+        code 는 RiskLevel enum 과 1:1 동기화 정책상 운영자 변경 금지.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          title: 표시 명
+          maxLength: 50
+        display_color:
+          type: string
+          minLength: 1
+          title: 표시 색상 토큰
+          description: green/orange/red 등 토큰명 — 디자이너 hex 회신 시 갱신
+          maxLength: 20
+        alert_intensity:
+          allOf:
+          - $ref: '#/components/schemas/AlertIntensityEnum'
+          title: 알림 강도
+        event_priority:
+          type: integer
+          maximum: 32767
+          minimum: 0
+          title: 이벤트 우선순위
+        is_active:
+          type: boolean
+        description:
+          type: string
+    PatchedThresholdGroupWriteRequest:
+      type: object
+      description: 분류 그룹 등록·수정 시리얼라이저.
+      properties:
+        code:
+          type: string
+          minLength: 1
+          title: 그룹 코드
+          maxLength: 50
+        name:
+          type: string
+          minLength: 1
+          title: 그룹 명
+          maxLength: 100
+        description:
+          type: string
+        is_active:
+          type: boolean
+        apply_scope:
+          title: 반영 범위
+          description: '예: ["realtime", "ai", "alert"]'
+    PatchedThresholdWriteRequest:
+      type: object
+      description: |-
+        임계치 항목 등록·수정 시리얼라이저.
+
+        facility 는 null 고정 (전사 기준) — 클라이언트에서 받지 않음.
+        group 은 URL 경로(/threshold-groups/<id>/thresholds/)에서 주입.
+      properties:
+        measurement_item:
+          type: string
+          minLength: 1
+          title: 측정 항목
+          maxLength: 50
+        unit:
+          type: string
+          minLength: 1
+          maxLength: 10
+        condition_type:
+          allOf:
+          - $ref: '#/components/schemas/ConditionTypeEnum'
+          title: 판단조건
+        warning_min:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,4})?$
+          nullable: true
+        warning_max:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,4})?$
+          nullable: true
+        danger_min:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,4})?$
+          nullable: true
+        danger_max:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,4})?$
+          nullable: true
+        chart_max:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,4})?$
+          nullable: true
+          title: 차트 Y축 최대값
+          description: 프론트 차트 스케일링용. 운영자가 어드민에서 조정
+        description:
+          type: string
+        is_active:
+          type: boolean
+    PatchedVRMetaUpdateRequest:
+      type: object
+      description: |-
+        파일을 동반하지 않는 메타 수정 (PATCH).
+
+        [최소 1개 요구]
+        빈 body로 PATCH가 들어오면 service가 노옵 save를 수행하면서도 updated_at만
+        움직여 감사 이력이 더러워지는 것을 막기 위해 검증 단계에서 차단.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          nullable: true
+        operation_note:
+          type: string
+          nullable: true
+    PolicyKindEnum:
+      enum:
+      - stateful
+      - immediate
+      - scheduled
+      type: string
+      description: |-
+        * `stateful` - 상태 기반
+        * `immediate` - 즉시
+        * `scheduled` - 예정
     PositionReceiveResponse:
       type: object
       properties:
@@ -5612,9 +9664,15 @@ components:
           type: array
           items:
             type: integer
+        statuses:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkerPositionStatus'
+          description: 작업자별 실시간 위험도(센서 측정값 기반) 및 현재 진입한 지오펜스명. 프론트가 화면 표시에 사용.
       required:
       - ids
       - saved
+      - statuses
     PowerDataBulkIngestRequest:
       type: object
       description: |-
@@ -5624,13 +9682,16 @@ components:
           device_id   : PowerDevice.device_id
           measured_at : 장치 측정 시각 — FastAPI가 UTC ISO 문자열로 주입
           data_type   : "current" | "voltage" | "watt"
-          channels    : [{channel: int, value: float, risk_level: str}, ...]
+          channels    : [{channel: int, value: float, risk_level: str,
+                           is_anomaly: bool?, anomaly_type: str?}, ...]
                         — PowerMeasurementPayload.to_channel_values() 변환 후 전달
 
         처리:
           - device_id → PowerDevice FK 조회
           - 16채널 PowerData 일괄 생성 (bulk_create, uq 충돌 시 무시)
           - 통신 불능 채널: value=None, sensor_status='comm_failure'로 저장
+          - is_anomaly/anomaly_type 은 더미 시뮬레이터 라벨 (IF 학습 평가용).
+            운영 장비 페이로드는 비워서 기본값(False/None) 저장.
       properties:
         device_id:
           type: string
@@ -5645,6 +9706,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/_ChannelEntryRequest'
+        ingress_ts:
+          type: number
+          format: double
+          nullable: true
       required:
       - channels
       - data_type
@@ -5733,6 +9798,7 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: 생성일
       required:
       - created_at
       - device_id
@@ -5760,9 +9826,8 @@ components:
           maxLength: 100
         channel_count:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
           title: 채널 수
         is_active:
           type: boolean
@@ -5870,6 +9935,7 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: 생성일
       required:
       - action_user_name
       - created_at
@@ -5990,7 +10056,7 @@ components:
     PowerThresholds:
       type: object
       properties:
-        warning:
+        caution:
           type: number
           format: double
           description: 주의 임계치 (W)
@@ -5998,9 +10064,173 @@ components:
           type: number
           format: double
           description: 위험 임계치 (W)
+        maxY:
+          type: number
+          format: double
+          description: 차트 Y축 최대값 (W)
+        unit:
+          type: string
+          description: 단위
       required:
+      - caution
       - danger
+      - maxY
+      - unit
+    PredictionEnum:
+      enum:
+      - normal
+      - anomaly
+      type: string
+      description: |-
+        * `normal` - 정상
+        * `anomaly` - 이상
+    Result7caEnum:
+      enum:
+      - success
+      - failure
+      - delay
+      type: string
+      description: |-
+        * `success` - 성공
+        * `failure` - 실패
+        * `delay` - 지연
+    RetentionPolicyListResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DataRetentionPolicy'
+        count:
+          type: integer
+      required:
+      - count
+      - results
+    RetentionPreviewResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        raw_days:
+          type: integer
+        history_days:
+          type: integer
+        current_raw_days:
+          type: integer
+        current_history_days:
+          type: integer
+        affected_rows:
+          type: integer
+          nullable: true
+        days_reduced:
+          type: boolean
+      required:
+      - affected_rows
+      - current_history_days
+      - current_raw_days
+      - days_reduced
+      - history_days
+      - id
+      - raw_days
+    RetentionRunRequestRequest:
+      type: object
+      properties:
+        dry_run:
+          type: boolean
+          default: true
+    RetentionRunResponse:
+      type: object
+      properties:
+        dry_run:
+          type: boolean
+        results:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        total:
+          type: integer
+      required:
+      - dry_run
+      - results
+      - total
+    RevisionDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        version:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          title: 버전 번호
+          description: 공장별 1, 2, 3, ... 자동 부여 (서비스 레이어에서 max+1)
+        published_at:
+          type: string
+          format: date-time
+          readOnly: true
+        published_by_name:
+          type: string
+          readOnly: true
+        is_active:
+          type: boolean
+          title: 활성 개정
+          description: facility별 1개만 True (부분 UniqueConstraint)
+        revision_data:
+          title: 개정 스냅샷
+          description: 발행 시점 Section 트리 + Item 메타
+        change_summary:
+          type: string
+          readOnly: true
+      required:
+      - change_summary
+      - id
+      - published_at
+      - published_by_name
+      - version
+    RevisionListItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        version:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          title: 버전 번호
+          description: 공장별 1, 2, 3, ... 자동 부여 (서비스 레이어에서 max+1)
+        published_at:
+          type: string
+          format: date-time
+          readOnly: true
+        published_by_name:
+          type: string
+          readOnly: true
+        is_active:
+          type: boolean
+          title: 활성 개정
+          description: facility별 1개만 True (부분 UniqueConstraint)
+      required:
+      - id
+      - published_at
+      - published_by_name
+      - version
+    RiskClassifiedEnum:
+      enum:
+      - normal
+      - caution
+      - predict_warn
       - warning
+      - danger
+      type: string
+      description: |-
+        * `normal` - 정상
+        * `caution` - 주의
+        * `predict_warn` - 예측경고
+        * `warning` - 경고
+        * `danger` - 위험
     RiskLevel1beEnum:
       enum:
       - normal
@@ -6011,16 +10241,77 @@ components:
         * `normal` - 정상
         * `warning` - 주의
         * `danger` - 위험
+    RiskLevelA12Enum:
+      enum:
+      - danger
+      - warning
+      - normal
+      type: string
+      description: |-
+        * `danger` - danger
+        * `warning` - warning
+        * `normal` - normal
+    RiskStandardList:
+      type: object
+      description: 목록 및 상세 읽기 전용 시리얼라이저.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        code:
+          type: string
+          title: 위험 단계 코드
+          description: RiskLevel 이넘 값과 1:1 (normal/warning/danger)
+          maxLength: 20
+        name:
+          type: string
+          title: 표시 명
+          maxLength: 50
+        display_color:
+          type: string
+          title: 표시 색상 토큰
+          description: green/orange/red 등 토큰명 — 디자이너 hex 회신 시 갱신
+          maxLength: 20
+        alert_intensity:
+          allOf:
+          - $ref: '#/components/schemas/AlertIntensityEnum'
+          title: 알림 강도
+        alert_intensity_display:
+          type: string
+          readOnly: true
+        event_priority:
+          type: integer
+          maximum: 32767
+          minimum: 0
+          title: 이벤트 우선순위
+        is_active:
+          type: boolean
+        description:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: 최근 수정일
+      required:
+      - alert_intensity_display
+      - code
+      - id
+      - name
+      - updated_at
     SafetyHistoryRecord:
       type: object
       properties:
         date:
           type: string
+        attended:
+          type: boolean
         checklist_done:
           type: boolean
         vr_done:
           type: boolean
       required:
+      - attended
       - checklist_done
       - date
       - vr_done
@@ -6067,6 +10358,14 @@ components:
       description: |-
         * `active` - 정상
         * `comm_failure` - 통신 불능
+    SensorTypeEnum:
+      enum:
+      - power
+      - gas
+      type: string
+      description: |-
+        * `power` - 전력
+        * `gas` - 가스
     ShapeTypeEnum:
       enum:
       - polygon
@@ -6115,20 +10414,286 @@ components:
         * `active` - active
         * `locked` - locked
         * `inactive` - inactive
+    SystemLogAdmin:
+      type: object
+      description: |-
+        흐름 위치: SystemLogAdminListView / MapEditLogAdminListView
+                   → AdminPagination → [이 시리얼라이저] → JSON.
+
+        사용자 활동 로그와 지도 편집 로그가 같은 시리얼라이저를 쓰는 이유:
+          두 뷰 모두 SystemLog 모델을 읽는다.
+          화면에서 보여주는 컬럼이 거의 동일하다.
+          뷰에서 queryset을 다르게 필터링하면 되므로
+          시리얼라이저를 나눌 이유가 없다.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        actor_name:
+          type: string
+          description: |-
+            왜 get_full_name() → username → fallback 순서인가:
+              get_full_name()이 비어있는 계정(성명 미입력)도 있으므로
+              비어있으면 username(로그인 ID)으로 대체하고,
+              actor 자체가 NULL이면 "탈퇴한 관리자" 표시.
+          readOnly: true
+        action_type:
+          $ref: '#/components/schemas/ActionTypeEnum'
+        action_type_display:
+          type: string
+          readOnly: true
+        target_model:
+          type: string
+          title: 대상 모델 이름
+          maxLength: 50
+        target_id:
+          type: string
+          title: 대상 레코드 ID
+          maxLength: 50
+        target_name:
+          type: string
+          title: 대상 이름
+          description: 삭제된 객체 이름 복원용 스냅샷
+          maxLength: 200
+        result:
+          allOf:
+          - $ref: '#/components/schemas/SystemLogAdminResultEnum'
+          title: 결과
+        result_display:
+          type: string
+          readOnly: true
+        description:
+          type: string
+        ip_address:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - action_type
+      - action_type_display
+      - actor_name
+      - created_at
+      - id
+      - result_display
+    SystemLogAdminResultEnum:
+      enum:
+      - success
+      - failure
+      type: string
+      description: |-
+        * `success` - 성공
+        * `failure` - 실패
+    Threshold:
+      type: object
+      description: 임계치 항목 읽기 시리얼라이저 — 목록·상세 공용.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        measurement_item:
+          type: string
+          title: 측정 항목
+          maxLength: 50
+        unit:
+          type: string
+          maxLength: 10
+        condition_type:
+          allOf:
+          - $ref: '#/components/schemas/ConditionTypeEnum'
+          title: 판단조건
+        condition_type_display:
+          type: string
+          readOnly: true
+        warning_min:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,4})?$
+          nullable: true
+        warning_max:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,4})?$
+          nullable: true
+        danger_min:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,4})?$
+          nullable: true
+        danger_max:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,4})?$
+          nullable: true
+        chart_max:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,4})?$
+          nullable: true
+          title: 차트 Y축 최대값
+          description: 프론트 차트 스케일링용. 운영자가 어드민에서 조정
+        description:
+          type: string
+        is_active:
+          type: boolean
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: 최근 수정일
+      required:
+      - condition_type_display
+      - id
+      - measurement_item
+      - updated_at
+    ThresholdBulkDeactivateRequestRequest:
+      type: object
+      properties:
+        ids:
+          type: array
+          items:
+            type: integer
+      required:
+      - ids
+    ThresholdBulkDeactivateResponse:
+      type: object
+      properties:
+        updated:
+          type: integer
+      required:
+      - updated
+    ThresholdGroup:
+      type: object
+      description: 분류 그룹 읽기 시리얼라이저 — 목록·상세 공용.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        code:
+          type: string
+          title: 그룹 코드
+          maxLength: 50
+        name:
+          type: string
+          title: 그룹 명
+          maxLength: 100
+        description:
+          type: string
+        is_active:
+          type: boolean
+        apply_scope:
+          title: 반영 범위
+          description: '예: ["realtime", "ai", "alert"]'
+        threshold_count:
+          type: integer
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: 최근 수정일
+      required:
+      - code
+      - id
+      - name
+      - threshold_count
+      - updated_at
+    ThresholdGroupWriteRequest:
+      type: object
+      description: 분류 그룹 등록·수정 시리얼라이저.
+      properties:
+        code:
+          type: string
+          minLength: 1
+          title: 그룹 코드
+          maxLength: 50
+        name:
+          type: string
+          minLength: 1
+          title: 그룹 명
+          maxLength: 100
+        description:
+          type: string
+        is_active:
+          type: boolean
+        apply_scope:
+          title: 반영 범위
+          description: '예: ["realtime", "ai", "alert"]'
+      required:
+      - code
+      - name
+    ThresholdWriteRequest:
+      type: object
+      description: |-
+        임계치 항목 등록·수정 시리얼라이저.
+
+        facility 는 null 고정 (전사 기준) — 클라이언트에서 받지 않음.
+        group 은 URL 경로(/threshold-groups/<id>/thresholds/)에서 주입.
+      properties:
+        measurement_item:
+          type: string
+          minLength: 1
+          title: 측정 항목
+          maxLength: 50
+        unit:
+          type: string
+          minLength: 1
+          maxLength: 10
+        condition_type:
+          allOf:
+          - $ref: '#/components/schemas/ConditionTypeEnum'
+          title: 판단조건
+        warning_min:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,4})?$
+          nullable: true
+        warning_max:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,4})?$
+          nullable: true
+        danger_min:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,4})?$
+          nullable: true
+        danger_max:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,4})?$
+          nullable: true
+        chart_max:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,4})?$
+          nullable: true
+          title: 차트 Y축 최대값
+          description: 프론트 차트 스케일링용. 운영자가 어드민에서 조정
+        description:
+          type: string
+        is_active:
+          type: boolean
+      required:
+      - measurement_item
     TokenRefresh:
       type: object
       properties:
         access:
           type: string
           readOnly: true
+        refresh:
+          type: string
       required:
       - access
+      - refresh
     TokenRefreshRequest:
       type: object
       properties:
         refresh:
           type: string
-          writeOnly: true
           minLength: 1
       required:
       - refresh
@@ -6144,21 +10709,101 @@ components:
         * `facility_admin` - 관리자
         * `worker` - 일반사용자
         * `viewer` - 열람자
+    VRContentDetail:
+      type: object
+      description: |-
+        VR 콘텐츠 단건 응답 직렬화 (read-only).
+
+        [target_type 비노출]
+        화면에서 적용 대상은 facility명으로만 표시하므로 target_type 필드는
+        출력 fields에서 제외한다. service 레이어가 INSERT 시 기본값을 강제하므로
+        응답에 노출할 필요 없음.
+
+        [facility/updated_by 평면화]
+        클라이언트가 별도 fetch 없이 facility명·수정자명을 바로 쓸 수 있도록
+        SerializerMethodField로 1단계 평면화. 호출부는 `select_related`로 N+1
+        회피.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        facility_id:
+          type: integer
+          readOnly: true
+        facility_name:
+          type: string
+          nullable: true
+          description: target_facility가 NULL이면 None — '전사 콘텐츠' 호환.
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+        description:
+          type: string
+          readOnly: true
+        operation_note:
+          type: string
+          readOnly: true
+          title: 운영 메모
+        content_url:
+          type: string
+          format: uri
+          readOnly: true
+        duration_seconds:
+          type: integer
+          readOnly: true
+          nullable: true
+          title: 재생 시간(초)
+        is_active:
+          type: boolean
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: 최근 수정일
+        updated_by_name:
+          type: string
+          nullable: true
+          description: |-
+            CustomUser의 `name` 우선, 없으면 username 폴백. updated_by 자체가
+            NULL(탈퇴 사용자 등)이면 None.
+          readOnly: true
+      required:
+      - content_url
+      - description
+      - duration_seconds
+      - facility_id
+      - facility_name
+      - id
+      - is_active
+      - name
+      - operation_note
+      - updated_at
+      - updated_by_name
     VRProgressGet:
       type: object
       properties:
+        content_id:
+          type: integer
+          nullable: true
         position:
           type: number
           format: double
       required:
+      - content_id
       - position
     VRProgressPostRequest:
       type: object
       properties:
+        content_id:
+          type: integer
+          nullable: true
         position:
           type: number
           format: double
       required:
+      - content_id
       - position
     VRProgressSaved:
       type: object
@@ -6168,6 +10813,72 @@ components:
           format: double
       required:
       - saved
+    VRRevisionList:
+      type: object
+      description: |-
+        VR 교체 이력 read-only 응답.
+
+        [UI 미사용 — 본 스코프]
+        화면에서 이력 패널을 노출하지 않지만, 산재 감사 요건상 API는 완비해 둔다.
+        추후 어드민에 [교체 이력] 모달이 추가되면 본 직렬화기를 그대로 사용.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        previous_name:
+          type: string
+          readOnly: true
+          title: 이전 명
+        previous_url:
+          type: string
+          format: uri
+          readOnly: true
+          title: 이전 URL
+        replaced_at:
+          type: string
+          format: date-time
+          readOnly: true
+        replaced_by_name:
+          type: string
+          nullable: true
+          description: 교체자 이름 평면화. SET_NULL 정책으로 탈퇴자 row는 None.
+          readOnly: true
+      required:
+      - id
+      - previous_name
+      - previous_url
+      - replaced_at
+      - replaced_by_name
+    VRVideoUploadRequest:
+      type: object
+      description: |-
+        multipart 영상 교체 요청의 입력 검증.
+
+        [필드 정책]
+        - file: 필수. validators.py의 세 검증(확장자/크기/MIME) 모두 통과해야 함.
+        - name/description/operation_note: 모두 선택. 누락 시 기존 값을 유지하는
+          PATCH 시맨틱을 service 레이어가 적용한다.
+
+        [allow_blank 차이]
+        name은 빈 문자열 비허용 — 빈 이름으로 덮어쓰는 사고 방지.
+        description/operation_note는 빈 문자열 허용 — 운영자가 명시적으로 비울
+        수 있도록.
+      properties:
+        file:
+          type: string
+          format: binary
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          nullable: true
+        operation_note:
+          type: string
+          nullable: true
+      required:
+      - file
     VocRiskEnum:
       enum:
       - normal
@@ -6214,7 +10925,11 @@ components:
       - workers
     WorkerPositionReceiveRequest:
       type: object
-      description: FastAPI로부터 작업자 위치 데이터 수신용 Serializer
+      description: |-
+        FastAPI로부터 작업자 위치 데이터 수신용 Serializer.
+
+        node_id 는 PositionNode.device_id 그대로 (예: "NODE-001"). 미수신/미상 row는
+        None 허용.
       properties:
         worker_id:
           type: integer
@@ -6235,12 +10950,30 @@ components:
         measured_at:
           type: string
           format: date-time
+        node_id:
+          type: string
+          nullable: true
+          maxLength: 50
       required:
       - facility_id
       - measured_at
       - worker_id
       - x
       - y
+    WorkerPositionStatus:
+      type: object
+      properties:
+        worker_id:
+          type: integer
+        risk_level:
+          $ref: '#/components/schemas/RiskLevelA12Enum'
+        zone_name:
+          type: string
+          nullable: true
+      required:
+      - risk_level
+      - worker_id
+      - zone_name
     WorkerSummaryData:
       type: object
       properties:
@@ -6276,6 +11009,114 @@ components:
       - code
       - data
       - status
+    WorkerVRContent:
+      type: object
+      properties:
+        id:
+          type: integer
+          nullable: true
+        name:
+          type: string
+          nullable: true
+        content_url:
+          type: string
+          format: uri
+          nullable: true
+        duration_seconds:
+          type: integer
+          nullable: true
+      required:
+      - content_url
+      - duration_seconds
+      - id
+      - name
+    _ActiveMLModel:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        version:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          title: 모델 버전
+          description: 동일 (sensor_type, algorithm, sensor_identifier) 안에서 1부터 순차 증가
+        sensor_type:
+          allOf:
+          - $ref: '#/components/schemas/SensorTypeEnum'
+          title: 센서 종류
+        algorithm:
+          allOf:
+          - $ref: '#/components/schemas/AlgorithmEnum'
+          default: isolation_forest
+          title: 모델 알고리즘
+        sensor_identifier:
+          type: string
+          default: ''
+          title: 센서 식별자
+          description: 'ARIMA 등 단일 시계열 모델용. 예: ''power:device_1:ch3:watt''. 비어 있으면
+            sensor_type 단위 (전 sensor 공유).'
+          maxLength: 64
+        file_path:
+          type: string
+          title: .pkl 파일 경로
+          description: settings.ML_MODELS_DIR 기준 상대 경로
+          maxLength: 255
+        feature_columns:
+          title: 피처 컬럼
+          description: 학습에 사용된 컬럼 이름 리스트 (추론 시 동일 순서로 입력)
+        params_json:
+          title: 학습 하이퍼파라미터
+          description: contamination, n_estimators 등
+        training_data_range_from:
+          type: string
+          format: date-time
+          title: 학습 데이터 시작
+        training_data_range_to:
+          type: string
+          format: date-time
+          title: 학습 데이터 끝
+        training_sample_count:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          title: 학습 샘플 수
+          description: 윈도우 적용 전 raw row 수
+        trained_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: 학습 완료 시각
+      required:
+      - feature_columns
+      - file_path
+      - id
+      - params_json
+      - sensor_type
+      - trained_at
+      - training_data_range_from
+      - training_data_range_to
+      - training_sample_count
+      - version
+    _ChannelEntryAnomalyTypeEnum:
+      enum:
+      - overload
+      - voltage_drop
+      - spike
+      - phase_loss
+      - degradation
+      - night_abnormal
+      - motor_stuck
+      type: string
+      description: |-
+        * `overload` - 과부하
+        * `voltage_drop` - 저전압
+        * `spike` - 스파이크
+        * `phase_loss` - 결상
+        * `degradation` - 열화
+        * `night_abnormal` - 야간 가동
+        * `motor_stuck` - 모터 정지
     _ChannelEntryRequest:
       type: object
       description: PowerDataBulkIngestSerializer 내부용 채널 단건 시리얼라이저.
@@ -6296,8 +11137,140 @@ components:
           allOf:
           - $ref: '#/components/schemas/RiskLevel1beEnum'
           default: normal
+        is_anomaly:
+          type: boolean
+          default: false
+        anomaly_type:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/_ChannelEntryAnomalyTypeEnum'
+          - $ref: '#/components/schemas/NullEnum'
       required:
       - channel
+    _MLAnomalyResultCreate:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        ml_model:
+          type: integer
+          nullable: true
+          title: 추론 모델
+        model_version_snapshot:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          title: 모델 버전 (스냅샷)
+          description: MLModel 삭제되더라도 추론 시점 버전 보존
+        sensor_type:
+          type: string
+          title: 센서 종류
+          description: power / gas — MLModel.SensorType 값 사용
+          maxLength: 10
+        sensor_identifier:
+          type: string
+          title: 센서 식별자
+          description: '예: ''power:device_1:ch3:watt'' 또는 ''gas:co'''
+          maxLength: 64
+        measured_at:
+          type: string
+          format: date-time
+          title: 측정 시각
+        anomaly_score:
+          type: number
+          format: double
+          title: 이상도 점수
+          description: IF decision_function 또는 score_samples 결과 (음수=이상)
+        prediction:
+          allOf:
+          - $ref: '#/components/schemas/PredictionEnum'
+          title: 이상 여부
+        risk_classified:
+          allOf:
+          - $ref: '#/components/schemas/RiskClassifiedEnum'
+          title: 결합 위험도
+          description: |-
+            결합 매트릭스로 임계치 평가와 AI 신호를 합친 분류
+
+            * `normal` - 정상
+            * `caution` - 주의
+            * `predict_warn` - 예측경고
+            * `warning` - 경고
+            * `danger` - 위험
+        feature_snapshot_json:
+          title: 입력 피처 스냅샷
+          description: 추론 시 사용된 피처 값 (디버깅·재현용)
+      required:
+      - anomaly_score
+      - feature_snapshot_json
+      - id
+      - measured_at
+      - model_version_snapshot
+      - prediction
+      - sensor_identifier
+      - sensor_type
+    _MLAnomalyResultCreateRequest:
+      type: object
+      properties:
+        ml_model:
+          type: integer
+          nullable: true
+          title: 추론 모델
+        model_version_snapshot:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          title: 모델 버전 (스냅샷)
+          description: MLModel 삭제되더라도 추론 시점 버전 보존
+        sensor_type:
+          type: string
+          minLength: 1
+          title: 센서 종류
+          description: power / gas — MLModel.SensorType 값 사용
+          maxLength: 10
+        sensor_identifier:
+          type: string
+          minLength: 1
+          title: 센서 식별자
+          description: '예: ''power:device_1:ch3:watt'' 또는 ''gas:co'''
+          maxLength: 64
+        measured_at:
+          type: string
+          format: date-time
+          title: 측정 시각
+        anomaly_score:
+          type: number
+          format: double
+          title: 이상도 점수
+          description: IF decision_function 또는 score_samples 결과 (음수=이상)
+        prediction:
+          allOf:
+          - $ref: '#/components/schemas/PredictionEnum'
+          title: 이상 여부
+        risk_classified:
+          allOf:
+          - $ref: '#/components/schemas/RiskClassifiedEnum'
+          title: 결합 위험도
+          description: |-
+            결합 매트릭스로 임계치 평가와 AI 신호를 합친 분류
+
+            * `normal` - 정상
+            * `caution` - 주의
+            * `predict_warn` - 예측경고
+            * `warning` - 경고
+            * `danger` - 위험
+        feature_snapshot_json:
+          title: 입력 피처 스냅샷
+          description: 추론 시 사용된 피처 값 (디버깅·재현용)
+      required:
+      - anomaly_score
+      - feature_snapshot_json
+      - measured_at
+      - model_version_snapshot
+      - prediction
+      - sensor_identifier
+      - sensor_type
   securitySchemes:
     jwtAuth:
       type: http
