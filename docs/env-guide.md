@@ -31,7 +31,7 @@
 | 변수 | 예시값 | 의미 |
 |---|---|---|
 | `DJANGO_SECRET_KEY` | `secrets.token_urlsafe(50)` 결과 | Django 시크릿. **모든 환경 서로 다르게** |
-| `DJANGO_DEBUG` | `False` (운영) / `True` (개발) | settings 분기 |
+| `DJANGO_DEBUG` | `False` | ⚠️ 참고용 표기값 — **코드는 읽지 않음(no-op)**. 실제 분기는 `DJANGO_SETTINGS_MODULE`(compose가 `config.settings.prod` 주입)이 결정하고 `DEBUG`는 dev.py/prod.py에 하드코딩 |
 | `DJANGO_ALLOWED_HOSTS` | `drf,localhost,127.0.0.1` | 컨테이너 호스트명 포함 필수 |
 | `DJANGO_LOG_LEVEL` | `INFO` | 로그 레벨 |
 
@@ -80,6 +80,7 @@
 | `DUMMY_SEND_INTERVAL_SEC` | `1.0` | 송출 주기 |
 | `DUMMY_RISK_PROBABILITY` | `0.1` | 위험값 발생 확률 (시연: 0, IF 학습: 0.005~0.1) |
 | `DUMMY_SCENARIO_MODE` | `normal` | `normal`=시연 안전 / `mixed`=IF 학습용 |
+| `DUMMY_FACILITY_ID` | `1` | 더미 작업자가 속한 시설 ID (코드 기본값) |
 
 **시연용 선택 override (미설정 시 코드 기본값):** `.env.docker.example`에 주석으로 제공.
 - 가스 `co_leak`: `DEMO_CO_LEAK_RAMP_UP_TICKS` / `_HOLD_TICKS` / `_RAMP_DOWN_TICKS` (기본 5/30/5)
@@ -118,6 +119,26 @@
 
 webhook URL 발급: Discord 채널 설정 → 연동 → 웹훅 → 새 웹훅 → URL 복사.
 소비처: [drf-server/apps/notifications/services/discord_service.py](../drf-server/apps/notifications/services/discord_service.py).
+
+### 10. 알람·판정 게이트
+
+미설정 시 모두 코드 기본값으로 동작. 시연/튜닝 시에만 override.
+
+| 변수 | 기본 | 의미 |
+|---|---|---|
+| `STATIC_THRESHOLD_AT_FASTAPI` | `false` | `true`면 FastAPI 수신 단계에서 정적 임계 판정(단일 결정자). `false`면 DRF `trigger_power_alarms`가 독자 발화(중복은 AI mute 60s가 억제). [base.py:198](../drf-server/config/settings/base.py) |
+| `DANGER_CONFIRM_TICKS` | `2` | DANGER 발화 전 연속 초과 틱 수. 단일 틱 스파이크/전력 인러시 false danger 억제 |
+| `GEOFENCE_SENSOR_FRESHNESS_SEC` | `60` | 지오펜스(센서 종속 구역) 진입 알람에서 센서값을 '현재 상태'로 인정하는 최신성(초) |
+| `ALARM_REPOPUP_COOLDOWN_SEC` | `60` (시연 `15`) | 알람 재팝업 쿨다운(초). drf `event_service` |
+| `GAS_AI_RATE_LIMIT_SEC` | `30` | 같은 센서 AI 이상탐지 알람 최소 발화 간격(초). 위 쿨다운과 동일하게 맞추는 것 권장. fastapi |
+
+### 11. ML·AI 모델
+
+| 변수 | 기본 | 의미 |
+|---|---|---|
+| `ML_MODELS_DIR` | drf=`BASE_DIR/ml_models`, 컨테이너=`/app/ml_models` | IF `.pkl` 모델 디렉토리. drf/fastapi 동일 volume |
+| `ML_MODEL_CACHE_TTL_SEC` | `3600` | 모델 캐시 TTL(초). `0` 이하면 영구 캐시. fastapi |
+| `FORWARD_ANOMALY_TO_DRF` | `true` | FastAPI AI 이상탐지 결과를 DRF로 forward 할지(event_id 확보). `os.getenv` 직접 읽음([anomaly_alarm.py:37](../fastapi-server/services/anomaly_alarm.py)) |
 
 ## 작성 시 주의사항
 
