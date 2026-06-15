@@ -13,7 +13,12 @@ alarm_type=power_anomaly_ai 만 처리. 가스 (gas_anomaly_ai) 는 enum 정의 
 
 import logging
 
-from rest_framework import status
+from drf_spectacular.utils import (
+    OpenApiResponse,
+    extend_schema,
+    inline_serializer,
+)
+from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -35,6 +40,21 @@ class AnomalyAlarmRecordCreateView(APIView):
     authentication_classes: list = []
     permission_classes: list = []
 
+    @extend_schema(
+        tags=["Internal"],
+        summary="AI 이상탐지 알람 INSERT (FastAPI → DRF)",
+        request=AnomalyAlarmRecordPayloadSerializer,
+        responses={
+            201: inline_serializer(
+                name="AnomalyAlarmRecordCreateResponse",
+                fields={
+                    "alarm_id": serializers.IntegerField(allow_null=True),
+                    "event_id": serializers.IntegerField(allow_null=True),
+                },
+            ),
+            404: OpenApiResponse(description="발생원 장비/센서를 찾을 수 없음"),
+        },
+    )
     def post(self, request):
         serializer = AnomalyAlarmRecordPayloadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

@@ -17,8 +17,13 @@ notices/views/notice_views.py
 
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
-from rest_framework import status
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiResponse,
+    extend_schema,
+    inline_serializer,
+)
+from rest_framework import serializers, status
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -53,6 +58,7 @@ def _get_client_ip(request) -> str | None:
 # ────────────────────────────────────────────
 # 1. 목록 조회 + 등록
 # ────────────────────────────────────────────
+
 
 class NoticeListView(APIView):
     """
@@ -103,7 +109,11 @@ class NoticeListView(APIView):
           5. 페이지네이션 응답 반환
         """
         # is_deleted=False: 소프트 삭제된 공지는 목록에서 제외
-        qs = Notice.objects.filter(is_deleted=False).select_related("author").prefetch_related("attachments")
+        qs = (
+            Notice.objects.filter(is_deleted=False)
+            .select_related("author")
+            .prefetch_related("attachments")
+        )
 
         # ── 필터 적용 ──────────────────────────────
         category = request.query_params.get("category", "").strip()
@@ -198,6 +208,7 @@ class NoticeListView(APIView):
 # 2. 상세 조회 + 수정 + 삭제
 # ────────────────────────────────────────────
 
+
 class NoticeDetailView(APIView):
     """
     GET    /api/admin/notices/{id}/  — 공지사항 상세 조회
@@ -216,7 +227,9 @@ class NoticeDetailView(APIView):
         """
         # is_deleted=False: 소프트 삭제된 공지는 이미 없는 것으로 처리 → 404 반환
         return get_object_or_404(
-            Notice.objects.filter(is_deleted=False).select_related("author").prefetch_related("attachments"),
+            Notice.objects.filter(is_deleted=False)
+            .select_related("author")
+            .prefetch_related("attachments"),
             pk=pk,
         )
 
@@ -262,7 +275,11 @@ class NoticeDetailView(APIView):
         notice = self._get_notice(pk)
 
         # 2번: 수정 전 값 스냅샷 — SystemLog old_value에 기록해 변경 이력 추적
-        old_value = {"title": notice.title, "category": notice.category, "is_pinned": notice.is_pinned}
+        old_value = {
+            "title": notice.title,
+            "category": notice.category,
+            "is_pinned": notice.is_pinned,
+        }
 
         serializer = NoticeCreateUpdateSerializer(
             notice,
@@ -281,7 +298,11 @@ class NoticeDetailView(APIView):
             target_model="Notice",
             target_id=notice.pk,
             old_value=old_value,
-            new_value={"title": notice.title, "category": notice.category, "is_pinned": notice.is_pinned},
+            new_value={
+                "title": notice.title,
+                "category": notice.category,
+                "is_pinned": notice.is_pinned,
+            },
             description=f"공지사항 수정: {notice.title}",
             ip_address=_get_client_ip(request),
         )
@@ -341,6 +362,7 @@ class NoticeDetailView(APIView):
 # 3. 첨부파일 업로드 + 삭제
 # ────────────────────────────────────────────
 
+
 class NoticeAttachmentView(APIView):
     """
     POST   /api/admin/notices/{id}/attachments/          — 첨부파일 업로드
@@ -357,6 +379,10 @@ class NoticeAttachmentView(APIView):
     @extend_schema(
         tags=["Admin — Notices"],
         summary="첨부파일 업로드",
+        request=inline_serializer(
+            name="NoticeAttachmentUploadRequest",
+            fields={"file": serializers.FileField()},
+        ),
         responses={
             201: NoticeAttachmentSerializer,
             400: OpenApiResponse(description="파일 없음 또는 유효성 오류"),
@@ -390,8 +416,8 @@ class NoticeAttachmentView(APIView):
         attachment = NoticeAttachment(
             notice=notice,
             file=file,
-            filename=file.name,   # 원본 파일명 저장 (storage 경로와 별개)
-            size=file.size,       # 파일 크기(byte) 저장
+            filename=file.name,  # 원본 파일명 저장 (storage 경로와 별개)
+            size=file.size,  # 파일 크기(byte) 저장
             updated_by=request.user,
         )
         # full_clean(): 모델 validators(10MB 제한, 확장자 검사) 명시적 실행
