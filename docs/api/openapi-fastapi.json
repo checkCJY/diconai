@@ -36,10 +36,46 @@
             }
           },
           "422": {
-            "description": "페이로드 검증 실패"
+            "description": "페이로드 검증 실패",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "validation_failed",
+                    "message": "요청 데이터 검증에 실패했습니다.",
+                    "details": [
+                      {
+                        "loc": [
+                          "body",
+                          "field"
+                        ],
+                        "msg": "field required",
+                        "type": "value_error.missing"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
           },
           "500": {
-            "description": "서버 내부 오류"
+            "description": "서버 내부 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "internal_error",
+                    "message": "서버 내부 오류가 발생했습니다."
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -74,13 +110,62 @@
             }
           },
           "422": {
-            "description": "페이로드 검증 실패 (예: o2 범위 초과)"
+            "description": "페이로드 검증 실패 (예: o2 범위 초과)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "validation_failed",
+                    "message": "요청 데이터 검증에 실패했습니다.",
+                    "details": [
+                      {
+                        "loc": [
+                          "body",
+                          "field"
+                        ],
+                        "msg": "field required",
+                        "type": "value_error.missing"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
           },
           "502": {
-            "description": "DRF 저장 실패"
+            "description": "DRF 저장 실패",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "upstream_unavailable",
+                    "message": "상위 서비스에 연결할 수 없습니다."
+                  }
+                }
+              }
+            }
           },
           "503": {
-            "description": "DRF 서버 연결 불가"
+            "description": "DRF 서버 연결 불가",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "upstream_unavailable",
+                    "message": "상위 서비스에 연결할 수 없습니다."
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -115,10 +200,46 @@
             }
           },
           "422": {
-            "description": "페이로드 검증 실패"
+            "description": "페이로드 검증 실패",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "validation_failed",
+                    "message": "요청 데이터 검증에 실패했습니다.",
+                    "details": [
+                      {
+                        "loc": [
+                          "body",
+                          "field"
+                        ],
+                        "msg": "field required",
+                        "type": "value_error.missing"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
           },
           "502": {
-            "description": "DRF 저장 실패 (BackgroundTask 비동기라 본 응답에는 영향 없음)"
+            "description": "DRF 저장 실패 (BackgroundTask 비동기라 본 응답에는 영향 없음)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "upstream_unavailable",
+                    "message": "상위 서비스에 연결할 수 없습니다."
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -153,10 +274,46 @@
             }
           },
           "422": {
-            "description": "페이로드 검증 실패"
+            "description": "페이로드 검증 실패",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "validation_failed",
+                    "message": "요청 데이터 검증에 실패했습니다.",
+                    "details": [
+                      {
+                        "loc": [
+                          "body",
+                          "field"
+                        ],
+                        "msg": "field required",
+                        "type": "value_error.missing"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
           },
           "502": {
-            "description": "DRF 저장 실패 (BackgroundTask 비동기라 본 응답에는 영향 없음)"
+            "description": "DRF 저장 실패 (BackgroundTask 비동기라 본 응답에는 영향 없음)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "upstream_unavailable",
+                    "message": "상위 서비스에 연결할 수 없습니다."
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -191,10 +348,46 @@
             }
           },
           "422": {
-            "description": "페이로드 검증 실패"
+            "description": "페이로드 검증 실패",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "validation_failed",
+                    "message": "요청 데이터 검증에 실패했습니다.",
+                    "details": [
+                      {
+                        "loc": [
+                          "body",
+                          "field"
+                        ],
+                        "msg": "field required",
+                        "type": "value_error.missing"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
           },
           "502": {
-            "description": "DRF 저장 실패 (BackgroundTask 비동기라 본 응답에는 영향 없음)"
+            "description": "DRF 저장 실패 (BackgroundTask 비동기라 본 응답에는 영향 없음)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "upstream_unavailable",
+                    "message": "상위 서비스에 연결할 수 없습니다."
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -229,10 +422,46 @@
             }
           },
           "422": {
-            "description": "페이로드 검증 실패"
+            "description": "페이로드 검증 실패",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "validation_failed",
+                    "message": "요청 데이터 검증에 실패했습니다.",
+                    "details": [
+                      {
+                        "loc": [
+                          "body",
+                          "field"
+                        ],
+                        "msg": "field required",
+                        "type": "value_error.missing"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
           },
           "502": {
-            "description": "DRF 저장 실패 (BackgroundTask 비동기라 본 응답에는 영향 없음)"
+            "description": "DRF 저장 실패 (BackgroundTask 비동기라 본 응답에는 영향 없음)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "upstream_unavailable",
+                    "message": "상위 서비스에 연결할 수 없습니다."
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -271,7 +500,30 @@
             }
           },
           "422": {
-            "description": "페이로드 검증 실패 (예: x/y 음수)"
+            "description": "페이로드 검증 실패 (예: x/y 음수)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "validation_failed",
+                    "message": "요청 데이터 검증에 실패했습니다.",
+                    "details": [
+                      {
+                        "loc": [
+                          "body",
+                          "field"
+                        ],
+                        "msg": "field required",
+                        "type": "value_error.missing"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -304,10 +556,46 @@
             }
           },
           "403": {
-            "description": "localhost 외부에서 호출"
+            "description": "localhost 외부에서 호출",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "permission_denied",
+                    "message": "이 작업을 수행할 권한이 없습니다."
+                  }
+                }
+              }
+            }
           },
           "422": {
-            "description": "AlarmPayload 검증 실패"
+            "description": "AlarmPayload 검증 실패",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "validation_failed",
+                    "message": "요청 데이터 검증에 실패했습니다.",
+                    "details": [
+                      {
+                        "loc": [
+                          "body",
+                          "field"
+                        ],
+                        "msg": "field required",
+                        "type": "value_error.missing"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -366,10 +654,56 @@
             }
           },
           "400": {
-            "description": "허용되지 않은 모드값"
+            "description": "허용되지 않은 모드값",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "validation_failed",
+                    "message": "요청 데이터 검증에 실패했습니다.",
+                    "details": [
+                      {
+                        "loc": [
+                          "body",
+                          "field"
+                        ],
+                        "msg": "field required",
+                        "type": "value_error.missing"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
           },
           "422": {
-            "description": "ModePayload 검증 실패"
+            "description": "ModePayload 검증 실패",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "validation_failed",
+                    "message": "요청 데이터 검증에 실패했습니다.",
+                    "details": [
+                      {
+                        "loc": [
+                          "body",
+                          "field"
+                        ],
+                        "msg": "field required",
+                        "type": "value_error.missing"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -404,20 +738,85 @@
             }
           },
           "400": {
-            "description": "window_values 길이 부족"
+            "description": "window_values 길이 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "validation_failed",
+                    "message": "요청 데이터 검증에 실패했습니다.",
+                    "details": [
+                      {
+                        "loc": [
+                          "body",
+                          "field"
+                        ],
+                        "msg": "field required",
+                        "type": "value_error.missing"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
           },
           "404": {
-            "description": "active 모델 없음"
+            "description": "active 모델 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "not_found",
+                    "message": "요청하신 리소스를 찾을 수 없습니다."
+                  }
+                }
+              }
+            }
           },
           "500": {
-            "description": "모델 파일 누락 또는 DRF 조회 실패"
+            "description": "모델 파일 누락 또는 DRF 조회 실패",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "internal_error",
+                    "message": "서버 내부 오류가 발생했습니다."
+                  }
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "validation_failed",
+                    "message": "요청 데이터 검증에 실패했습니다.",
+                    "details": [
+                      {
+                        "loc": [
+                          "body",
+                          "field"
+                        ],
+                        "msg": "field required",
+                        "type": "value_error.missing"
+                      }
+                    ]
+                  }
                 }
               }
             }
@@ -495,7 +894,23 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "validation_failed",
+                    "message": "요청 데이터 검증에 실패했습니다.",
+                    "details": [
+                      {
+                        "loc": [
+                          "body",
+                          "field"
+                        ],
+                        "msg": "field required",
+                        "type": "value_error.missing"
+                      }
+                    ]
+                  }
                 }
               }
             }
@@ -1709,6 +2124,39 @@
         ],
         "title": "WorkerPositionSchema",
         "description": "작업자 위치 데이터 스키마 — Pydantic 검증.\n\nnode_id 는 PositionNode.device_id 그대로 (예: \"NODE-001\"). 펌웨어 페이로드 갱신\n전에는 None."
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "표준 에러 코드."
+              },
+              "message": {
+                "type": "string",
+                "description": "사람이 읽을 한 줄 메시지."
+              },
+              "details": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                },
+                "nullable": true,
+                "description": "검증 실패 시 필드별 오류 목록."
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ]
       }
     }
   },

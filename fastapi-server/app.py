@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse, Response
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
@@ -230,3 +231,99 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 async def health_check() -> dict[str, str]:
     """서버 생존 확인용 엔드포인트. Liveness probe 등 운영 모니터링에 사용."""
     return {"status": "ok"}
+
+
+# ── OpenAPI 후처리: 4xx/5xx 응답에 표준 에러 봉투 본문 주입 ──────────────
+# 예외 핸들러 3종이 모든 에러를 {error:{code,message,details?}} 로 일원화하지만,
+# 라우터의 responses= 선언은 description 만 있어 문서에 본문 형태가 안 보인다.
+# 코드별 예시를 붙여 401 에 not_found 예시가 뜨는 혼동을 막는다.
+_ERROR_ENVELOPE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "error": {
+            "type": "object",
+            "properties": {
+                "code": {"type": "string", "description": "표준 에러 코드."},
+                "message": {
+                    "type": "string",
+                    "description": "사람이 읽을 한 줄 메시지.",
+                },
+                "details": {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "nullable": True,
+                    "description": "검증 실패 시 필드별 오류 목록.",
+                },
+            },
+            "required": ["code", "message"],
+        }
+    },
+    "required": ["error"],
+}
+
+# 상태코드 → (코드, 예시 메시지). app.py 예외 핸들러 _HTTP_CODE_FALLBACK 과 동기화.
+_STATUS_EXAMPLE = {
+    400: ("validation_failed", "요청 데이터 검증에 실패했습니다."),
+    401: ("authentication_required", "인증이 필요합니다."),
+    403: ("permission_denied", "이 작업을 수행할 권한이 없습니다."),
+    404: ("not_found", "요청하신 리소스를 찾을 수 없습니다."),
+    422: ("validation_failed", "요청 데이터 검증에 실패했습니다."),
+    500: ("internal_error", "서버 내부 오류가 발생했습니다."),
+    502: ("upstream_unavailable", "상위 서비스에 연결할 수 없습니다."),
+    503: ("upstream_unavailable", "상위 서비스에 연결할 수 없습니다."),
+    504: ("upstream_unavailable", "상위 서비스에 연결할 수 없습니다."),
+}
+
+
+def _error_example(status_code: int) -> dict:
+    code, message = _STATUS_EXAMPLE.get(
+        status_code, ("internal_error", "오류가 발생했습니다.")
+    )
+    example: dict = {"error": {"code": code, "message": message}}
+    if code == "validation_failed":
+        example["error"]["details"] = [
+            {
+                "loc": ["body", "field"],
+                "msg": "field required",
+                "type": "value_error.missing",
+            }
+        ]
+    return example
+
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+        tags=app.openapi_tags,
+    )
+    schema.setdefault("components", {}).setdefault("schemas", {})["ErrorEnvelope"] = (
+        _ERROR_ENVELOPE_SCHEMA
+    )
+    ref = {"$ref": "#/components/schemas/ErrorEnvelope"}
+
+    for path_item in schema.get("paths", {}).values():
+        for method, operation in path_item.items():
+            if not isinstance(operation, dict):
+                continue
+            for code, response in operation.get("responses", {}).items():
+                if not (code.isdigit() and int(code) >= 400):
+                    continue
+                # 모든 에러 응답을 표준 봉투로 통일 (런타임 핸들러와 일치)
+                response["content"] = {
+                    "application/json": {
+                        "schema": ref,
+                        "example": _error_example(int(code)),
+                    }
+                }
+
+    app.openapi_schema = schema
+    return schema
+
+
+app.openapi = custom_openapi
