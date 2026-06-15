@@ -41,7 +41,7 @@
 
 ### B11. fastapi JWT 검증 인프라
 
-#### B11-1. PyJWT 의존성 추가 ([requirements.txt:16](../../../../fastapi-server/requirements.txt#L16))
+#### B11-1. PyJWT 의존성 추가 ([requirements.txt:16](../../../../../fastapi-server/requirements.txt#L16))
 
 **(A) 변경 내용**
 - `pyjwt==2.10.1` 한 줄 추가 (alphabetical 위치)
@@ -77,7 +77,7 @@ python-dotenv==1.2.2
 | authlib | 완전한 OAuth 솔루션 | 본 작업 범위 초과 | 미채택 |
 | 자체 구현 | 의존성 0 | 보안 위험 / 학습 비용 | 미채택 |
 
-#### B11-2. websocket/auth.py 신규 ([websocket/auth.py](../../../../fastapi-server/websocket/auth.py))
+#### B11-2. websocket/auth.py 신규 ([websocket/auth.py](../../../../../fastapi-server/websocket/auth.py))
 
 **(A) 변경 내용**
 - 신규 파일 (60줄)
@@ -132,7 +132,7 @@ def verify_jwt_from_ws_query(websocket: WebSocket) -> dict | None:
 | WS Middleware | 모든 WS 자동 적용 | FastAPI는 WS middleware 미지원 (HTTP만) | 미채택 |
 | 강제 활성화 | 보안 강제 | 기존 환경 즉시 깨짐 | 미채택 |
 
-#### B11-3. fastapi config.py JWT env 추가 ([core/config.py:25-29](../../../../fastapi-server/core/config.py#L25-L29))
+#### B11-3. fastapi config.py JWT env 추가 ([core/config.py:25-29](../../../../../fastapi-server/core/config.py#L25-L29))
 
 **(A) 변경 내용**
 - `JWT_SIGNING_KEY: str = ""` (옵트인 비활성 기본값)
@@ -207,7 +207,7 @@ SIMPLE_JWT = {
 
 ### B12. WS 엔드포인트 인증 적용
 
-#### B12-1. `/ws/sensors/` 인증 ([ws_router.py:88-103](../../../../fastapi-server/websocket/routers/ws_router.py#L88-L103))
+#### B12-1. `/ws/sensors/` 인증 ([ws_router.py:88-103](../../../../../fastapi-server/websocket/routers/ws_router.py#L88-L103))
 
 **(A) 변경 내용**
 - `accept()` 후 `verify_jwt_from_ws_query(websocket)` 호출
@@ -245,7 +245,7 @@ async def sensor_stream(websocket: WebSocket):
     ...
 ```
 
-#### B12-2. `/ws/worker/{user_id}/` 인증 + path 일치 검증 ([ws_router.py:117-141](../../../../fastapi-server/websocket/routers/ws_router.py#L117-L141))
+#### B12-2. `/ws/worker/{user_id}/` 인증 + path 일치 검증 ([ws_router.py:117-141](../../../../../fastapi-server/websocket/routers/ws_router.py#L117-L141))
 
 **(A) 변경 내용**
 - B12-1의 인증 흐름 적용
@@ -292,7 +292,7 @@ async def worker_stream(websocket: WebSocket, user_id: int):
     ...
 ```
 
-#### B12-3. `/ws/position/` Wave 3 범위 밖 ([ws_router.py:165-172](../../../../fastapi-server/websocket/routers/ws_router.py#L165-L172))
+#### B12-3. `/ws/position/` Wave 3 범위 밖 ([ws_router.py:165-172](../../../../../fastapi-server/websocket/routers/ws_router.py#L165-L172))
 
 **(A) 변경 내용**
 - 코드 동작 변경 없음
@@ -361,7 +361,7 @@ const ws = WSClient.connect('/ws/sensors/', { attachToken: true });
 ## 3. 적용된 신규 기능 (요약)
 
 ### 3.1 `verify_jwt_from_ws_query` 헬퍼
-**위치**: [fastapi-server/websocket/auth.py](../../../../fastapi-server/websocket/auth.py)
+**위치**: [fastapi-server/websocket/auth.py](../../../../../fastapi-server/websocket/auth.py)
 **역할**: WS query string의 token을 PyJWT로 검증
 **옵트인**: `JWT_SIGNING_KEY` 빈 값이면 비활성
 

@@ -51,7 +51,7 @@ NULL 허용 정책: `node_id=None` 또는 lookup 실패 시 `received_node=None`
 
 | 파일 | 역할 |
 |---|---|
-| [drf-server/apps/positioning/migrations/0002_workerposition_received_node.py](../../drf-server/apps/positioning/migrations/0002_workerposition_received_node.py) | WorkerPosition에 `received_node` FK 컬럼 추가 (nullable, SET_NULL) |
+| [drf-server/apps/positioning/migrations/0002_workerposition_received_node.py](../../../drf-server/apps/positioning/migrations/0002_workerposition_received_node.py) | WorkerPosition에 `received_node` FK 컬럼 추가 (nullable, SET_NULL) |
 
 ---
 
@@ -61,23 +61,23 @@ NULL 허용 정책: `node_id=None` 또는 lookup 실패 시 `received_node=None`
 
 | 파일 | 변경 내용 |
 |---|---|
-| [drf-server/apps/positioning/models/worker_position.py](../../drf-server/apps/positioning/models/worker_position.py) | `received_node = ForeignKey("facilities.PositionNode", SET_NULL, null=True, blank=True, related_name="received_positions")` 추가 |
-| [drf-server/apps/positioning/serializers/serializers.py](../../drf-server/apps/positioning/serializers/serializers.py) | `WorkerPositionReceiveSerializer.node_id` (CharField, required=False, allow_null/blank) 추가 |
-| [drf-server/apps/positioning/services/position_service.py](../../drf-server/apps/positioning/services/position_service.py) | `handle_position_receive()` 시그니처에 `node_id: str \| None = None` 추가. PositionNode lookup (`device_id=node_id, is_active=True`) 후 `WorkerPosition.objects.create(received_node=...)` 전달 |
-| [drf-server/apps/positioning/views/position_views.py](../../drf-server/apps/positioning/views/position_views.py) | `handle_position_receive()` 호출에 `node_id=item.get("node_id") or None` 전달 |
+| [drf-server/apps/positioning/models/worker_position.py](../../../drf-server/apps/positioning/models/worker_position.py) | `received_node = ForeignKey("facilities.PositionNode", SET_NULL, null=True, blank=True, related_name="received_positions")` 추가 |
+| [drf-server/apps/positioning/serializers/serializers.py](../../../drf-server/apps/positioning/serializers/serializers.py) | `WorkerPositionReceiveSerializer.node_id` (CharField, required=False, allow_null/blank) 추가 |
+| [drf-server/apps/positioning/services/position_service.py](../../../drf-server/apps/positioning/services/position_service.py) | `handle_position_receive()` 시그니처에 `node_id: str \| None = None` 추가. PositionNode lookup (`device_id=node_id, is_active=True`) 후 `WorkerPosition.objects.create(received_node=...)` 전달 |
+| [drf-server/apps/positioning/views/position_views.py](../../../drf-server/apps/positioning/views/position_views.py) | `handle_position_receive()` 호출에 `node_id=item.get("node_id") or None` 전달 |
 
 ### 4-2. FastAPI 측 (2개)
 
 | 파일 | 변경 내용 |
 |---|---|
-| [fastapi-server/positioning/schemas/position.py](../../fastapi-server/positioning/schemas/position.py) | `WorkerPositionSchema.node_id: str \| None = None` 추가. docstring에 Phase 3-a 명시 |
-| [fastapi-server/positioning/services/position_service.py](../../fastapi-server/positioning/services/position_service.py) | `save_positions_to_drf()` payload에 `"node_id": p.node_id` 포함 |
+| [fastapi-server/positioning/schemas/position.py](../../../fastapi-server/positioning/schemas/position.py) | `WorkerPositionSchema.node_id: str \| None = None` 추가. docstring에 Phase 3-a 명시 |
+| [fastapi-server/positioning/services/position_service.py](../../../fastapi-server/positioning/services/position_service.py) | `save_positions_to_drf()` payload에 `"node_id": p.node_id` 포함 |
 
 ### 4-3. 더미 스크립트 (1개)
 
 | 파일 | 변경 내용 |
 |---|---|
-| [fastapi-server/dummies/position_dummy.py](../../fastapi-server/dummies/position_dummy.py) | `DUMMY_WORKERS` 4명 모두 `node_id="NODE-001"` 추가. `generate_positions()` payload에 `"node_id": w.get("node_id")` 포함. 학습 환경에서 모의 데이터 흐름 검증용 |
+| [fastapi-server/dummies/position_dummy.py](../../../fastapi-server/dummies/position_dummy.py) | `DUMMY_WORKERS` 4명 모두 `node_id="NODE-001"` 추가. `generate_positions()` payload에 `"node_id": w.get("node_id")` 포함. 학습 환경에서 모의 데이터 흐름 검증용 |
 
 ---
 
@@ -105,7 +105,7 @@ NULL 허용 정책: `node_id=None` 또는 lookup 실패 시 `received_node=None`
 
 ### 6-2. WorkerPositionSchema 비-WS 호환
 
-`WorkerPositionSchema`는 [fastapi-server/positioning/routers/position_router.py](../../fastapi-server/positioning/routers/position_router.py)의 `receive_positions()` 입력 + `ws_state.worker_positions[]` 캐시에 모두 사용됨. WS 전송 시 `node_id` 포함되지만 브라우저 측 처리 코드 변경 없음 (모르는 필드 무시).
+`WorkerPositionSchema`는 [fastapi-server/positioning/routers/position_router.py](../../../fastapi-server/positioning/routers/position_router.py)의 `receive_positions()` 입력 + `ws_state.worker_positions[]` 캐시에 모두 사용됨. WS 전송 시 `node_id` 포함되지만 브라우저 측 처리 코드 변경 없음 (모르는 필드 무시).
 
 ### 6-3. 마이그레이션 reverse 검증
 

@@ -42,16 +42,16 @@ safety.0011      ← reverse → safety.0010    → re-apply OK
 
 | 모델 | 파일 | 추가 필드 |
 |---|---|---|
-| DeviceBase (abstract) | [devices.py](../../drf-server/apps/facilities/models/devices.py) | updated_by → 자식 GasSensor/PowerDevice/PositionNode 자동 적용 |
-| Facility | [facility.py](../../drf-server/apps/facilities/models/facility.py) | updated_by |
-| GasSensorInspection | [gas_sensor_inspection.py](../../drf-server/apps/facilities/models/gas_sensor_inspection.py) | updated_by |
-| PowerDeviceInspection | [power_device_inspection.py](../../drf-server/apps/facilities/models/power_device_inspection.py) | updated_by |
-| GeoFence | [geofence.py](../../drf-server/apps/geofence/models/geofence.py) | updated_by |
-| SafetyStatus | [safety.py](../../drf-server/apps/safety/models/safety.py) | updated_by |
-| AlarmRecord | [alarm_record.py](../../drf-server/apps/alerts/models/alarm_record.py) | updated_at + updated_by (save override로 수정 차단 유지) |
-| Event | [event.py](../../drf-server/apps/alerts/models/event.py) | updated_at + updated_by |
-| Notification | [notification.py](../../drf-server/apps/notifications/models/notification.py) | updated_at + updated_by |
-| PowerEvent | [power_event.py](../../drf-server/apps/monitoring/models/power_event.py) | updated_at + updated_by |
+| DeviceBase (abstract) | [devices.py](../../../drf-server/apps/facilities/models/devices.py) | updated_by → 자식 GasSensor/PowerDevice/PositionNode 자동 적용 |
+| Facility | [facility.py](../../../drf-server/apps/facilities/models/facility.py) | updated_by |
+| GasSensorInspection | [gas_sensor_inspection.py](../../../drf-server/apps/facilities/models/gas_sensor_inspection.py) | updated_by |
+| PowerDeviceInspection | [power_device_inspection.py](../../../drf-server/apps/facilities/models/power_device_inspection.py) | updated_by |
+| GeoFence | [geofence.py](../../../drf-server/apps/geofence/models/geofence.py) | updated_by |
+| SafetyStatus | [safety.py](../../../drf-server/apps/safety/models/safety.py) | updated_by |
+| AlarmRecord | [alarm_record.py](../../../drf-server/apps/alerts/models/alarm_record.py) | updated_at + updated_by (save override로 수정 차단 유지) |
+| Event | [event.py](../../../drf-server/apps/alerts/models/event.py) | updated_at + updated_by |
+| Notification | [notification.py](../../../drf-server/apps/notifications/models/notification.py) | updated_at + updated_by |
+| PowerEvent | [power_event.py](../../../drf-server/apps/monitoring/models/power_event.py) | updated_at + updated_by |
 
 각 모델: `class X(BaseModel):` + `created_at`/`updated_at` 직접 정의 제거 + `# created_at / updated_at / updated_by 는 BaseModel 상속` 주석 명시.
 

@@ -55,7 +55,7 @@
 
 | 파일 | 모델 | 역할 |
 |---|---|---|
-| [safety/models/safety_check_section.py](../../drf-server/apps/safety/models/safety_check_section.py) | `SafetyCheckSection` | 체크리스트 섹션 마스터 (공장별 + facility FK PROTECT). BaseModel 상속 + Soft Delete |
+| [safety/models/safety_check_section.py](../../../drf-server/apps/safety/models/safety_check_section.py) | `SafetyCheckSection` | 체크리스트 섹션 마스터 (공장별 + facility FK PROTECT). BaseModel 상속 + Soft Delete |
 
 ### 3-2. 마이그레이션
 
@@ -75,19 +75,19 @@
 
 | 파일 | 변경 |
 |---|---|
-| [safety/models/safety.py](../../drf-server/apps/safety/models/safety.py) | `SafetyCheckItem.section` FK 추가 (PROTECT, related_name="items"). 마이그 1단계는 nullable, 5단계 적용 후 NOT NULL |
-| [safety/models/__init__.py](../../drf-server/apps/safety/models/__init__.py) | `SafetyCheckSection` re-export |
-| [alerts/models/event.py](../../drf-server/apps/alerts/models/event.py) | `description` (TextField, 상세 본문), `status_note` (TextField, 처리자 메모), `policy` FK (AlertPolicy, SET_NULL, related_name="events") 추가 |
-| [notifications/models/notification.py](../../drf-server/apps/notifications/models/notification.py) | `event` FK CASCADE → SET_NULL + nullable, `policy` FK (AlertPolicy, SET_NULL), `retry_count` (PositiveInteger, default 0), `last_attempted_at` (DateTime nullable). `clean()`에 event/policy 중 하나 필수 검증 추가 |
+| [safety/models/safety.py](../../../drf-server/apps/safety/models/safety.py) | `SafetyCheckItem.section` FK 추가 (PROTECT, related_name="items"). 마이그 1단계는 nullable, 5단계 적용 후 NOT NULL |
+| [safety/models/__init__.py](../../../drf-server/apps/safety/models/__init__.py) | `SafetyCheckSection` re-export |
+| [alerts/models/event.py](../../../drf-server/apps/alerts/models/event.py) | `description` (TextField, 상세 본문), `status_note` (TextField, 처리자 메모), `policy` FK (AlertPolicy, SET_NULL, related_name="events") 추가 |
+| [notifications/models/notification.py](../../../drf-server/apps/notifications/models/notification.py) | `event` FK CASCADE → SET_NULL + nullable, `policy` FK (AlertPolicy, SET_NULL), `retry_count` (PositiveInteger, default 0), `last_attempted_at` (DateTime nullable). `clean()`에 event/policy 중 하나 필수 검증 추가 |
 
 ### 4-2. settings / 어드민
 
 | 파일 | 변경 |
 |---|---|
 | [config/settings.py](../../drf-server/config/settings.py) | `NOTIFICATION_DELAY_THRESHOLD_MINUTES = env.int(..., default=5)` 추가 — 동적 "지연" 판정 임계값 (§4-6 ⓒ) |
-| [safety/admin.py](../../drf-server/apps/safety/admin.py) | `SafetyCheckSectionAdmin` 신규 등록. `SafetyCheckItemAdmin`에 section list_display + filter + select_related 추가 |
-| [alerts/admin.py](../../drf-server/apps/alerts/admin.py) | EventAdmin에 policy list_display + filter, search_fields에 description/status_note 추가, list_select_related 확장 |
-| [notifications/admin.py](../../drf-server/apps/notifications/admin.py) | NotificationAdmin에 retry_count list_display, readonly_fields에 last_attempted_at 추가 |
+| [safety/admin.py](../../../drf-server/apps/safety/admin.py) | `SafetyCheckSectionAdmin` 신규 등록. `SafetyCheckItemAdmin`에 section list_display + filter + select_related 추가 |
+| [alerts/admin.py](../../../drf-server/apps/alerts/admin.py) | EventAdmin에 policy list_display + filter, search_fields에 description/status_note 추가, list_select_related 확장 |
+| [notifications/admin.py](../../../drf-server/apps/notifications/admin.py) | NotificationAdmin에 retry_count list_display, readonly_fields에 last_attempted_at 추가 |
 
 ---
 

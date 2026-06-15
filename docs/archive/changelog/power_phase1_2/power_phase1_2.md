@@ -2,7 +2,7 @@
 
 > **요약 한 줄**: 전력 알람을 "W 단일축·절대값(2200/2860W)" → "W·A·V 3축·채널별 정격 % 기반"으로 전환하고, 채널-설비 매핑을 DB(`PowerDevice.channel_meta`)로 이관해 운영자가 어드민에서 직접 관리하게 한다.
 
-**브랜치**: `feature/power_refactory` (Alarm Phase 1+2 후속) · **커밋**: 6개 (C1~C6) · **머지 PR 단위**: 단일 PR · **상세 plan**: [skill/plan/power-threshold-roadmap.md](../../../skill/plan/power-threshold-roadmap.md) §1~2단계 (gitignore 영역)
+**브랜치**: `feature/power_refactory` (Alarm Phase 1+2 후속) · **커밋**: 6개 (C1~C6) · **머지 PR 단위**: 단일 PR · **상세 plan**: [skill/plan/power-threshold-roadmap.md](../../../../skill/plan/power-threshold-roadmap.md) §1~2단계 (gitignore 영역)
 
 ---
 
@@ -15,7 +15,7 @@
 | 평가 축 | W(전력) 단일 | 전류·전압 이상 미감지 |
 | 임계치 기준 | 절대값 (2200W / 2860W) | 정격이 다른 설비에 동일 기준 → 오탐·미탐 |
 | 저전압 위험 | 감지 불가 | V² ∝ 토크, 저전압이 모터 과부하 유발하지만 알람 없음 |
-| 채널 라벨 | 코드 하드코딩 ([_CHANNEL_NAME](../../../drf-server/apps/monitoring/services/power_alarm.py), CHANNEL_TO_DEVICE) | 사이트별 다른 설비 매핑을 코드 수정 없이 못 바꿈 |
+| 채널 라벨 | 코드 하드코딩 ([_CHANNEL_NAME](../../../../drf-server/apps/monitoring/services/power_alarm.py), CHANNEL_TO_DEVICE) | 사이트별 다른 설비 매핑을 코드 수정 없이 못 바꿈 |
 | 채널 정보 출처 | 8개 채널만 라벨, 9-16은 "CH9~CH16" | 도메인 입력이 부재한 상태로 운영 어려움 |
 
 ### 코드 검토에서 확인한 결함 5가지
@@ -50,11 +50,11 @@
 ### C1 — `channel_meta` 16채널 추정값 시드 + 어드민 노출
 
 **무엇**
-- 신규 [drf-server/apps/facilities/migrations/0017_seed_power_channel_meta.py](../../../drf-server/apps/facilities/migrations/0017_seed_power_channel_meta.py) — RunPython 데이터 마이그레이션
+- 신규 [drf-server/apps/facilities/migrations/0017_seed_power_channel_meta.py](../../../../drf-server/apps/facilities/migrations/0017_seed_power_channel_meta.py) — RunPython 데이터 마이그레이션
   - 16채널 `{name, rated_w, rated_a, rated_v}` 추정값 시드 (압연기 7.5kW, 송풍기 3.7kW, ... 조명/제어 1kW @220V, 예비 등)
   - **per-key merge**: 이미 운영자가 입력한 키는 보존, 누락 채널만 채움 (운영 DB 보호)
   - revert는 no-op (운영자 정정값과 시드값 구분 불가)
-- 수정 [drf-server/apps/facilities/admin.py:59-93](../../../drf-server/apps/facilities/admin.py#L59-L93) — `PowerDeviceAdmin.fields`에 `channel_meta` 노출
+- 수정 [drf-server/apps/facilities/admin.py:59-93](../../../../drf-server/apps/facilities/admin.py#L59-L93) — `PowerDeviceAdmin.fields`에 `channel_meta` 노출
 
 **왜**
 - `PowerDevice` 한 대의 16채널이 서로 다른 설비라 디바이스 단위 정격은 부적합. JSON 채널 단위 저장이 도메인과 일치
@@ -77,7 +77,7 @@ print(d.channel_meta['1'])
 ### C2 — Threshold 그룹 `power_facility_default` 시드
 
 **무엇**
-- 신규 [drf-server/apps/facilities/migrations/0018_seed_power_facility_default.py](../../../drf-server/apps/facilities/migrations/0018_seed_power_facility_default.py)
+- 신규 [drf-server/apps/facilities/migrations/0018_seed_power_facility_default.py](../../../../drf-server/apps/facilities/migrations/0018_seed_power_facility_default.py)
   - `ThresholdGroup("power_facility_default")` + 3 Threshold row
   - `power_w`: warning 80%, danger 100% (단방향)
   - `current`: warning 80%, danger 100% (단방향)
@@ -93,7 +93,7 @@ print(d.channel_meta['1'])
 ### C3 — 평가 함수 W·A·V 3축 확장
 
 **무엇**
-- 수정 [drf-server/apps/facilities/services/threshold_service.py](../../../drf-server/apps/facilities/services/threshold_service.py) L134~ 신규 5개 함수
+- 수정 [drf-server/apps/facilities/services/threshold_service.py](../../../../drf-server/apps/facilities/services/threshold_service.py) L134~ 신규 5개 함수
   - `_get_channel_rated(device_id, channel, key)` — channel_meta에서 정격 조회. device_id 단위 60초 캐시
   - `_evaluate_with_rated(value, rated, threshold, bidirectional=False)` — 정격 % 환산, `>=` 시맨틱(가스와 일관)
   - `_legacy_power_w_absolute(watt)` — `power_default` 절대값 fallback (`>` 시맨틱, 기존 회귀 방지)
@@ -118,7 +118,7 @@ print(d.channel_meta['1'])
 ### C4 — `power_alarm.py` 3축 통합 (max-of-3 aggregate)
 
 **무엇**
-- 수정 [drf-server/apps/monitoring/services/power_alarm.py](../../../drf-server/apps/monitoring/services/power_alarm.py) — 전체 재구성
+- 수정 [drf-server/apps/monitoring/services/power_alarm.py](../../../../drf-server/apps/monitoring/services/power_alarm.py) — 전체 재구성
   - `_CHANNEL_NAME` 하드코딩 삭제 → `_channel_label(device, channel)`이 `device.channel_meta[ch]["name"]` 조회, 미지정 시 `"CH{n}"` fallback
   - 신규 헬퍼: `_axis_risk_key`, `_aggregate_risk`, `_max_risk`, `_EVALUATORS` 매핑
   - `trigger_power_alarms`:
@@ -152,17 +152,17 @@ print(d.channel_meta['1'])
 ### C5 — FastAPI WS 페이로드 3축 필드 + `channel_meta` 캐시
 
 **무엇**
-- 신규 [fastapi-server/power/services/channel_meta_cache.py](../../../fastapi-server/power/services/channel_meta_cache.py)
+- 신규 [fastapi-server/power/services/channel_meta_cache.py](../../../../fastapi-server/power/services/channel_meta_cache.py)
   - 5분 주기로 DRF `GET /api/monitoring/power/channel-meta/` 호출 → 모듈 캐시 갱신
   - `get_channel_entry(device_id, channel)` — 라벨·정격 조회 헬퍼
-- 신규 [drf-server/apps/monitoring/views/power_data.py](../../../drf-server/apps/monitoring/views/power_data.py) `PowerChannelMetaView`
+- 신규 [drf-server/apps/monitoring/views/power_data.py](../../../../drf-server/apps/monitoring/views/power_data.py) `PowerChannelMetaView`
   - 활성 PowerDevice의 `channel_meta` JSON 노출 (AllowAny, `PowerThresholdView`와 동일 정책)
-- 수정 [fastapi-server/power/services/power_service.py](../../../fastapi-server/power/services/power_service.py)
+- 수정 [fastapi-server/power/services/power_service.py](../../../../fastapi-server/power/services/power_service.py)
   - `CHANNEL_TO_DEVICE` 하드코딩 삭제
   - `_eval_axis_pct(value, rated, axis)` — 정격 % 환산 표시용 (DRF와 동일 `>=` 시맨틱)
   - `build_equipment()` 페이로드에 `power_risk`/`current_risk`/`voltage_risk` + `risk_level = max(3축)` 추가
   - 정격 정보 없는 채널은 `POWER_THRESHOLDS` 절대값 watt fallback (graceful)
-- 수정 [fastapi-server/app.py](../../../fastapi-server/app.py) lifespan에 `channel_meta_refresh_loop` 추가
+- 수정 [fastapi-server/app.py](../../../../fastapi-server/app.py) lifespan에 `channel_meta_refresh_loop` 추가
 
 **왜**
 - 채널 라벨은 DRF가 단일 진실 공급원 → fastapi는 표시용으로 fetch
@@ -188,11 +188,11 @@ eq, _ = build_equipment()
 ### C6 — 테스트
 
 **무엇**
-- 신규 [drf-server/apps/facilities/tests/test_evaluate_power_axes.py](../../../drf-server/apps/facilities/tests/test_evaluate_power_axes.py) — 8 케이스
+- 신규 [drf-server/apps/facilities/tests/test_evaluate_power_axes.py](../../../../drf-server/apps/facilities/tests/test_evaluate_power_axes.py) — 8 케이스
   - W·A·V 경계값 (79/80/81%, 99/100/101%, 양방향 89/90/91%, 109/110/111%)
   - graceful 경로 (정격 미입력, 임계치 그룹 부재)
   - 후방 호환 (`evaluate_power_risk(watt)` 무인자)
-- 신규 [drf-server/apps/monitoring/tests/test_power_alarm_axis_combine.py](../../../drf-server/apps/monitoring/tests/test_power_alarm_axis_combine.py) — 6 케이스
+- 신규 [drf-server/apps/monitoring/tests/test_power_alarm_axis_combine.py](../../../../drf-server/apps/monitoring/tests/test_power_alarm_axis_combine.py) — 6 케이스
   - 축별 캐시 격리 (W·A·V 키 독립)
   - W WARNING → A DANGER 진입 시 fire 정확히 1회씩 (중복 차단)
   - 저전압 단독 DANGER (이전엔 못 잡던 위험)

@@ -33,18 +33,18 @@ fastapi-server 측에 단위 테스트 인프라 부재 — 회귀 점검 Step 3
 
 | 파일 | 역할 |
 |---|---|
-| [fastapi-server/pytest.ini](../../fastapi-server/pytest.ini) | `asyncio_mode = auto` (pytest-asyncio 자동 모드) + 디스커버리 패턴 + `--strict-markers` |
-| [fastapi-server/conftest.py](../../fastapi-server/conftest.py) | placeholder docstring (단위 테스트 위주, 외부 의존 없음). 추후 통합 테스트 도입 시 httpx mock fixture 확장 |
-| [fastapi-server/requirements-dev.txt](../../fastapi-server/requirements-dev.txt) | `pytest==9.0.3`, `pytest-asyncio==1.3.0` |
-| [fastapi-server/tests/__init__.py](../../fastapi-server/tests/__init__.py) | namespace package → 일반 패키지 (drf-server 패턴 일관) |
+| [fastapi-server/pytest.ini](../../../fastapi-server/pytest.ini) | `asyncio_mode = auto` (pytest-asyncio 자동 모드) + 디스커버리 패턴 + `--strict-markers` |
+| [fastapi-server/conftest.py](../../../fastapi-server/conftest.py) | placeholder docstring (단위 테스트 위주, 외부 의존 없음). 추후 통합 테스트 도입 시 httpx mock fixture 확장 |
+| [fastapi-server/requirements-dev.txt](../../../fastapi-server/requirements-dev.txt) | `pytest==9.0.3`, `pytest-asyncio==1.3.0` |
+| [fastapi-server/tests/__init__.py](../../../fastapi-server/tests/__init__.py) | namespace package → 일반 패키지 (drf-server 패턴 일관) |
 
 ### 3-2. 스모크 테스트 (3개 — 22 tests)
 
 | 파일 | 회귀 커버 |
 |---|---|
-| [tests/test_gas_thresholds.py](../../fastapi-server/tests/test_gas_thresholds.py) | `evaluate_single_gas` 12 분기 (parametrize) + max_risk 합성 + lel 제외 + 9종 키 일관 |
-| [tests/test_position_schema.py](../../fastapi-server/tests/test_position_schema.py) | WorkerPositionSchema `node_id` Optional + x/y >= 0 + movement_status default |
-| [tests/test_drf_client.py](../../fastapi-server/tests/test_drf_client.py) | INTEGRATION_LOG_PATH 자체 호출 시 IntegrationLog 기록 skip (재귀 회피) + fire-and-forget silent fail + 일반 경로 호출 시 IntegrationLog 기록 |
+| [tests/test_gas_thresholds.py](../../../fastapi-server/tests/test_gas_thresholds.py) | `evaluate_single_gas` 12 분기 (parametrize) + max_risk 합성 + lel 제외 + 9종 키 일관 |
+| [tests/test_position_schema.py](../../../fastapi-server/tests/test_position_schema.py) | WorkerPositionSchema `node_id` Optional + x/y >= 0 + movement_status default |
+| [tests/test_drf_client.py](../../../fastapi-server/tests/test_drf_client.py) | INTEGRATION_LOG_PATH 자체 호출 시 IntegrationLog 기록 skip (재귀 회피) + fire-and-forget silent fail + 일반 경로 호출 시 IntegrationLog 기록 |
 
 ---
 
@@ -74,7 +74,7 @@ drf-server 패턴 차용:
 `pytest-asyncio` 자동 모드 — `@pytest.mark.asyncio` 명시 불필요 (auto 적용). drf_client 비동기 함수 테스트 단순화.
 
 ### 5-3. DRF 측 임계치 일관 검증
-[tests/test_gas_thresholds.py::test_evaluate_single_gas_matches_drf_thresholds](../../fastapi-server/tests/test_gas_thresholds.py)는 fastapi `GAS_THRESHOLDS`와 DRF `threshold_default.json`이 동일 분기 결과를 내는지 12 케이스 검증. 단일 진실 공급원 정책 위반 시 본 테스트가 실패.
+[tests/test_gas_thresholds.py::test_evaluate_single_gas_matches_drf_thresholds](../../../fastapi-server/tests/test_gas_thresholds.py)는 fastapi `GAS_THRESHOLDS`와 DRF `threshold_default.json`이 동일 분기 결과를 내는지 12 케이스 검증. 단일 진실 공급원 정책 위반 시 본 테스트가 실패.
 
 ### 5-4. drf-server 영향 0 확인
 fastapi-server 변경은 drf-server 측 코드/테스트에 영향 없음. 회귀 점검 Step 3의 56 tests 그대로 통과.

@@ -24,33 +24,33 @@
 
 ### 1.2 백엔드 파일
 - **drf 인입**:
-  - [drf-server/apps/monitoring/views/gas_data.py](../../../drf-server/apps/monitoring/views/gas_data.py) — 100줄, 무인증 ingest
+  - [drf-server/apps/monitoring/views/gas_data.py](../../../../drf-server/apps/monitoring/views/gas_data.py) — 100줄, 무인증 ingest
   - power 인입 view들 (PowerDataBulkIngestView, PowerEventIngestView)
 - **drf 어드민 조회**:
-  - [drf-server/apps/monitoring/views/gas_data_admin.py](../../../drf-server/apps/monitoring/views/gas_data_admin.py) — 308줄
-  - [drf-server/apps/monitoring/views/power_data_admin.py](../../../drf-server/apps/monitoring/views/power_data_admin.py) — 260줄
+  - [drf-server/apps/monitoring/views/gas_data_admin.py](../../../../drf-server/apps/monitoring/views/gas_data_admin.py) — 308줄
+  - [drf-server/apps/monitoring/views/power_data_admin.py](../../../../drf-server/apps/monitoring/views/power_data_admin.py) — 260줄
 - **drf 모델/임계치**:
-  - [drf-server/apps/monitoring/models/](../../../drf-server/apps/monitoring/models/) — GasData, PowerData, PowerEvent
-  - [drf-server/apps/facilities/models/thresholds.py](../../../drf-server/apps/facilities/models/thresholds.py) — Facility별 임계치 (PR-G 추가)
+  - [drf-server/apps/monitoring/models/](../../../../drf-server/apps/monitoring/models/) — GasData, PowerData, PowerEvent
+  - [drf-server/apps/facilities/models/thresholds.py](../../../../drf-server/apps/facilities/models/thresholds.py) — Facility별 임계치 (PR-G 추가)
 - **fastapi 인입**:
-  - [fastapi-server/gas/routers/gas_router.py](../../../fastapi-server/gas/routers/gas_router.py) — 57줄
-  - [fastapi-server/gas/services/gas_service.py](../../../fastapi-server/gas/services/gas_service.py) — 108줄
-  - [fastapi-server/gas/schemas/gas.py](../../../fastapi-server/gas/schemas/gas.py) — Pydantic 검증
-  - [fastapi-server/core/gas_thresholds.py](../../../fastapi-server/core/gas_thresholds.py) — 86줄, **전역 정적 dict**
+  - [fastapi-server/gas/routers/gas_router.py](../../../../fastapi-server/gas/routers/gas_router.py) — 57줄
+  - [fastapi-server/gas/services/gas_service.py](../../../../fastapi-server/gas/services/gas_service.py) — 108줄
+  - [fastapi-server/gas/schemas/gas.py](../../../../fastapi-server/gas/schemas/gas.py) — Pydantic 검증
+  - [fastapi-server/core/gas_thresholds.py](../../../../fastapi-server/core/gas_thresholds.py) — 86줄, **전역 정적 dict**
   - power/* (router·service)
 
 ### 1.3 프론트엔드 파일
 - 실시간 모니터링:
-  - [drf-server/static/js/detail/gas_monitoring.js](../../../drf-server/static/js/detail/gas_monitoring.js)
-  - [drf-server/static/js/detail/websocket_gas.js](../../../drf-server/static/js/detail/websocket_gas.js)
-  - [drf-server/static/js/detail/power_system.js](../../../drf-server/static/js/detail/power_system.js)
-  - [drf-server/static/js/detail/websocket_power.js](../../../drf-server/static/js/detail/websocket_power.js)
+  - [drf-server/static/js/detail/gas_monitoring.js](../../../../drf-server/static/js/detail/gas_monitoring.js)
+  - [drf-server/static/js/detail/websocket_gas.js](../../../../drf-server/static/js/detail/websocket_gas.js)
+  - [drf-server/static/js/detail/power_system.js](../../../../drf-server/static/js/detail/power_system.js)
+  - [drf-server/static/js/detail/websocket_power.js](../../../../drf-server/static/js/detail/websocket_power.js)
 - 어드민 데이터 조회:
-  - [drf-server/static/js/admin/gas/gas_data.js](../../../drf-server/static/js/admin/gas/gas_data.js)
-  - [drf-server/static/js/admin/power/power_data.js](../../../drf-server/static/js/admin/power/power_data.js)
+  - [drf-server/static/js/admin/gas/gas_data.js](../../../../drf-server/static/js/admin/gas/gas_data.js)
+  - [drf-server/static/js/admin/power/power_data.js](../../../../drf-server/static/js/admin/power/power_data.js)
 - 템플릿:
-  - [drf-server/templates/snb_details/monitoring_{gas,power,realtime}.html](../../../drf-server/templates/snb_details/)
-  - [drf-server/templates/admin_panel/data/{gas,power}_data.html](../../../drf-server/templates/admin_panel/data/)
+  - [drf-server/templates/snb_details/monitoring_{gas,power,realtime}.html](../../../../drf-server/templates/snb_details/)
+  - [drf-server/templates/admin_panel/data/{gas,power}_data.html](../../../../drf-server/templates/admin_panel/data/)
 
 ## 2. 기능 흐름
 
@@ -103,15 +103,15 @@
 
 ### 3.1 일반 코드 리뷰
 - **[중] gas_thresholds.py가 전역 정적 dict**
-  [gas_thresholds.py:14-25](../../../fastapi-server/core/gas_thresholds.py#L14-L25) `GAS_THRESHOLDS`가 모듈 상수. PR-G에서 facility별 정책(`gas_facility_default`)을 도입했으나 **fastapi 측은 여전히 단일 값 사용**. drf의 facility별 정책과 fastapi의 정적 정책이 분기되면 같은 측정값이 두 서버에서 다르게 평가됨. fastapi가 facility별 임계치를 DRF에서 동기 fetch하거나 Redis 캐시하는 패턴 필요.
+  [gas_thresholds.py:14-25](../../../../fastapi-server/core/gas_thresholds.py#L14-L25) `GAS_THRESHOLDS`가 모듈 상수. PR-G에서 facility별 정책(`gas_facility_default`)을 도입했으나 **fastapi 측은 여전히 단일 값 사용**. drf의 facility별 정책과 fastapi의 정적 정책이 분기되면 같은 측정값이 두 서버에서 다르게 평가됨. fastapi가 facility별 임계치를 DRF에서 동기 fetch하거나 Redis 캐시하는 패턴 필요.
 - **[중] gas_service의 `gas_data._alarms` 매직 어트리뷰트**
-  [gas_data.py:95](../../../drf-server/apps/monitoring/views/gas_data.py#L95) `getattr(gas_data, "_alarms", [])`. `_alarms`는 GasData 모델 필드 아닌 **GasDataCreateSerializer.save()가 동적으로 부착**하는 attr로 보임. 코드 흐름이 마법적이라 디버깅 어려움. `serializer.save()`가 tuple `(gas_data, alarms)` 반환 또는 service가 dict 반환 권장.
+  [gas_data.py:95](../../../../drf-server/apps/monitoring/views/gas_data.py#L95) `getattr(gas_data, "_alarms", [])`. `_alarms`는 GasData 모델 필드 아닌 **GasDataCreateSerializer.save()가 동적으로 부착**하는 attr로 보임. 코드 흐름이 마법적이라 디버깅 어려움. `serializer.save()`가 tuple `(gas_data, alarms)` 반환 또는 service가 dict 반환 권장.
 - **[중] raw_payload 저장 비용**
   fastapi가 DRF에 보낼 때 `raw_payload: payload.model_dump(mode="json")` 동봉 — 모든 GasData row가 원본 JSON을 1조각씩 더 보관. 1초 1행, 9~10필드면 한 row당 ~500바이트 추가 → 1년 운영 시 GB 급. 정상적으로 검증된 후엔 raw_payload 보관 정책 검토(retention 30일?).
 - **[하] gas_router.py 짧지만 power_router는 본문 미확인**
   power 측은 4개 엔드포인트로 분산. 채널 데이터를 stream별로 분리한 게 IoT 측 요구라면 OK. service에서 일관 처리 패턴 확인 필요.
 - **[하] DRF 통신 에러 코드 매핑이 service에**
-  [gas_service.py:71-81](../../../fastapi-server/gas/services/gas_service.py#L71-L81) `if exc.status is None: 503; if 404; else 502`. 같은 패턴이 power/positioning service에도 있을 가능성 — `services/drf_client.py::raise_drf_error_as_http(exc)` 헬퍼로 중복 제거.
+  [gas_service.py:71-81](../../../../fastapi-server/gas/services/gas_service.py#L71-L81) `if exc.status is None: 503; if 404; else 502`. 같은 패턴이 power/positioning service에도 있을 가능성 — `services/drf_client.py::raise_drf_error_as_http(exc)` 헬퍼로 중복 제거.
 
 ### 3.2 아키텍처/레이어
 - **[참고] gas/power 도메인 분리 (fastapi side)**
@@ -125,7 +125,7 @@
 
 ### 3.3 보안 관점 (요약)
 - **[상] 무인증 ingest 엔드포인트의 외부 노출 위험**
-  [GasDataCreateView:23-24](../../../drf-server/apps/monitoring/views/gas_data.py#L23-L24) `authentication_classes = []`. 의도(서버 간)는 명확하고 주석에도 "Phase 5에서 보호 예정"이라 명시. 그러나 **현재 운영 중이라면** reverse proxy 차단·내부 네트워크 격리·서비스 토큰 중 1개라도 즉시 시급. 외부에 노출 시 임의 측정값 위변조 → 알람 폭주 또는 위험 무시 가능.
+  [GasDataCreateView:23-24](../../../../drf-server/apps/monitoring/views/gas_data.py#L23-L24) `authentication_classes = []`. 의도(서버 간)는 명확하고 주석에도 "Phase 5에서 보호 예정"이라 명시. 그러나 **현재 운영 중이라면** reverse proxy 차단·내부 네트워크 격리·서비스 토큰 중 1개라도 즉시 시급. 외부에 노출 시 임의 측정값 위변조 → 알람 폭주 또는 위험 무시 가능.
 - **[상] fastapi → drf 호출에는 토큰이 있으나, drf → fastapi의 알람 push에는 토큰 없음 (04에서 다룸)**
 - **[중] CSV export 파라미터 검증**
   GET /api/admin/{gas,power}-data/export/는 from/to 등 파라미터에 대량 데이터 추출 가능. 기간 제한·rate limit 없으면 DoS 또는 정보 추출 위험. 1년 치 일괄 추출 가능 여부 확인 필요.
@@ -160,8 +160,8 @@
 - **장점**: 위변조·DoS·내부 네트워크 침투 차단.
 - **단점**: fastapi 측 호출 코드에 토큰 헤더 추가 필요 (1줄).
 - **변경 위치**:
-  - [GasDataCreateView, PowerDataBulkIngestView, PowerEventIngestView](../../../drf-server/apps/monitoring/views/gas_data.py#L23) `authentication_classes = [ServiceTokenAuthentication]` 도입.
-  - [apps/core/auth.py](../../../drf-server/apps/core/) 또는 별도 — `Authorization: Bearer <DRF_SERVICE_TOKEN>` 검증.
+  - [GasDataCreateView, PowerDataBulkIngestView, PowerEventIngestView](../../../../drf-server/apps/monitoring/views/gas_data.py#L23) `authentication_classes = [ServiceTokenAuthentication]` 도입.
+  - [apps/core/auth.py](../../../../drf-server/apps/core/) 또는 별도 — `Authorization: Bearer <DRF_SERVICE_TOKEN>` 검증.
   - fastapi `services/drf_client.py`는 이미 토큰을 보내고 있으니 DRF 측만 검증 추가하면 됨.
 
 ### F2. 장비 인증·등록 절차 (장기) [상 · 대]
@@ -174,13 +174,13 @@
 - **왜 필요?**: drf의 facility별 임계치(PR-G)와 fastapi의 정적 임계치가 분기. 같은 측정값이 다르게 평가됨.
 - **장점**: 진실 원천 단일화 / 정책 변경 1곳.
 - **단점**: fastapi가 DRF API 의존 → 시작 시 fetch + 주기적 refresh 또는 캐시 무효화 신호 필요.
-- **변경 위치**: [core/gas_thresholds.py](../../../fastapi-server/core/gas_thresholds.py) — `GAS_THRESHOLDS = {}` (캐시), 시작 시 `GET /api/admin/threshold-policies/`로 로드, 변경 시 SSE/Redis 또는 폴링.
+- **변경 위치**: [core/gas_thresholds.py](../../../../fastapi-server/core/gas_thresholds.py) — `GAS_THRESHOLDS = {}` (캐시), 시작 시 `GET /api/admin/threshold-policies/`로 로드, 변경 시 SSE/Redis 또는 폴링.
 
 ### F4. CSV export 보호 [중 · 소]
 - **왜 필요?**: 무제한 기간 export는 DoS·정보 추출 위험.
 - **장점**: 시스템 안정성 / 데이터 보호.
 - **단점**: 큰 데이터 운영 보고가 필요한 경우 별도 절차 필요.
-- **변경 위치**: [GasDataAdminExportView, PowerDataAdminExportView](../../../drf-server/apps/monitoring/views/gas_data_admin.py) — 최대 기간 90일 검증 + StreamingHttpResponse + rate limit (django-ratelimit).
+- **변경 위치**: [GasDataAdminExportView, PowerDataAdminExportView](../../../../drf-server/apps/monitoring/views/gas_data_admin.py) — 최대 기간 90일 검증 + StreamingHttpResponse + rate limit (django-ratelimit).
 
 ### F5. raw_payload 보존 정책 [중 · 중]
 - **왜 필요?**: 매 row 500바이트 추가 → 1년 GB. 디버깅 외 가치 낮음.
@@ -192,21 +192,21 @@
 - **왜 필요?**: serializer.save()가 모델에 동적 attr 붙이는 패턴은 디버깅·테스트 어려움.
 - **장점**: 흐름 명시 / 타입 힌트 가능.
 - **단점**: 호출 시그니처 변경 (사용처 1곳).
-- **변경 위치**: [GasDataCreateSerializer.save](../../../drf-server/apps/monitoring/serializers/) → tuple 반환 또는 service 호출로 분리.
+- **변경 위치**: [GasDataCreateSerializer.save](../../../../drf-server/apps/monitoring/serializers/) → tuple 반환 또는 service 호출로 분리.
 
 ### F7. ingest vs admin view 폴더 분리 [중 · 소]
 - **왜 필요?**: 권한·트래픽·SLA가 다른 view가 같은 폴더에 있어 한꺼번에 import.
-- **변경 위치**: [apps/monitoring/views/{ingest,admin}/](../../../drf-server/apps/monitoring/views/) 분리.
+- **변경 위치**: [apps/monitoring/views/{ingest,admin}/](../../../../drf-server/apps/monitoring/views/) 분리.
 
 ### F8. drf_client 에러 매핑 헬퍼 [하 · 소]
 - **왜 필요?**: 503/502/404 매핑이 모든 service에 중복.
-- **변경 위치**: [services/drf_client.py](../../../fastapi-server/services/drf_client.py)에 `raise_as_http(exc)` 헬퍼.
+- **변경 위치**: [services/drf_client.py](../../../../fastapi-server/services/drf_client.py)에 `raise_as_http(exc)` 헬퍼.
 
 ### F9. 차트 1초 redraw 최적화 [하 · 중]
 - **왜 필요?**: 1초 redraw는 모바일/저성능 PC에서 끊김 발생 가능.
 - **장점**: 부드러운 UX / CPU 사용률 절감.
 - **단점**: 라이브러리에 따라 batch update 패턴 학습 필요.
-- **변경 위치**: [websocket_gas.js, websocket_power.js](../../../drf-server/static/js/detail/) — 최근 N개만 ring buffer + requestAnimationFrame.
+- **변경 위치**: [websocket_gas.js, websocket_power.js](../../../../drf-server/static/js/detail/) — 최근 N개만 ring buffer + requestAnimationFrame.
 
 ### F10. CSV 다운로드 streaming + progress [하 · 중]
 - **왜 필요?**: 큰 데이터 추출 시 브라우저 freeze 방지.

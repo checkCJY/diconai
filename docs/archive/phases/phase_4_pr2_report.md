@@ -36,13 +36,13 @@ Phase 3-d/3-e에서 추가했던 Event.policy / Notification.policy FK가 비로
 
 | 파일 | 테스트 | 검증 |
 |---|---|---|
-| [alerts/tests/test_policy_matcher.py](../../drf-server/apps/alerts/tests/test_policy_matcher.py) | `test_match_specific_facility` | target_facility 일치 매칭 |
+| [alerts/tests/test_policy_matcher.py](../../../drf-server/apps/alerts/tests/test_policy_matcher.py) | `test_match_specific_facility` | target_facility 일치 매칭 |
 | | `test_match_global_policy_when_facility_specific_absent` | 전사(NULL) 정책 fallback |
 | | `test_match_specific_takes_priority_over_global` | 특정 facility > 전사 우선순위 |
 | | `test_no_match_returns_none` | 일치 없음 → None |
 | | `test_save_policy_updates_condition_summary` | save_policy() condition_summary 자동 갱신 |
 | | `test_compute_condition_summary_global` | 전사 정책 요약에 "전사" 포함 |
-| [notifications/tests/test_template_renderer.py](../../drf-server/apps/notifications/tests/test_template_renderer.py) | `test_simple_substitution` | 단순 변수 치환 |
+| [notifications/tests/test_template_renderer.py](../../../drf-server/apps/notifications/tests/test_template_renderer.py) | `test_simple_substitution` | 단순 변수 치환 |
 | | `test_if_branch_danger` | `{% if level == 'danger' %}` 분기 |
 | | `test_if_branch_warning` | `{% if level == 'danger' %}{% else %}` 분기 |
 | | `test_empty_template_returns_fallback` | 빈 템플릿 → fallback |
@@ -54,9 +54,9 @@ Phase 3-d/3-e에서 추가했던 Event.policy / Notification.policy FK가 비로
 
 | 파일 | 역할 |
 |---|---|
-| [alerts/services/policy_matcher.py](../../drf-server/apps/alerts/services/policy_matcher.py) | `match_policy(event_type, facility_id, sensor_id, device_id, geofence_id) -> AlertPolicy | None` — 구체성 점수 기반 매칭 (target_facility 2점 + 자산 매칭 1점). `compute_condition_summary(policy)` 화면 캐시 문자열. `save_policy(policy)` — condition_summary 자동 갱신 진입점 |
-| [notifications/services/template_renderer.py](../../drf-server/apps/notifications/services/template_renderer.py) | `render_alert_message(template, context, fallback="")` — Django Template 렌더 + graceful fallback (TemplateSyntaxError/Exception 모두 logger.warning 후 fallback 반환) |
-| [alerts/migrations/0007_alertpolicy_message_template.py](../../drf-server/apps/alerts/migrations/0007_alertpolicy_message_template.py) | AlertPolicy.message_template TextField 추가 |
+| [alerts/services/policy_matcher.py](../../../drf-server/apps/alerts/services/policy_matcher.py) | `match_policy(event_type, facility_id, sensor_id, device_id, geofence_id) -> AlertPolicy | None` — 구체성 점수 기반 매칭 (target_facility 2점 + 자산 매칭 1점). `compute_condition_summary(policy)` 화면 캐시 문자열. `save_policy(policy)` — condition_summary 자동 갱신 진입점 |
+| [notifications/services/template_renderer.py](../../../drf-server/apps/notifications/services/template_renderer.py) | `render_alert_message(template, context, fallback="")` — Django Template 렌더 + graceful fallback (TemplateSyntaxError/Exception 모두 logger.warning 후 fallback 반환) |
+| [alerts/migrations/0007_alertpolicy_message_template.py](../../../drf-server/apps/alerts/migrations/0007_alertpolicy_message_template.py) | AlertPolicy.message_template TextField 추가 |
 
 신규 테스트 2개도 함께:
 - `alerts/tests/test_policy_matcher.py`
@@ -68,7 +68,7 @@ Phase 3-d/3-e에서 추가했던 Event.policy / Notification.policy FK가 비로
 
 ### 4-1. AlertPolicy 모델
 
-[alerts/models/alert_policy.py](../../drf-server/apps/alerts/models/alert_policy.py):
+[alerts/models/alert_policy.py](../../../drf-server/apps/alerts/models/alert_policy.py):
 ```python
 message_template = TextField(
     blank=True, default="", verbose_name="알림 메시지 템플릿",
@@ -79,7 +79,7 @@ docstring에 예시 포함: `"{{ source_label }}에서 {% if level == 'danger' %
 
 ### 4-2. event_service 통합
 
-[alerts/services/event_service.py](../../drf-server/apps/alerts/services/event_service.py) 의 `create_alarm_and_event` — 새 Event 생성 직전 `match_policy()` 호출. 결과를 `Event.objects.create(policy=policy, ...)`로 전달.
+[alerts/services/event_service.py](../../../drf-server/apps/alerts/services/event_service.py) 의 `create_alarm_and_event` — 새 Event 생성 직전 `match_policy()` 호출. 결과를 `Event.objects.create(policy=policy, ...)`로 전달.
 
 ```python
 from apps.alerts.services.policy_matcher import match_policy
@@ -94,7 +94,7 @@ event = Event.objects.create(..., policy=policy, ...)
 
 ### 4-3. notification_service 통합
 
-[notifications/services/notification_service.py](../../drf-server/apps/notifications/services/notification_service.py) 의 `notify_event_created`:
+[notifications/services/notification_service.py](../../../drf-server/apps/notifications/services/notification_service.py) 의 `notify_event_created`:
 - Event.policy → Notification.policy FK 자동 전달
 - AlertPolicy.message_template + context로 `render_alert_message()` 호출
 - 빈 템플릿/렌더 실패 시 Event.summary fallback (graceful)

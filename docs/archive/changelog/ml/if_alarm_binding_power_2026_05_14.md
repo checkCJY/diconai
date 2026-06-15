@@ -2,8 +2,8 @@
 
 > 작성: 2026-05-14
 > branch: `feature/power_IF_2`
-> 본 sprint plan: [skill/plan/if-data-prep-and-alarm-binding.md](../../../skill/plan/if-data-prep-and-alarm-binding.md) §"트랙 1 v2"
-> 다음 단계: [skill/planB/if-data-prep-followups.md](../../../skill/planB/if-data-prep-followups.md), [skill/plan/alarm-record-integration.md](../../../skill/plan/alarm-record-integration.md)
+> 본 sprint plan: [skill/plan/if-data-prep-and-alarm-binding.md](../../../../skill/plan/if-data-prep-and-alarm-binding.md) §"트랙 1 v2"
+> 다음 단계: [skill/planB/if-data-prep-followups.md](../../../../skill/planB/if-data-prep-followups.md), [skill/plan/alarm-record-integration.md](../../../../skill/plan/alarm-record-integration.md)
 
 ---
 
@@ -126,25 +126,25 @@
 
 | 파일 | 변경 |
 |---|---|
-| [apps/core/constants.py](../../../drf-server/apps/core/constants.py) | `AlarmType.POWER_ANOMALY_AI = "power_anomaly_ai"` ("전력 AI 이상 감지") + `USER_FACING_ALARM_TYPES` 갱신 |
-| [apps/alerts/migrations/0011_*.py](../../../drf-server/apps/alerts/migrations/) | enum 추가 (3 필드 choices) |
-| [apps/alerts/migrations/0012_*.py](../../../drf-server/apps/alerts/migrations/) | enum rename + RunPython data migration (alarm_record 7건 + event 4건 자동 변환) |
-| [apps/ml/views.py](../../../drf-server/apps/ml/views.py) | `MLAnomalyResultCreateView` (`POST /api/ml/anomaly-results/`) + `authentication_classes=[]` (drf_client invalid Bearer 토큰 401 회피) |
-| [apps/ml/urls.py](../../../drf-server/apps/ml/urls.py) | `path("anomaly-results/", ...)` |
-| [apps/ml/tests/test_anomaly_result_create.py](../../../drf-server/apps/ml/tests/test_anomaly_result_create.py) | 4 통합 테스트 |
+| [apps/core/constants.py](../../../../drf-server/apps/core/constants.py) | `AlarmType.POWER_ANOMALY_AI = "power_anomaly_ai"` ("전력 AI 이상 감지") + `USER_FACING_ALARM_TYPES` 갱신 |
+| [apps/alerts/migrations/0011_*.py](../../../../drf-server/apps/alerts/migrations/) | enum 추가 (3 필드 choices) |
+| [apps/alerts/migrations/0012_*.py](../../../../drf-server/apps/alerts/migrations/) | enum rename + RunPython data migration (alarm_record 7건 + event 4건 자동 변환) |
+| [apps/ml/views.py](../../../../drf-server/apps/ml/views.py) | `MLAnomalyResultCreateView` (`POST /api/ml/anomaly-results/`) + `authentication_classes=[]` (drf_client invalid Bearer 토큰 401 회피) |
+| [apps/ml/urls.py](../../../../drf-server/apps/ml/urls.py) | `path("anomaly-results/", ...)` |
+| [apps/ml/tests/test_anomaly_result_create.py](../../../../drf-server/apps/ml/tests/test_anomaly_result_create.py) | 4 통합 테스트 |
 
 ### fastapi (실시간 추론·알람)
 
 | 파일 | 변경 |
 |---|---|
-| [ai/risk_combine.py](../../../fastapi-server/ai/risk_combine.py) (신규) | `combine_risk` 매트릭스 (DRF와 회귀 일치) |
-| [tests/test_risk_combine.py](../../../fastapi-server/tests/test_risk_combine.py) | 8 tests (6 cell + 2 error) |
-| [power/services/threshold_eval.py](../../../fastapi-server/power/services/threshold_eval.py) (신규) | `calculate_power_risk` — 정격 % 환산 (단방향 W/A + 양방향 V) |
-| [tests/test_threshold_eval.py](../../../fastapi-server/tests/test_threshold_eval.py) | 17 tests (W/A/V × normal/warning/danger 경계 14 + edge 3) |
-| [internal/routers/alarm_router.py](../../../fastapi-server/internal/routers/alarm_router.py) | `AnomalyMeta` nested schema 추가 |
-| [tests/test_alarm_payload_anomaly_meta.py](../../../fastapi-server/tests/test_alarm_payload_anomaly_meta.py) | 5 tests (Pydantic validation) |
-| [power/services/power_service.py](../../../fastapi-server/power/services/power_service.py) | `process_anomaly_inference` — channel별 deque + IF 추론 + combine_risk + DRF forward + rate limit + `_safe_push_alarm` |
-| [power/routers/power_router.py](../../../fastapi-server/power/routers/power_router.py) | `recv_watt`에서 `process_anomaly_inference` 호출 |
+| [ai/risk_combine.py](../../../../fastapi-server/ai/risk_combine.py) (신규) | `combine_risk` 매트릭스 (DRF와 회귀 일치) |
+| [tests/test_risk_combine.py](../../../../fastapi-server/tests/test_risk_combine.py) | 8 tests (6 cell + 2 error) |
+| [power/services/threshold_eval.py](../../../../fastapi-server/power/services/threshold_eval.py) (신규) | `calculate_power_risk` — 정격 % 환산 (단방향 W/A + 양방향 V) |
+| [tests/test_threshold_eval.py](../../../../fastapi-server/tests/test_threshold_eval.py) | 17 tests (W/A/V × normal/warning/danger 경계 14 + edge 3) |
+| [internal/routers/alarm_router.py](../../../../fastapi-server/internal/routers/alarm_router.py) | `AnomalyMeta` nested schema 추가 |
+| [tests/test_alarm_payload_anomaly_meta.py](../../../../fastapi-server/tests/test_alarm_payload_anomaly_meta.py) | 5 tests (Pydantic validation) |
+| [power/services/power_service.py](../../../../fastapi-server/power/services/power_service.py) | `process_anomaly_inference` — channel별 deque + IF 추론 + combine_risk + DRF forward + rate limit + `_safe_push_alarm` |
+| [power/routers/power_router.py](../../../../fastapi-server/power/routers/power_router.py) | `recv_watt`에서 `process_anomaly_inference` 호출 |
 
 ---
 
@@ -263,7 +263,7 @@ docker restart diconai-fastapi-1
 
 | 한계 | 영향 | 다음 단계 |
 |---|---|---|
-| **AlarmRecord 미저장** (push만) | 운영 분석·통계·정책 매칭 불가 (양측 공통) | **P0 — [skill/plan/alarm-record-integration.md](../../../skill/plan/alarm-record-integration.md)** (즉시 진입) |
+| **AlarmRecord 미저장** (push만) | 운영 분석·통계·정책 매칭 불가 (양측 공통) | **P0 — [skill/plan/alarm-record-integration.md](../../../../skill/plan/alarm-record-integration.md)** (즉시 진입) |
 | spike·phase_loss recall ~0% | watt 단일 채널 + window=30 구조적 한계 | §3-1 multi-variate IF / §3-2 spike 전용 (planB §P2) |
 | 16채널 일반화 안 됨 | 본 sprint는 ch1·watt 1개 시리즈만 | §3-6 multi-channel (운영 6개월 후) |
 | `_get_or_load` TTL 만료 시 hang | 5분 TTL 만료 후 첫 호출 1회 묶임 | T1-v2-followup-2 (트리거 시) |
@@ -276,8 +276,8 @@ docker restart diconai-fastapi-1
 
 | 트랙 | 본 sprint 영향 | 가이드 |
 |---|---|---|
-| **가스 트랙** (별도 작업자) | 본 sprint 무관 — `gas_service.py` 그대로. P0 인프라 머지 후 helper 호출만 추가하면 일관 패턴 | [alarm-record-integration.md](../../../skill/plan/alarm-record-integration.md) §"가스 트랙 가이드" |
-| **§3 IF 고도화** (다음 sprint) | active 모델 v3 (90일) 베이스. C7 `_INFERENCE_ENABLED_CHANNELS` 확장 + multi-variate 모델 학습 | [planB §P2](../../../skill/planB/if-data-prep-followups.md) |
+| **가스 트랙** (별도 작업자) | 본 sprint 무관 — `gas_service.py` 그대로. P0 인프라 머지 후 helper 호출만 추가하면 일관 패턴 | [alarm-record-integration.md](../../../../skill/plan/alarm-record-integration.md) §"가스 트랙 가이드" |
+| **§3 IF 고도화** (다음 sprint) | active 모델 v3 (90일) 베이스. C7 `_INFERENCE_ENABLED_CHANNELS` 확장 + multi-variate 모델 학습 | [planB §P2](../../../../skill/planB/if-data-prep-followups.md) |
 | **UI Phase 2** (별도 트랙) | `combined_risk=PREDICT_WARN` 표시 색상 — 노란-주황 톤 별도 디자이너 협의 | UI 트랙 |
 
 ---
@@ -305,9 +305,9 @@ c48e3f2 feat(T1-3): MLAnomalyResult INSERT view + 4 tests
 
 | 문서 | 위치 |
 |---|---|
-| 본 sprint 실행 plan | [skill/plan/if-data-prep-and-alarm-binding.md](../../../skill/plan/if-data-prep-and-alarm-binding.md) §"트랙 1 v2" |
+| 본 sprint 실행 plan | [skill/plan/if-data-prep-and-alarm-binding.md](../../../../skill/plan/if-data-prep-and-alarm-binding.md) §"트랙 1 v2" |
 | 더미 데이터 audit | [docs/changelog/ml/power_dummy_audit_2026_05_13.md](./power_dummy_audit_2026_05_13.md) |
 | IF 윈도우 비교 (PoC 방법론) | [docs/changelog/ml/if_window_comparison_2026_05_13.md](./if_window_comparison_2026_05_13.md) |
 | ML STEP 1 인프라 | [docs/changelog/ml/ml_step1_infra.md](./ml_step1_infra.md) |
-| **다음 단계 P0** | [skill/plan/alarm-record-integration.md](../../../skill/plan/alarm-record-integration.md) |
-| 후속 sprint 인덱스 | [skill/planB/if-data-prep-followups.md](../../../skill/planB/if-data-prep-followups.md) |
+| **다음 단계 P0** | [skill/plan/alarm-record-integration.md](../../../../skill/plan/alarm-record-integration.md) |
+| 후속 sprint 인덱스 | [skill/planB/if-data-prep-followups.md](../../../../skill/planB/if-data-prep-followups.md) |

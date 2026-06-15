@@ -2,7 +2,7 @@
 
 작성일: 2026-05-19
 대상 작업: 브랜치 `feature/power_zscore_cp` 3 commits (D2 / E1 / F)
-관련 문서: [`drf-server/docs/refactoring/power-ai-zscore-changepoint-2026-05-19.md`](../../../drf-server/docs/refactoring/power-ai-zscore-changepoint-2026-05-19.md) — 배경·결정·검증
+관련 문서: [`drf-server/docs/refactoring/power-ai-zscore-changepoint-2026-05-19.md`](../../../../drf-server/docs/refactoring/power-ai-zscore-changepoint-2026-05-19.md) — 배경·결정·검증
 
 본 문서는 **"코드가 어떻게 흐르는지"** 와 **"어떤 함수가 핵심인지"** 에 집중. 변경 의도·결정 근거는 위 refactoring 문서 참조.
 

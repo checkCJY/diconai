@@ -47,7 +47,7 @@ Wave 1~3 의 J 트랙 17건 적용 후 남아 있던 **[상] 우선순위 7건**
 
 ---
 
-### 02 R1. WS 지수 백오프 + 최대 시도 ([ws-client.js](../../../../drf-server/static/js/shared/ws-client.js))
+### 02 R1. WS 지수 백오프 + 최대 시도 ([ws-client.js](../../../../../drf-server/static/js/shared/ws-client.js))
 
 **(A) 변경 내용**
 - 상수 `RECONNECT_DELAY = 3000` (고정 3초) 제거
@@ -119,7 +119,7 @@ ws.onclose = function (e) {
 
 ---
 
-### 03 R1. `shared/alarm-mapper.js` 추출 — 키 변환 단일화 ([alarm-mapper.js](../../../../drf-server/static/js/shared/alarm-mapper.js))
+### 03 R1. `shared/alarm-mapper.js` 추출 — 키 변환 단일화 ([alarm-mapper.js](../../../../../drf-server/static/js/shared/alarm-mapper.js))
 
 **(A) 변경 내용**
 - 신규 `shared/alarm-mapper.js` (43줄) — `AlarmMapper.fromSensorsAlarm(serverAlarm)` / `AlarmMapper.fromWorkerAlert(serverData)` 두 함수
@@ -192,7 +192,7 @@ const AlarmMapper = (function () {
 
 ---
 
-### 03 R2. AlarmPopup 큐 정책 ([alarm-popup.js](../../../../drf-server/static/js/shared/alarm-popup.js))
+### 03 R2. AlarmPopup 큐 정책 ([alarm-popup.js](../../../../../drf-server/static/js/shared/alarm-popup.js))
 
 **(A) 변경 내용**
 - `droppedCount` 인스턴스 카운터 추가
@@ -272,9 +272,9 @@ msgEl.textContent = (sensor ? `${sensor} — ${msg}` : msg) + suffix;
 ### 03 R3. 서버 timestamp 사용 (`created_at`)
 
 **(A) 변경 내용**
-- DRF [`apps/alerts/tasks.py::_push_to_ws()`](../../../../drf-server/apps/alerts/tasks.py) — fastapi 호출 직전에 `alarm_data.setdefault("created_at", datetime.now(timezone.utc).isoformat())` 자동 주입. 7개 callsite 일괄 적용 (각 callsite 수정 불필요)
-- fastapi [`AlarmPayload`](../../../../fastapi-server/internal/routers/alarm_router.py) 에 `created_at: str | None = None` 필드 추가
-- [`alarm-mapper.js`](../../../../drf-server/static/js/shared/alarm-mapper.js) 의 `_common()` 이 `src.created_at || new Date().toISOString()` — 서버 발신 시각 우선, 누락 시 도착 시각 fallback
+- DRF [`apps/alerts/tasks.py::_push_to_ws()`](../../../../../drf-server/apps/alerts/tasks.py) — fastapi 호출 직전에 `alarm_data.setdefault("created_at", datetime.now(timezone.utc).isoformat())` 자동 주입. 7개 callsite 일괄 적용 (각 callsite 수정 불필요)
+- fastapi [`AlarmPayload`](../../../../../fastapi-server/internal/routers/alarm_router.py) 에 `created_at: str | None = None` 필드 추가
+- [`alarm-mapper.js`](../../../../../drf-server/static/js/shared/alarm-mapper.js) 의 `_common()` 이 `src.created_at || new Date().toISOString()` — 서버 발신 시각 우선, 누락 시 도착 시각 fallback
 
 **(B) 왜 바뀌었나**
 - 분석 근거: [03_alarm_pipeline.md R3](../../js/2026_05_09/03_alarm_pipeline.md) [중 · 소]
@@ -332,7 +332,7 @@ function _common(src) {
 
 ---
 
-### 04 R1. `Menu.render` innerHTML → createElement (XSS 패턴) ([layout.js](../../../../drf-server/static/js/shared/layout.js))
+### 04 R1. `Menu.render` innerHTML → createElement (XSS 패턴) ([layout.js](../../../../../drf-server/static/js/shared/layout.js))
 
 **(A) 변경 내용**
 - `Menu.render()` 의 두 `innerHTML` 템플릿 리터럴(루트 버튼 + 자식 `<a>`) 을 `createElement` + `textContent` 패턴으로 교체
@@ -397,7 +397,7 @@ subLi.appendChild(a);
 
 ---
 
-### 05 R2. `loadMySafetyStatus` → `Auth.apiFetch` ([dashboard/app.js](../../../../drf-server/static/js/dashboard/app.js))
+### 05 R2. `loadMySafetyStatus` → `Auth.apiFetch` ([dashboard/app.js](../../../../../drf-server/static/js/dashboard/app.js))
 
 **(A) 변경 내용**
 - 직접 `fetch('/dashboard/api/safety-status/')` 를 `Auth.apiFetch('/dashboard/api/safety-status/')` 로 교체
@@ -455,7 +455,7 @@ async function loadMySafetyStatus() {
 
 ---
 
-### 05 R3. `caution/safe` ↔ `warning/normal` 변환층 단일화 ([level-mapper.js](../../../../drf-server/static/js/shared/level-mapper.js))
+### 05 R3. `caution/safe` ↔ `warning/normal` 변환층 단일화 ([level-mapper.js](../../../../../drf-server/static/js/shared/level-mapper.js))
 
 **(A) 변경 내용**
 - 신규 `shared/level-mapper.js` (37줄) — `LevelMapper.toCssClass(level)` / `toLabel(level)` / `normalize(level)`

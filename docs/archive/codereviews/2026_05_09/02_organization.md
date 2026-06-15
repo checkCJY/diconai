@@ -18,18 +18,18 @@
 | `/api/admin/departments/<id>/members/assign-leader/` | POST | DeptLeaderAssignView | IsSuperAdmin |
 
 ### 1.2 백엔드 파일
-- [drf-server/apps/accounts/views/admin_views.py](../../../drf-server/apps/accounts/views/admin_views.py) — 276줄, 사용자 CRUD + 잠금
-- [drf-server/apps/accounts/views/org_views.py](../../../drf-server/apps/accounts/views/org_views.py) — **629줄, 분리 시급**
-- [drf-server/apps/accounts/selectors/admin_users.py](../../../drf-server/apps/accounts/selectors/admin_users.py)
-- [drf-server/apps/accounts/serializers/admin_serializers.py](../../../drf-server/apps/accounts/serializers/admin_serializers.py)
-- [drf-server/apps/accounts/serializers/org_serializers.py](../../../drf-server/apps/accounts/serializers/org_serializers.py)
-- [drf-server/apps/core/models/system_log.py](../../../drf-server/apps/core/models/system_log.py) — 변경 이력 감사 로그
+- [drf-server/apps/accounts/views/admin_views.py](../../../../drf-server/apps/accounts/views/admin_views.py) — 276줄, 사용자 CRUD + 잠금
+- [drf-server/apps/accounts/views/org_views.py](../../../../drf-server/apps/accounts/views/org_views.py) — **629줄, 분리 시급**
+- [drf-server/apps/accounts/selectors/admin_users.py](../../../../drf-server/apps/accounts/selectors/admin_users.py)
+- [drf-server/apps/accounts/serializers/admin_serializers.py](../../../../drf-server/apps/accounts/serializers/admin_serializers.py)
+- [drf-server/apps/accounts/serializers/org_serializers.py](../../../../drf-server/apps/accounts/serializers/org_serializers.py)
+- [drf-server/apps/core/models/system_log.py](../../../../drf-server/apps/core/models/system_log.py) — 변경 이력 감사 로그
 
 ### 1.3 프론트엔드 파일
-- [drf-server/static/js/admin/accounts/accounts.js](../../../drf-server/static/js/admin/accounts/accounts.js)
-- [drf-server/static/js/admin/organizations/organizations.js](../../../drf-server/static/js/admin/organizations/organizations.js)
-- [drf-server/templates/admin_panel/accounts/](../../../drf-server/templates/admin_panel/accounts/)
-- [drf-server/templates/admin_panel/organizations/](../../../drf-server/templates/admin_panel/organizations/)
+- [drf-server/static/js/admin/accounts/accounts.js](../../../../drf-server/static/js/admin/accounts/accounts.js)
+- [drf-server/static/js/admin/organizations/organizations.js](../../../../drf-server/static/js/admin/organizations/organizations.js)
+- [drf-server/templates/admin_panel/accounts/](../../../../drf-server/templates/admin_panel/accounts/)
+- [drf-server/templates/admin_panel/organizations/](../../../../drf-server/templates/admin_panel/organizations/)
 
 ## 2. 기능 흐름
 
@@ -77,19 +77,19 @@
 
 ### 3.1 일반 코드 리뷰
 - **[중] 매직스트링 URL action**
-  [admin_views.py:248-273](../../../drf-server/apps/accounts/views/admin_views.py#L248-L273) `AccountsAdminLockView`가 URL의 `<action>`(lock/unlock)으로 분기. RESTful 관점에선 별도 엔드포인트(`/lock/`, `/unlock/`) 두 개로 분리가 명확. 또는 PATCH `.../<id>/` body로 처리.
+  [admin_views.py:248-273](../../../../drf-server/apps/accounts/views/admin_views.py#L248-L273) `AccountsAdminLockView`가 URL의 `<action>`(lock/unlock)으로 분기. RESTful 관점에선 별도 엔드포인트(`/lock/`, `/unlock/`) 두 개로 분리가 명확. 또는 PATCH `.../<id>/` body로 처리.
 - **[중] "100년 뒤"로 무기한 잠금 표현**
-  [admin_views.py:258](../../../drf-server/apps/accounts/views/admin_views.py#L258) `now + 36500일`로 무기한을 흉내. 의미 모호 + 100년 후 자동 해제 위험. `is_locked_manually=True` boolean이나 `account_locked_until=None + locked_by_admin=True` 같은 명시 모델 권장.
+  [admin_views.py:258](../../../../drf-server/apps/accounts/views/admin_views.py#L258) `now + 36500일`로 무기한을 흉내. 의미 모호 + 100년 후 자동 해제 위험. `is_locked_manually=True` boolean이나 `account_locked_until=None + locked_by_admin=True` 같은 명시 모델 권장.
 - **[상] org_views.py 629줄 모놀리식**
   8개 view 클래스가 한 파일 + 모듈 레벨 `_log()`. 도메인별 분리 필요: `org_views/tree.py`, `org_views/department.py`, `org_views/members.py`.
 - **[상] 부분 실패 시 일관성 깨짐 (트랜잭션 부재)**
-  [org_views.py:351-397](../../../drf-server/apps/accounts/views/org_views.py#L351-L397) `DeptMemberAddView.post`의 for loop은 `@transaction.atomic` 미적용. 중간에 예외 발생 시 일부 사용자만 부서 변경 + 일부 SystemLog만 기록 → 부분 실패. `move`, `remove`도 동일. **모든 변경 view에 `@transaction.atomic` 추가 시급**.
+  [org_views.py:351-397](../../../../drf-server/apps/accounts/views/org_views.py#L351-L397) `DeptMemberAddView.post`의 for loop은 `@transaction.atomic` 미적용. 중간에 예외 발생 시 일부 사용자만 부서 변경 + 일부 SystemLog만 기록 → 부분 실패. `move`, `remove`도 동일. **모든 변경 view에 `@transaction.atomic` 추가 시급**.
 - **[중] DeptMemberRemoveView N+1 쿼리**
-  [org_views.py:538-549](../../../drf-server/apps/accounts/views/org_views.py#L538-L549) `for uid in user_ids: User.objects.get(pk=uid)` — 사용자별로 매번 쿼리. `User.objects.filter(pk__in=user_ids)` 한 번에 조회 후 dict 매핑.
+  [org_views.py:538-549](../../../../drf-server/apps/accounts/views/org_views.py#L538-L549) `for uid in user_ids: User.objects.get(pk=uid)` — 사용자별로 매번 쿼리. `User.objects.filter(pk__in=user_ids)` 한 번에 조회 후 dict 매핑.
 - **[중] 중복 로직: add/move의 분기 본문이 거의 동일**
-  [DeptMemberAddView.post:368-386](../../../drf-server/apps/accounts/views/org_views.py#L368-L386)와 [DeptMemberMoveView.post:456-471](../../../drf-server/apps/accounts/views/org_views.py#L456-L471)의 `keep_previous` 처리 본체가 동일. `services/membership.py::set_primary_membership(user, dept, keep_previous)` 추출.
+  [DeptMemberAddView.post:368-386](../../../../drf-server/apps/accounts/views/org_views.py#L368-L386)와 [DeptMemberMoveView.post:456-471](../../../../drf-server/apps/accounts/views/org_views.py#L456-L471)의 `keep_previous` 처리 본체가 동일. `services/membership.py::set_primary_membership(user, dept, keep_previous)` 추출.
 - **[중] _log 헬퍼 + IP 추출 중복**
-  [org_views.py:33-51](../../../drf-server/apps/accounts/views/org_views.py#L33-L51)의 IP 추출이 [auth_views._get_client_ip](../../../drf-server/apps/accounts/views/auth_views.py#L34)와 중복. `apps/core/utils/request_ip.py`로 단일화. SystemLog 기록도 `services/system_log.py`로 추출 권장.
+  [org_views.py:33-51](../../../../drf-server/apps/accounts/views/org_views.py#L33-L51)의 IP 추출이 [auth_views._get_client_ip](../../../../drf-server/apps/accounts/views/auth_views.py#L34)와 중복. `apps/core/utils/request_ip.py`로 단일화. SystemLog 기록도 `services/system_log.py`로 추출 권장.
 
 ### 3.2 아키텍처/레이어
 - **[상] selectors/services 부재**
@@ -98,13 +98,13 @@
 - **[중] view 책임 과다**
   특히 org_views의 각 view가: 권한 체크 + 입력 검증 + ORM 조작 + 로그 기록 + 응답 직렬화를 모두 수행. service 추출 시 view는 30~40줄로 줄어듦.
 - **[하] _get_dept 메서드 중복**
-  [admin_views.py:132-140](../../../drf-server/apps/accounts/views/admin_views.py#L132-L140), [org_views.py:145-151,225-229](../../../drf-server/apps/accounts/views/org_views.py#L145-L151) 등 `try-except DoesNotExist → None` 패턴이 5번 반복. `selectors/...get_or_404()` 헬퍼 또는 DRF `get_object_or_404` 사용.
+  [admin_views.py:132-140](../../../../drf-server/apps/accounts/views/admin_views.py#L132-L140), [org_views.py:145-151,225-229](../../../../drf-server/apps/accounts/views/org_views.py#L145-L151) 등 `try-except DoesNotExist → None` 패턴이 5번 반복. `selectors/...get_or_404()` 헬퍼 또는 DRF `get_object_or_404` 사용.
 
 ### 3.3 보안 관점 (요약)
 - **[중] PATCH/DELETE에 SystemLog 기록 누락 (사용자 도메인)**
-  org_views는 모든 변경을 SystemLog로 감사 기록. 반면 [admin_views.py](../../../drf-server/apps/accounts/views/admin_views.py)의 사용자 PATCH/DELETE/lock/unlock은 SystemLog 미사용 — 누가 누구 계정을 잠갔는지 추적 불가. 일관성 위해 사용자 도메인도 SystemLog 적용 시급.
+  org_views는 모든 변경을 SystemLog로 감사 기록. 반면 [admin_views.py](../../../../drf-server/apps/accounts/views/admin_views.py)의 사용자 PATCH/DELETE/lock/unlock은 SystemLog 미사용 — 누가 누구 계정을 잠갔는지 추적 불가. 일관성 위해 사용자 도메인도 SystemLog 적용 시급.
 - **[하] 사용자 잠금 무한 카운터 / 자가 잠금 회피**
-  본인 계정 비활성화는 [admin_views.py:205](../../../drf-server/apps/accounts/views/admin_views.py#L205)에서 차단. 그러나 본인 계정 lock은 차단되지 않음 → super_admin이 본인을 잠그면 모든 super_admin이 잠긴 경우 잠금 해제 불가 (단일 super_admin 환경 가정 시 위험). `lock` 본인 차단 추가 권장.
+  본인 계정 비활성화는 [admin_views.py:205](../../../../drf-server/apps/accounts/views/admin_views.py#L205)에서 차단. 그러나 본인 계정 lock은 차단되지 않음 → super_admin이 본인을 잠그면 모든 super_admin이 잠긴 경우 잠금 해제 불가 (단일 super_admin 환경 가정 시 위험). `lock` 본인 차단 추가 권장.
 - **[하] _log()의 raw IP 신뢰**
   X-Forwarded-For 우선 — 01의 A6과 동일 이슈, 한 번에 해결.
 
@@ -112,11 +112,11 @@
 
 ### 4.1 백엔드 contract 정합성
 - **[하] AccountsAdmin·Org 두 페이지 모듈이 매우 유사한 fetch 패턴**
-  organizations.js는 [`_api(method, url, body)`](../../../drf-server/static/js/admin/organizations/organizations.js#L22) 헬퍼를 둠. accounts.js는 직접 `Auth.apiFetch` 호출. **공유 헬퍼 부재**로 같은 패턴이 페이지마다 살짝 다른 구현. `shared/api-helper.js::api(method, url, body)` 단일화.
+  organizations.js는 [`_api(method, url, body)`](../../../../drf-server/static/js/admin/organizations/organizations.js#L22) 헬퍼를 둠. accounts.js는 직접 `Auth.apiFetch` 호출. **공유 헬퍼 부재**로 같은 패턴이 페이지마다 살짝 다른 구현. `shared/api-helper.js::api(method, url, body)` 단일화.
 
 ### 4.2 클라이언트 권한 체크의 한계
 - **[중] _showAccessDenied가 클라이언트만 차단**
-  [accounts.js:42-65](../../../drf-server/static/js/admin/accounts/accounts.js#L42-L65)는 권한 없을 시 모달. 그러나 페이지 자체는 누구나 접근 가능 + 권한 체크는 API 레벨에서 401/403로 이뤄짐. 클라이언트 모달은 UX일 뿐 보안 경계 아님 — 명시적 주석 추가 권장 (초보자가 "이게 보안 처리"로 오해 가능).
+  [accounts.js:42-65](../../../../drf-server/static/js/admin/accounts/accounts.js#L42-L65)는 권한 없을 시 모달. 그러나 페이지 자체는 누구나 접근 가능 + 권한 체크는 API 레벨에서 401/403로 이뤄짐. 클라이언트 모달은 UX일 뿐 보안 경계 아님 — 명시적 주석 추가 권장 (초보자가 "이게 보안 처리"로 오해 가능).
 
 ### 4.3 UX/안정성
 - **[중] 일괄 작업 진행률·실패 처리 미흡**
@@ -142,7 +142,7 @@
 - **왜 필요?**: 누가 누구 계정을 잠그고 비활성화했는지 추적 불가 → 감사·컴플라이언스 미충족.
 - **장점**: 통일된 감사 트레일 / 운영 사고 시 원인 추적 가능.
 - **단점**: SystemLog 테이블 증가 / `ActionType` enum 4종 추가 필요.
-- **변경 위치**: [admin_views.py](../../../drf-server/apps/accounts/views/admin_views.py) PATCH/DELETE/lock/unlock 후처리에 _log() 호출 추가. 단, _log를 [services/system_log.py](../../../drf-server/apps/accounts/services/) 헬퍼로 먼저 추출 (B6과 함께).
+- **변경 위치**: [admin_views.py](../../../../drf-server/apps/accounts/views/admin_views.py) PATCH/DELETE/lock/unlock 후처리에 _log() 호출 추가. 단, _log를 [services/system_log.py](../../../../drf-server/apps/accounts/services/) 헬퍼로 먼저 추출 (B6과 함께).
 
 ### B4. account_locked_until 100년 트릭 제거 [중 · 중]
 - **왜 필요?**: 잠금 의도("관리자 수동 무기한")가 코드에 표현되지 않음. 코드 읽는 사람이 36500의 의미를 알아야 함.
@@ -154,13 +154,13 @@
 - **왜 필요?**: 컨벤션 위반 + 같은 쿼리·로직이 여러 view에 반복.
 - **장점**: 테스트 용이 / 재사용 / view 30줄 이내로 축소.
 - **단점**: 작업량 큼 (8개 view + 새 파일 3~4개).
-- **변경 위치**: 신규 [selectors/organizations.py](../../../drf-server/apps/accounts/selectors/), [services/membership.py](../../../drf-server/apps/accounts/services/), [services/account_admin.py](../../../drf-server/apps/accounts/services/).
+- **변경 위치**: 신규 [selectors/organizations.py](../../../../drf-server/apps/accounts/selectors/), [services/membership.py](../../../../drf-server/apps/accounts/services/), [services/account_admin.py](../../../../drf-server/apps/accounts/services/).
 
 ### B6. _log/IP 추출 헬퍼 단일화 [중 · 소]
 - **왜 필요?**: org_views의 _log()와 auth_views의 _get_client_ip()가 사실상 동일. 추후 변경 시 두 곳 수정 필요.
 - **장점**: 한 곳 변경 / 다른 도메인(alerts, monitoring)에서도 재사용.
 - **단점**: 없음 (단순 추출).
-- **변경 위치**: [apps/core/utils/request_ip.py](../../../drf-server/apps/core/), [apps/core/services/system_log.py](../../../drf-server/apps/core/).
+- **변경 위치**: [apps/core/utils/request_ip.py](../../../../drf-server/apps/core/), [apps/core/services/system_log.py](../../../../drf-server/apps/core/).
 
 ### B7. 일괄 작업 부분 실패 응답 표준화 [중 · 중]
 - **왜 필요?**: 100명 일괄 이동 중 일부 실패해도 200 OK라 운영자가 인지 불가.
@@ -172,7 +172,7 @@
 - **왜 필요?**: super_admin 1명 환경에서 자기 자신을 잠그면 시스템 락아웃 가능.
 - **장점**: 운영 사고 방지.
 - **단점**: 없음.
-- **변경 위치**: [admin_views.py:248](../../../drf-server/apps/accounts/views/admin_views.py#L248) `if action=='lock' and user.pk == request.user.pk: return 400`.
+- **변경 위치**: [admin_views.py:248](../../../../drf-server/apps/accounts/views/admin_views.py#L248) `if action=='lock' and user.pk == request.user.pk: return 400`.
 
 ### B9. action을 별도 엔드포인트로 분리 [하 · 소]
 - **왜 필요?**: `/<id>/lock/`, `/<id>/unlock/` 두 개가 RESTful + drf-spectacular 스키마 명확.
@@ -184,7 +184,7 @@
 - **왜 필요?**: `_api()` 패턴이 페이지마다 살짝 다른 구현으로 반복.
 - **장점**: JS 페이지 간 일관성.
 - **단점**: shared/auth.js와 책임 경계 명확화 필요.
-- **변경 위치**: [shared/api-helper.js](../../../drf-server/static/js/shared/) 신규.
+- **변경 위치**: [shared/api-helper.js](../../../../drf-server/static/js/shared/) 신규.
 
 ## 6. 구현 추천 순서
 

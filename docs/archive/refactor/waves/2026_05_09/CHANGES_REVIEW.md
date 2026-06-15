@@ -38,7 +38,7 @@
 | A.8 | **B 트랙 PR-C** — 기본 시드 (DataRetentionPolicy 5종 + AlertPolicy 9종) | `81e70de` | 2개 마이그 시드 | 신규 시스템 구동 즉시 알림 매칭/보관 정책 동작 | [PR-C 보고서](../../../phases/post_phase4_b_track_pr_c_report.md) |
 | A.9 | **B 트랙 PR-E** — GasTypeChoices.LEL dead code 제거 | `af80d69` | `apps/core/constants.py`, fixture | 센서 정의서 9종과 100% 일치 | [PR-E 보고서](../../../phases/post_phase4_b_track_pr_e_report.md) |
 
-→ 신규 모델 28개, 신규 앱 5개 (`dashboard/notices/operations/reference/training`). 모델 인벤토리 상세는 [skill/DB/DB 변경사항_최재용.md](../../../../skill/DB/DB%20변경사항_최재용.md) (로컬 only — gitignored).
+→ 신규 모델 28개, 신규 앱 5개 (`dashboard/notices/operations/reference/training`). 모델 인벤토리 상세는 [skill/DB/DB 변경사항_최재용.md](../../../../../skill/DB/DB%20변경사항_최재용.md) (로컬 only — gitignored).
 
 ### B. 알림·이벤트 시스템 (Phase 4)
 
@@ -133,7 +133,7 @@
 
 ### 문서·링크
 - [ ] [TEAM_BRIEF §2-bis](TEAM_BRIEF.md) cheatsheet 적용 명령 정확
-- [ ] [README .env 표](../../../../README.md) `INTERNAL_SERVICE_TOKEN` / `JWT_SIGNING_KEY` / `JWT_ALGORITHM` 등장
+- [ ] [README .env 표](../../../../../README.md) `INTERNAL_SERVICE_TOKEN` / `JWT_SIGNING_KEY` / `JWT_ALGORITHM` 등장
 - [ ] README docs/ 링크 broken 0건
 
 ---

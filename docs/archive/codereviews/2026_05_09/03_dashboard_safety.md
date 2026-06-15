@@ -21,29 +21,29 @@
 | `/dashboard/api/refresh/` | API | GET | DashboardRefreshView | IsAuthenticated |
 
 ### 1.2 백엔드 파일
-- [drf-server/apps/dashboard/views.py](../../../drf-server/apps/dashboard/views.py) — **451줄, 모놀리식** (페이지 뷰 11개 + API 6개)
-- [drf-server/apps/dashboard/menu.py](../../../drf-server/apps/dashboard/menu.py) — 권한별 메뉴 트리 정의
-- [drf-server/apps/dashboard/urls.py](../../../drf-server/apps/dashboard/urls.py)
-- [drf-server/apps/dashboard/signals.py](../../../drf-server/apps/dashboard/signals.py) — 시그널 (확인 필요)
-- [drf-server/apps/dashboard/models/](../../../drf-server/apps/dashboard/models/) — Menu, RoleMenuVisibility 등
-- [drf-server/apps/safety/](../../../drf-server/apps/safety/) — selectors/services/views/serializers 풀 구조 (체크리스트·VR 세션)
-- [drf-server/apps/training/](../../../drf-server/apps/training/) — VR 콘텐츠 (단순 모델)
+- [drf-server/apps/dashboard/views.py](../../../../drf-server/apps/dashboard/views.py) — **451줄, 모놀리식** (페이지 뷰 11개 + API 6개)
+- [drf-server/apps/dashboard/menu.py](../../../../drf-server/apps/dashboard/menu.py) — 권한별 메뉴 트리 정의
+- [drf-server/apps/dashboard/urls.py](../../../../drf-server/apps/dashboard/urls.py)
+- [drf-server/apps/dashboard/signals.py](../../../../drf-server/apps/dashboard/signals.py) — 시그널 (확인 필요)
+- [drf-server/apps/dashboard/models/](../../../../drf-server/apps/dashboard/models/) — Menu, RoleMenuVisibility 등
+- [drf-server/apps/safety/](../../../../drf-server/apps/safety/) — selectors/services/views/serializers 풀 구조 (체크리스트·VR 세션)
+- [drf-server/apps/training/](../../../../drf-server/apps/training/) — VR 콘텐츠 (단순 모델)
 
 ### 1.3 프론트엔드 파일
 - 대시보드 메인:
-  - [drf-server/static/js/dashboard/app.js](../../../drf-server/static/js/dashboard/app.js) — 진입점·패널 초기화
-  - [drf-server/static/js/dashboard/charts.js](../../../drf-server/static/js/dashboard/charts.js)
-  - [drf-server/static/js/dashboard/websocket.js](../../../drf-server/static/js/dashboard/websocket.js) — `/ws/sensors/` 통합 스트림 수신
-  - [drf-server/static/js/dashboard/panels/](../../../drf-server/static/js/dashboard/panels/) — event-panel, map-panel, scenario-panel, worker-panel
+  - [drf-server/static/js/dashboard/app.js](../../../../drf-server/static/js/dashboard/app.js) — 진입점·패널 초기화
+  - [drf-server/static/js/dashboard/charts.js](../../../../drf-server/static/js/dashboard/charts.js)
+  - [drf-server/static/js/dashboard/websocket.js](../../../../drf-server/static/js/dashboard/websocket.js) — `/ws/sensors/` 통합 스트림 수신
+  - [drf-server/static/js/dashboard/panels/](../../../../drf-server/static/js/dashboard/panels/) — event-panel, map-panel, scenario-panel, worker-panel
 - 서브 페이지(SNB):
-  - [drf-server/static/js/detail/safety_checklist.js](../../../drf-server/static/js/detail/safety_checklist.js)
-  - [drf-server/static/js/detail/safety_history.js](../../../drf-server/static/js/detail/safety_history.js)
-  - [drf-server/static/js/detail/safety_vr.js](../../../drf-server/static/js/detail/safety_vr.js)
-  - [drf-server/static/js/detail/my_profile.js](../../../drf-server/static/js/detail/my_profile.js)
+  - [drf-server/static/js/detail/safety_checklist.js](../../../../drf-server/static/js/detail/safety_checklist.js)
+  - [drf-server/static/js/detail/safety_history.js](../../../../drf-server/static/js/detail/safety_history.js)
+  - [drf-server/static/js/detail/safety_vr.js](../../../../drf-server/static/js/detail/safety_vr.js)
+  - [drf-server/static/js/detail/my_profile.js](../../../../drf-server/static/js/detail/my_profile.js)
 - 템플릿:
-  - [drf-server/templates/dashboard/main.html](../../../drf-server/templates/dashboard/main.html)
-  - [drf-server/templates/dashboard/panels/](../../../drf-server/templates/dashboard/panels/) — 6개 패널 템플릿
-  - [drf-server/templates/snb_details/](../../../drf-server/templates/snb_details/) — 9개 서브 페이지
+  - [drf-server/templates/dashboard/main.html](../../../../drf-server/templates/dashboard/main.html)
+  - [drf-server/templates/dashboard/panels/](../../../../drf-server/templates/dashboard/panels/) — 6개 패널 템플릿
+  - [drf-server/templates/snb_details/](../../../../drf-server/templates/snb_details/) — 9개 서브 페이지
 
 ## 2. 기능 흐름
 
@@ -90,13 +90,13 @@
 - **[상] views.py 451줄 모놀리식 + 페이지/API/비즈니스 혼재**
   HTML 렌더 함수 11개, API view 6개, 비즈니스 로직(달력 매핑·필터·prefetch)이 한 파일. 도메인별 책임 분리 시급.
 - **[중] 함수 본문 안 import**
-  [views.py:266-275](../../../drf-server/apps/dashboard/views.py#L266-L275), [364-365](../../../drf-server/apps/dashboard/views.py#L364-L365), [275](../../../drf-server/apps/dashboard/views.py#L275) 등에서 `from apps.X import Y`를 함수 안에 둠. 순환 import 회피 임시 패턴인 듯하나 매번 호출 시 import 비용 + 코드 가독성 저하. 모듈 상단으로 옮기거나 `apps.dashboard.selectors`로 위임.
+  [views.py:266-275](../../../../drf-server/apps/dashboard/views.py#L266-L275), [364-365](../../../../drf-server/apps/dashboard/views.py#L364-L365), [275](../../../../drf-server/apps/dashboard/views.py#L275) 등에서 `from apps.X import Y`를 함수 안에 둠. 순환 import 회피 임시 패턴인 듯하나 매번 호출 시 import 비용 + 코드 가독성 저하. 모듈 상단으로 옮기거나 `apps.dashboard.selectors`로 위임.
 - **[중] AllowAny + Session 데이터 = 권한 모호**
-  [VRProgressView](../../../drf-server/apps/dashboard/views.py#L106), [MySafetyStatusView](../../../drf-server/apps/dashboard/views.py#L151)가 `AllowAny`인데 세션 기반 데이터 저장. JWT 환경에서 anonymous user가 세션 쿠키만 갖고 진행률·완료 상태를 저장 가능 → 의도와 다른 동작. `IsAuthenticated`로 변경 후 `request.user.id` 키로 저장 권장.
+  [VRProgressView](../../../../drf-server/apps/dashboard/views.py#L106), [MySafetyStatusView](../../../../drf-server/apps/dashboard/views.py#L151)가 `AllowAny`인데 세션 기반 데이터 저장. JWT 환경에서 anonymous user가 세션 쿠키만 갖고 진행률·완료 상태를 저장 가능 → 의도와 다른 동작. `IsAuthenticated`로 변경 후 `request.user.id` 키로 저장 권장.
 - **[중] selectors/services 부재**
   apps/dashboard에 selectors/, services/ 폴더 없음. SafetyHistoryAPIView가 직접 `SafetyStatus.objects.filter(...).values_list(...)` 조회. apps/safety는 풀 레이어 구조인데 dashboard에서 직접 safety의 모델을 import해 쿼리 → 도메인 경계 침범.
 - **[중] 광범위 except**
-  [MenuView.get:90-96](../../../drf-server/apps/dashboard/views.py#L90-L96) `try: get_menu_tree(...) except Exception: return 500`. 어떤 예외인지 알 수 없으니 디버깅 어려움 + 의도치 않은 예외도 500으로 묻힘.
+  [MenuView.get:90-96](../../../../drf-server/apps/dashboard/views.py#L90-L96) `try: get_menu_tree(...) except Exception: return 500`. 어떤 예외인지 알 수 없으니 디버깅 어려움 + 의도치 않은 예외도 500으로 묻힘.
 - **[하] inline_serializer 과다**
   views.py 내 `inline_serializer` 정의가 ~10개. dashboard/serializers.py 신설 후 분리 시 가독성 개선.
 - **[하] page view 중복**
@@ -114,7 +114,7 @@
 - **[중] AllowAny VR/안전 API의 세션 키 충돌 가능**
   같은 브라우저로 다른 사용자가 로그인해도 세션이 그대로면 이전 사용자의 진도·체크리스트가 유지됨. user별 격리 안 됨.
 - **[하] worker_id로 다른 사용자 이력 조회 (관리자)**
-  [SafetyHistoryAPIView.get:264-271](../../../drf-server/apps/dashboard/views.py#L264-L271) facility_admin이 자기 공장 외부 작업자도 조회 가능 (체크 없음). super_admin과 동일 권한 — facility_admin은 facility 범위 제한 권장.
+  [SafetyHistoryAPIView.get:264-271](../../../../drf-server/apps/dashboard/views.py#L264-L271) facility_admin이 자기 공장 외부 작업자도 조회 가능 (체크 없음). super_admin과 동일 권한 — facility_admin은 facility 범위 제한 권장.
 
 ## 4. 프론트엔드(JS/HTML) 소견
 
@@ -137,14 +137,14 @@
 ### C1. dashboard/views.py 분리 + 레이어 정착 [상 · 대]
 - **왜 필요?**: 451줄에 페이지/API/비즈니스 로직 혼재. 컨벤션 위반·테스트 어려움·도메인 경계 흐림.
 - **장점**: 책임 분리·테스트 용이·dashboard 도메인이 BFF로 명확해짐.
-- **단점**: 큰 PR (페이지 뷰는 ​​[urls.py](../../../drf-server/apps/dashboard/urls.py)만 변경, API 분리는 import 경로 갱신).
+- **단점**: 큰 PR (페이지 뷰는 ​​[urls.py](../../../../drf-server/apps/dashboard/urls.py)만 변경, API 분리는 import 경로 갱신).
 - **변경 위치**: 신규 [views/pages.py](../../../drf-server/apps/dashboard/views/), [views/menu_api.py](../../../drf-server/apps/dashboard/views/), [views/safety_api.py](../../../drf-server/apps/dashboard/views/), [views/workers_api.py](../../../drf-server/apps/dashboard/views/) + selectors/, services/ 폴더.
 
 ### C2. AllowAny VR/안전 API → IsAuthenticated [상 · 소]
 - **왜 필요?**: 같은 브라우저로 다른 사용자 로그인 시 진도가 섞임. 세션 키가 user별 격리 안 됨.
 - **장점**: 사용자 격리 / 인증 일관성.
 - **단점**: 페이지 진입 시점 + 세션 만료 시 401 처리 추가 필요 (이미 auth.js가 처리).
-- **변경 위치**: [VRProgressView:107](../../../drf-server/apps/dashboard/views.py#L107), [MySafetyStatusView:152](../../../drf-server/apps/dashboard/views.py#L152). 세션 키도 `f"safety_{user.id}_checklist_done_date"`로 격리.
+- **변경 위치**: [VRProgressView:107](../../../../drf-server/apps/dashboard/views.py#L107), [MySafetyStatusView:152](../../../../drf-server/apps/dashboard/views.py#L152). 세션 키도 `f"safety_{user.id}_checklist_done_date"`로 격리.
 
 ### C3. 안전확인 진실 원천 단일화 (세션 → DB) [상 · 중]
 - **왜 필요?**: 현재 "오늘 완료"는 세션에, 월별 히스토리는 SafetyStatus 모델에. 두 곳이 어긋나면 사용자가 "체크 완료했는데 히스토리에 안 보임" 사고.
@@ -162,32 +162,32 @@
 - **왜 필요?**: dashboard.views가 safety, accounts, positioning 모델을 직접 import → 도메인 경계 침범.
 - **장점**: 도메인 변경 시 영향 격리.
 - **단점**: 한 번의 BFF 패턴 정립 필요 (학습 비용).
-- **변경 위치**: [apps/dashboard/selectors/cross_domain.py](../../../drf-server/apps/dashboard/) 신규. 또는 각 도메인의 selectors가 호출 인터페이스 노출.
+- **변경 위치**: [apps/dashboard/selectors/cross_domain.py](../../../../drf-server/apps/dashboard/) 신규. 또는 각 도메인의 selectors가 호출 인터페이스 노출.
 
 ### C6. 광범위 except → 구체 예외 [중 · 소]
 - **왜 필요?**: `except Exception`은 의도치 않은 예외도 묻힘. 운영 디버깅 시 원인 추적 불가.
 - **장점**: 진짜 에러는 500/sentry로 노출, 비즈니스 예외만 친절 메시지.
 - **단점**: 예외 타입 학습 필요.
-- **변경 위치**: [MenuView.get:92](../../../drf-server/apps/dashboard/views.py#L92), 비슷한 패턴들.
+- **변경 위치**: [MenuView.get:92](../../../../drf-server/apps/dashboard/views.py#L92), 비슷한 패턴들.
 
 ### C7. inline_serializer → schemas.py 분리 [하 · 중]
 - **왜 필요?**: dashboard/views.py에 inline_serializer가 10개+. 가독성·재사용 저하.
-- **변경 위치**: [apps/dashboard/schemas.py](../../../drf-server/apps/dashboard/) 신규.
+- **변경 위치**: [apps/dashboard/schemas.py](../../../../drf-server/apps/dashboard/) 신규.
 
 ### C8. JS shared/page-init 추출 [하 · 소]
 - **왜 필요?**: 페이지마다 Auth.getMe → 권한 체크 보일러플레이트 반복.
 - **장점**: 추가 페이지 작성 시 1줄로 인증 보장.
-- **변경 위치**: [shared/page-init.js](../../../drf-server/static/js/shared/) 신규.
+- **변경 위치**: [shared/page-init.js](../../../../drf-server/static/js/shared/) 신규.
 
 ### C9. facility_admin 데이터 범위 검증 [중 · 소]
 - **왜 필요?**: facility_admin이 worker_id 파라미터로 자기 공장 외부 작업자 이력 조회 가능.
 - **장점**: 권한 모델 일관 / 정보 누출 차단.
 - **단점**: 없음.
-- **변경 위치**: [SafetyHistoryAPIView:264-271](../../../drf-server/apps/dashboard/views.py#L264-L271)에 facility 일치 체크 추가.
+- **변경 위치**: [SafetyHistoryAPIView:264-271](../../../../drf-server/apps/dashboard/views.py#L264-L271)에 facility 일치 체크 추가.
 
 ### C10. 함수 안 import 제거 [하 · 소]
 - **왜 필요?**: 함수 호출마다 import 오버헤드 + 가독성.
-- **변경 위치**: [views.py:266, 275, 364-365](../../../drf-server/apps/dashboard/views.py#L266) 등.
+- **변경 위치**: [views.py:266, 275, 364-365](../../../../drf-server/apps/dashboard/views.py#L266) 등.
 
 ## 6. 구현 추천 순서
 

@@ -66,7 +66,7 @@ WHERE value != value OR value = 1e999 OR value = -1e999;
 
 ### 1.2 gas_data NaN / Infinity (실제 가스 9종)
 
-가스 컬럼은 `co, h2s, co2, o2, no2, so2, o3, nh3, voc` ([gas_data.py](../../drf-server/apps/monitoring/models/gas_data.py) FloatField). 모체 plan 의 `ch4/hcn/h2` 는 잘못된 명세였음.
+가스 컬럼은 `co, h2s, co2, o2, no2, so2, o3, nh3, voc` ([gas_data.py](../../../drf-server/apps/monitoring/models/gas_data.py) FloatField). 모체 plan 의 `ch4/hcn/h2` 는 잘못된 명세였음.
 
 ```sql
 SELECT COUNT(*) FROM gas_data

@@ -28,14 +28,14 @@
 
 ## 2. 아키텍처 + 데이터 흐름
 
-[`README.md`](../../README.md)의 시스템 구조도가 듀얼 서버(DRF + FastAPI) 기본 골격을 설명. 본 작업으로 **추가/변경된 흐름**:
+[`README.md`](../../../README.md)의 시스템 구조도가 듀얼 서버(DRF + FastAPI) 기본 골격을 설명. 본 작업으로 **추가/변경된 흐름**:
 
 ### 2-1. 듀얼 서버 책임 분담
 
 | 서버 | 포트 | 역할 |
 |---|---|---|
-| [drf-server/](../../drf-server/) | 8000 | 인증·DB 영속성·REST API·Celery 알람/배치 처리 |
-| [fastapi-server/](../../fastapi-server/) | 8001 | 센서 수신·WebSocket 브로드캐스트·DRF로 fire-and-forget POST |
+| [drf-server/](../../../drf-server/) | 8000 | 인증·DB 영속성·REST API·Celery 알람/배치 처리 |
+| [fastapi-server/](../../../fastapi-server/) | 8001 | 센서 수신·WebSocket 브로드캐스트·DRF로 fire-and-forget POST |
 
 ### 2-2. 알람 흐름 (Phase 4 + B-G/H 통합)
 
@@ -260,9 +260,9 @@ pre-commit run --files <변경파일>   # ruff + ruff-format
 - [team_decisions_summary.md](team_decisions_summary.md) — Phase 1~4 + 회귀 점검까지 (B 트랙 결정은 본 overview §3-6 참조)
 
 ### 7-5. 프로젝트 메인
-- [README.md](../../README.md) — 프로젝트 소개 + 기술 스택 + 시스템 구조도 PNG
-- [CLAUDE.md](../../.claude/CLAUDE.md) — 작업 규칙 + 컨벤션
-- [docs/conventions/](../conventions/) — dev_convention / github_convention / COMMANDS
+- [README.md](../../../README.md) — 프로젝트 소개 + 기술 스택 + 시스템 구조도 PNG
+- [CLAUDE.md](../../../.claude/CLAUDE.md) — 작업 규칙 + 컨벤션
+- [docs/conventions/](../../conventions/) — dev_convention / github_convention / COMMANDS
 
 ---
 

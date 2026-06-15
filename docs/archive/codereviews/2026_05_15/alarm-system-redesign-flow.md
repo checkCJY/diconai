@@ -2,7 +2,7 @@
 
 작성일: 2026-05-15
 대상 작업: Phase 1 (`feature/alarm-popup-refactory`) + Phase 2 (`feature/alarm-phase2-global-loading`) 총 10 commit
-관련 문서: [`drf-server/docs/refactoring/alarm-system-redesign-2026-05-15.md`](../../../drf-server/docs/refactoring/alarm-system-redesign-2026-05-15.md) (배경·결정·검증)
+관련 문서: [`drf-server/docs/refactoring/alarm-system-redesign-2026-05-15.md`](../../../../drf-server/docs/refactoring/alarm-system-redesign-2026-05-15.md) (배경·결정·검증)
 
 본 문서는 **"코드가 어떻게 흐르는지"** 와 **"어떤 함수가 핵심인지"** 에 집중. 변경 의도·결정 근거는 위 refactoring 문서 참조.
 
@@ -361,7 +361,7 @@ fastapi `PUSH_DEDUP_TTL_SEC=30` 과 drf `ALARM_REPOPUP_COOLDOWN_SEC=60` (운영 
 | 알람 누락 의심 | fastapi 로그 `[push_alarm] dedup hit` → fingerprint 확인. Redis `LLEN diconai:ws:alarms` 큐 적체 확인 |
 | 새 페이지에 알람 추가 | snb_details 신규 페이지면 `snb_base.html` extends. admin-panel 신규면 base 가 처리. 기타 페이지는 alarm_stack include 한 줄 |
 | Phase 3 진입 시 | (작업자 디바이스 확정 후) `geofence/services/lookup.py` 신설 + `sensor_clients` 구조 재설계 + JWT 강제 활성 + drf `acked-users` API |
-| monitoring_realtime fix | [`drf-server/docs/known-issues/monitoring-realtime-websocket-bug.md`](../../../drf-server/docs/known-issues/monitoring-realtime-websocket-bug.md) 의 fix 방향 옵션 4가지 참조 |
+| monitoring_realtime fix | [`drf-server/docs/known-issues/monitoring-realtime-websocket-bug.md`](../../../../drf-server/docs/known-issues/monitoring-realtime-websocket-bug.md) 의 fix 방향 옵션 4가지 참조 |
 
 ---
 

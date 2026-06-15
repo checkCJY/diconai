@@ -33,17 +33,17 @@
 
 | 파일 | 역할 |
 |---|---|
-| [apps/alerts/migrations/0010_alter_alarmrecord_gas_type.py](../../drf-server/apps/alerts/migrations/0010_alter_alarmrecord_gas_type.py) | `AlarmRecord.gas_type` choices를 9종으로 갱신 (자동 생성 — GasTypeChoices 변경 detect) |
-| [apps/reference/migrations/0003_remove_lel.py](../../drf-server/apps/reference/migrations/0003_remove_lel.py) | RunPython — `CommonCode(group=GAS_TYPE, code=lel)` row 삭제. reverse는 row 복원 |
+| [apps/alerts/migrations/0010_alter_alarmrecord_gas_type.py](../../../drf-server/apps/alerts/migrations/0010_alter_alarmrecord_gas_type.py) | `AlarmRecord.gas_type` choices를 9종으로 갱신 (자동 생성 — GasTypeChoices 변경 detect) |
+| [apps/reference/migrations/0003_remove_lel.py](../../../drf-server/apps/reference/migrations/0003_remove_lel.py) | RunPython — `CommonCode(group=GAS_TYPE, code=lel)` row 삭제. reverse는 row 복원 |
 
 ### 3-2. 기존 수정 (4개)
 
 | 파일 | 변경 |
 |---|---|
-| [apps/core/constants.py](../../drf-server/apps/core/constants.py) | `GasTypeChoices.LEL` 라인 제거 (9종으로 축약). docstring 갱신 (PR-E 변경 사실 + 메모리 근거 명시) |
-| [apps/reference/fixtures/gas_type.json](../../drf-server/apps/reference/fixtures/gas_type.json) | pk=10 LEL row 제거, CodeGroup description "9종"으로 갱신 |
-| [apps/reference/migrations/0002_seed_gas_type.py](../../drf-server/apps/reference/migrations/0002_seed_gas_type.py) | PR-A에서 작성한 seed에서 LEL 제거 (fresh migrate 시 9종 시드) + docstring PR-E 변경 명시 |
-| [apps/facilities/services/threshold_service.py](../../drf-server/apps/facilities/services/threshold_service.py) | `evaluate_gas_risk` docstring에서 "lel은 임계치 미정의" 라인 제거 — GasTypeChoices에서 LEL 제거됐으므로 무의미 |
+| [apps/core/constants.py](../../../drf-server/apps/core/constants.py) | `GasTypeChoices.LEL` 라인 제거 (9종으로 축약). docstring 갱신 (PR-E 변경 사실 + 메모리 근거 명시) |
+| [apps/reference/fixtures/gas_type.json](../../../drf-server/apps/reference/fixtures/gas_type.json) | pk=10 LEL row 제거, CodeGroup description "9종"으로 갱신 |
+| [apps/reference/migrations/0002_seed_gas_type.py](../../../drf-server/apps/reference/migrations/0002_seed_gas_type.py) | PR-A에서 작성한 seed에서 LEL 제거 (fresh migrate 시 9종 시드) + docstring PR-E 변경 명시 |
+| [apps/facilities/services/threshold_service.py](../../../drf-server/apps/facilities/services/threshold_service.py) | `evaluate_gas_risk` docstring에서 "lel은 임계치 미정의" 라인 제거 — GasTypeChoices에서 LEL 제거됐으므로 무의미 |
 
 ---
 
@@ -59,7 +59,7 @@
 ## 5. 발견 사항 / 주의
 
 ### 5-1. CI 정합성 자동 유지
-[apps/reference/tests/test_gas_type_consistency.py](../../drf-server/apps/reference/tests/test_gas_type_consistency.py)의 `test_gas_type_enum_matches_common_code`가 `GasTypeChoices.values` ↔ `CommonCode(GAS_TYPE).code` 1:1 일치 검증. PR-E에서 양측 동시 9종으로 줄이므로 자동 통과 — 실패 없음.
+[apps/reference/tests/test_gas_type_consistency.py](../../../drf-server/apps/reference/tests/test_gas_type_consistency.py)의 `test_gas_type_enum_matches_common_code`가 `GasTypeChoices.values` ↔ `CommonCode(GAS_TYPE).code` 1:1 일치 검증. PR-E에서 양측 동시 9종으로 줄이므로 자동 통과 — 실패 없음.
 
 ### 5-2. AlarmRecord.gas_type historical row 호환
 운영 DB에 `AlarmRecord.gas_type='lel'`인 historical row가 있다면, 모델 choices가 9종으로 줄어도 DB CharField는 값 유지 (Django choices는 입력 검증용, 기존 row는 영향 없음). 단 어드민 화면에서는 "lel" 표시명이 빈 값으로 보일 수 있음. 학습 환경에서는 0건.
@@ -72,7 +72,7 @@
 → 모든 운영 흐름이 9종으로 일관. PR-E는 enum/CommonCode 정리만으로 충분.
 
 ### 5-4. raw_payload 호환
-[apps/monitoring/serializers/gas_data.py](../../drf-server/apps/monitoring/serializers/gas_data.py)는 fastapi 페이로드의 lel 키를 `raw_payload`에 보관 (모델 컬럼 미저장). 기존 historical row의 raw_payload에 lel 값 있어도 무시됨 → 영향 0.
+[apps/monitoring/serializers/gas_data.py](../../../drf-server/apps/monitoring/serializers/gas_data.py)는 fastapi 페이로드의 lel 키를 `raw_payload`에 보관 (모델 컬럼 미저장). 기존 historical row의 raw_payload에 lel 값 있어도 무시됨 → 영향 0.
 
 ---
 

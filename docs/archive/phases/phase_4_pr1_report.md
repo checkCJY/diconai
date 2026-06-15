@@ -58,9 +58,9 @@ watt=3000 → danger   (> danger_max=2860)
 
 | 파일 | 역할 |
 |---|---|
-| [facilities/signals.py](../../drf-server/apps/facilities/signals.py) | Threshold post_save/post_delete → 캐시 invalidate (group_code, item) |
-| [dashboard/signals.py](../../drf-server/apps/dashboard/signals.py) | Menu/RoleMenuVisibility post_save/post_delete → 모든 role 메뉴 트리 캐시 무효화 |
-| [facilities/fixtures/threshold_default.json](../../drf-server/apps/facilities/fixtures/threshold_default.json) | ThresholdGroup 2 (gas_legal + power_default) + Threshold 10 (가스 9종 + 전력 1종) |
+| [facilities/signals.py](../../../drf-server/apps/facilities/signals.py) | Threshold post_save/post_delete → 캐시 invalidate (group_code, item) |
+| [dashboard/signals.py](../../../drf-server/apps/dashboard/signals.py) | Menu/RoleMenuVisibility post_save/post_delete → 모든 role 메뉴 트리 캐시 무효화 |
+| [facilities/fixtures/threshold_default.json](../../../drf-server/apps/facilities/fixtures/threshold_default.json) | ThresholdGroup 2 (gas_legal + power_default) + Threshold 10 (가스 9종 + 전력 1종) |
 
 ### 3-2. 마이그레이션 (3개)
 
@@ -76,7 +76,7 @@ watt=3000 → danger   (> danger_max=2860)
 
 ### 4-1. threshold_service.py 전면 재작성
 
-[facilities/services/threshold_service.py](../../drf-server/apps/facilities/services/threshold_service.py):
+[facilities/services/threshold_service.py](../../../drf-server/apps/facilities/services/threshold_service.py):
 
 | 이전 | 이후 |
 |---|---|
@@ -90,16 +90,16 @@ watt=3000 → danger   (> danger_max=2860)
 
 | 파일 | 변경 |
 |---|---|
-| [facilities/apps.py](../../drf-server/apps/facilities/apps.py) | `ready()`에서 signals 모듈 import |
-| [dashboard/apps.py](../../drf-server/apps/dashboard/apps.py) | 동일 |
+| [facilities/apps.py](../../../drf-server/apps/facilities/apps.py) | `ready()`에서 signals 모듈 import |
+| [dashboard/apps.py](../../../drf-server/apps/dashboard/apps.py) | 동일 |
 
 ### 4-3. 알람/모델 코드 전환
 
 | 파일 | 변경 |
 |---|---|
-| [monitoring/services/power_alarm.py](../../drf-server/apps/monitoring/services/power_alarm.py) | `from apps.core.constants import POWER_THRESHOLDS` 제거 → `from apps.facilities.services.threshold_service import evaluate_power_risk` 추가. `_evaluate(watt)`이 evaluate_power_risk 위임 |
-| [monitoring/models/gas_data.py](../../drf-server/apps/monitoring/models/gas_data.py) | `recalculate_risks_from_thresholds()` 메서드 신규 — raw 측정값(co/h2s/...)으로부터 *_risk 9종을 DB Threshold 기반 재계산. `save()`에서 max_risk_level 계산 전 호출 → **단일 진실 공급원**: fastapi가 보낸 risk 페이로드는 무시, DRF Threshold가 마스터 |
-| [dashboard/menu.py](../../drf-server/apps/dashboard/menu.py) | 전면 재작성. `_MENU_WORKER`/`_MENU_ADMIN_EXTRA` 하드코딩 제거. `get_menu_tree(role)`은 RoleProfile + RoleMenuVisibility + Menu DB 조회. role별 5분 TTL Redis 캐시. `_build_menu_tree`로 트리 구성. `invalidate_menu_tree_cache()` 함수 — signal에서 호출 |
+| [monitoring/services/power_alarm.py](../../../drf-server/apps/monitoring/services/power_alarm.py) | `from apps.core.constants import POWER_THRESHOLDS` 제거 → `from apps.facilities.services.threshold_service import evaluate_power_risk` 추가. `_evaluate(watt)`이 evaluate_power_risk 위임 |
+| [monitoring/models/gas_data.py](../../../drf-server/apps/monitoring/models/gas_data.py) | `recalculate_risks_from_thresholds()` 메서드 신규 — raw 측정값(co/h2s/...)으로부터 *_risk 9종을 DB Threshold 기반 재계산. `save()`에서 max_risk_level 계산 전 호출 → **단일 진실 공급원**: fastapi가 보낸 risk 페이로드는 무시, DRF Threshold가 마스터 |
+| [dashboard/menu.py](../../../drf-server/apps/dashboard/menu.py) | 전면 재작성. `_MENU_WORKER`/`_MENU_ADMIN_EXTRA` 하드코딩 제거. `get_menu_tree(role)`은 RoleProfile + RoleMenuVisibility + Menu DB 조회. role별 5분 TTL Redis 캐시. `_build_menu_tree`로 트리 구성. `invalidate_menu_tree_cache()` 함수 — signal에서 호출 |
 
 ---
 
@@ -143,7 +143,7 @@ PR1은 `get_menu_tree(role)` 함수 시그니처 유지. 호출자(dashboard/vie
 
 ### 6-5. POWER_THRESHOLDS 상수는 그대로 유지
 
-[core/constants.py](../../drf-server/apps/core/constants.py#L101-L106)의 `POWER_THRESHOLDS` 상수는 본 PR에서 제거하지 않음. 다른 모듈(특히 fastapi 더미)에서 참조하지 않는지 grep 후 별도 PR에서 cleanup 권장.
+[core/constants.py](../../../drf-server/apps/core/constants.py#L101-L106)의 `POWER_THRESHOLDS` 상수는 본 PR에서 제거하지 않음. 다른 모듈(특히 fastapi 더미)에서 참조하지 않는지 grep 후 별도 PR에서 cleanup 권장.
 
 ```bash
 grep -rn "POWER_THRESHOLDS" /home/cjy/diconai --include="*.py"

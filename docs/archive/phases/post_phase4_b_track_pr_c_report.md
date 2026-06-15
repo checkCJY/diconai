@@ -52,15 +52,15 @@ DataRetentionPolicy count: 5
 
 | 파일 | 시드 |
 |---|---|
-| [drf-server/apps/operations/migrations/0003_seed_data_retention_default.py](../../drf-server/apps/operations/migrations/0003_seed_data_retention_default.py) | DataRetentionPolicy 5종 — phase_4_pr3 §7-4 권장 |
-| [drf-server/apps/alerts/migrations/0009_seed_alert_policy_default.py](../../drf-server/apps/alerts/migrations/0009_seed_alert_policy_default.py) | AlertPolicy 9종 — USER_FACING_ALARM_TYPES (SENSOR_FAULT 제외) |
+| [drf-server/apps/operations/migrations/0003_seed_data_retention_default.py](../../../drf-server/apps/operations/migrations/0003_seed_data_retention_default.py) | DataRetentionPolicy 5종 — phase_4_pr3 §7-4 권장 |
+| [drf-server/apps/alerts/migrations/0009_seed_alert_policy_default.py](../../../drf-server/apps/alerts/migrations/0009_seed_alert_policy_default.py) | AlertPolicy 9종 — USER_FACING_ALARM_TYPES (SENSOR_FAULT 제외) |
 
 ### 3-2. 회귀 테스트 갱신 (2개)
 
 | 파일 | 변경 |
 |---|---|
-| [apps/operations/tests/test_data_retention.py](../../drf-server/apps/operations/tests/test_data_retention.py) | `RunDataRetentionTest.setUp()`에서 `DataRetentionPolicy.objects.all().delete()` 추가 — 시드된 5종 제거 후 테스트 진행 |
-| [apps/alerts/tests/test_policy_matcher.py](../../drf-server/apps/alerts/tests/test_policy_matcher.py) | `setUpTestData()`에서 `AlertPolicy.objects.all().delete()` 추가 — 시드된 9종 제거 |
+| [apps/operations/tests/test_data_retention.py](../../../drf-server/apps/operations/tests/test_data_retention.py) | `RunDataRetentionTest.setUp()`에서 `DataRetentionPolicy.objects.all().delete()` 추가 — 시드된 5종 제거 후 테스트 진행 |
+| [apps/alerts/tests/test_policy_matcher.py](../../../drf-server/apps/alerts/tests/test_policy_matcher.py) | `setUpTestData()`에서 `AlertPolicy.objects.all().delete()` 추가 — 시드된 9종 제거 |
 
 ---
 

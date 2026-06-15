@@ -40,8 +40,8 @@ power_w: warning_max=2200.0000 danger_max=2860.0000 chart_max=3500.0000 unit=W
 
 | 파일 | 역할 |
 |---|---|
-| [drf-server/apps/facilities/migrations/0012_threshold_chart_max.py](../../drf-server/apps/facilities/migrations/0012_threshold_chart_max.py) | `Threshold.chart_max` DecimalField(nullable) 컬럼 추가 (자동 생성) |
-| [drf-server/apps/facilities/migrations/0013_backfill_chart_max.py](../../drf-server/apps/facilities/migrations/0013_backfill_chart_max.py) | RunPython — `power_default.power_w` row에 `chart_max=3500` 백필 (forward + reverse 명시) |
+| [drf-server/apps/facilities/migrations/0012_threshold_chart_max.py](../../../drf-server/apps/facilities/migrations/0012_threshold_chart_max.py) | `Threshold.chart_max` DecimalField(nullable) 컬럼 추가 (자동 생성) |
+| [drf-server/apps/facilities/migrations/0013_backfill_chart_max.py](../../../drf-server/apps/facilities/migrations/0013_backfill_chart_max.py) | RunPython — `power_default.power_w` row에 `chart_max=3500` 백필 (forward + reverse 명시) |
 
 ---
 
@@ -51,26 +51,26 @@ power_w: warning_max=2200.0000 danger_max=2860.0000 chart_max=3500.0000 unit=W
 
 | 파일 | 변경 |
 |---|---|
-| [drf-server/apps/facilities/models/thresholds.py](../../drf-server/apps/facilities/models/thresholds.py) | `Threshold.chart_max` DecimalField 추가 (`max_digits=12, decimal_places=4, null=True, blank=True`). `verbose_name="차트 Y축 최대값"` |
-| [drf-server/apps/facilities/services/threshold_service.py](../../drf-server/apps/facilities/services/threshold_service.py) | `get_threshold()` 반환 dict에 `chart_max` 키 추가. docstring 갱신 |
-| [drf-server/apps/facilities/migrations/0011_seed_threshold_default.py](../../drf-server/apps/facilities/migrations/0011_seed_threshold_default.py) | **재작성**: `call_command("loaddata", ...)` → `apps.get_model()` 기반 explicit `update_or_create()`. 사유: fixture가 이후 마이그(0012)의 `chart_max` 필드를 미리 알 수 없어 새 환경 fresh migrate 시점에 `OperationalError: no such column: chart_max` 발생. historical apps 사용으로 해결. **운영 DB는 이미 0011 적용 완료라 영향 없음** (forward는 새 환경에서만 실행) |
-| [drf-server/apps/facilities/fixtures/threshold_default.json](../../drf-server/apps/facilities/fixtures/threshold_default.json) | `power_w` row description만 갱신 (chart_max는 0013 백필에서 채움) |
+| [drf-server/apps/facilities/models/thresholds.py](../../../drf-server/apps/facilities/models/thresholds.py) | `Threshold.chart_max` DecimalField 추가 (`max_digits=12, decimal_places=4, null=True, blank=True`). `verbose_name="차트 Y축 최대값"` |
+| [drf-server/apps/facilities/services/threshold_service.py](../../../drf-server/apps/facilities/services/threshold_service.py) | `get_threshold()` 반환 dict에 `chart_max` 키 추가. docstring 갱신 |
+| [drf-server/apps/facilities/migrations/0011_seed_threshold_default.py](../../../drf-server/apps/facilities/migrations/0011_seed_threshold_default.py) | **재작성**: `call_command("loaddata", ...)` → `apps.get_model()` 기반 explicit `update_or_create()`. 사유: fixture가 이후 마이그(0012)의 `chart_max` 필드를 미리 알 수 없어 새 환경 fresh migrate 시점에 `OperationalError: no such column: chart_max` 발생. historical apps 사용으로 해결. **운영 DB는 이미 0011 적용 완료라 영향 없음** (forward는 새 환경에서만 실행) |
+| [drf-server/apps/facilities/fixtures/threshold_default.json](../../../drf-server/apps/facilities/fixtures/threshold_default.json) | `power_w` row description만 갱신 (chart_max는 0013 백필에서 채움) |
 
 ### 4-2. DRF 호출자 (3개)
 
 | 파일 | 변경 |
 |---|---|
-| [drf-server/apps/alerts/tasks.py](../../drf-server/apps/alerts/tasks.py) | `fire_power_danger_task` + `fire_power_warning_task` 두 곳: `from apps.core.constants import POWER_THRESHOLDS` 제거 → `from apps.facilities.services.threshold_service import get_threshold`. `threshold = float(power_threshold.get("danger_max"))` / `warning_max` 패턴 (Decimal → float 변환 포함) |
-| [drf-server/apps/monitoring/views/power_data.py](../../drf-server/apps/monitoring/views/power_data.py) | `PowerThresholdView.get()`: `Response(POWER_THRESHOLDS)` → `get_threshold("power_default", "power_w")` 조회 후 `{caution, danger, maxY, unit}` 4키 dict 합성. `_to_float()` helper로 Decimal/None → float/None 변환 (JSON 직렬화 호환). docstring에 단일 진실 공급원 정책 명시. OpenAPI schema에 maxY/unit 필드 추가 |
-| [drf-server/apps/core/constants.py](../../drf-server/apps/core/constants.py) | `POWER_THRESHOLDS` dict 정의 (~127L) **삭제** — DB로 완전 이전 |
+| [drf-server/apps/alerts/tasks.py](../../../drf-server/apps/alerts/tasks.py) | `fire_power_danger_task` + `fire_power_warning_task` 두 곳: `from apps.core.constants import POWER_THRESHOLDS` 제거 → `from apps.facilities.services.threshold_service import get_threshold`. `threshold = float(power_threshold.get("danger_max"))` / `warning_max` 패턴 (Decimal → float 변환 포함) |
+| [drf-server/apps/monitoring/views/power_data.py](../../../drf-server/apps/monitoring/views/power_data.py) | `PowerThresholdView.get()`: `Response(POWER_THRESHOLDS)` → `get_threshold("power_default", "power_w")` 조회 후 `{caution, danger, maxY, unit}` 4키 dict 합성. `_to_float()` helper로 Decimal/None → float/None 변환 (JSON 직렬화 호환). docstring에 단일 진실 공급원 정책 명시. OpenAPI schema에 maxY/unit 필드 추가 |
+| [drf-server/apps/core/constants.py](../../../drf-server/apps/core/constants.py) | `POWER_THRESHOLDS` dict 정의 (~127L) **삭제** — DB로 완전 이전 |
 
 ### 4-3. FastAPI docstring (3개) — 코드 수정 없음
 
 | 파일 | 변경 |
 |---|---|
-| [fastapi-server/core/power_thresholds.py](../../fastapi-server/core/power_thresholds.py) | docstring 전면 갱신: "표시용 fallback" 명시 + DRF 단일 진실 공급원 정책 + 운영 진입 시 검토 사항 (DRF API fetch 캐시 옵션) 명시. `POWER_THRESHOLDS` dict 정의는 그대로 유지 |
-| [fastapi-server/power/services/power_service.py](../../fastapi-server/power/services/power_service.py) | `build_equipment()` docstring 갱신: risk_level은 표시용, 실제 알람 판정 + DB 저장은 DRF의 `fire_power_*_task`가 담당 명시. 코드 동작은 그대로 |
-| [fastapi-server/core/config.py](../../fastapi-server/core/config.py) | `POWER_THRESHOLD_CAUTION/DANGER` env 주석 갱신: "표시용 fallback. 실제 알람 판정은 DRF facilities.Threshold가 단일 진실 공급원" 명시 (이전: "DRF apps.core.constants.POWER_THRESHOLDS와 동일 값 유지" — DRF dict 제거됐으므로 갱신 필요) |
+| [fastapi-server/core/power_thresholds.py](../../../fastapi-server/core/power_thresholds.py) | docstring 전면 갱신: "표시용 fallback" 명시 + DRF 단일 진실 공급원 정책 + 운영 진입 시 검토 사항 (DRF API fetch 캐시 옵션) 명시. `POWER_THRESHOLDS` dict 정의는 그대로 유지 |
+| [fastapi-server/power/services/power_service.py](../../../fastapi-server/power/services/power_service.py) | `build_equipment()` docstring 갱신: risk_level은 표시용, 실제 알람 판정 + DB 저장은 DRF의 `fire_power_*_task`가 담당 명시. 코드 동작은 그대로 |
+| [fastapi-server/core/config.py](../../../fastapi-server/core/config.py) | `POWER_THRESHOLD_CAUTION/DANGER` env 주석 갱신: "표시용 fallback. 실제 알람 판정은 DRF facilities.Threshold가 단일 진실 공급원" 명시 (이전: "DRF apps.core.constants.POWER_THRESHOLDS와 동일 값 유지" — DRF dict 제거됐으므로 갱신 필요) |
 
 ---
 

@@ -2,7 +2,7 @@
 
 > **이 문서를 처음 보는 팀원께**: 본 PR 로 **가스 도메인이 ml 앱(IF 이상탐지)을 사용할 수 있게** 됐습니다. 전력 트랙이 먼저 Phase 3([`../power_phase1_2/power_phase3.md`](../power_phase1_2/power_phase3.md)) + ML STEP 1([`ml_step1_infra.md`](ml_step1_infra.md))을 완료한 후, 가스도 같은 패턴을 그대로 복제하면서 ml 앱의 generic 인터페이스(`sensor_type=power|gas`)에 가스 분기를 활성화했습니다.
 
-**브랜치**: `feature/power_refactory` · **커밋 단위**: 8개 (G1~G8) · **상세 plan**: [skill/plan/if-integration-guide.md](../../../skill/plan/if-integration-guide.md) · **참조 패턴**: 전력 Phase 3 changelog([`../power_phase1_2/power_phase3.md`](../power_phase1_2/power_phase3.md))
+**브랜치**: `feature/power_refactory` · **커밋 단위**: 8개 (G1~G8) · **상세 plan**: [skill/plan/if-integration-guide.md](../../../../skill/plan/if-integration-guide.md) · **참조 패턴**: 전력 Phase 3 changelog([`../power_phase1_2/power_phase3.md`](../power_phase1_2/power_phase3.md))
 
 ---
 
@@ -84,7 +84,7 @@ curl -X POST http://localhost:8001/internal/scenario/mode \
 - IF 가 정상 데이터로만 학습되려면 `WHERE is_anomaly=False` 필터링이 필수
 - 평가 단계에선 시나리오별 detection rate 측정용 라벨 필요
 
-**파일**: [`drf-server/apps/monitoring/models/gas_data.py`](../../../drf-server/apps/monitoring/models/gas_data.py)
+**파일**: [`drf-server/apps/monitoring/models/gas_data.py`](../../../../drf-server/apps/monitoring/models/gas_data.py)
 
 ### G2 — Serializer 라벨 통과 ([커밋 `7bc5200`](.))
 
@@ -95,7 +95,7 @@ curl -X POST http://localhost:8001/internal/scenario/mode \
 **왜**
 - G1 의 모델 필드가 있어도 시리얼라이저가 받지 않으면 FastAPI 페이로드의 라벨이 DB 까지 도달 못함
 
-**파일**: [`drf-server/apps/monitoring/serializers/gas_data.py`](../../../drf-server/apps/monitoring/serializers/gas_data.py)
+**파일**: [`drf-server/apps/monitoring/serializers/gas_data.py`](../../../../drf-server/apps/monitoring/serializers/gas_data.py)
 
 ### G3 — FastAPI 페이로드 anomaly_type 필드 ([커밋 `9562fbb`](.))
 
@@ -106,7 +106,7 @@ curl -X POST http://localhost:8001/internal/scenario/mode \
 - pydantic 의 기본 `extra=ignore` 라 schema 에 없으면 시뮬레이터가 보낸 라벨이 버려짐
 - 운영 센서는 anomaly_type 을 안 보냄 → None 으로 매핑되어 자동 호환
 
-**파일**: [`fastapi-server/gas/schemas/gas.py`](../../../fastapi-server/gas/schemas/gas.py)
+**파일**: [`fastapi-server/gas/schemas/gas.py`](../../../../fastapi-server/gas/schemas/gas.py)
 
 ### G4 — gas_service 가 DRF 페이로드에 라벨 전달 ([커밋 `53ece14`](.))
 
@@ -120,7 +120,7 @@ curl -X POST http://localhost:8001/internal/scenario/mode \
 **왜**
 - G3 에서 schema 가 필드를 받아도, drf_payload 에 명시 안 하면 DRF 로 가는 HTTP 요청에 안 실림
 
-**파일**: [`fastapi-server/gas/services/gas_service.py`](../../../fastapi-server/gas/services/gas_service.py)
+**파일**: [`fastapi-server/gas/services/gas_service.py`](../../../../fastapi-server/gas/services/gas_service.py)
 
 ### G5 — gas_dummy v3 재작성 ([커밋 `2c9d7b3`](.))
 
@@ -136,7 +136,7 @@ curl -X POST http://localhost:8001/internal/scenario/mode \
 - v2 의 두 가지 한계 해결: (1) 시계열 자기상관 없음 — RAMP/HOLD/RAMP_DOWN 로 점진 전이 (2) DB 라벨 부재 — 페이로드 동봉
 - `_state_machine.py` 가 도메인 비종속이라 전력에서 만든 모듈을 그대로 재사용 — 코드 중복 zero
 
-**파일**: [`fastapi-server/dummies/gas_dummy.py`](../../../fastapi-server/dummies/gas_dummy.py)
+**파일**: [`fastapi-server/dummies/gas_dummy.py`](../../../../fastapi-server/dummies/gas_dummy.py)
 
 ### G6 — 시나리오 모드 화이트리스트 확장 ([커밋 `60805c4`](.))
 
@@ -148,7 +148,7 @@ curl -X POST http://localhost:8001/internal/scenario/mode \
 - G5 의 dummy 가 단일 시나리오 모드를 받을 준비를 했지만, scenario 화이트리스트가 그걸 막으면 422 거부
 - 두 파일 모두 동기화 필수 (이전에 전력 검증 시에도 같은 버그 경험)
 
-**파일**: [`fastapi-server/dummies/_scenario.py`](../../../fastapi-server/dummies/_scenario.py), [`fastapi-server/internal/routers/scenario_router.py`](../../../fastapi-server/internal/routers/scenario_router.py)
+**파일**: [`fastapi-server/dummies/_scenario.py`](../../../../fastapi-server/dummies/_scenario.py), [`fastapi-server/internal/routers/scenario_router.py`](../../../../fastapi-server/internal/routers/scenario_router.py)
 
 ### G7 — ml/dataset_service 에 가스 함수 추가 ([커밋 `bcd3286`](.))
 
@@ -162,7 +162,7 @@ curl -X POST http://localhost:8001/internal/scenario/mode \
 - 가스 wide-format 에서 시계열을 추출하려면 가스명 컬럼을 지정해 `.values_list` 해야 함 (전력의 long-format `.values_list("value")` 와 시그니처 다름)
 - sensor_identifier 패턴 `gas:sensor_{id}:{gas_name}` — 전력의 `power:device_X:chN:type` 과 1:1 대응
 
-**파일**: [`drf-server/apps/ml/services/dataset_service.py`](../../../drf-server/apps/ml/services/dataset_service.py)
+**파일**: [`drf-server/apps/ml/services/dataset_service.py`](../../../../drf-server/apps/ml/services/dataset_service.py)
 
 ### G8 — train_anomaly_model 가스 분기 활성화 ([커밋 `99e3d1e`](.))
 
@@ -175,7 +175,7 @@ curl -X POST http://localhost:8001/internal/scenario/mode \
 **왜**
 - ml 앱 generic 인터페이스의 완성 — `--sensor-type power|gas` 한 옵션만 바꾸면 동일 커맨드로 두 도메인 학습 가능
 
-**파일**: [`drf-server/apps/ml/management/commands/train_anomaly_model.py`](../../../drf-server/apps/ml/management/commands/train_anomaly_model.py)
+**파일**: [`drf-server/apps/ml/management/commands/train_anomaly_model.py`](../../../../drf-server/apps/ml/management/commands/train_anomaly_model.py)
 
 ---
 

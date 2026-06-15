@@ -23,23 +23,23 @@
 | `/api/managers/select/` | GET | ManagerSelectView | IsSuperAdmin |
 
 ### 1.2 백엔드 파일 (총 1818줄, 분리 시급)
-- [drf-server/apps/facilities/views/facility_admin.py](../../../drf-server/apps/facilities/views/facility_admin.py) — **668줄** (시설+설비+전력장치 일부)
-- [drf-server/apps/facilities/views/gas_sensor_admin.py](../../../drf-server/apps/facilities/views/gas_sensor_admin.py) — **485줄**
-- [drf-server/apps/facilities/views/power_device_admin.py](../../../drf-server/apps/facilities/views/power_device_admin.py) — **453줄**
-- [drf-server/apps/facilities/views/map_editor.py](../../../drf-server/apps/facilities/views/map_editor.py) — 212줄
-- [drf-server/apps/facilities/selectors/{active_devices,admin_devices}.py](../../../drf-server/apps/facilities/selectors/)
-- [drf-server/apps/facilities/services/{device_service,threshold_service}.py](../../../drf-server/apps/facilities/services/)
-- [drf-server/apps/facilities/models/{facility,equipment,devices,gas_sensor_inspection,power_device_inspection,thresholds}.py](../../../drf-server/apps/facilities/models/)
+- [drf-server/apps/facilities/views/facility_admin.py](../../../../drf-server/apps/facilities/views/facility_admin.py) — **668줄** (시설+설비+전력장치 일부)
+- [drf-server/apps/facilities/views/gas_sensor_admin.py](../../../../drf-server/apps/facilities/views/gas_sensor_admin.py) — **485줄**
+- [drf-server/apps/facilities/views/power_device_admin.py](../../../../drf-server/apps/facilities/views/power_device_admin.py) — **453줄**
+- [drf-server/apps/facilities/views/map_editor.py](../../../../drf-server/apps/facilities/views/map_editor.py) — 212줄
+- [drf-server/apps/facilities/selectors/{active_devices,admin_devices}.py](../../../../drf-server/apps/facilities/selectors/)
+- [drf-server/apps/facilities/services/{device_service,threshold_service}.py](../../../../drf-server/apps/facilities/services/)
+- [drf-server/apps/facilities/models/{facility,equipment,devices,gas_sensor_inspection,power_device_inspection,thresholds}.py](../../../../drf-server/apps/facilities/models/)
 
 ### 1.3 프론트엔드 파일
-- [drf-server/static/js/admin/facility/facility.js](../../../drf-server/static/js/admin/facility/facility.js)
-- [drf-server/static/js/admin/gas_sensor/gas_sensor.js](../../../drf-server/static/js/admin/gas_sensor/gas_sensor.js)
-- [drf-server/static/js/admin/power_system/power_system.js](../../../drf-server/static/js/admin/power_system/power_system.js)
-- [drf-server/static/js/admin/map_editor/map_editor.js](../../../drf-server/static/js/admin/map_editor/map_editor.js)
-- [drf-server/templates/admin_panel/facility/facility.html](../../../drf-server/templates/admin_panel/facility/facility.html)
-- [drf-server/templates/admin_panel/gas_sensor/gas_sensor.html](../../../drf-server/templates/admin_panel/gas_sensor/gas_sensor.html)
-- [drf-server/templates/admin_panel/power_system/power_system.html](../../../drf-server/templates/admin_panel/power_system/power_system.html)
-- [drf-server/templates/admin_panel/map_editor/map_editor.html](../../../drf-server/templates/admin_panel/map_editor/map_editor.html)
+- [drf-server/static/js/admin/facility/facility.js](../../../../drf-server/static/js/admin/facility/facility.js)
+- [drf-server/static/js/admin/gas_sensor/gas_sensor.js](../../../../drf-server/static/js/admin/gas_sensor/gas_sensor.js)
+- [drf-server/static/js/admin/power_system/power_system.js](../../../../drf-server/static/js/admin/power_system/power_system.js)
+- [drf-server/static/js/admin/map_editor/map_editor.js](../../../../drf-server/static/js/admin/map_editor/map_editor.js)
+- [drf-server/templates/admin_panel/facility/facility.html](../../../../drf-server/templates/admin_panel/facility/facility.html)
+- [drf-server/templates/admin_panel/gas_sensor/gas_sensor.html](../../../../drf-server/templates/admin_panel/gas_sensor/gas_sensor.html)
+- [drf-server/templates/admin_panel/power_system/power_system.html](../../../../drf-server/templates/admin_panel/power_system/power_system.html)
+- [drf-server/templates/admin_panel/map_editor/map_editor.html](../../../../drf-server/templates/admin_panel/map_editor/map_editor.html)
 
 ## 2. 기능 흐름
 
@@ -84,15 +84,15 @@
   - `views/equipment/...`
   - `views/devices/{gas_sensor, power_device}/...`
 - **[상] view에서 직접 ORM 호출 (selector 무시)**
-  [facility_admin.py:91-118](../../../drf-server/apps/facilities/views/facility_admin.py#L91-L118) `Facility.objects.all().prefetch_related().select_related()` + 필터 인라인. selectors/admin_devices.py가 존재하는데 활용 안 됨.
+  [facility_admin.py:91-118](../../../../drf-server/apps/facilities/views/facility_admin.py#L91-L118) `Facility.objects.all().prefetch_related().select_related()` + 필터 인라인. selectors/admin_devices.py가 존재하는데 활용 안 됨.
 - **[중] 검색 파싱 로직이 view에**
-  [facility_admin.py:97-104](../../../drf-server/apps/facilities/views/facility_admin.py#L97-L104) `q.upper().startswith("FAC-")` 같은 도메인 규칙이 view에. selector 또는 utils로 추출.
+  [facility_admin.py:97-104](../../../../drf-server/apps/facilities/views/facility_admin.py#L97-L104) `q.upper().startswith("FAC-")` 같은 도메인 규칙이 view에. selector 또는 utils로 추출.
 - **[중] order 화이트리스트가 view에**
-  [facility_admin.py:115-117](../../../drf-server/apps/facilities/views/facility_admin.py#L115-L117) `if order not in [...]: order = "-created_at"` 인라인. 같은 패턴이 다른 view에도 반복 가능 — `OrderingFilter` 또는 헬퍼.
+  [facility_admin.py:115-117](../../../../drf-server/apps/facilities/views/facility_admin.py#L115-L117) `if order not in [...]: order = "-created_at"` 인라인. 같은 패턴이 다른 view에도 반복 가능 — `OrderingFilter` 또는 헬퍼.
 - **[중] inline_serializer 헬퍼 함수**
-  [facility_admin.py:59-67](../../../drf-server/apps/facilities/views/facility_admin.py#L59-L67) `_bulk_delete_request/response` 헬퍼. 다른 도메인(02 조직, 06 모니터링)에도 같은 패턴이 별도 구현되어 있을 가능성 — `apps/core/schemas.py::bulk_delete_schemas()` 단일화.
+  [facility_admin.py:59-67](../../../../drf-server/apps/facilities/views/facility_admin.py#L59-L67) `_bulk_delete_request/response` 헬퍼. 다른 도메인(02 조직, 06 모니터링)에도 같은 패턴이 별도 구현되어 있을 가능성 — `apps/core/schemas.py::bulk_delete_schemas()` 단일화.
 - **[중] 페이지뷰가 facility_admin.py 내부에**
-  [FacilityAdminPageView (TemplateView)](../../../drf-server/apps/facilities/views/facility_admin.py#L38)이 API view들과 같은 파일. 페이지/API 분리 권장 — `views/pages.py` vs `views/api/...`.
+  [FacilityAdminPageView (TemplateView)](../../../../drf-server/apps/facilities/views/facility_admin.py#L38)이 API view들과 같은 파일. 페이지/API 분리 권장 — `views/pages.py` vs `views/api/...`.
 
 ### 3.2 아키텍처/레이어
 - **[참고] selectors/services 폴더는 정의되어 있음**
@@ -120,7 +120,7 @@
 - **[중] 캔버스 좌표 ↔ 백엔드 좌표 변환 일관성**
   지도 좌표계(픽셀 vs 정규화 0~1 vs 실제 미터)가 어디에서 변환되는지 명확해야 함. 변환 로직이 JS에만 있다면 다른 페이지(monitoring_workers의 작업자 위치)와 어긋날 수 있음. 변환 함수 단일화 필요.
 - **[중] save 일괄 업로드의 부분 실패 노출**
-  [map_editor 저장 시 일부 객체만 갱신 실패](../../../drf-server/static/js/admin/map_editor/map_editor.js) 시 사용자에게 어떤 객체가 실패했는지 노출 필요. 현재 응답 형식 확인 필요.
+  [map_editor 저장 시 일부 객체만 갱신 실패](../../../../drf-server/static/js/admin/map_editor/map_editor.js) 시 사용자에게 어떤 객체가 실패했는지 노출 필요. 현재 응답 형식 확인 필요.
 
 ### 4.3 페이지 셸 + 데이터 분리
 - **[참고] facility.html 등 페이지는 셸만 + JS가 데이터 fetch — 좋은 패턴**
@@ -156,7 +156,7 @@
 - **왜 필요?**: 부분 실패 시 지도 좌표 깨짐.
 - **장점**: 데이터 정합성.
 - **단점**: 길어진 트랜잭션 — 좌표 변경은 빠르므로 영향 미미.
-- **변경 위치**: [map_editor.py](../../../drf-server/apps/facilities/views/map_editor.py) `MapEditorSaveView.post`에 `@transaction.atomic` + 객체별 응답 (성공/실패).
+- **변경 위치**: [map_editor.py](../../../../drf-server/apps/facilities/views/map_editor.py) `MapEditorSaveView.post`에 `@transaction.atomic` + 객체별 응답 (성공/실패).
 
 ### E6. 검색·정렬 헬퍼 단일화 [중 · 중]
 - **왜 필요?**: order 화이트리스트, q 파싱 패턴이 여러 view에 반복.
@@ -166,7 +166,7 @@
 
 ### E7. inline_serializer 헬퍼 통합 [중 · 소]
 - **왜 필요?**: bulk-delete request/response 패턴이 여러 도메인에 분산.
-- **변경 위치**: [apps/core/schemas.py](../../../drf-server/apps/core/) 신규 — `bulk_delete_request_schema(name)`, `bulk_delete_response_schema(name)`.
+- **변경 위치**: [apps/core/schemas.py](../../../../drf-server/apps/core/) 신규 — `bulk_delete_request_schema(name)`, `bulk_delete_response_schema(name)`.
 
 ### E8. 페이지뷰/API 분리 [중 · 소]
 - **왜 필요?**: TemplateView와 APIView가 같은 파일에 있어 import 검색 시 노이즈.
@@ -176,11 +176,11 @@
 - **왜 필요?**: 4개 admin 페이지가 90% 동일 구조. 같은 버그가 4곳에 복제될 위험.
 - **장점**: 새 도메인 추가 시 100줄로 페이지 완성 / 버그 수정 1곳.
 - **단점**: 템플릿화의 학습 비용. 일부 도메인 특수 요구가 깨끗하게 안 들어맞을 수 있음.
-- **변경 위치**: [shared/admin-list-page.js](../../../drf-server/static/js/shared/) 신규.
+- **변경 위치**: [shared/admin-list-page.js](../../../../drf-server/static/js/shared/) 신규.
 
 ### E10. 좌표 변환 함수 단일화 [중 · 소]
 - **왜 필요?**: map_editor와 monitoring_workers가 동일 좌표계를 다루는데 변환 로직이 분산되면 어긋남.
-- **변경 위치**: [shared/coordinate.js](../../../drf-server/static/js/shared/) 신규 — `pixelToNormalized`, `normalizedToFacilityMeter` 등.
+- **변경 위치**: [shared/coordinate.js](../../../../drf-server/static/js/shared/) 신규 — `pixelToNormalized`, `normalizedToFacilityMeter` 등.
 
 ## 6. 구현 추천 순서
 

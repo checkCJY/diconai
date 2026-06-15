@@ -56,8 +56,8 @@ print(list(CommonCode.objects.filter(group__code='GAS_TYPE').values_list('code',
 
 | 경로 | 역할 |
 |---|---|
-| [drf-server/apps/operations/](../../drf-server/apps/operations/) | 운영 중 쌓이는 로그·정책 (AppLog/IntegrationLog는 Phase 2 예정, DataRetentionPolicy 신설) |
-| [drf-server/apps/reference/](../../drf-server/apps/reference/) | 운영자가 어드민에서 편집하는 공통 코드 마스터 (CodeGroup, CommonCode) |
+| [drf-server/apps/operations/](../../../drf-server/apps/operations/) | 운영 중 쌓이는 로그·정책 (AppLog/IntegrationLog는 Phase 2 예정, DataRetentionPolicy 신설) |
+| [drf-server/apps/reference/](../../../drf-server/apps/reference/) | 운영자가 어드민에서 편집하는 공통 코드 마스터 (CodeGroup, CommonCode) |
 
 각 앱 디렉토리에 보일러플레이트 6종(`__init__.py`, `apps.py`, `admin.py`, `models/__init__.py`, `migrations/__init__.py`, `tests/__init__.py`).
 
@@ -65,18 +65,18 @@ print(list(CommonCode.objects.filter(group__code='GAS_TYPE').values_list('code',
 
 | 파일 | 모델 | 역할 |
 |---|---|---|
-| [drf-server/apps/core/models/risk_level_standard.py](../../drf-server/apps/core/models/risk_level_standard.py) | `RiskLevelStandard` | 위험 단계 메타데이터 (code/name/display_color/alert_intensity/event_priority). RiskLevel 이넘과 1:1 강제 매핑 |
-| [drf-server/apps/reference/models/code_group.py](../../drf-server/apps/reference/models/code_group.py) | `CodeGroup` | 공통 코드 그룹 마스터 (GAS_TYPE/DEVICE_TYPE 등) |
-| [drf-server/apps/reference/models/common_code.py](../../drf-server/apps/reference/models/common_code.py) | `CommonCode` | CodeGroup 내 개별 코드값. UNIQUE(group, code) |
-| [drf-server/apps/accounts/models/role_profile.py](../../drf-server/apps/accounts/models/role_profile.py) | `RoleProfile` | UserType 4종 외 사용자 정의 역할. Phase 2-c Menu/RoleMenuVisibility에서 활용 |
-| [drf-server/apps/operations/models/data_retention_policy.py](../../drf-server/apps/operations/models/data_retention_policy.py) | `DataRetentionPolicy` | 데이터 보관 정책 (gas/power/position 횡단). Phase 4-g Celery 태스크가 본 모델 순회 |
+| [drf-server/apps/core/models/risk_level_standard.py](../../../drf-server/apps/core/models/risk_level_standard.py) | `RiskLevelStandard` | 위험 단계 메타데이터 (code/name/display_color/alert_intensity/event_priority). RiskLevel 이넘과 1:1 강제 매핑 |
+| [drf-server/apps/reference/models/code_group.py](../../../drf-server/apps/reference/models/code_group.py) | `CodeGroup` | 공통 코드 그룹 마스터 (GAS_TYPE/DEVICE_TYPE 등) |
+| [drf-server/apps/reference/models/common_code.py](../../../drf-server/apps/reference/models/common_code.py) | `CommonCode` | CodeGroup 내 개별 코드값. UNIQUE(group, code) |
+| [drf-server/apps/accounts/models/role_profile.py](../../../drf-server/apps/accounts/models/role_profile.py) | `RoleProfile` | UserType 4종 외 사용자 정의 역할. Phase 2-c Menu/RoleMenuVisibility에서 활용 |
+| [drf-server/apps/operations/models/data_retention_policy.py](../../../drf-server/apps/operations/models/data_retention_policy.py) | `DataRetentionPolicy` | 데이터 보관 정책 (gas/power/position 횡단). Phase 4-g Celery 태스크가 본 모델 순회 |
 
 ### 3-3. fixture (2개)
 
 | 파일 | 시드 내용 |
 |---|---|
-| [drf-server/apps/core/fixtures/risk_level_standard.json](../../drf-server/apps/core/fixtures/risk_level_standard.json) | RiskLevelStandard 3 row (`normal`/`warning`/`danger`) — RiskLevel 이넘과 1:1 |
-| [drf-server/apps/reference/fixtures/gas_type.json](../../drf-server/apps/reference/fixtures/gas_type.json) | CodeGroup 1 (`GAS_TYPE`) + CommonCode 10 (CO/H2S/CO2/O2/NO2/SO2/O3/NH3/VOC/LEL) |
+| [drf-server/apps/core/fixtures/risk_level_standard.json](../../../drf-server/apps/core/fixtures/risk_level_standard.json) | RiskLevelStandard 3 row (`normal`/`warning`/`danger`) — RiskLevel 이넘과 1:1 |
+| [drf-server/apps/reference/fixtures/gas_type.json](../../../drf-server/apps/reference/fixtures/gas_type.json) | CodeGroup 1 (`GAS_TYPE`) + CommonCode 10 (CO/H2S/CO2/O2/NO2/SO2/O3/NH3/VOC/LEL) |
 
 ### 3-4. 마이그레이션 (8개)
 
@@ -96,8 +96,8 @@ print(list(CommonCode.objects.filter(group__code='GAS_TYPE').values_list('code',
 
 | 파일 | 검증 |
 |---|---|
-| [drf-server/apps/reference/tests/test_gas_type_consistency.py](../../drf-server/apps/reference/tests/test_gas_type_consistency.py) | `GasTypeChoices` 이넘 ↔ `CommonCode(GAS_TYPE)` 키 목록 일치 |
-| [drf-server/apps/core/tests/test_risk_level_standard_consistency.py](../../drf-server/apps/core/tests/test_risk_level_standard_consistency.py) | `RiskLevel` 이넘 ↔ `RiskLevelStandard.code` 일치 + event_priority 중복 검증 |
+| [drf-server/apps/reference/tests/test_gas_type_consistency.py](../../../drf-server/apps/reference/tests/test_gas_type_consistency.py) | `GasTypeChoices` 이넘 ↔ `CommonCode(GAS_TYPE)` 키 목록 일치 |
+| [drf-server/apps/core/tests/test_risk_level_standard_consistency.py](../../../drf-server/apps/core/tests/test_risk_level_standard_consistency.py) | `RiskLevel` 이넘 ↔ `RiskLevelStandard.code` 일치 + event_priority 중복 검증 |
 
 ---
 
@@ -108,42 +108,42 @@ print(list(CommonCode.objects.filter(group__code='GAS_TYPE').values_list('code',
 | 파일 | 변경 내용 |
 |---|---|
 | [drf-server/config/settings.py](../../drf-server/config/settings.py) | `INSTALLED_APPS`에 `apps.operations`, `apps.reference` 2줄 추가 |
-| [drf-server/apps/core/constants.py](../../drf-server/apps/core/constants.py) | `AlarmType` 4종 → 10종 (PPE_VIOLATION/VR_TRAINING_NOT_DONE/SAFETY_CHECK_PENDING/INSPECTION_SCHEDULED/BATCH_FAILED/STORAGE_OVERDUE 추가, 기존 4종 라벨만 통일). `USER_FACING_ALARM_TYPES` 9종 추가 (SENSOR_FAULT 제외) |
+| [drf-server/apps/core/constants.py](../../../drf-server/apps/core/constants.py) | `AlarmType` 4종 → 10종 (PPE_VIOLATION/VR_TRAINING_NOT_DONE/SAFETY_CHECK_PENDING/INSPECTION_SCHEDULED/BATCH_FAILED/STORAGE_OVERDUE 추가, 기존 4종 라벨만 통일). `USER_FACING_ALARM_TYPES` 9종 추가 (SENSOR_FAULT 제외) |
 
 ### 4-2. SystemLog 확장
 
 | 파일 | 변경 내용 |
 |---|---|
-| [drf-server/apps/core/models/system_log.py](../../drf-server/apps/core/models/system_log.py) | 필드 3개 추가 (`target_menu` Menu.code 문자열 참조, `target_name` 삭제 객체 이름 스냅샷, `result` success/failure choices) + ActionType 17종 추가 (MAP_* 5 + POLICY_* 3 + NOTICE_* 3 + VR_* 3 + CHECKLIST_* 3) + `Result` 내부 TextChoices 클래스 + action_type max_length 30 → 40 |
-| [drf-server/apps/core/admin.py](../../drf-server/apps/core/admin.py) | SystemLog 어드민에 신규 필드 표시 (target_menu/result), search_fields 확장. RiskLevelStandard 어드민 신규 등록 (`readonly_fields = ['code', ...]` — 운영자 임의 변경 차단) |
+| [drf-server/apps/core/models/system_log.py](../../../drf-server/apps/core/models/system_log.py) | 필드 3개 추가 (`target_menu` Menu.code 문자열 참조, `target_name` 삭제 객체 이름 스냅샷, `result` success/failure choices) + ActionType 17종 추가 (MAP_* 5 + POLICY_* 3 + NOTICE_* 3 + VR_* 3 + CHECKLIST_* 3) + `Result` 내부 TextChoices 클래스 + action_type max_length 30 → 40 |
+| [drf-server/apps/core/admin.py](../../../drf-server/apps/core/admin.py) | SystemLog 어드민에 신규 필드 표시 (target_menu/result), search_fields 확장. RiskLevelStandard 어드민 신규 등록 (`readonly_fields = ['code', ...]` — 운영자 임의 변경 차단) |
 
 ### 4-3. accounts
 
 | 파일 | 변경 내용 |
 |---|---|
-| [drf-server/apps/accounts/models/__init__.py](../../drf-server/apps/accounts/models/__init__.py) | `RoleProfile` re-export 추가 |
-| [drf-server/apps/accounts/admin.py](../../drf-server/apps/accounts/admin.py) | `RoleProfileAdmin` 등록 |
-| [drf-server/apps/accounts/migrations/0003_loginlog.py](../../drf-server/apps/accounts/migrations/0003_loginlog.py) | **noop fix** — 0001_initial이 partial LoginLog 생성, 0002_initial이 user FK + indexes 추가로 완전체화. 0003의 CreateModel은 잘못 생성된 중복이라 새 환경에서 `table already exists` 충돌 → `operations = []` 빈 리스트로 변경. 운영 DB는 이미 적용 처리되어 영향 없음 |
+| [drf-server/apps/accounts/models/__init__.py](../../../drf-server/apps/accounts/models/__init__.py) | `RoleProfile` re-export 추가 |
+| [drf-server/apps/accounts/admin.py](../../../drf-server/apps/accounts/admin.py) | `RoleProfileAdmin` 등록 |
+| [drf-server/apps/accounts/migrations/0003_loginlog.py](../../../drf-server/apps/accounts/migrations/0003_loginlog.py) | **noop fix** — 0001_initial이 partial LoginLog 생성, 0002_initial이 user FK + indexes 추가로 완전체화. 0003의 CreateModel은 잘못 생성된 중복이라 새 환경에서 `table already exists` 충돌 → `operations = []` 빈 리스트로 변경. 운영 DB는 이미 적용 처리되어 영향 없음 |
 
 ### 4-4. core
 
 | 파일 | 변경 내용 |
 |---|---|
-| [drf-server/apps/core/models/__init__.py](../../drf-server/apps/core/models/__init__.py) | `RiskLevelStandard` re-export 추가 |
+| [drf-server/apps/core/models/__init__.py](../../../drf-server/apps/core/models/__init__.py) | `RiskLevelStandard` re-export 추가 |
 
 ### 4-5. facilities — Equipment
 
 | 파일 | 변경 내용 |
 |---|---|
-| [drf-server/apps/facilities/models/equipment.py](../../drf-server/apps/facilities/models/equipment.py) | `models.Model` → `BaseModel` 상속 (updated_by FK 자동 추가). `equipment_code` property `EQP-{id:03d}` → `FAC-{id:03d}`. `deactivate(updated_by=None)` 시그니처 변경 |
-| [drf-server/apps/facilities/serializers/facility_admin.py](../../drf-server/apps/facilities/serializers/facility_admin.py) | `get_equipment_code`의 prefix `EQP-` → `FAC-` |
-| [drf-server/apps/facilities/views/facility_admin.py](../../drf-server/apps/facilities/views/facility_admin.py) | 검색 prefix `EQP-` → `FAC-`. POST/PUT의 `serializer.save()` → `serializer.save(updated_by=request.user)`. DELETE 단건 + bulk delete의 `equipment.deactivate()` → `equipment.deactivate(updated_by=request.user)` |
+| [drf-server/apps/facilities/models/equipment.py](../../../drf-server/apps/facilities/models/equipment.py) | `models.Model` → `BaseModel` 상속 (updated_by FK 자동 추가). `equipment_code` property `EQP-{id:03d}` → `FAC-{id:03d}`. `deactivate(updated_by=None)` 시그니처 변경 |
+| [drf-server/apps/facilities/serializers/facility_admin.py](../../../drf-server/apps/facilities/serializers/facility_admin.py) | `get_equipment_code`의 prefix `EQP-` → `FAC-` |
+| [drf-server/apps/facilities/views/facility_admin.py](../../../drf-server/apps/facilities/views/facility_admin.py) | 검색 prefix `EQP-` → `FAC-`. POST/PUT의 `serializer.save()` → `serializer.save(updated_by=request.user)`. DELETE 단건 + bulk delete의 `equipment.deactivate()` → `equipment.deactivate(updated_by=request.user)` |
 
 ### 4-6. safety — SafetyCheckItem
 
 | 파일 | 변경 내용 |
 |---|---|
-| [drf-server/apps/safety/models/safety.py](../../drf-server/apps/safety/models/safety.py) | `SafetyCheckItem`: `models.Model` → `BaseModel` 상속. `deactivate(updated_by=None)` 시그니처 변경. SafetyStatus는 변경 없음 (UNIQUE 변경은 Phase 3-c) |
+| [drf-server/apps/safety/models/safety.py](../../../drf-server/apps/safety/models/safety.py) | `SafetyCheckItem`: `models.Model` → `BaseModel` 상속. `deactivate(updated_by=None)` 시그니처 변경. SafetyStatus는 변경 없음 (UNIQUE 변경은 Phase 3-c) |
 
 ---
 

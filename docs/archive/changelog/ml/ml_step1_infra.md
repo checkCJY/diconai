@@ -4,7 +4,7 @@
 
 > **요약 한 줄**: `apps/ml/` Django 앱과 `fastapi-server/ai/` 라우터를 신설해 sklearn IsolationForest 학습 → .pkl 저장 → MLModel 메타 → FastAPI 실시간 추론까지 end-to-end 동작하는 인프라를 구축한다. sensor_type 분리로 전력/가스 양 도메인이 같은 ml 앱을 공유한다.
 
-**브랜치**: `feature/power_refactory` (Phase 3 후속) · **상세 plan**: [skill/plan/if-integration-guide.md](../../../skill/plan/if-integration-guide.md) §1단계 · **선행**: 전력 Phase 3 (라벨 데이터 인프라, [`power_phase3.md`](../power_phase1_2/power_phase3.md))
+**브랜치**: `feature/power_refactory` (Phase 3 후속) · **상세 plan**: [skill/plan/if-integration-guide.md](../../../../skill/plan/if-integration-guide.md) §1단계 · **선행**: 전력 Phase 3 (라벨 데이터 인프라, [`power_phase3.md`](../power_phase1_2/power_phase3.md))
 
 ---
 
@@ -77,12 +77,12 @@
 ### C2 — `MLModel` 모델 (학습 메타 영속)
 
 **무엇**
-- 신규 [drf-server/apps/ml/models/ml_model.py](../../../drf-server/apps/ml/models/ml_model.py)
+- 신규 [drf-server/apps/ml/models/ml_model.py](../../../../drf-server/apps/ml/models/ml_model.py)
   - `SensorType` (power/gas) · `ModelType` (isolation_forest)
   - `version`, `file_path`, `feature_columns`(JSON), `params_json`(JSON), `is_active`
   - `training_data_range_from/to`, `training_sample_count`, `trained_at`
   - `UniqueConstraint(sensor_type, version)` + 인덱스 2건
-- 신규 [drf-server/apps/ml/models/ml_anomaly_result.py](../../../drf-server/apps/ml/models/ml_anomaly_result.py)
+- 신규 [drf-server/apps/ml/models/ml_anomaly_result.py](../../../../drf-server/apps/ml/models/ml_anomaly_result.py)
   - `Prediction` (normal/anomaly) · `RiskClassified` (normal/caution/predict_warn/danger)
   - `ml_model` FK (SET_NULL) + `model_version_snapshot` (모델 삭제되어도 버전 보존)
   - `sensor_type` + `sensor_identifier` (도메인 무관 자유 키)
@@ -97,7 +97,7 @@
 ### C3 — `dataset_service.py` + 가스 협업 가이드
 
 **무엇**
-- 신규 [drf-server/apps/ml/services/dataset_service.py](../../../drf-server/apps/ml/services/dataset_service.py)
+- 신규 [drf-server/apps/ml/services/dataset_service.py](../../../../drf-server/apps/ml/services/dataset_service.py)
   - `TimeSeries` dataclass (sensor_identifier, measured_at, values, is_anomaly, anomaly_type)
   - `extract_normal_power_series(device_id, channel, data_type, since, until)` — `is_anomaly=False AND value > 0` (통신불능 -1 제외)
   - `extract_labeled_power_series(...)` — `is_anomaly=True` 평가용
@@ -115,7 +115,7 @@
 ### C4 — `feature_service.py` (도메인 무관 sliding window)
 
 **무엇**
-- 신규 [drf-server/apps/ml/services/feature_service.py](../../../drf-server/apps/ml/services/feature_service.py)
+- 신규 [drf-server/apps/ml/services/feature_service.py](../../../../drf-server/apps/ml/services/feature_service.py)
   - `FeatureMatrix` dataclass (columns, features, measured_at, is_anomaly)
   - `build_features(series, window=30, drop_warmup=True)` — value / roll_mean / roll_std / diff 4 컬럼
   - `_rolling_mean` (cumsum O(N)) / `_rolling_std` (ddof=0) / `_first_diff`
@@ -128,7 +128,7 @@
 ### C5 — `train_anomaly_model` management command
 
 **무엇**
-- 신규 [drf-server/apps/ml/management/commands/train_anomaly_model.py](../../../drf-server/apps/ml/management/commands/train_anomaly_model.py)
+- 신규 [drf-server/apps/ml/management/commands/train_anomaly_model.py](../../../../drf-server/apps/ml/management/commands/train_anomaly_model.py)
   - argparse: `--sensor-type` `--device-id` `--channel` `--data-type` `--since` `--until` `--window 30` `--contamination 0.01` `--n-estimators 100` `--random-state 42` `--activate`
   - 5단계 흐름: dataset 추출 → feature engineering → IsolationForest fit → joblib.dump → MLModel row 생성
   - `--activate` 지정 시 동일 sensor_type 의 기존 활성 모델 자동 비활성화 (transaction.atomic)
@@ -149,10 +149,10 @@ python manage.py train_anomaly_model \
 ### C6 — DRF active 모델 메타 API
 
 **무엇**
-- 신규 [drf-server/apps/ml/views.py](../../../drf-server/apps/ml/views.py) — `ActiveMLModelView` (`RetrieveAPIView`)
+- 신규 [drf-server/apps/ml/views.py](../../../../drf-server/apps/ml/views.py) — `ActiveMLModelView` (`RetrieveAPIView`)
   - `GET /api/ml/models/active/?sensor_type=power` 응답: `{id, version, file_path, feature_columns, params_json, ...}`
-- 신규 [drf-server/apps/ml/urls.py](../../../drf-server/apps/ml/urls.py) — `models/active/` 경로
-- 수정 [drf-server/config/urls.py](../../../drf-server/config/urls.py) — `path("api/ml/", include("apps.ml.urls"))`
+- 신규 [drf-server/apps/ml/urls.py](../../../../drf-server/apps/ml/urls.py) — `models/active/` 경로
+- 수정 [drf-server/config/urls.py](../../../../drf-server/config/urls.py) — `path("api/ml/", include("apps.ml.urls"))`
 
 **왜**
 - fastapi 가 Django ORM 직접 의존하지 않게 (서비스 분리)
@@ -164,14 +164,14 @@ python manage.py train_anomaly_model \
 ### C7 — FastAPI `ai/router.py` (실시간 추론 + 모델 캐시)
 
 **무엇**
-- 신규 [fastapi-server/ai/router.py](../../../fastapi-server/ai/router.py)
+- 신규 [fastapi-server/ai/router.py](../../../../fastapi-server/ai/router.py)
   - `_CachedModel` — model + feature_columns + window + version + loaded_at
   - `_get_or_load(sensor_type)` — TTL 만료 시 `GET /api/ml/models/active/` → joblib.load
   - `_build_feature_row()` — 추론 1회용 (value, roll_mean, roll_std, diff) 산출 — drf feature_service 와 동일 시맨틱
   - `POST /ai/predict` — `{sensor_type, sensor_identifier, window_values}` → `{anomaly_score, prediction, model_version, features}`
   - `POST /ai/reload?sensor_type=power` — 학습 직후 강제 무효화
-- 수정 [fastapi-server/app.py](../../../fastapi-server/app.py) — ai_router include + "ai" 태그
-- 수정 [fastapi-server/core/config.py](../../../fastapi-server/core/config.py) — `ML_MODELS_DIR`, `ML_MODEL_CACHE_TTL_SEC` 환경 변수
+- 수정 [fastapi-server/app.py](../../../../fastapi-server/app.py) — ai_router include + "ai" 태그
+- 수정 [fastapi-server/core/config.py](../../../../fastapi-server/core/config.py) — `ML_MODELS_DIR`, `ML_MODEL_CACHE_TTL_SEC` 환경 변수
 
 **왜**
 - skill 권고 — Django ML 계산이 메인 API 흐름 막지 않도록 fastapi 분리
@@ -285,4 +285,4 @@ python manage.py train_anomaly_model \
 - **STEP D (전력 §4-2 알람 연동)**: `evaluate_power_risk()` dict 반환 확장 + 결합 매트릭스 4단계 분류 + Phase 1 `try_transition` 키 분리 (`:threshold` / `:anomaly`)
 - **STEP E (E2E 검증)**: 임계치 주석 토글로 AI 단독 알람 동작 확인 + 회귀 테스트
 
-상세 가이드: [skill/plan/if-integration-guide.md](../../../skill/plan/if-integration-guide.md) §2단계
+상세 가이드: [skill/plan/if-integration-guide.md](../../../../skill/plan/if-integration-guide.md) §2단계

@@ -39,23 +39,23 @@ phase_2_report §6-5 명시 — facility별 보수적 정책(gas_facility_defaul
 
 | 파일 | 변경 |
 |---|---|
-| [apps/facilities/models/thresholds.py](../../drf-server/apps/facilities/models/thresholds.py) | `Threshold.facility = FK(Facility, null=True, blank=True, on_delete=CASCADE)` 추가. UNIQUE 제약 (`group, measurement_item`) → (`group, measurement_item, facility`). docstring에 facility 우선순위 정책 명시 |
-| [apps/facilities/migrations/0015_threshold_facility_fk.py](../../drf-server/apps/facilities/migrations/0015_threshold_facility_fk.py) | facility FK 추가 + RemoveConstraint + AddConstraint (자동 생성) |
-| [apps/facilities/migrations/0016_seed_facility_default_group.py](../../drf-server/apps/facilities/migrations/0016_seed_facility_default_group.py) | gas_facility_default ThresholdGroup 시드 (RunPython, get_or_create idempotent). 실제 facility별 Threshold row는 운영자 어드민 입력 |
+| [apps/facilities/models/thresholds.py](../../../drf-server/apps/facilities/models/thresholds.py) | `Threshold.facility = FK(Facility, null=True, blank=True, on_delete=CASCADE)` 추가. UNIQUE 제약 (`group, measurement_item`) → (`group, measurement_item, facility`). docstring에 facility 우선순위 정책 명시 |
+| [apps/facilities/migrations/0015_threshold_facility_fk.py](../../../drf-server/apps/facilities/migrations/0015_threshold_facility_fk.py) | facility FK 추가 + RemoveConstraint + AddConstraint (자동 생성) |
+| [apps/facilities/migrations/0016_seed_facility_default_group.py](../../../drf-server/apps/facilities/migrations/0016_seed_facility_default_group.py) | gas_facility_default ThresholdGroup 시드 (RunPython, get_or_create idempotent). 실제 facility별 Threshold row는 운영자 어드민 입력 |
 
 ### 3-2. 서비스 시그니처 변경
 
 | 파일 | 변경 |
 |---|---|
-| [apps/facilities/services/threshold_service.py](../../drf-server/apps/facilities/services/threshold_service.py) | `get_threshold(group, item, facility_id=None)` — facility specific row 우선 조회 후 facility=NULL fallback. `evaluate_gas_risk(gas, value, facility_id=None)` — gas_facility_default 그룹 우선 매칭 후 gas_legal fallback. 캐시 키 `threshold:{group}:{item}:{facility_id}` (facility None은 "all"). `invalidate_threshold_cache` 시그니처 확장 |
-| [apps/facilities/signals.py](../../drf-server/apps/facilities/signals.py) | post_save/post_delete signal에서 `instance.facility_id`도 함께 invalidate 호출 |
-| [apps/monitoring/models/gas_data.py](../../drf-server/apps/monitoring/models/gas_data.py) | `recalculate_risks_from_thresholds()`에서 `self.gas_sensor.facility_id`를 `evaluate_gas_risk(gas, value, facility_id=facility_id)` 전달. docstring PR-G 변경 명시 |
+| [apps/facilities/services/threshold_service.py](../../../drf-server/apps/facilities/services/threshold_service.py) | `get_threshold(group, item, facility_id=None)` — facility specific row 우선 조회 후 facility=NULL fallback. `evaluate_gas_risk(gas, value, facility_id=None)` — gas_facility_default 그룹 우선 매칭 후 gas_legal fallback. 캐시 키 `threshold:{group}:{item}:{facility_id}` (facility None은 "all"). `invalidate_threshold_cache` 시그니처 확장 |
+| [apps/facilities/signals.py](../../../drf-server/apps/facilities/signals.py) | post_save/post_delete signal에서 `instance.facility_id`도 함께 invalidate 호출 |
+| [apps/monitoring/models/gas_data.py](../../../drf-server/apps/monitoring/models/gas_data.py) | `recalculate_risks_from_thresholds()`에서 `self.gas_sensor.facility_id`를 `evaluate_gas_risk(gas, value, facility_id=facility_id)` 전달. docstring PR-G 변경 명시 |
 
 ### 3-3. 회귀 테스트 신규 (2건)
 
 | 파일 | 테스트 |
 |---|---|
-| [apps/monitoring/tests/test_power_alarm_flow.py](../../drf-server/apps/monitoring/tests/test_power_alarm_flow.py) | `test_facility_specific_threshold_overrides_legal` — gas_facility_default 그룹 row 추가 후 facility specific 우선 매칭 확인. `test_facility_without_specific_falls_back_to_legal` — facility specific row 부재 시 gas_legal fallback 확인 |
+| [apps/monitoring/tests/test_power_alarm_flow.py](../../../drf-server/apps/monitoring/tests/test_power_alarm_flow.py) | `test_facility_specific_threshold_overrides_legal` — gas_facility_default 그룹 row 추가 후 facility specific 우선 매칭 확인. `test_facility_without_specific_falls_back_to_legal` — facility specific row 부재 시 gas_legal fallback 확인 |
 
 ---
 

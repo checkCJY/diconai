@@ -53,7 +53,7 @@
 
 ### 단위 테스트 4종 (Session/Revision)
 
-[apps/safety/tests/test_session_migration.py](../../drf-server/apps/safety/tests/test_session_migration.py):
+[apps/safety/tests/test_session_migration.py](../../../drf-server/apps/safety/tests/test_session_migration.py):
 
 | 테스트 | 검증 |
 |---|---|
@@ -70,8 +70,8 @@
 
 | 파일 | 모델 | 역할 |
 |---|---|---|
-| [safety/models/safety_checklist_revision.py](../../drf-server/apps/safety/models/safety_checklist_revision.py) | `SafetyChecklistRevision` | 발행 시점 동결 스냅샷 (revision_data JSON: Section 트리 + Item 메타). facility별 1개 active 부분 UniqueConstraint |
-| [safety/models/safety_check_session.py](../../drf-server/apps/safety/models/safety_check_session.py) | `SafetyCheckSession` | 1일 1세션 단위 (worker, date, revision UNIQUE). is_completed 추적 |
+| [safety/models/safety_checklist_revision.py](../../../drf-server/apps/safety/models/safety_checklist_revision.py) | `SafetyChecklistRevision` | 발행 시점 동결 스냅샷 (revision_data JSON: Section 트리 + Item 메타). facility별 1개 active 부분 UniqueConstraint |
+| [safety/models/safety_check_session.py](../../../drf-server/apps/safety/models/safety_check_session.py) | `SafetyCheckSession` | 1일 1세션 단위 (worker, date, revision UNIQUE). is_completed 추적 |
 
 ### 3-2. 마이그레이션 (5개)
 
@@ -87,7 +87,7 @@
 
 | 파일 | 검증 |
 |---|---|
-| [safety/tests/test_session_migration.py](../../drf-server/apps/safety/tests/test_session_migration.py) | Session/Revision UNIQUE 4건 (위 §2 표 참조) |
+| [safety/tests/test_session_migration.py](../../../drf-server/apps/safety/tests/test_session_migration.py) | Session/Revision UNIQUE 4건 (위 §2 표 참조) |
 
 ---
 
@@ -95,10 +95,10 @@
 
 | 파일 | 변경 |
 |---|---|
-| [safety/models/safety.py](../../drf-server/apps/safety/models/safety.py) | `SafetyStatus.session` FK 추가 (PROTECT, related_name="statuses"). 모델 정의 최종 상태(NOT NULL + UNIQUE(session, check_item))로 갱신. `mark_checked(session, note=None)` 시그니처 변경 (session 필수). docstring 갱신 (3차 한계 표기 → Phase 3-c 변경 표기) |
-| [safety/models/__init__.py](../../drf-server/apps/safety/models/__init__.py) | `SafetyChecklistRevision`, `SafetyCheckSession` re-export |
-| [safety/services/check_service.py](../../drf-server/apps/safety/services/check_service.py) | `get_or_create_today_session(worker_id, facility_id)` 신규 헬퍼. `check_item()` 단순화 — 내부에서 today session 조회 후 `mark_checked(session=...)`. `can_complete_session()` 재작성 — session 기반으로 단순화 (3차 "오늘 체크 여부 = checked_at.date() 비교" 우회 제거) |
-| [safety/admin.py](../../drf-server/apps/safety/admin.py) | `SafetyChecklistRevisionAdmin`, `SafetyCheckSessionAdmin` 신규 등록. `SafetyStatusAdmin`에 session list_display + select_related 추가 |
+| [safety/models/safety.py](../../../drf-server/apps/safety/models/safety.py) | `SafetyStatus.session` FK 추가 (PROTECT, related_name="statuses"). 모델 정의 최종 상태(NOT NULL + UNIQUE(session, check_item))로 갱신. `mark_checked(session, note=None)` 시그니처 변경 (session 필수). docstring 갱신 (3차 한계 표기 → Phase 3-c 변경 표기) |
+| [safety/models/__init__.py](../../../drf-server/apps/safety/models/__init__.py) | `SafetyChecklistRevision`, `SafetyCheckSession` re-export |
+| [safety/services/check_service.py](../../../drf-server/apps/safety/services/check_service.py) | `get_or_create_today_session(worker_id, facility_id)` 신규 헬퍼. `check_item()` 단순화 — 내부에서 today session 조회 후 `mark_checked(session=...)`. `can_complete_session()` 재작성 — session 기반으로 단순화 (3차 "오늘 체크 여부 = checked_at.date() 비교" 우회 제거) |
+| [safety/admin.py](../../../drf-server/apps/safety/admin.py) | `SafetyChecklistRevisionAdmin`, `SafetyCheckSessionAdmin` 신규 등록. `SafetyStatusAdmin`에 session list_display + select_related 추가 |
 
 ---
 
@@ -126,7 +126,7 @@
 
 ### 6-1. RunPython 백필의 facility 추론
 
-[0007_backfill_default_session.py](../../drf-server/apps/safety/migrations/0007_backfill_default_session.py)는 `SafetyStatus.check_item.facility_id`로 facility 추론. `check_item=NULL`인 row(탈퇴/삭제된 항목 이력)는 facility 추론 불가 → `session=NULL`로 남음.
+[0007_backfill_default_session.py](../../../drf-server/apps/safety/migrations/0007_backfill_default_session.py)는 `SafetyStatus.check_item.facility_id`로 facility 추론. `check_item=NULL`인 row(탈퇴/삭제된 항목 이력)는 facility 추론 불가 → `session=NULL`로 남음.
 
 학습 환경에서는 사실상 0건이지만, 운영 시점에는 (e) NOT NULL 전환 전 별도 정리 마이그 필요할 수 있음. 본 PR은 학습 환경 전제로 그대로 진행 (결정문 §3c 결정 일관).
 

@@ -31,11 +31,11 @@
 
 | 흐름 | 파일 | 테스트 수 | 레벨 |
 |---|---|---|---|
-| 가스 알람 | [apps/monitoring/tests/test_gas_alarm_flow.py](../../drf-server/apps/monitoring/tests/test_gas_alarm_flow.py) | 6 | 통합 |
-| 전력 알람 | [apps/monitoring/tests/test_power_alarm_flow.py](../../drf-server/apps/monitoring/tests/test_power_alarm_flow.py) | 4 | 통합 |
-| 지오펜스 알람 | [apps/positioning/tests/test_geofence_alarm_flow.py](../../drf-server/apps/positioning/tests/test_geofence_alarm_flow.py) | 5 | 통합 |
-| 안전 체크리스트 | [apps/safety/tests/test_check_item_flow.py](../../drf-server/apps/safety/tests/test_check_item_flow.py) | 5 | 통합 |
-| 메뉴 트리 | [apps/dashboard/tests/test_menu_tree.py](../../drf-server/apps/dashboard/tests/test_menu_tree.py) | 7 | 단위 |
+| 가스 알람 | [apps/monitoring/tests/test_gas_alarm_flow.py](../../../drf-server/apps/monitoring/tests/test_gas_alarm_flow.py) | 6 | 통합 |
+| 전력 알람 | [apps/monitoring/tests/test_power_alarm_flow.py](../../../drf-server/apps/monitoring/tests/test_power_alarm_flow.py) | 4 | 통합 |
+| 지오펜스 알람 | [apps/positioning/tests/test_geofence_alarm_flow.py](../../../drf-server/apps/positioning/tests/test_geofence_alarm_flow.py) | 5 | 통합 |
+| 안전 체크리스트 | [apps/safety/tests/test_check_item_flow.py](../../../drf-server/apps/safety/tests/test_check_item_flow.py) | 5 | 통합 |
+| 메뉴 트리 | [apps/dashboard/tests/test_menu_tree.py](../../../drf-server/apps/dashboard/tests/test_menu_tree.py) | 7 | 단위 |
 
 ---
 
@@ -45,10 +45,10 @@
 
 | 파일 | 역할 |
 |---|---|
-| [drf-server/pytest.ini](../../drf-server/pytest.ini) | DJANGO_SETTINGS_MODULE 지정 + 테스트 디스커버리 패턴 + `addopts = -ra --strict-markers` |
-| [drf-server/conftest.py](../../drf-server/conftest.py) | 공통 fixture 5종 (`facility`, `gas_sensor`, `power_device`, `position_node`, `worker_user`). `db` fixture 의존 |
-| [drf-server/requirements-dev.txt](../../drf-server/requirements-dev.txt) | `pytest==9.0.3`, `pytest-django==4.12.0` 신규 dev dep |
-| [drf-server/apps/dashboard/tests/__init__.py](../../drf-server/apps/dashboard/tests/__init__.py) | namespace package → 일반 패키지 (다른 tests 디렉토리 일관) |
+| [drf-server/pytest.ini](../../../drf-server/pytest.ini) | DJANGO_SETTINGS_MODULE 지정 + 테스트 디스커버리 패턴 + `addopts = -ra --strict-markers` |
+| [drf-server/conftest.py](../../../drf-server/conftest.py) | 공통 fixture 5종 (`facility`, `gas_sensor`, `power_device`, `position_node`, `worker_user`). `db` fixture 의존 |
+| [drf-server/requirements-dev.txt](../../../drf-server/requirements-dev.txt) | `pytest==9.0.3`, `pytest-django==4.12.0` 신규 dev dep |
+| [drf-server/apps/dashboard/tests/__init__.py](../../../drf-server/apps/dashboard/tests/__init__.py) | namespace package → 일반 패키지 (다른 tests 디렉토리 일관) |
 
 ### 3-2. 회귀 테스트 5개 (위 §2 표)
 

@@ -32,7 +32,7 @@ Phase 4 plan §1 PR3 — DataRetentionPolicy 자동 보관 배치 구현. Phase 
 
 ### PR3 단위 테스트 10종
 
-[apps/operations/tests/test_data_retention.py](../../drf-server/apps/operations/tests/test_data_retention.py):
+[apps/operations/tests/test_data_retention.py](../../../drf-server/apps/operations/tests/test_data_retention.py):
 
 | 클래스 / 테스트 | 검증 |
 |---|---|
@@ -53,9 +53,9 @@ Phase 4 plan §1 PR3 — DataRetentionPolicy 자동 보관 배치 구현. Phase 
 
 | 파일 | 역할 |
 |---|---|
-| [operations/tasks/__init__.py](../../drf-server/apps/operations/tasks/__init__.py) | tasks 패키지 초기화 + `run_data_retention`/`is_cycle_due` re-export |
-| [operations/tasks/data_retention_task.py](../../drf-server/apps/operations/tasks/data_retention_task.py) | Celery `@shared_task` 진입점 + `is_cycle_due()` cycle 판정 헬퍼 + `_delete_for_policy()` 카테고리별 삭제 분기 |
-| [operations/tests/test_data_retention.py](../../drf-server/apps/operations/tests/test_data_retention.py) | cycle 판정 6 + 실행 4 = 10 tests |
+| [operations/tasks/__init__.py](../../../drf-server/apps/operations/tasks/__init__.py) | tasks 패키지 초기화 + `run_data_retention`/`is_cycle_due` re-export |
+| [operations/tasks/data_retention_task.py](../../../drf-server/apps/operations/tasks/data_retention_task.py) | Celery `@shared_task` 진입점 + `is_cycle_due()` cycle 판정 헬퍼 + `_delete_for_policy()` 카테고리별 삭제 분기 |
+| [operations/tests/test_data_retention.py](../../../drf-server/apps/operations/tests/test_data_retention.py) | cycle 판정 6 + 실행 4 = 10 tests |
 
 ---
 

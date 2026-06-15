@@ -1,7 +1,7 @@
 # 통합본 진단 적용 보고 — 시연 영향 분석 (2026-05-19)
 
 > **대상 독자**: 시연(2026-06-14)을 함께 모니터링하는 인원
-> **목적**: [skill/디코나이_전체문제_통합본.md](../../../skill/디코나이_전체문제_통합본.md) 19개 항목 각각이 이번 PR에서 **어떻게 처리됐는지**와 **시연 중 무엇을 봐야 하는지**를 통합본 번호 순서로 매핑.
+> **목적**: [skill/디코나이_전체문제_통합본.md](../../../../skill/디코나이_전체문제_통합본.md) 19개 항목 각각이 이번 PR에서 **어떻게 처리됐는지**와 **시연 중 무엇을 봐야 하는지**를 통합본 번호 순서로 매핑.
 
 ---
 
@@ -31,7 +31,7 @@
 
 **카운트**:
 - ✅ 적용 완료: 8 (② ③ ④ ⑥전력 ⑦전력 ⑧ ⑨ ⑩)
-- 📝 가스 인계: 3 (① ⑥가스 ⑦가스) — [핸드오프 문서](../../../fastapi-server/docs/handoff/gas-p0-fixes-2026-05-19.md)
+- 📝 가스 인계: 3 (① ⑥가스 ⑦가스) — [핸드오프 문서](../../../../fastapi-server/docs/handoff/gas-p0-fixes-2026-05-19.md)
 - ⏭️ 시연 후: 10 (⑤ ⑪ ⑫ ⑬ ⑭ ⑮ ⑯ ⑰ ⑱ ⑲)
 - **현재 PR 범위 11/19 = 58%**
 
@@ -47,7 +47,7 @@
 ### ① 가스 데이터 들어올 때마다 에러 발생  〔📝 가스 인계〕
 
 - **무엇이 문제**: 가스 AI 모델이 미등록 상태일 때 코드가 존재하지 않는 함수 `_save_gas_data`를 호출 → `NameError`. 외부 `except`가 잡아서 DRF 저장 흐름은 살아남지만 **매 가스 데이터마다 NameError 로그**가 찍힘.
-- **처리**: 가스 영역이라 다른 팀원에게 인계 ([handoff 문서](../../../fastapi-server/docs/handoff/gas-p0-fixes-2026-05-19.md)).
+- **처리**: 가스 영역이라 다른 팀원에게 인계 ([handoff 문서](../../../../fastapi-server/docs/handoff/gas-p0-fixes-2026-05-19.md)).
 - **시연 중 영향**: 가스 AI 모델 등록 전까지 로그 노이즈만 발생. **DRF 저장과 화면은 정상**. 가스 모델 등록 시 자동 해소.
 
 ---
@@ -236,7 +236,7 @@
 
 ## §5. 참고 링크
 
-- 진단 원본: [skill/디코나이_전체문제_통합본.md](../../../skill/디코나이_전체문제_통합본.md)
-- 가스 핸드오프: [fastapi-server/docs/handoff/gas-p0-fixes-2026-05-19.md](../../../fastapi-server/docs/handoff/gas-p0-fixes-2026-05-19.md)
-- 알람 시스템 재설계 plan: [skill/plan/alarm-system-redesign.md](../../../skill/plan/alarm-system-redesign.md) — ⑫·⑭와 별개의 큰 재설계
+- 진단 원본: [skill/디코나이_전체문제_통합본.md](../../../../skill/디코나이_전체문제_통합본.md)
+- 가스 핸드오프: [fastapi-server/docs/handoff/gas-p0-fixes-2026-05-19.md](../../../../fastapi-server/docs/handoff/gas-p0-fixes-2026-05-19.md)
+- 알람 시스템 재설계 plan: [skill/plan/alarm-system-redesign.md](../../../../skill/plan/alarm-system-redesign.md) — ⑫·⑭와 별개의 큰 재설계
 - 시연 일정: 2026-06-14 (D-26)

@@ -2,7 +2,7 @@
 
 > **요약 한 줄**: 더미 시뮬레이터를 "균등 난수" → "채널 정격 + 시간대별 base_load + 시나리오 5종(상태머신)"으로 재구성하고, PowerData에 `is_anomaly`/`anomaly_type` 라벨을 추가해 STEP B(sklearn IsolationForest)의 학습 가능한 데이터셋을 생산한다.
 
-**브랜치**: `feature/power_refactory` (Phase 1+2 후속) · **커밋**: 1개 (`c6f773b`) · **상세 plan**: [skill/plan/power-threshold-roadmap.md](../../../skill/plan/power-threshold-roadmap.md) §3단계 (gitignore 영역) · **선행 정리**: [skill/planB/power-phase1-2-followups.md](../../../skill/planB/power-phase1-2-followups.md) #G
+**브랜치**: `feature/power_refactory` (Phase 1+2 후속) · **커밋**: 1개 (`c6f773b`) · **상세 plan**: [skill/plan/power-threshold-roadmap.md](../../../../skill/plan/power-threshold-roadmap.md) §3단계 (gitignore 영역) · **선행 정리**: [skill/planB/power-phase1-2-followups.md](../../../../skill/planB/power-phase1-2-followups.md) #G
 
 ---
 
@@ -22,15 +22,15 @@
 
 | # | 문제 | 위치 | 영향 |
 |---|---|---|---|
-| 1 | `power_dummy.generate_*_data()`가 균등 난수만 생성 | [`fastapi-server/dummies/power_dummy.py`](../../../fastapi-server/dummies/power_dummy.py) (변경 전) | IF 학습 부적합 |
-| 2 | `PowerData`에 라벨 필드 부재 | [`drf-server/apps/monitoring/models/power_data.py`](../../../drf-server/apps/monitoring/models/power_data.py) | 평가 단계 시나리오 매칭 불가 |
-| 3 | `_PowerMeasurementBase`에 라벨 통과 경로 없음 | [`fastapi-server/power/schemas/power.py`](../../../fastapi-server/power/schemas/power.py) | 시뮬레이터 라벨이 DB까지 도달 못 함 |
-| 4 | `ALLOWED_MODES`가 4종(mixed/normal/warning/danger)뿐 | [`fastapi-server/internal/routers/scenario_router.py`](../../../fastapi-server/internal/routers/scenario_router.py) + [`dummies/_scenario.py`](../../../fastapi-server/dummies/_scenario.py) | 시나리오 격리 테스트 불가 |
-| 5 | 가스 dummy v2의 알려진 단점(시계열 자기상관 없음, 균등 분포) | [`fastapi-server/dummies/gas_dummy.py`](../../../fastapi-server/dummies/gas_dummy.py) v2 회고 | 전력에서 동일 실수 반복 가능 |
+| 1 | `power_dummy.generate_*_data()`가 균등 난수만 생성 | [`fastapi-server/dummies/power_dummy.py`](../../../../fastapi-server/dummies/power_dummy.py) (변경 전) | IF 학습 부적합 |
+| 2 | `PowerData`에 라벨 필드 부재 | [`drf-server/apps/monitoring/models/power_data.py`](../../../../drf-server/apps/monitoring/models/power_data.py) | 평가 단계 시나리오 매칭 불가 |
+| 3 | `_PowerMeasurementBase`에 라벨 통과 경로 없음 | [`fastapi-server/power/schemas/power.py`](../../../../fastapi-server/power/schemas/power.py) | 시뮬레이터 라벨이 DB까지 도달 못 함 |
+| 4 | `ALLOWED_MODES`가 4종(mixed/normal/warning/danger)뿐 | [`fastapi-server/internal/routers/scenario_router.py`](../../../../fastapi-server/internal/routers/scenario_router.py) + [`dummies/_scenario.py`](../../../../fastapi-server/dummies/_scenario.py) | 시나리오 격리 테스트 불가 |
+| 5 | 가스 dummy v2의 알려진 단점(시계열 자기상관 없음, 균등 분포) | [`fastapi-server/dummies/gas_dummy.py`](../../../../fastapi-server/dummies/gas_dummy.py) v2 회고 | 전력에서 동일 실수 반복 가능 |
 
 ### 가스 v2 패턴과의 관계
 
-가스 dummy v2는 시나리오 4종(co_leak/h2s_leak/fire/chemical_spill)을 도입해 **멀티변수 상관 패턴**을 처음 구현했다 ([`gas_dummy.py`](../../../fastapi-server/dummies/gas_dummy.py) §SCENARIOS). 그러나 두 가지 알려진 단점:
+가스 dummy v2는 시나리오 4종(co_leak/h2s_leak/fire/chemical_spill)을 도입해 **멀티변수 상관 패턴**을 처음 구현했다 ([`gas_dummy.py`](../../../../fastapi-server/dummies/gas_dummy.py) §SCENARIOS). 그러나 두 가지 알려진 단점:
 
 1. **시계열 자기상관 부재** — 매 틱이 독립 균등 샘플, "정상→사고→회복" 흐름 없음
 2. **시나리오 균등 분포** — `random.choice` 25% 균등, 실제 사고 빈도 무관
@@ -48,7 +48,7 @@
 | 상태머신 위치 | **`fastapi-server/dummies/_state_machine.py` 별도 모듈 (도메인 비종속)** | 가스/위치 dummy 재사용 가능. `ChannelState` dataclass로 채널별 독립 상태 |
 | 시나리오 가중치 | **`random.choices(weights=[6,4,2,2,1])` for overload/voltage_drop/spike/phase_loss/degradation** | roadmap §3-5 도메인 지식 초기값. 운영 데이터 축적 후 보정 가능 |
 | 시나리오 모드 화이트리스트 | **dummy `_scenario.py` + scenario_router 둘 다 확장 (중복 정의 유지)** | dummy는 polling 응답 검증용, router는 입력 화이트리스트. 별도 책임. 공통 모듈 추출은 후속 정리 |
-| 시뮬레이터 채널 정격 출처 | **dummy 모듈 안에 하드코딩** ([`migrations/0017_seed_power_channel_meta.py`](../../../drf-server/apps/facilities/migrations/0017_seed_power_channel_meta.py)과 동일) | dummy는 fastapi 컨테이너에서 동작 — channel_meta_cache 의존하면 booting race. 명시적 복제 + 동기화 책임 주석 |
+| 시뮬레이터 채널 정격 출처 | **dummy 모듈 안에 하드코딩** ([`migrations/0017_seed_power_channel_meta.py`](../../../../drf-server/apps/facilities/migrations/0017_seed_power_channel_meta.py)과 동일) | dummy는 fastapi 컨테이너에서 동작 — channel_meta_cache 의존하면 booting race. 명시적 복제 + 동기화 책임 주석 |
 | 라벨 적용 범위 | **RAMP_UP 구간도 `is_anomaly=True` 라벨** | IF 학습 데이터에서 전이 구간을 "정상→이상 전조"로 학습하게 함 |
 
 ---
@@ -60,12 +60,12 @@
 ### C1 — PowerData 라벨 필드 (`is_anomaly`/`anomaly_type`) + 마이그 0006
 
 **무엇**
-- 수정 [drf-server/apps/monitoring/models/power_data.py](../../../drf-server/apps/monitoring/models/power_data.py)
+- 수정 [drf-server/apps/monitoring/models/power_data.py](../../../../drf-server/apps/monitoring/models/power_data.py)
   - `AnomalyType` TextChoices 5종(overload/voltage_drop/spike/phase_loss/degradation)
   - `is_anomaly` (BooleanField, default=False, verbose+help_text)
   - `anomaly_type` (CharField, choices, nullable, blank=True)
   - 신규 인덱스 `idx_pwr_anomaly_time` (is_anomaly, -measured_at) — IF 학습 데이터 추출 쿼리 가속
-- 신규 [drf-server/apps/monitoring/migrations/0006_powerdata_is_anomaly_anomaly_type.py](../../../drf-server/apps/monitoring/migrations/0006_powerdata_is_anomaly_anomaly_type.py)
+- 신규 [drf-server/apps/monitoring/migrations/0006_powerdata_is_anomaly_anomaly_type.py](../../../../drf-server/apps/monitoring/migrations/0006_powerdata_is_anomaly_anomaly_type.py)
 
 **왜**
 - IF 학습 입력: `WHERE is_anomaly=False AND value > 0` 정상 데이터셋 추출
@@ -88,7 +88,7 @@ print([f for f in fields if 'anomaly' in f[0]])
 ### C2 — DRF 시리얼라이저 라벨 통과 경로
 
 **무엇**
-- 수정 [drf-server/apps/monitoring/serializers/power_data.py](../../../drf-server/apps/monitoring/serializers/power_data.py)
+- 수정 [drf-server/apps/monitoring/serializers/power_data.py](../../../../drf-server/apps/monitoring/serializers/power_data.py)
   - `_ChannelEntrySerializer`에 `is_anomaly`/`anomaly_type` (required=False, default=False/None)
   - `PowerDataBulkIngestSerializer.create()`이 두 필드를 PowerData 인스턴스에 매핑
   - docstring 보강 — 두 필드가 더미 시뮬레이터 전용임 명시
@@ -102,7 +102,7 @@ print([f for f in fields if 'anomaly' in f[0]])
 ### C3 — `_state_machine.py` 신설 (NORMAL/RAMP_UP/HOLD/RAMP_DOWN FSM)
 
 **무엇**
-- 신규 [fastapi-server/dummies/_state_machine.py](../../../fastapi-server/dummies/_state_machine.py)
+- 신규 [fastapi-server/dummies/_state_machine.py](../../../../fastapi-server/dummies/_state_machine.py)
   - `ChannelState` dataclass — 채널 1개의 상태(`state`, `scenario`, `ticks_in_state`, ramp/hold 길이)
   - `StateOutput` dataclass — step() 결과(`scenario_weight`, `is_anomaly`, `anomaly_type`)
   - `enter_scenario(cs, scenario, ramp_up_ticks, hold_ticks, ramp_down_ticks)` — NORMAL → RAMP_UP 진입 (이미 진행 중이면 무시)
@@ -128,8 +128,8 @@ enter_scenario(cs, 'overload', ramp_up_ticks=3, hold_ticks=4, ramp_down_ticks=2)
 ### C4 — `power_dummy.py` v3 전면 재작성
 
 **무엇**
-- 수정 [fastapi-server/dummies/power_dummy.py](../../../fastapi-server/dummies/power_dummy.py) (+340 / -91 라인)
-  - **`CHANNEL_RATED` 16채널 정격 하드코딩** — [0017_seed_power_channel_meta.py](../../../drf-server/apps/facilities/migrations/0017_seed_power_channel_meta.py)와 동일 (변경 시 양쪽 동시 수정 책임 주석)
+- 수정 [fastapi-server/dummies/power_dummy.py](../../../../fastapi-server/dummies/power_dummy.py) (+340 / -91 라인)
+  - **`CHANNEL_RATED` 16채널 정격 하드코딩** — [0017_seed_power_channel_meta.py](../../../../drf-server/apps/facilities/migrations/0017_seed_power_channel_meta.py)와 동일 (변경 시 양쪽 동시 수정 책임 주석)
   - **`MOTOR_CHANNELS`/`LIGHTING_CHANNELS`/`PANEL_CHANNELS`** 분류 — 시나리오 적용 대상 결정
   - **`base_load_ratio(hour, ch)`** — 채널 종류·시간대 기저 부하 비율 (모터 08-12시 60%, 13-18시 70%, 야간 15%; 조명 40%; 분전반 50%)
   - **`SCENARIO_PATTERNS` 5종** — (w_factor, a_factor, v_factor, ramp_up, hold, ramp_down) 매핑
@@ -165,13 +165,13 @@ w, a, v, onoff, is_anom, anom_type = _compute_channel_tick(3, hour=10)
 ### C5 — FastAPI 페이로드 anomaly 라벨 통과
 
 **무엇**
-- 수정 [fastapi-server/power/schemas/power.py](../../../fastapi-server/power/schemas/power.py)
+- 수정 [fastapi-server/power/schemas/power.py](../../../../fastapi-server/power/schemas/power.py)
   - `_PowerMeasurementBase.anomaly_labels: dict[str, str] | None = None` 옵션 필드
   - `to_anomaly_map() -> dict[int, str]` 메서드 (str 키 → int 변환)
-- 수정 [fastapi-server/power/services/power_service.py](../../../fastapi-server/power/services/power_service.py)
+- 수정 [fastapi-server/power/services/power_service.py](../../../../fastapi-server/power/services/power_service.py)
   - `to_channel_list(channel_values, anomaly_map=None)` 시그니처 확장
   - 채널 entry 생성 시 `is_anomaly`/`anomaly_type` 포함
-- 수정 [fastapi-server/power/routers/power_router.py](../../../fastapi-server/power/routers/power_router.py)
+- 수정 [fastapi-server/power/routers/power_router.py](../../../../fastapi-server/power/routers/power_router.py)
   - `recv_current` / `recv_voltage` / `recv_watt` 세 라우터가 `payload.to_anomaly_map()` 호출
   - `recv_onoff`는 변경 없음 (ON/OFF는 라벨 불필요)
 
@@ -184,10 +184,10 @@ w, a, v, onoff, is_anom, anom_type = _compute_channel_tick(3, hour=10)
 ### C6 — 시나리오 모드 화이트리스트 확장 (5종 추가)
 
 **무엇**
-- 수정 [fastapi-server/dummies/_scenario.py](../../../fastapi-server/dummies/_scenario.py)
+- 수정 [fastapi-server/dummies/_scenario.py](../../../../fastapi-server/dummies/_scenario.py)
   - `ALLOWED_MODES`에 5종 추가 (`overload`, `voltage_drop`, `spike`, `phase_loss`, `degradation`)
   - 코멘트: 가스/위치 더미는 fallback("mixed") 처리
-- 수정 [fastapi-server/internal/routers/scenario_router.py](../../../fastapi-server/internal/routers/scenario_router.py)
+- 수정 [fastapi-server/internal/routers/scenario_router.py](../../../../fastapi-server/internal/routers/scenario_router.py)
   - `ALLOWED_MODES` 동일하게 확장 (입력 화이트리스트)
   - 모듈 상단 코멘트 + GET/POST description에 9종 모드 반영 (OpenAPI 자동 문서 갱신)
 
@@ -307,4 +307,4 @@ C3 (_state_machine.py) ──┴───┬─→ C4 (power_dummy v3)
 4. `management/commands/train_anomaly_model` — sklearn IsolationForest 학습 → `media/ml_models/power_if_v1.pkl`
 5. `fastapi-server/ai/router.py` — `POST /ai/predict`
 
-상세 가이드: [skill/plan/if-integration-guide.md](../../../skill/plan/if-integration-guide.md)
+상세 가이드: [skill/plan/if-integration-guide.md](../../../../skill/plan/if-integration-guide.md)

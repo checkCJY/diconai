@@ -38,7 +38,7 @@ alerts:    migrate alerts 0004 → migrate alerts     (0005_seed_hazard_type)
 ### 3-1. core/0004_seed_risk_level_standard.py
 - 이전: `call_command("loaddata", "risk_level_standard", app_label="core")`
 - 이후: 모듈 상수 `RISK_LEVELS` (3 row) + `apps.get_model().objects.update_or_create()`
-- fixture json 보존 ([`apps/core/fixtures/risk_level_standard.json`](../../drf-server/apps/core/fixtures/risk_level_standard.json)) — 수동 loaddata용
+- fixture json 보존 ([`apps/core/fixtures/risk_level_standard.json`](../../../drf-server/apps/core/fixtures/risk_level_standard.json)) — 수동 loaddata용
 
 ### 3-2. dashboard/0002_seed_menu.py
 - Menu 12 row (parent self-FK 포함). 부모 row 3건(safety/monitoring/admin_only) 먼저 처리되도록 정렬한 모듈 상수 `MENUS` 정의.

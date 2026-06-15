@@ -33,7 +33,7 @@
 
 ---
 
-### B1. `print()` → `logger.exception` ([positioning/views/position_views.py:102](../../../../drf-server/apps/positioning/views/position_views.py#L102))
+### B1. `print()` → `logger.exception` ([positioning/views/position_views.py:102](../../../../../drf-server/apps/positioning/views/position_views.py#L102))
 
 **(A) 변경 내용**
 - 모듈 상단에 `import logging` + `logger = logging.getLogger(__name__)` 추가
@@ -70,7 +70,7 @@ except Exception:
 
 ---
 
-### B2. `AlarmPayload.extra="ignore"` ([alarm_router.py:18](../../../../fastapi-server/internal/routers/alarm_router.py#L18))
+### B2. `AlarmPayload.extra="ignore"` ([alarm_router.py:18](../../../../../fastapi-server/internal/routers/alarm_router.py#L18))
 
 **(A) 변경 내용**
 - Pydantic `model_config`의 `"extra"` 값을 `"allow"` → `"ignore"` 변경
@@ -109,7 +109,7 @@ class AlarmPayload(BaseModel):
 
 ---
 
-### B5. `WorkerSummaryView` permission_classes 클래스화 ([alarm_record.py:119](../../../../drf-server/apps/alerts/views/alarm_record.py#L119))
+### B5. `WorkerSummaryView` permission_classes 클래스화 ([alarm_record.py:119](../../../../../drf-server/apps/alerts/views/alarm_record.py#L119))
 
 **(A) 변경 내용**
 - `permission_classes`에 `IsSuperAdminOrFacilityAdmin` 추가
@@ -158,7 +158,7 @@ class WorkerSummaryView(APIView):
 
 ---
 
-### B3 + B4. 서비스 토큰 인증 (Phase 5) — 신규 [apps/core/authentication.py](../../../../drf-server/apps/core/authentication.py) + 5개 view + Celery + fastapi alarm_router
+### B3 + B4. 서비스 토큰 인증 (Phase 5) — 신규 [apps/core/authentication.py](../../../../../drf-server/apps/core/authentication.py) + 5개 view + Celery + fastapi alarm_router
 
 **(A) 변경 내용**
 1. **신규**: `apps/core/authentication.py::ServiceTokenAuthentication` — DRF BaseAuthentication 클래스
@@ -245,7 +245,7 @@ async def push_alarm(request: Request, alarm: AlarmPayload):
 
 ---
 
-### J1. `levelLabel` dead code 제거 ([util.js:51](../../../../drf-server/static/js/shared/util.js))
+### J1. `levelLabel` dead code 제거 ([util.js:51](../../../../../drf-server/static/js/shared/util.js))
 
 **(A) 변경 내용**
 - `levelLabel = { danger: '위험', caution: '주의', safe: '정상' }` 한 줄 제거
@@ -284,7 +284,7 @@ const MAX_POINTS = 30;
 
 ---
 
-### J2. `pushData` 검증 추가 ([util.js:37-50](../../../../drf-server/static/js/shared/util.js))
+### J2. `pushData` 검증 추가 ([util.js:37-50](../../../../../drf-server/static/js/shared/util.js))
 
 **(A) 변경 내용**
 - chart 객체 null 가드 추가
@@ -337,7 +337,7 @@ function pushData(chart, label, ...values) {
 
 ---
 
-### J3. WS_BASE 운영 가드 ([config.js:6-22](../../../../drf-server/static/js/shared/config.js))
+### J3. WS_BASE 운영 가드 ([config.js:6-22](../../../../../drf-server/static/js/shared/config.js))
 
 **(A) 변경 내용**
 - `window.AppConfig` 미정의 시 fallback 직전 `console.warn` 추가
@@ -389,7 +389,7 @@ if (window.AppConfig.WS_BASE &&
 
 ---
 
-### J4. `safety_history.js` pad 로컬 재정의 제거 ([safety_history.js:4](../../../../drf-server/static/js/detail/safety_history.js))
+### J4. `safety_history.js` pad 로컬 재정의 제거 ([safety_history.js:4](../../../../../drf-server/static/js/detail/safety_history.js))
 
 **(A) 변경 내용**
 - IIFE 내부의 `function pad(n) { return String(n).padStart(2, '0'); }` 제거
@@ -431,7 +431,7 @@ if (window.AppConfig.WS_BASE &&
 
 ---
 
-### J5. WSClient `_resolveUrl` console.warn ([ws-client.js:28-50](../../../../drf-server/static/js/shared/ws-client.js))
+### J5. WSClient `_resolveUrl` console.warn ([ws-client.js:28-50](../../../../../drf-server/static/js/shared/ws-client.js))
 
 **(A) 변경 내용**
 - AppConfig.wsUrl 미정의 시 `console.warn`
@@ -497,7 +497,7 @@ function _resolveUrl(path, opts) {
 
 ---
 
-### J6. `Menu.iconMap` 미정의 console.warn ([layout.js:50-58](../../../../drf-server/static/js/shared/layout.js))
+### J6. `Menu.iconMap` 미정의 console.warn ([layout.js:50-58](../../../../../drf-server/static/js/shared/layout.js))
 
 **(A) 변경 내용**
 - `const icon = this.iconMap[menu.icon] || '•';` 한 줄 → 분기 + console.warn 추가
@@ -534,7 +534,7 @@ if (!icon) {
 
 ---
 
-### J7. `ROLE_LABEL` 모듈 상수화 + 미정의 console.warn ([layout.js:107-115, 199-211](../../../../drf-server/static/js/shared/layout.js))
+### J7. `ROLE_LABEL` 모듈 상수화 + 미정의 console.warn ([layout.js:107-115, 199-211](../../../../../drf-server/static/js/shared/layout.js))
 
 **(A) 변경 내용**
 - `Header.renderUser` 내부에 함수 호출마다 새로 만들어지던 객체를 모듈 상단의 `Object.freeze` 상수로 추출
@@ -597,7 +597,7 @@ const Header = {
 
 ---
 
-### J8. `handleRefresh` setTimeout 누적 방지 ([layout.js:118, 152-163](../../../../drf-server/static/js/shared/layout.js))
+### J8. `handleRefresh` setTimeout 누적 방지 ([layout.js:118, 152-163](../../../../../drf-server/static/js/shared/layout.js))
 
 **(A) 변경 내용**
 - `Header._refreshErrTimer: null` 인스턴스 속성 추가
@@ -645,7 +645,7 @@ const Header = {
 
 ---
 
-### J9. `initApp().catch()` ([dashboard/app.js:49](../../../../drf-server/static/js/dashboard/app.js), [app-sub.js:11](../../../../drf-server/static/js/shared/app-sub.js))
+### J9. `initApp().catch()` ([dashboard/app.js:49](../../../../../drf-server/static/js/dashboard/app.js), [app-sub.js:11](../../../../../drf-server/static/js/shared/app-sub.js))
 
 **(A) 변경 내용**
 - 두 파일의 `initApp();` → `initApp().catch(err => console.error(...));`
@@ -679,7 +679,7 @@ initApp().catch(err => {
 
 ---
 
-### J10. `loadMySafetyStatus` catch console.warn ([dashboard/app.js:46](../../../../drf-server/static/js/dashboard/app.js))
+### J10. `loadMySafetyStatus` catch console.warn ([dashboard/app.js:46](../../../../../drf-server/static/js/dashboard/app.js))
 
 **(A) 변경 내용**
 - `catch { /* 기본값 유지 */ }` → `catch (e) { console.warn(...); }`
@@ -711,7 +711,7 @@ initApp().catch(err => {
 
 ---
 
-### J11. `Auth.getMe` catch console.warn ([auth.js:97-99](../../../../drf-server/static/js/shared/auth.js))
+### J11. `Auth.getMe` catch console.warn ([auth.js:97-99](../../../../../drf-server/static/js/shared/auth.js))
 
 **(A) 변경 내용**
 - `catch { return null; }` → `catch (e) { console.warn(...); return null; }`
@@ -759,7 +759,7 @@ async getMe() {
 ## 3. 적용된 신규 기능 (요약)
 
 ### 3.1 `ServiceTokenAuthentication` (DRF 인증 클래스)
-**위치**: [drf-server/apps/core/authentication.py](../../../../drf-server/apps/core/authentication.py)
+**위치**: [drf-server/apps/core/authentication.py](../../../../../drf-server/apps/core/authentication.py)
 **역할**: 서비스 간 호출(fastapi → drf 인입)을 Bearer 토큰으로 검증.
 **옵트인**: `settings.INTERNAL_SERVICE_TOKEN` 빈 값이면 비활성 (다음 인증 클래스로 위임), 값이 있으면 검증.
 

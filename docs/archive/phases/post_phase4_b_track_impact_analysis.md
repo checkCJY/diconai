@@ -47,10 +47,10 @@
 
 | 호출처 | 코드 | 평가 |
 |---|---|---|
-| [`apps/monitoring/models/gas_data.py:153`](../../drf-server/apps/monitoring/models/gas_data.py#L153) | `evaluate_gas_risk(gas, value, facility_id=facility_id)` (gas_sensor.facility_id 자동 전달) | ✅ 정상 |
-| [`apps/monitoring/views/power_data.py:45`](../../drf-server/apps/monitoring/views/power_data.py#L45) | `get_threshold("power_default", "power_w")` — facility_id 미지정 (의도적) | ✅ 정상 |
-| [`apps/alerts/tasks.py:299,355`](../../drf-server/apps/alerts/tasks.py) | `get_threshold("power_default", "power_w")` (×2) | ✅ 정상 |
-| [`apps/facilities/services/threshold_service.py:144`](../../drf-server/apps/facilities/services/threshold_service.py) | `evaluate_power_risk(watt)` 내부 `get_threshold("power_default", "power_w")` | ✅ 정상 |
+| [`apps/monitoring/models/gas_data.py:153`](../../../drf-server/apps/monitoring/models/gas_data.py#L153) | `evaluate_gas_risk(gas, value, facility_id=facility_id)` (gas_sensor.facility_id 자동 전달) | ✅ 정상 |
+| [`apps/monitoring/views/power_data.py:45`](../../../drf-server/apps/monitoring/views/power_data.py#L45) | `get_threshold("power_default", "power_w")` — facility_id 미지정 (의도적) | ✅ 정상 |
+| [`apps/alerts/tasks.py:299,355`](../../../drf-server/apps/alerts/tasks.py) | `get_threshold("power_default", "power_w")` (×2) | ✅ 정상 |
+| [`apps/facilities/services/threshold_service.py:144`](../../../drf-server/apps/facilities/services/threshold_service.py) | `evaluate_power_risk(watt)` 내부 `get_threshold("power_default", "power_w")` | ✅ 정상 |
 
 전력은 `power_default` 1개 그룹 (전사) — facility_id 미지정이 정확한 의도. 가스는 `gas_data.recalculate_risks_from_thresholds`가 자동 전달. fastapi-server는 `evaluate_gas_risk` 비사용.
 
@@ -64,13 +64,13 @@ UNIQUE 제약 `(group, measurement_item)` → `(group, measurement_item, facilit
 
 | 영역 | 상태 |
 |---|---|
-| [`apps/core/constants.py:104~`](../../drf-server/apps/core/constants.py) | `GasTypeChoices` 9종 (LEL 제거) ✅ |
-| [`apps/reference/migrations/0003_remove_lel.py`](../../drf-server/apps/reference/migrations/0003_remove_lel.py) | CommonCode(group=GAS_TYPE, code='lel') delete ✅ |
-| [`apps/alerts/migrations/0010_alter_alarmrecord_gas_type.py`](../../drf-server/apps/alerts/migrations/0010_alter_alarmrecord_gas_type.py) | AlarmRecord.gas_type choices 9종 ✅ |
-| [`apps/monitoring/models/gas_data.py`](../../drf-server/apps/monitoring/models/gas_data.py) | 9종 컬럼만 (lel 컬럼 부재) ✅ |
-| [`apps/alerts/serializers/alarm_record.py:45`](../../drf-server/apps/alerts/serializers/alarm_record.py) | `if obj.gas_type and obj.measured_value is not None:` — gas_type 9종 dict 매칭 ✅ |
-| [`apps/alerts/tasks.py:87`](../../drf-server/apps/alerts/tasks.py) | `_GAS_NAME.get(gas_type, gas_type.upper())` 9종 dict + fallback ✅ |
-| [`apps/reference/tests/test_gas_type_consistency.py`](../../drf-server/apps/reference/tests/test_gas_type_consistency.py) | CI 정합성 자동 통과 (이넘과 DB 동기) ✅ |
+| [`apps/core/constants.py:104~`](../../../drf-server/apps/core/constants.py) | `GasTypeChoices` 9종 (LEL 제거) ✅ |
+| [`apps/reference/migrations/0003_remove_lel.py`](../../../drf-server/apps/reference/migrations/0003_remove_lel.py) | CommonCode(group=GAS_TYPE, code='lel') delete ✅ |
+| [`apps/alerts/migrations/0010_alter_alarmrecord_gas_type.py`](../../../drf-server/apps/alerts/migrations/0010_alter_alarmrecord_gas_type.py) | AlarmRecord.gas_type choices 9종 ✅ |
+| [`apps/monitoring/models/gas_data.py`](../../../drf-server/apps/monitoring/models/gas_data.py) | 9종 컬럼만 (lel 컬럼 부재) ✅ |
+| [`apps/alerts/serializers/alarm_record.py:45`](../../../drf-server/apps/alerts/serializers/alarm_record.py) | `if obj.gas_type and obj.measured_value is not None:` — gas_type 9종 dict 매칭 ✅ |
+| [`apps/alerts/tasks.py:87`](../../../drf-server/apps/alerts/tasks.py) | `_GAS_NAME.get(gas_type, gas_type.upper())` 9종 dict + fallback ✅ |
+| [`apps/reference/tests/test_gas_type_consistency.py`](../../../drf-server/apps/reference/tests/test_gas_type_consistency.py) | CI 정합성 자동 통과 (이넘과 DB 동기) ✅ |
 
 historical AlarmRecord row에 `gas_type='lel'` 있어도 dict fallback `.upper()`로 안전 처리. 운영 DB에서는 `0003_remove_lel` 마이그가 LEL CommonCode row 삭제.
 
@@ -78,12 +78,12 @@ historical AlarmRecord row에 `gas_type='lel'` 있어도 dict fallback `.upper()
 
 | 파일 | 위치 | 코드 | 상태 |
 |---|---|---|---|
-| [`fastapi-server/gas/schemas/gas.py:69,74-76`](../../fastapi-server/gas/schemas/gas.py) | Pydantic 필드 | `lel` 필드 (주석 "임계치 미정의") | 🟠 의도 |
-| [`fastapi-server/gas/services/gas_service.py:39`](../../fastapi-server/gas/services/gas_service.py) | raw_payload 보관 | lel 값 그대로 DRF 전달 | 🟠 의도 |
-| [`fastapi-server/core/gas_thresholds.py:52-58`](../../fastapi-server/core/gas_thresholds.py) | `calculate_individual_risks` | `if gas != "lel"` 자동 필터 | ✅ 안전 |
-| [`fastapi-server/dummies/gas_dummy.py:42,55,68`](../../fastapi-server/dummies/gas_dummy.py) | 더미 페이로드 | lel 값 생성 | 🟠 의도 |
-| [`fastapi-server/gas/routers/gas_router.py:42`](../../fastapi-server/gas/routers/gas_router.py) | docstring | "10종" 주석 | 🟠 정정 |
-| [`docs/api/openapi-fastapi.json`](../api/openapi-fastapi.json) | OpenAPI | lel 필드 스키마 | 🟠 정정 |
+| [`fastapi-server/gas/schemas/gas.py:69,74-76`](../../../fastapi-server/gas/schemas/gas.py) | Pydantic 필드 | `lel` 필드 (주석 "임계치 미정의") | 🟠 의도 |
+| [`fastapi-server/gas/services/gas_service.py:39`](../../../fastapi-server/gas/services/gas_service.py) | raw_payload 보관 | lel 값 그대로 DRF 전달 | 🟠 의도 |
+| [`fastapi-server/core/gas_thresholds.py:52-58`](../../../fastapi-server/core/gas_thresholds.py) | `calculate_individual_risks` | `if gas != "lel"` 자동 필터 | ✅ 안전 |
+| [`fastapi-server/dummies/gas_dummy.py:42,55,68`](../../../fastapi-server/dummies/gas_dummy.py) | 더미 페이로드 | lel 값 생성 | 🟠 의도 |
+| [`fastapi-server/gas/routers/gas_router.py:42`](../../../fastapi-server/gas/routers/gas_router.py) | docstring | "10종" 주석 | 🟠 정정 |
+| [`docs/api/openapi-fastapi.json`](../../api/openapi-fastapi.json) | OpenAPI | lel 필드 스키마 | 🟠 정정 |
 
 **의도적 잔존**: 펌웨어 페이로드가 lel 값을 보내도 fastapi가 거부하지 않고 raw_payload에 보관. DRF의 `recalculate_risks_from_thresholds`는 9종 컬럼만 처리 (lel 무시). `calculate_individual_risks`도 `if gas != "lel"` 필터 — **서비스 동작 무영향**. 단 docstring/주석 "9종 + LEL" 형식은 정정 권장 (펌웨어 합의 트랙과 묶음).
 
@@ -93,12 +93,12 @@ historical AlarmRecord row에 `gas_type='lel'` 있어도 dict fallback `.upper()
 
 | 파일 | 라인 | 코드 발췌 | 모델 | 영향 |
 |---|---|---|---|---|
-| [`apps/alerts/services/event_service.py:78,143`](../../drf-server/apps/alerts/services/event_service.py) | 78,143 | `AlarmRecord.objects.create(...)` (병합/신규 양측) | AlarmRecord | 알람 발생자 추적 불가 |
-| [`apps/alerts/services/event_service.py:127`](../../drf-server/apps/alerts/services/event_service.py) | 127 | `Event.objects.create(...)` | Event | 이벤트 생성자 추적 불가 |
-| [`apps/notifications/services/notification_service.py:63`](../../drf-server/apps/notifications/services/notification_service.py) | 51-63 | `Notification.objects.bulk_create(...)` | Notification | bulk_create는 auto_now 미발동 — `updated_at`도 NULL 가능 |
-| [`apps/monitoring/serializers/power_data.py:52`](../../drf-server/apps/monitoring/serializers/power_data.py) | 52 | `PowerEvent.objects.create(...)` | PowerEvent | 측정 소스 불명확 |
-| [`apps/safety/services/check_service.py:48`](../../drf-server/apps/safety/services/check_service.py) | 48 | `SafetyStatus.objects.get_or_create(defaults={...})` | SafetyStatus | 체크 작업자 → worker_id로 분리 추적 가능하나 컨벤션 불일치 |
-| [`apps/positioning/services/position_service.py:168`](../../drf-server/apps/positioning/services/position_service.py) | 168 | `WorkerPosition.objects.create(...)` | WorkerPosition | 위치 데이터 출처 불명확 (FastAPI/외부 GPS) |
+| [`apps/alerts/services/event_service.py:78,143`](../../../drf-server/apps/alerts/services/event_service.py) | 78,143 | `AlarmRecord.objects.create(...)` (병합/신규 양측) | AlarmRecord | 알람 발생자 추적 불가 |
+| [`apps/alerts/services/event_service.py:127`](../../../drf-server/apps/alerts/services/event_service.py) | 127 | `Event.objects.create(...)` | Event | 이벤트 생성자 추적 불가 |
+| [`apps/notifications/services/notification_service.py:63`](../../../drf-server/apps/notifications/services/notification_service.py) | 51-63 | `Notification.objects.bulk_create(...)` | Notification | bulk_create는 auto_now 미발동 — `updated_at`도 NULL 가능 |
+| [`apps/monitoring/serializers/power_data.py:52`](../../../drf-server/apps/monitoring/serializers/power_data.py) | 52 | `PowerEvent.objects.create(...)` | PowerEvent | 측정 소스 불명확 |
+| [`apps/safety/services/check_service.py:48`](../../../drf-server/apps/safety/services/check_service.py) | 48 | `SafetyStatus.objects.get_or_create(defaults={...})` | SafetyStatus | 체크 작업자 → worker_id로 분리 추적 가능하나 컨벤션 불일치 |
+| [`apps/positioning/services/position_service.py:168`](../../../drf-server/apps/positioning/services/position_service.py) | 168 | `WorkerPosition.objects.create(...)` | WorkerPosition | 위치 데이터 출처 불명확 (FastAPI/외부 GPS) |
 
 **Notification.bulk_create의 추가 영향**: Django는 `bulk_create`에서 `auto_now` / `auto_now_add` 트리거 안 함. `created_at`은 `auto_now_add` default라 ORM 측에서 NULL이지만 DB default로 채워질 가능성 있음 (DB 의존). `updated_at`은 명시 안 하면 NULL.
 
@@ -151,7 +151,7 @@ AlarmRecord.objects.create(..., updated_by=system_user)
 
 ### 3-8. 🟠 PR-G `ThresholdAdmin.list_display` facility 컬럼
 
-[`apps/facilities/admin.py`](../../drf-server/apps/facilities/admin.py) `ThresholdAdmin.list_display`에 `facility` 컬럼 미노출. PR-G에서 facility FK 추가됐지만 admin UI에서 facility specific row 식별이 어려움. 어드민 화면 구현 트랙(A 트랙)과 함께 보강 권장.
+[`apps/facilities/admin.py`](../../../drf-server/apps/facilities/admin.py) `ThresholdAdmin.list_display`에 `facility` 컬럼 미노출. PR-G에서 facility FK 추가됐지만 admin UI에서 facility specific row 식별이 어려움. 어드민 화면 구현 트랙(A 트랙)과 함께 보강 권장.
 
 ---
 

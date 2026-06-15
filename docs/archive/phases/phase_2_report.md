@@ -62,8 +62,8 @@ Menu count: 12 (snake_case 변환 완료)
 
 | 경로 | 역할 |
 |---|---|
-| [drf-server/apps/notices/](../../drf-server/apps/notices/) | 공지사항 게시물 (Notice + NoticeAttachment + validators) |
-| [drf-server/apps/training/](../../drf-server/apps/training/) | VR 교육 콘텐츠 (VRTrainingContent + VRTrainingRevision 교체 이력) |
+| [drf-server/apps/notices/](../../../drf-server/apps/notices/) | 공지사항 게시물 (Notice + NoticeAttachment + validators) |
+| [drf-server/apps/training/](../../../drf-server/apps/training/) | VR 교육 콘텐츠 (VRTrainingContent + VRTrainingRevision 교체 이력) |
 
 각 앱: `__init__.py`, `apps.py`, `admin.py`, `models/`, `migrations/`, `tests/`.
 
@@ -71,35 +71,35 @@ Menu count: 12 (snake_case 변환 완료)
 
 | 파일 | 모델 | 역할 |
 |---|---|---|
-| [alerts/models/hazard_type_group.py](../../drf-server/apps/alerts/models/hazard_type_group.py) | `HazardTypeGroup` | 위험 유형 그룹 마스터 (환경/설비/위치/작업자/운영/시스템) |
-| [alerts/models/hazard_type.py](../../drf-server/apps/alerts/models/hazard_type.py) | `HazardType` | AlarmType 이넘과 1:1 매핑 마스터 (UI 편집용) |
-| [alerts/models/alert_policy.py](../../drf-server/apps/alerts/models/alert_policy.py) | `AlertPolicy` | "어떤 이벤트 → 누구에게 어떤 채널" 정책. target_user_types JSON 시작 |
-| [facilities/models/thresholds.py](../../drf-server/apps/facilities/models/thresholds.py) | `ThresholdGroup`, `Threshold` | 임계치 DB화 — 기존 빈 파일 → 모델 작성 |
-| [dashboard/models/menu.py](../../drf-server/apps/dashboard/models/menu.py) | `Menu` | 메뉴 마스터 (parent self-FK, snake_case 코드) |
-| [dashboard/models/role_menu_visibility.py](../../drf-server/apps/dashboard/models/role_menu_visibility.py) | `RoleMenuVisibility` | RoleProfile × Menu 노출 매핑 |
-| [operations/models/app_log.py](../../drf-server/apps/operations/models/app_log.py) | `AppLog` | 운영 로그 (logger.error 등 영속화). APPEND-ONLY |
-| [operations/models/integration_log.py](../../drf-server/apps/operations/models/integration_log.py) | `IntegrationLog` | 시스템 간 호출 영속화. APPEND-ONLY |
-| [notices/models/notice.py](../../drf-server/apps/notices/models/notice.py) | `Notice` | 공지사항 (category/is_pinned/target_facility) |
-| [notices/models/notice_attachment.py](../../drf-server/apps/notices/models/notice_attachment.py) | `NoticeAttachment` | 첨부파일 (10MB, 8종 확장자 validator) |
-| [training/models/vr_training_content.py](../../drf-server/apps/training/models/vr_training_content.py) | `VRTrainingContent` | VR 교육 콘텐츠. 부분 UniqueConstraint(is_active=True) |
-| [training/models/vr_training_revision.py](../../drf-server/apps/training/models/vr_training_revision.py) | `VRTrainingRevision` | 콘텐츠 교체 이력 스냅샷 |
+| [alerts/models/hazard_type_group.py](../../../drf-server/apps/alerts/models/hazard_type_group.py) | `HazardTypeGroup` | 위험 유형 그룹 마스터 (환경/설비/위치/작업자/운영/시스템) |
+| [alerts/models/hazard_type.py](../../../drf-server/apps/alerts/models/hazard_type.py) | `HazardType` | AlarmType 이넘과 1:1 매핑 마스터 (UI 편집용) |
+| [alerts/models/alert_policy.py](../../../drf-server/apps/alerts/models/alert_policy.py) | `AlertPolicy` | "어떤 이벤트 → 누구에게 어떤 채널" 정책. target_user_types JSON 시작 |
+| [facilities/models/thresholds.py](../../../drf-server/apps/facilities/models/thresholds.py) | `ThresholdGroup`, `Threshold` | 임계치 DB화 — 기존 빈 파일 → 모델 작성 |
+| [dashboard/models/menu.py](../../../drf-server/apps/dashboard/models/menu.py) | `Menu` | 메뉴 마스터 (parent self-FK, snake_case 코드) |
+| [dashboard/models/role_menu_visibility.py](../../../drf-server/apps/dashboard/models/role_menu_visibility.py) | `RoleMenuVisibility` | RoleProfile × Menu 노출 매핑 |
+| [operations/models/app_log.py](../../../drf-server/apps/operations/models/app_log.py) | `AppLog` | 운영 로그 (logger.error 등 영속화). APPEND-ONLY |
+| [operations/models/integration_log.py](../../../drf-server/apps/operations/models/integration_log.py) | `IntegrationLog` | 시스템 간 호출 영속화. APPEND-ONLY |
+| [notices/models/notice.py](../../../drf-server/apps/notices/models/notice.py) | `Notice` | 공지사항 (category/is_pinned/target_facility) |
+| [notices/models/notice_attachment.py](../../../drf-server/apps/notices/models/notice_attachment.py) | `NoticeAttachment` | 첨부파일 (10MB, 8종 확장자 validator) |
+| [training/models/vr_training_content.py](../../../drf-server/apps/training/models/vr_training_content.py) | `VRTrainingContent` | VR 교육 콘텐츠. 부분 UniqueConstraint(is_active=True) |
+| [training/models/vr_training_revision.py](../../../drf-server/apps/training/models/vr_training_revision.py) | `VRTrainingRevision` | 콘텐츠 교체 이력 스냅샷 |
 
 ### 3-3. 인프라 코드 신규 (5개)
 
 | 파일 | 역할 |
 |---|---|
-| [operations/logging/db_handler.py](../../drf-server/apps/operations/logging/db_handler.py) | `DBLogHandler` — Python logging → AppLog 영속화. 재귀 가드 thread-local |
-| [operations/views/internal/integration_log.py](../../drf-server/apps/operations/views/internal/integration_log.py) | `IntegrationLogInternalCreateView` — `POST /api/internal/integration-logs/`. localhost-only IP 화이트리스트 + JWT 우회 |
-| [operations/serializers/integration_log.py](../../drf-server/apps/operations/serializers/integration_log.py) | DRF serializer for IntegrationLog |
-| [operations/urls.py](../../drf-server/apps/operations/urls.py) | operations 앱 URL (internal-integration-log-create) |
-| [notices/validators.py](../../drf-server/apps/notices/validators.py) | `validate_max_10mb`, `validate_allowed_extension` (jpg/png/gif/pdf/docx/xlsx/pptx) |
+| [operations/logging/db_handler.py](../../../drf-server/apps/operations/logging/db_handler.py) | `DBLogHandler` — Python logging → AppLog 영속화. 재귀 가드 thread-local |
+| [operations/views/internal/integration_log.py](../../../drf-server/apps/operations/views/internal/integration_log.py) | `IntegrationLogInternalCreateView` — `POST /api/internal/integration-logs/`. localhost-only IP 화이트리스트 + JWT 우회 |
+| [operations/serializers/integration_log.py](../../../drf-server/apps/operations/serializers/integration_log.py) | DRF serializer for IntegrationLog |
+| [operations/urls.py](../../../drf-server/apps/operations/urls.py) | operations 앱 URL (internal-integration-log-create) |
+| [notices/validators.py](../../../drf-server/apps/notices/validators.py) | `validate_max_10mb`, `validate_allowed_extension` (jpg/png/gif/pdf/docx/xlsx/pptx) |
 
 ### 3-4. fixture (2개)
 
 | 파일 | 시드 내용 |
 |---|---|
-| [alerts/fixtures/hazard_type.json](../../drf-server/apps/alerts/fixtures/hazard_type.json) | HazardTypeGroup 6 row + HazardType 10 row (AlarmType 10종 1:1) |
-| [dashboard/fixtures/menu.json](../../drf-server/apps/dashboard/fixtures/menu.json) | Menu 12 row (snake_case 변환, parent FK 포함) |
+| [alerts/fixtures/hazard_type.json](../../../drf-server/apps/alerts/fixtures/hazard_type.json) | HazardTypeGroup 6 row + HazardType 10 row (AlarmType 10종 1:1) |
+| [dashboard/fixtures/menu.json](../../../drf-server/apps/dashboard/fixtures/menu.json) | Menu 12 row (snake_case 변환, parent FK 포함) |
 
 ### 3-5. 마이그레이션 (8개)
 
@@ -118,7 +118,7 @@ Menu count: 12 (snake_case 변환 완료)
 
 | 파일 | 검증 |
 |---|---|
-| [alerts/tests/test_alarm_type_consistency.py](../../drf-server/apps/alerts/tests/test_alarm_type_consistency.py) | `AlarmType` 10종 ↔ `HazardType.type_code` 1:1 일치 |
+| [alerts/tests/test_alarm_type_consistency.py](../../../drf-server/apps/alerts/tests/test_alarm_type_consistency.py) | `AlarmType` 10종 ↔ `HazardType.type_code` 1:1 일치 |
 
 ---
 
@@ -129,33 +129,33 @@ Menu count: 12 (snake_case 변환 완료)
 | 파일 | 변경 내용 |
 |---|---|
 | [config/settings.py](../../drf-server/config/settings.py) | `INSTALLED_APPS`에 `apps.notices`, `apps.training` 추가. `LOGGING.handlers`에 `applog_db` (DBLogHandler, level=ERROR) 추가, root logger에 연결 |
-| [config/urls.py](../../drf-server/config/urls.py) | `path("api/", include("apps.operations.urls"))` 추가 → `/api/internal/integration-logs/` 진입 |
+| [config/urls.py](../../../drf-server/config/urls.py) | `path("api/", include("apps.operations.urls"))` 추가 → `/api/internal/integration-logs/` 진입 |
 
 ### 4-2. 모델 모듈 인덱스
 
 | 파일 | 변경 내용 |
 |---|---|
-| [alerts/models/__init__.py](../../drf-server/apps/alerts/models/__init__.py) | `HazardType`, `HazardTypeGroup`, `AlertPolicy` re-export |
-| [facilities/models/__init__.py](../../drf-server/apps/facilities/models/__init__.py) | `Threshold`, `ThresholdGroup` re-export. 기존 4차 예고 주석 제거 |
-| [operations/models/__init__.py](../../drf-server/apps/operations/models/__init__.py) | `AppLog`, `IntegrationLog` re-export 추가 |
+| [alerts/models/__init__.py](../../../drf-server/apps/alerts/models/__init__.py) | `HazardType`, `HazardTypeGroup`, `AlertPolicy` re-export |
+| [facilities/models/__init__.py](../../../drf-server/apps/facilities/models/__init__.py) | `Threshold`, `ThresholdGroup` re-export. 기존 4차 예고 주석 제거 |
+| [operations/models/__init__.py](../../../drf-server/apps/operations/models/__init__.py) | `AppLog`, `IntegrationLog` re-export 추가 |
 
 ### 4-3. 어드민 등록
 
 | 파일 | 등록한 모델 |
 |---|---|
-| [alerts/admin.py](../../drf-server/apps/alerts/admin.py) | `HazardTypeGroup`, `HazardType` (`type_code` readonly), `AlertPolicy` |
-| [facilities/admin.py](../../drf-server/apps/facilities/admin.py) | `ThresholdGroup`, `Threshold` |
-| [dashboard/admin.py](../../drf-server/apps/dashboard/admin.py) (신규) | `Menu`, `RoleMenuVisibility` |
-| [operations/admin.py](../../drf-server/apps/operations/admin.py) | `AppLog`, `IntegrationLog` (둘 다 readonly + has_*_permission False — APPEND-ONLY 강제) |
-| [notices/admin.py](../../drf-server/apps/notices/admin.py) (신규) | `Notice` (NoticeAttachment inline), `NoticeAttachment` |
-| [training/admin.py](../../drf-server/apps/training/admin.py) (신규) | `VRTrainingContent`, `VRTrainingRevision` |
+| [alerts/admin.py](../../../drf-server/apps/alerts/admin.py) | `HazardTypeGroup`, `HazardType` (`type_code` readonly), `AlertPolicy` |
+| [facilities/admin.py](../../../drf-server/apps/facilities/admin.py) | `ThresholdGroup`, `Threshold` |
+| [dashboard/admin.py](../../../drf-server/apps/dashboard/admin.py) (신규) | `Menu`, `RoleMenuVisibility` |
+| [operations/admin.py](../../../drf-server/apps/operations/admin.py) | `AppLog`, `IntegrationLog` (둘 다 readonly + has_*_permission False — APPEND-ONLY 강제) |
+| [notices/admin.py](../../../drf-server/apps/notices/admin.py) (신규) | `Notice` (NoticeAttachment inline), `NoticeAttachment` |
+| [training/admin.py](../../../drf-server/apps/training/admin.py) (신규) | `VRTrainingContent`, `VRTrainingRevision` |
 
 ### 4-4. IntegrationLog 호출 코드 갱신 (Phase 2-e 핵심)
 
 | 파일 | 변경 내용 |
 |---|---|
-| [fastapi-server/services/drf_client.py](../../fastapi-server/services/drf_client.py) | `INTEGRATION_LOG_PATH` 상수 + `_record_integration_log()` helper (fire-and-forget 비동기 httpx). `post_to_drf` 끝부분에서 path != INTEGRATION_LOG_PATH일 때 결과 영속화 (재귀 회피) |
-| [drf-server/apps/alerts/tasks.py](../../drf-server/apps/alerts/tasks.py) | `_push_to_ws()`에서 httpx.post 결과(success/failure) → ORM 직접 `IntegrationLog.objects.create(...)`. 기록 실패 silent fail |
+| [fastapi-server/services/drf_client.py](../../../fastapi-server/services/drf_client.py) | `INTEGRATION_LOG_PATH` 상수 + `_record_integration_log()` helper (fire-and-forget 비동기 httpx). `post_to_drf` 끝부분에서 path != INTEGRATION_LOG_PATH일 때 결과 영속화 (재귀 회피) |
+| [drf-server/apps/alerts/tasks.py](../../../drf-server/apps/alerts/tasks.py) | `_push_to_ws()`에서 httpx.post 결과(success/failure) → ORM 직접 `IntegrationLog.objects.create(...)`. 기록 실패 silent fail |
 
 ---
 

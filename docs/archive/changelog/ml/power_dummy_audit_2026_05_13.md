@@ -3,14 +3,14 @@
 > 작성: 2026-05-13
 > 대상: `power_data` 테이블 24,883,200 row (2025-11-13 ~ 2026-05-11, 180일)
 > 데이터 출처: `python manage.py backfill_power_data --start-date 2025-11-13 --duration-days 180 --interval-sec 30`
-> 목적: IF 학습 전 시뮬레이션 데이터가 [power_dummy.py v3](../../../fastapi-server/dummies/power_dummy.py) 의 의도된 패턴을 정확히 반영하는지 6항목 검증
+> 목적: IF 학습 전 시뮬레이션 데이터가 [power_dummy.py v3](../../../../fastapi-server/dummies/power_dummy.py) 의 의도된 패턴을 정확히 반영하는지 6항목 검증
 > 결과: **6항목 모두 통과** — IF 학습 진입 OK
 
 ---
 
 ## 무엇을 했나
 
-[backfill_power_data.py](../../../drf-server/apps/monitoring/management/commands/backfill_power_data.py)
+[backfill_power_data.py](../../../../drf-server/apps/monitoring/management/commands/backfill_power_data.py)
 가 power_dummy v3 로직을 인라인 복제해서 시간 가속 백필을 수행한다.
 실시간 더미는 `measured_at = now_utc_iso()` 고정이라 6개월치를 만들 방법이
 없어서 신규 management 커맨드를 작성했다.

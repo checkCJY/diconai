@@ -1,7 +1,7 @@
 # Power AI 다채널 활성화 (ch1 → +ch9/ch14/ch15)
 
 > **작업일**: 2026-05-21
-> **plan**: [skill/plan/power-ai-multichannel-activate.md](../../../skill/plan/power-ai-multichannel-activate.md)
+> **plan**: [skill/plan/power-ai-multichannel-activate.md](../../../../skill/plan/power-ai-multichannel-activate.md)
 > **트리거**: 사용자 질문 — "1 디바이스 × 1 채널 추론 상태에서 의미있는 모니터링·향후 방향 결정을 위해 몇 개 채널까지 확장해야 하는가"
 > **결론**: 4채널 (ch1·ch9·ch14·ch15) 활성화 + 외부 리뷰어 #1 (a/c path 충돌) 본체 해결 + ARIMA fit 본질 보강
 
@@ -21,7 +21,7 @@
 
 ### 2.1 fastapi 활성화 플래그 확장
 
-**Before** ([fastapi-server/power/services/power_service.py:75](../../../fastapi-server/power/services/power_service.py#L75))
+**Before** ([fastapi-server/power/services/power_service.py:75](../../../../fastapi-server/power/services/power_service.py#L75))
 ```python
 _INFERENCE_ENABLED_CHANNELS: set[tuple[int, str]] = {(1, "watt")}
 ```
@@ -37,7 +37,7 @@ _INFERENCE_ENABLED_CHANNELS: set[tuple[int, str]] = {
 
 ### 2.2 IF 학습 명령 sensor_identifier mac 변환 (회귀 #1 수정)
 
-**Before** ([drf-server/apps/ml/management/commands/train_anomaly_model.py:258](../../../drf-server/apps/ml/management/commands/train_anomaly_model.py#L258))
+**Before** ([drf-server/apps/ml/management/commands/train_anomaly_model.py:258](../../../../drf-server/apps/ml/management/commands/train_anomaly_model.py#L258))
 ```python
 sensor_identifier = (
     f"power:device_{opts['device_id']}"  # ← PowerDevice.id (정수) 그대로
@@ -54,13 +54,13 @@ sensor_identifier = (
 )
 ```
 
-→ ARIMA 학습 명령 ([train_arima_power_model.py:96-104](../../../drf-server/apps/ml/management/commands/train_arima_power_model.py#L96-L104)) 이 이미 사용 중이던 PK→mac 변환 패턴을 IF 명령에도 동일하게 이식.
+→ ARIMA 학습 명령 ([train_arima_power_model.py:96-104](../../../../drf-server/apps/ml/management/commands/train_arima_power_model.py#L96-L104)) 이 이미 사용 중이던 PK→mac 변환 패턴을 IF 명령에도 동일하게 이식.
 
-**왜 회귀였나**: 추론 측 ([power_service.py:367](../../../fastapi-server/power/services/power_service.py#L367)) 은 `f"power:device_{device_id}:ch{n}:{type}"` 에서 device_id 를 **raw mac** 으로 받음. 두 학습 명령이 표기를 다르게 만들면 IF 모델은 매칭 실패 → 404 silent fallback → IF 미동작.
+**왜 회귀였나**: 추론 측 ([power_service.py:367](../../../../fastapi-server/power/services/power_service.py#L367)) 은 `f"power:device_{device_id}:ch{n}:{type}"` 에서 device_id 를 **raw mac** 으로 받음. 두 학습 명령이 표기를 다르게 만들면 IF 모델은 매칭 실패 → 404 silent fallback → IF 미동작.
 
 ### 2.3 DRF RiskClassified enum 에 WARNING 추가 (회귀 #2 본체)
 
-**Before** ([drf-server/apps/ml/models/ml_anomaly_result.py:17](../../../drf-server/apps/ml/models/ml_anomaly_result.py#L17))
+**Before** ([drf-server/apps/ml/models/ml_anomaly_result.py:17](../../../../drf-server/apps/ml/models/ml_anomaly_result.py#L17))
 ```python
 class RiskClassified(models.TextChoices):
     NORMAL = "normal", "정상"
@@ -91,13 +91,13 @@ class RiskClassified(models.TextChoices):
 
 3곳 매핑에 "warning" 추가 — DRF 측 enum 만 추가하면 fastapi 자신은 "warning" 키가 없어 silent fallback "normal" 잠재 회귀 발생.
 
-- [power_service.py:65](../../../fastapi-server/power/services/power_service.py#L65) `_COMBINED_TO_RISK_LEVEL` 에 `"warning": "warning"` 추가
-- [power_service.py:71](../../../fastapi-server/power/services/power_service.py#L71) `_FIRE_LEVELS` 에 `"warning"` 추가 (없으면 WebSocket fire 흐름 누락)
-- [decide_alarm.py:37-50](../../../fastapi-server/power/services/decide_alarm.py#L37-L50) `_ai_combined_to_risk_level` 에 `"warning": "warning"` + docstring "AI 5단계 → UI 3단계" 갱신
+- [power_service.py:65](../../../../fastapi-server/power/services/power_service.py#L65) `_COMBINED_TO_RISK_LEVEL` 에 `"warning": "warning"` 추가
+- [power_service.py:71](../../../../fastapi-server/power/services/power_service.py#L71) `_FIRE_LEVELS` 에 `"warning"` 추가 (없으면 WebSocket fire 흐름 누락)
+- [decide_alarm.py:37-50](../../../../fastapi-server/power/services/decide_alarm.py#L37-L50) `_ai_combined_to_risk_level` 에 `"warning": "warning"` + docstring "AI 5단계 → UI 3단계" 갱신
 
 ### 2.5 ARIMA 학습 `max_rows` default 3000 → 10000
 
-**Before** ([train_arima_power_model.py:80-85](../../../drf-server/apps/ml/management/commands/train_arima_power_model.py#L80-L85))
+**Before** ([train_arima_power_model.py:80-85](../../../../drf-server/apps/ml/management/commands/train_arima_power_model.py#L80-L85))
 ```python
 parser.add_argument("--max-rows", default=3000, ...)
 ```
@@ -115,7 +115,7 @@ parser.add_argument("--max-rows", default=10000, ...)
 
 ### 2.6 테스트 정리
 
-[test_anomaly_result_create.py:67](../../../drf-server/apps/ml/tests/test_anomaly_result_create.py#L67) 의 `invalid_risk_classified` 테스트가 `"warning"` 을 invalid 값으로 사용했었으나, 이젠 valid. invalid 의도는 보존하기 위해 `"bogus"` 로 교체.
+[test_anomaly_result_create.py:67](../../../../drf-server/apps/ml/tests/test_anomaly_result_create.py#L67) 의 `invalid_risk_classified` 테스트가 `"warning"` 을 invalid 값으로 사용했었으나, 이젠 valid. invalid 의도는 보존하기 위해 `"bogus"` 로 교체.
 
 ---
 
@@ -153,7 +153,7 @@ parser.add_argument("--max-rows", default=10000, ...)
 
 `combined=caution` 빈도가 높은 이유는 IF/ARIMA FP 가 아니라 **`night_abnormal` 시각 휴리스틱 격상**:
 
-- [power_service.py:459-478](../../../fastapi-server/power/services/power_service.py#L459-L478) — KST 야간(22~05) + `value > rated × 0.30` 이면 `_NIGHT_ESCALATION["normal"]="caution"` 격상
+- [power_service.py:459-478](../../../../fastapi-server/power/services/power_service.py#L459-L478) — KST 야간(22~05) + `value > rated × 0.30` 이면 `_NIGHT_ESCALATION["normal"]="caution"` 격상
 - 4채널 추론 1276건 중 472건(37%) 이 night_abnormal 격상
 - 시연이 KST 주간(08~18) 으로 결정됨 → 시연 시각에는 미발동 → 별도 조치 불필요
 

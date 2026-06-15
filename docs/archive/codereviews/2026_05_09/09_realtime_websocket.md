@@ -5,20 +5,20 @@
 이 도메인은 fastapi-server의 실시간 처리 인프라를 횡단으로 리뷰. 04(알람), 06(데이터 수집), 07(위치)에서 부분적으로 다룬 내용을 종합 + 깊이 있는 동시성/contract 분석.
 
 ### 1.1 핵심 파일
-- [fastapi-server/websocket/state.py](../../../fastapi-server/websocket/state.py) — **41줄, 9개 mutable globals** ⭐
-- [fastapi-server/websocket/routers/ws_router.py](../../../fastapi-server/websocket/routers/ws_router.py) — 180줄
-- [fastapi-server/websocket/services/broadcast.py](../../../fastapi-server/websocket/services/broadcast.py) — 119줄 ⭐
-- [fastapi-server/services/drf_client.py](../../../fastapi-server/services/drf_client.py) — DRF 통신 헬퍼
-- [fastapi-server/app.py](../../../fastapi-server/app.py) — 156줄, 라이프사이클 + 전역 예외 핸들러
-- [fastapi-server/core/config.py](../../../fastapi-server/core/config.py) — `BROADCAST_INTERVAL_SEC`, `DATA_STALE_THRESHOLD_SEC`, `DUMMY_RISK_PROBABILITY`
+- [fastapi-server/websocket/state.py](../../../../fastapi-server/websocket/state.py) — **41줄, 9개 mutable globals** ⭐
+- [fastapi-server/websocket/routers/ws_router.py](../../../../fastapi-server/websocket/routers/ws_router.py) — 180줄
+- [fastapi-server/websocket/services/broadcast.py](../../../../fastapi-server/websocket/services/broadcast.py) — 119줄 ⭐
+- [fastapi-server/services/drf_client.py](../../../../fastapi-server/services/drf_client.py) — DRF 통신 헬퍼
+- [fastapi-server/app.py](../../../../fastapi-server/app.py) — 156줄, 라이프사이클 + 전역 예외 핸들러
+- [fastapi-server/core/config.py](../../../../fastapi-server/core/config.py) — `BROADCAST_INTERVAL_SEC`, `DATA_STALE_THRESHOLD_SEC`, `DUMMY_RISK_PROBABILITY`
 
 ### 1.2 프론트엔드 매칭 파일
-- [drf-server/static/js/shared/ws-client.js](../../../drf-server/static/js/shared/ws-client.js) — 단일 연결 캐시
-- [drf-server/static/js/dashboard/websocket.js](../../../drf-server/static/js/dashboard/websocket.js)
-- [drf-server/static/js/detail/websocket_gas.js](../../../drf-server/static/js/detail/websocket_gas.js)
-- [drf-server/static/js/detail/websocket_power.js](../../../drf-server/static/js/detail/websocket_power.js)
-- [drf-server/static/js/shared/alarm-ws.js](../../../drf-server/static/js/shared/alarm-ws.js)
-- [drf-server/static/js/shared/worker-ws.js](../../../drf-server/static/js/shared/worker-ws.js)
+- [drf-server/static/js/shared/ws-client.js](../../../../drf-server/static/js/shared/ws-client.js) — 단일 연결 캐시
+- [drf-server/static/js/dashboard/websocket.js](../../../../drf-server/static/js/dashboard/websocket.js)
+- [drf-server/static/js/detail/websocket_gas.js](../../../../drf-server/static/js/detail/websocket_gas.js)
+- [drf-server/static/js/detail/websocket_power.js](../../../../drf-server/static/js/detail/websocket_power.js)
+- [drf-server/static/js/shared/alarm-ws.js](../../../../drf-server/static/js/shared/alarm-ws.js)
+- [drf-server/static/js/shared/worker-ws.js](../../../../drf-server/static/js/shared/worker-ws.js)
 
 ## 2. 기능 흐름
 
@@ -82,23 +82,23 @@ alarm_flush_loop:
 
 ### 3.1 일반 코드 리뷰
 - **[상] broadcast.py에 random 더미가 운영 페이로드에 섞임**
-  [broadcast.py:73,49-60](../../../fastapi-server/websocket/services/broadcast.py#L73) `is_danger = random.random() < DUMMY_RISK_PROBABILITY` → `"level": "위험" if is_danger else "정상"`. 운영 환경에서도 broadcast 페이로드 `level` 필드가 **랜덤**. 또한 `ai_eta_min/ai_max_load_*` 4개 필드 모두 random. 더미 모드와 실데이터 모드가 같은 코드에서 분기 안 됨 — feature flag(`if settings.IS_DUMMY:`)로 분리 시급.
+  [broadcast.py:73,49-60](../../../../fastapi-server/websocket/services/broadcast.py#L73) `is_danger = random.random() < DUMMY_RISK_PROBABILITY` → `"level": "위험" if is_danger else "정상"`. 운영 환경에서도 broadcast 페이로드 `level` 필드가 **랜덤**. 또한 `ai_eta_min/ai_max_load_*` 4개 필드 모두 random. 더미 모드와 실데이터 모드가 같은 코드에서 분기 안 됨 — feature flag(`if settings.IS_DUMMY:`)로 분리 시급.
 - **[상] `del active_alarms[:5]`로 5개 초과 알람 silent drop**
-  [broadcast.py:113,117](../../../fastapi-server/websocket/services/broadcast.py#L113) `alarms[:5]` 송신 후 `del [:5]` — 6번째 이후 알람은 다음 broadcast tick에서야 처리됨 (이때도 5개 제한). 1초 안에 10개 알람이 쌓이면 5개씩 2 tick = 2초 후에야 모두 송신. **알람 폭주 시 누락 위험은 없으나 지연 발생**. 대신 의도라면 주석 명시.
+  [broadcast.py:113,117](../../../../fastapi-server/websocket/services/broadcast.py#L113) `alarms[:5]` 송신 후 `del [:5]` — 6번째 이후 알람은 다음 broadcast tick에서야 처리됨 (이때도 5개 제한). 1초 안에 10개 알람이 쌓이면 5개씩 2 tick = 2초 후에야 모두 송신. **알람 폭주 시 누락 위험은 없으나 지연 발생**. 대신 의도라면 주석 명시.
 - **[중] _prev_total_kw가 broadcast.py 모듈 글로벌**
-  [broadcast.py:26](../../../fastapi-server/websocket/services/broadcast.py#L26) state.py 외 또 다른 글로벌. state.py로 통합하거나 캡슐화. 단위 테스트 시 reset 어려움.
+  [broadcast.py:26](../../../../fastapi-server/websocket/services/broadcast.py#L26) state.py 외 또 다른 글로벌. state.py로 통합하거나 캡슐화. 단위 테스트 시 reset 어려움.
 - **[중] timestamp는 timezone-naive**
-  [broadcast.py:104](../../../fastapi-server/websocket/services/broadcast.py#L104) `datetime.now().isoformat()` — timezone 정보 없음. gas_latest는 `datetime.now(timezone.utc).isoformat()` 사용. 두 곳이 어긋남 → JS 측 시각 비교 시 오류 가능.
+  [broadcast.py:104](../../../../fastapi-server/websocket/services/broadcast.py#L104) `datetime.now().isoformat()` — timezone 정보 없음. gas_latest는 `datetime.now(timezone.utc).isoformat()` 사용. 두 곳이 어긋남 → JS 측 시각 비교 시 오류 가능.
 - **[하] device_id="sensor-01" 하드코드**
-  [broadcast.py:103](../../../fastapi-server/websocket/services/broadcast.py#L103) 단일 모니터링 가정. 다중 facility 환경에선 어긋남.
+  [broadcast.py:103](../../../../fastapi-server/websocket/services/broadcast.py#L103) 단일 모니터링 가정. 다중 facility 환경에선 어긋남.
 - **[하] CORS allow_methods 제한**
-  [app.py:84](../../../fastapi-server/app.py#L84) `allow_methods=["GET","POST"]`. PUT/DELETE 미사용이라 OK이나 향후 확장 시 주의.
+  [app.py:84](../../../../fastapi-server/app.py#L84) `allow_methods=["GET","POST"]`. PUT/DELETE 미사용이라 OK이나 향후 확장 시 주의.
 
 ### 3.2 아키텍처/레이어
 - **[참고] 응답 봉투 표준이 fastapi에도 일관 적용**
-  [app.py:99-150](../../../fastapi-server/app.py#L99-L150) `{error:{code,message,details?}}` 봉투, drf-server의 standard_exception_handler와 동일 정책. **모범**.
+  [app.py:99-150](../../../../fastapi-server/app.py#L99-L150) `{error:{code,message,details?}}` 봉투, drf-server의 standard_exception_handler와 동일 정책. **모범**.
 - **[참고] 라이프사이클로 broadcast_loop 시작·정리**
-  [app.py:33-48](../../../fastapi-server/app.py#L33-L48) lifespan으로 task 시작 + finally cancel. **모범**.
+  [app.py:33-48](../../../../fastapi-server/app.py#L33-L48) lifespan으로 task 시작 + finally cancel. **모범**.
 - **[참고] state.py 단일 파일에 모든 공유 상태 집중**
   의도적 설계. 상태 변경 위치가 분산되어 있으나 origin은 한 곳 — 디버깅 시 grep 용이.
 
@@ -110,11 +110,11 @@ alarm_flush_loop:
   - worker_positions가 워커별 분기 → 위치가 워커마다 다름
   → **단일 워커 + Redis(상태)/Pub-Sub(broadcast)** 또는 **Sticky session + 단일 워커** 강제 필요. 현재 운영이 단일 워커라면 운영 문서에 명시.
 - **[상] 단일 슬로우 클라이언트가 broadcast 차단**
-  [ws_router.py:32-43](../../../fastapi-server/websocket/routers/ws_router.py#L32-L43) `_send_to_all`이 순차 await. 한 클라이언트의 send_json이 5초 걸리면 나머지 모두 5초 지연. 모바일 약전계 환경에서 빈번. **`asyncio.gather(*[ws.send_json(...) for ws in clients])` + timeout per send** 권장.
+  [ws_router.py:32-43](../../../../fastapi-server/websocket/routers/ws_router.py#L32-L43) `_send_to_all`이 순차 await. 한 클라이언트의 send_json이 5초 걸리면 나머지 모두 5초 지연. 모바일 약전계 환경에서 빈번. **`asyncio.gather(*[ws.send_json(...) for ws in clients])` + timeout per send** 권장.
 - **[중] worker_positions 등 dict 갱신 비원자성**
   Python dict assignment(`d[k]=v`)은 단일 키는 원자적이지만, dict 자체를 spread/list화할 때 동시 갱신과 race 가능. broadcast가 `dict(worker_positions)` 복사 — 복사 시점에 갱신되면 일부 누락 가능. 단일 asyncio 스레드라 yield 지점 사이엔 안전하나, 코드 변경으로 yield 도입되면 위험. **명시적 lock + snapshot 패턴** 권장.
 - **[중] WS 핸드셰이크 인증 표준 부재**
-  [ws_router.py](../../../fastapi-server/websocket/routers/ws_router.py) 어떤 WS도 인증 검증하지 않음. ws-client.js의 `attachToken` 옵션은 토큰을 query에 붙이지만 **서버에서 검증 미적용** (04 D2 / 07 G1 추적). 표준 WS 인증 미들웨어 필요.
+  [ws_router.py](../../../../fastapi-server/websocket/routers/ws_router.py) 어떤 WS도 인증 검증하지 않음. ws-client.js의 `attachToken` 옵션은 토큰을 query에 붙이지만 **서버에서 검증 미적용** (04 D2 / 07 G1 추적). 표준 WS 인증 미들웨어 필요.
 - **[중] heartbeat/ping 정책 부재**
   WebSocket 스펙은 ping/pong 자동 처리하나, 애플리케이션 레벨 heartbeat 부재. 클라이언트는 받은 메시지가 없으면 끊긴 건지 데이터가 없는 건지 모름. 30초 등에 빈 ping 송신 + 클라이언트 timeout 필요.
 - **[중] back-pressure 처리 부재**
@@ -162,7 +162,7 @@ fastapi `build_broadcast_payload` 송신 키 → 클라이언트 소비:
 - **왜 필요?**: 운영 broadcast의 `level`/`ai_*` 필드가 random. 사용자가 화면에서 보는 위험도가 실제 위험과 무관. 신뢰성 핵심 침해.
 - **장점**: 신뢰성 / 더미 모드와 실모드 명시 분리.
 - **단점**: scenario_mode와 통합 정책 필요.
-- **변경 위치**: [broadcast.py:73,49-60](../../../fastapi-server/websocket/services/broadcast.py#L73) `if settings.IS_DUMMY: ... else: ...` 분기. settings에 `IS_DUMMY` flag 추가. 실데이터에선 `level=None` 또는 alarms 기반 derived value.
+- **변경 위치**: [broadcast.py:73,49-60](../../../../fastapi-server/websocket/services/broadcast.py#L73) `if settings.IS_DUMMY: ... else: ...` 분기. settings에 `IS_DUMMY` flag 추가. 실데이터에선 `level=None` 또는 alarms 기반 derived value.
 
 ### I2. 다중 워커 대비 (Redis 또는 단일 워커 강제) [상 · 대]
 - **왜 필요?**: 현재 코드는 단일 워커 가정인데 운영 배포에서 워커 수를 늘리면 100% 깨짐. 사고 발생 시 원인 추적 어려움.
@@ -170,13 +170,13 @@ fastapi `build_broadcast_payload` 송신 키 → 클라이언트 소비:
 - **단점**: Redis 인프라 추가 또는 워커 수 명시 운영 절차.
 - **변경 위치**:
   - 단기: 운영 배포 스크립트에 `--workers 1` 강제 + 문서화.
-  - 장기: state.py를 [websocket/state_redis.py](../../../fastapi-server/websocket/) 또는 채널별 pub/sub.
+  - 장기: state.py를 [websocket/state_redis.py](../../../../fastapi-server/websocket/) 또는 채널별 pub/sub.
 
 ### I3. _send_to_all 병렬화 + per-send timeout [상 · 소]
 - **왜 필요?**: 슬로우 클라이언트 1명이 broadcast 전체 차단 → 다른 사용자 모두 영향.
 - **장점**: 한 클라이언트의 지연이 다른 사용자에 영향 안 줌.
 - **단점**: timeout 정책 결정 필요(2초?).
-- **변경 위치**: [ws_router.py:32-43](../../../fastapi-server/websocket/routers/ws_router.py#L32-L43)
+- **변경 위치**: [ws_router.py:32-43](../../../../fastapi-server/websocket/routers/ws_router.py#L32-L43)
   ```python
   async def _send_one(ws):
       try:
@@ -190,19 +190,19 @@ fastapi `build_broadcast_payload` 송신 키 → 클라이언트 소비:
 - **왜 필요?**: 04 D2 / 07 G1과 통합. WS별로 따로 검증하지 말고 한 곳.
 - **장점**: 누락 방지 / 일관 정책.
 - **단점**: FastAPI WS는 표준 미들웨어 적용 어려움 — Depends 데코레이터로 처리.
-- **변경 위치**: [websocket/auth.py](../../../fastapi-server/websocket/) 신규 — `get_current_user_from_ws_token(websocket)` Depends. 모든 WS endpoint가 사용.
+- **변경 위치**: [websocket/auth.py](../../../../fastapi-server/websocket/) 신규 — `get_current_user_from_ws_token(websocket)` Depends. 모든 WS endpoint가 사용.
 
 ### I5. active_alarms 5개 drop 정책 명시 [중 · 소]
 - **왜 필요?**: silent drop은 디버깅 어려움.
 - **장점**: 동작 명확.
 - **단점**: 없음.
-- **변경 위치**: [broadcast.py:113-117](../../../fastapi-server/websocket/services/broadcast.py#L113-L117) 주석 명시 + 6번째 이후는 다음 tick으로 ROLL OVER 명시. 또는 5개 제한을 옵션화.
+- **변경 위치**: [broadcast.py:113-117](../../../../fastapi-server/websocket/services/broadcast.py#L113-L117) 주석 명시 + 6번째 이후는 다음 tick으로 ROLL OVER 명시. 또는 5개 제한을 옵션화.
 
 ### I6. timestamp UTC 통일 [중 · 소]
 - **왜 필요?**: 일부는 utc, 일부는 naive — JS 측 비교 오류 가능.
 - **장점**: 일관성.
 - **단점**: 없음.
-- **변경 위치**: [broadcast.py:104](../../../fastapi-server/websocket/services/broadcast.py#L104) `datetime.now(timezone.utc).isoformat()`로 통일. 다른 위치도 grep.
+- **변경 위치**: [broadcast.py:104](../../../../fastapi-server/websocket/services/broadcast.py#L104) `datetime.now(timezone.utc).isoformat()`로 통일. 다른 위치도 grep.
 
 ### I7. heartbeat / 빈 ping [중 · 소]
 - **왜 필요?**: 클라이언트가 끊김인지 정상 무데이터인지 구분 못 함.
@@ -214,17 +214,17 @@ fastapi `build_broadcast_payload` 송신 키 → 클라이언트 소비:
 - **왜 필요?**: 코드로만 표현된 contract — 키 변경 시 silent break.
 - **장점**: 협업 명확 / 타입 검증.
 - **단점**: AsyncAPI/JSON Schema 학습 필요.
-- **변경 위치**: [docs/specs/ws_contract.md](../../../docs/specs/) + 가능하면 JSON Schema. 또는 클라이언트 측 타입 정의 (`shared/types.js` typedef JSDoc).
+- **변경 위치**: [docs/specs/ws_contract.md](../../../../docs/specs/) + 가능하면 JSON Schema. 또는 클라이언트 측 타입 정의 (`shared/types.js` typedef JSDoc).
 
 ### I9. 재시작 시 상태 복원 hook [중 · 중]
 - **왜 필요?**: 재시작 후 빈 상태 → 브라우저가 잠시 가짜 정보 또는 깜빡임.
 - **장점**: 부드러운 재시작.
 - **단점**: 시작 시 DRF 호출 (지연 1~2초).
-- **변경 위치**: [app.py lifespan](../../../fastapi-server/app.py#L33-L48) startup에서 DRF로부터 latest gas/power/positions fetch.
+- **변경 위치**: [app.py lifespan](../../../../fastapi-server/app.py#L33-L48) startup에서 DRF로부터 latest gas/power/positions fetch.
 
 ### I10. _prev_total_kw 캡슐화 [하 · 소]
 - **왜 필요?**: state.py 외 또 다른 글로벌. 테스트 reset 어려움.
-- **변경 위치**: [broadcast.py](../../../fastapi-server/websocket/services/broadcast.py)에 class 또는 state.py로 통합.
+- **변경 위치**: [broadcast.py](../../../../fastapi-server/websocket/services/broadcast.py)에 class 또는 state.py로 통합.
 
 ## 6. 구현 추천 순서
 

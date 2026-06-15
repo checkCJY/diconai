@@ -153,7 +153,7 @@ SIMPLE_JWT = {
 
 ---
 
-### B9. LogoutView에서 refresh 토큰 블랙리스트 ([auth_views.py:334-380](../../../../drf-server/apps/accounts/views/auth_views.py#L334-L380))
+### B9. LogoutView에서 refresh 토큰 블랙리스트 ([auth_views.py:334-380](../../../../../drf-server/apps/accounts/views/auth_views.py#L334-L380))
 
 **(A) 변경 내용**
 - `request.data.get("refresh")`로 클라이언트가 동봉한 refresh 토큰 추출
@@ -226,7 +226,7 @@ class LogoutView(APIView):
 
 ---
 
-### J12. `Auth._refresh` 싱글톤 동시성 가드 ([auth.js:48-78](../../../../drf-server/static/js/shared/auth.js#L48-L78))
+### J12. `Auth._refresh` 싱글톤 동시성 가드 ([auth.js:48-78](../../../../../drf-server/static/js/shared/auth.js#L48-L78))
 
 **(A) 변경 내용**
 - `_refreshing: null` 인스턴스 캐시 추가
@@ -315,7 +315,7 @@ async _refresh() {
 
 ---
 
-### J13. Logout 호출 시 refresh body 동봉 ([layout.js:197-209](../../../../drf-server/static/js/shared/layout.js#L197-L209))
+### J13. Logout 호출 시 refresh body 동봉 ([layout.js:197-209](../../../../../drf-server/static/js/shared/layout.js#L197-L209))
 
 **(A) 변경 내용**
 - `Auth.apiFetch('/api/auth/logout/', { method: 'POST' })` → body에 `{ refresh: <token> }` 동봉

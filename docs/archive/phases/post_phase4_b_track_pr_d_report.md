@@ -34,17 +34,17 @@ Docker/K8s 도입 예정 — Celery worker pod 분리로 web latency 보호 + br
 
 | 파일 | 역할 |
 |---|---|
-| [apps/operations/tasks/applog_task.py](../../drf-server/apps/operations/tasks/applog_task.py) | `applog_create_task` Celery 태스크 — `@shared_task(max_retries=0, ignore_result=True)` |
-| [apps/operations/tasks/integration_log_task.py](../../drf-server/apps/operations/tasks/integration_log_task.py) | `integration_log_create_task` Celery 태스크 — 동일 패턴 |
+| [apps/operations/tasks/applog_task.py](../../../drf-server/apps/operations/tasks/applog_task.py) | `applog_create_task` Celery 태스크 — `@shared_task(max_retries=0, ignore_result=True)` |
+| [apps/operations/tasks/integration_log_task.py](../../../drf-server/apps/operations/tasks/integration_log_task.py) | `integration_log_create_task` Celery 태스크 — 동일 패턴 |
 
 ### 3-2. 기존 수정 (4개)
 
 | 파일 | 변경 |
 |---|---|
-| [apps/operations/tasks/__init__.py](../../drf-server/apps/operations/tasks/__init__.py) | `applog_create_task`, `integration_log_create_task` re-export |
-| [apps/operations/logging/db_handler.py](../../drf-server/apps/operations/logging/db_handler.py) | `emit()`이 `applog_create_task.delay()` 호출. broker 예외 시 `_sync_insert()` graceful fallback. `settings.APPLOG_FORCE_SYNC=True`로 동기 모드 강제 가능 (테스트용) |
-| [apps/alerts/tasks.py](../../drf-server/apps/alerts/tasks.py) | `_push_to_ws()`의 `IntegrationLog.objects.create()` → `integration_log_create_task.delay()` |
-| [fastapi-server/services/drf_client.py](../../fastapi-server/services/drf_client.py) | docstring 갱신: fastapi 측 이미 async fire-and-forget이라 변경 불필요. PR-D 변경 명시 + 운영 진입 시 batch endpoint 도입 검토 후속 메모 |
+| [apps/operations/tasks/__init__.py](../../../drf-server/apps/operations/tasks/__init__.py) | `applog_create_task`, `integration_log_create_task` re-export |
+| [apps/operations/logging/db_handler.py](../../../drf-server/apps/operations/logging/db_handler.py) | `emit()`이 `applog_create_task.delay()` 호출. broker 예외 시 `_sync_insert()` graceful fallback. `settings.APPLOG_FORCE_SYNC=True`로 동기 모드 강제 가능 (테스트용) |
+| [apps/alerts/tasks.py](../../../drf-server/apps/alerts/tasks.py) | `_push_to_ws()`의 `IntegrationLog.objects.create()` → `integration_log_create_task.delay()` |
+| [fastapi-server/services/drf_client.py](../../../fastapi-server/services/drf_client.py) | docstring 갱신: fastapi 측 이미 async fire-and-forget이라 변경 불필요. PR-D 변경 명시 + 운영 진입 시 batch endpoint 도입 검토 후속 메모 |
 
 ---
 
@@ -70,7 +70,7 @@ batch flush의 가치(다건 통합 INSERT)는 향후 fastapi → DRF 호출 빈
 
 ### 5-2. fastapi 측은 변경 없음
 
-[fastapi-server/services/drf_client.py:_record_integration_log](../../fastapi-server/services/drf_client.py)는 이미 `httpx.AsyncClient` + fire-and-forget BackgroundTask 패턴 — fastapi 응답 latency 영향 0. docstring만 갱신해 PR-D 변경 사실 + batch endpoint 후속 메모 명시.
+[fastapi-server/services/drf_client.py:_record_integration_log](../../../fastapi-server/services/drf_client.py)는 이미 `httpx.AsyncClient` + fire-and-forget BackgroundTask 패턴 — fastapi 응답 latency 영향 0. docstring만 갱신해 PR-D 변경 사실 + batch endpoint 후속 메모 명시.
 
 ### 5-3. broker fallback 동작
 

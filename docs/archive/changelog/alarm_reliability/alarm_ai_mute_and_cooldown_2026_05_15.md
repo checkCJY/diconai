@@ -52,7 +52,7 @@
 - **§2 회귀 가드** DANGER 분기에서 mute 활성 시에도 pending WARNING task 를 가드 이전에 revoke (stale 타이머 발화 차단).
 
 ### Commit 4 — `f9bf4e4` tune: dedup cooldown 5분 → 1분
-[5번 문서 §9](../../../skill/AI/5️⃣%20알림%20고도화.md) "동일 작업자+센서+구역+위험단계 1분 내 1회" 권장 패턴 정렬. `_CACHE_TTL=60`, `RENOTIFY_COOLDOWN_MINUTES=1`, `PUSH_DEDUP_TTL_SEC=30` (race 마진). 산업 안전 도메인에서 위험 지속은 미대응 신호이므로 1분 cadence 가 자연 escalation 트리거.
+[5번 문서 §9](../../../../skill/AI/5️⃣%20알림%20고도화.md) "동일 작업자+센서+구역+위험단계 1분 내 1회" 권장 패턴 정렬. `_CACHE_TTL=60`, `RENOTIFY_COOLDOWN_MINUTES=1`, `PUSH_DEDUP_TTL_SEC=30` (race 마진). 산업 안전 도메인에서 위험 지속은 미대응 신호이므로 1분 cadence 가 자연 escalation 트리거.
 
 ### Commit 5 — `1c1551f` fix: AI mute 식별자 일치 (회귀 픽스)
 시연 검증 중 발견 — Redis 키 `ai_fired:63200c3afd12:1:danger` 는 fastapi 가 IoT raw id 로 set, DRF 는 `ai_fired:1:1:danger` (PK) 로 read 해서 mismatch. `power_alarm` 의 mute 가드만 `device.device_id` (raw IoT) 로 변경, 다른 코드 경로(try_transition, fire_*_task)는 PK 그대로 사용.
@@ -120,19 +120,19 @@
 ## 변경 파일 인덱스
 
 ### DRF
-- [`apps/alerts/services/alarm_dedupe.py`](../../../drf-server/apps/alerts/services/alarm_dedupe.py) — `mark_ai_recent` / `is_ai_mute_active` 추가
-- [`apps/alerts/tasks.py`](../../../drf-server/apps/alerts/tasks.py) — fire_warning_* 정상 종료 시 `cache.delete(task_key)`
-- [`apps/alerts/tests/test_ai_mute_guard.py`](../../../drf-server/apps/alerts/tests/test_ai_mute_guard.py) — 신규 (10 종)
-- [`apps/core/constants.py`](../../../drf-server/apps/core/constants.py) — `AI_TO_RULE_LEVEL`
-- [`apps/core/metrics.py`](../../../drf-server/apps/core/metrics.py) — `RULE_FIRE_SUPPRESSED_BY_AI_TOTAL`
-- [`apps/alerts/services/event_service.py`](../../../drf-server/apps/alerts/services/event_service.py) — `RENOTIFY_COOLDOWN_MINUTES = 1`
-- [`apps/monitoring/services/gas_alarm.py`](../../../drf-server/apps/monitoring/services/gas_alarm.py) — `_CACHE_TTL=60`, `_TASK_KEY_TTL`
-- [`apps/monitoring/services/power_alarm.py`](../../../drf-server/apps/monitoring/services/power_alarm.py) — `_CACHE_TTL=60`, `_TASK_KEY_TTL`, mute 가드 (`device.device_id`), §2 회귀 가드
+- [`apps/alerts/services/alarm_dedupe.py`](../../../../drf-server/apps/alerts/services/alarm_dedupe.py) — `mark_ai_recent` / `is_ai_mute_active` 추가
+- [`apps/alerts/tasks.py`](../../../../drf-server/apps/alerts/tasks.py) — fire_warning_* 정상 종료 시 `cache.delete(task_key)`
+- [`apps/alerts/tests/test_ai_mute_guard.py`](../../../../drf-server/apps/alerts/tests/test_ai_mute_guard.py) — 신규 (10 종)
+- [`apps/core/constants.py`](../../../../drf-server/apps/core/constants.py) — `AI_TO_RULE_LEVEL`
+- [`apps/core/metrics.py`](../../../../drf-server/apps/core/metrics.py) — `RULE_FIRE_SUPPRESSED_BY_AI_TOTAL`
+- [`apps/alerts/services/event_service.py`](../../../../drf-server/apps/alerts/services/event_service.py) — `RENOTIFY_COOLDOWN_MINUTES = 1`
+- [`apps/monitoring/services/gas_alarm.py`](../../../../drf-server/apps/monitoring/services/gas_alarm.py) — `_CACHE_TTL=60`, `_TASK_KEY_TTL`
+- [`apps/monitoring/services/power_alarm.py`](../../../../drf-server/apps/monitoring/services/power_alarm.py) — `_CACHE_TTL=60`, `_TASK_KEY_TTL`, mute 가드 (`device.device_id`), §2 회귀 가드
 
 ### fastapi
-- [`core/constants.py`](../../../fastapi-server/core/constants.py) — 신규, `AI_TO_RULE_LEVEL`
-- [`services/ai_mute.py`](../../../fastapi-server/services/ai_mute.py) — 신규, Redis 직접 마킹
-- [`services/anomaly_alarm.py`](../../../fastapi-server/services/anomaly_alarm.py) — `forward_inference_e2e` 안 `mark_ai_recent` fire-and-forget 호출
-- [`websocket/services/alarm_queue.py`](../../../fastapi-server/websocket/services/alarm_queue.py) — fingerprint dedup, `PUSH_DEDUP_TTL_SEC=30`, `push_alarm_dedup_hits_total`
-- [`tests/test_push_alarm_dedup.py`](../../../fastapi-server/tests/test_push_alarm_dedup.py) — 신규 (9 종)
-- [`tests/test_ai_mute_marking.py`](../../../fastapi-server/tests/test_ai_mute_marking.py) — 신규 (8 종)
+- [`core/constants.py`](../../../../fastapi-server/core/constants.py) — 신규, `AI_TO_RULE_LEVEL`
+- [`services/ai_mute.py`](../../../../fastapi-server/services/ai_mute.py) — 신규, Redis 직접 마킹
+- [`services/anomaly_alarm.py`](../../../../fastapi-server/services/anomaly_alarm.py) — `forward_inference_e2e` 안 `mark_ai_recent` fire-and-forget 호출
+- [`websocket/services/alarm_queue.py`](../../../../fastapi-server/websocket/services/alarm_queue.py) — fingerprint dedup, `PUSH_DEDUP_TTL_SEC=30`, `push_alarm_dedup_hits_total`
+- [`tests/test_push_alarm_dedup.py`](../../../../fastapi-server/tests/test_push_alarm_dedup.py) — 신규 (9 종)
+- [`tests/test_ai_mute_marking.py`](../../../../fastapi-server/tests/test_ai_mute_marking.py) — 신규 (8 종)

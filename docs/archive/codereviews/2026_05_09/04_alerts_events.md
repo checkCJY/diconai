@@ -16,25 +16,25 @@
 | **fastapi** `/ws/worker/{user_id}/` | WS | worker_clients | (인증 미정) |
 
 ### 1.2 백엔드 파일
-- [drf-server/apps/alerts/views/alarm_record.py](../../../drf-server/apps/alerts/views/alarm_record.py) — 296줄 (MyStatusView, WorkerSummaryView, AlarmRecordViewSet)
-- [drf-server/apps/alerts/views/event.py](../../../drf-server/apps/alerts/views/event.py)
-- [drf-server/apps/alerts/services/alarm_service.py](../../../drf-server/apps/alerts/services/alarm_service.py)
-- [drf-server/apps/alerts/services/event_service.py](../../../drf-server/apps/alerts/services/event_service.py)
-- [drf-server/apps/alerts/services/merge_policy.py](../../../drf-server/apps/alerts/services/merge_policy.py)
-- [drf-server/apps/alerts/services/policy_matcher.py](../../../drf-server/apps/alerts/services/policy_matcher.py)
-- [drf-server/apps/alerts/selectors/{active_events,alarm_timeline,event_history}.py](../../../drf-server/apps/alerts/selectors/)
-- [drf-server/apps/alerts/tasks.py](../../../drf-server/apps/alerts/tasks.py) — **432줄** Celery 태스크
-- [fastapi-server/internal/routers/alarm_router.py](../../../fastapi-server/internal/routers/alarm_router.py) — 66줄 브리지
-- [fastapi-server/websocket/state.py](../../../fastapi-server/websocket/state.py) — `active_alarms`, `alarm_signal`, `worker_clients`
+- [drf-server/apps/alerts/views/alarm_record.py](../../../../drf-server/apps/alerts/views/alarm_record.py) — 296줄 (MyStatusView, WorkerSummaryView, AlarmRecordViewSet)
+- [drf-server/apps/alerts/views/event.py](../../../../drf-server/apps/alerts/views/event.py)
+- [drf-server/apps/alerts/services/alarm_service.py](../../../../drf-server/apps/alerts/services/alarm_service.py)
+- [drf-server/apps/alerts/services/event_service.py](../../../../drf-server/apps/alerts/services/event_service.py)
+- [drf-server/apps/alerts/services/merge_policy.py](../../../../drf-server/apps/alerts/services/merge_policy.py)
+- [drf-server/apps/alerts/services/policy_matcher.py](../../../../drf-server/apps/alerts/services/policy_matcher.py)
+- [drf-server/apps/alerts/selectors/{active_events,alarm_timeline,event_history}.py](../../../../drf-server/apps/alerts/selectors/)
+- [drf-server/apps/alerts/tasks.py](../../../../drf-server/apps/alerts/tasks.py) — **432줄** Celery 태스크
+- [fastapi-server/internal/routers/alarm_router.py](../../../../fastapi-server/internal/routers/alarm_router.py) — 66줄 브리지
+- [fastapi-server/websocket/state.py](../../../../fastapi-server/websocket/state.py) — `active_alarms`, `alarm_signal`, `worker_clients`
 
 ### 1.3 프론트엔드 파일
-- [drf-server/static/js/shared/alarm-ws.js](../../../drf-server/static/js/shared/alarm-ws.js) — 35줄, 비대시보드 페이지용 알람 수신
-- [drf-server/static/js/shared/alarm-popup.js](../../../drf-server/static/js/shared/alarm-popup.js) — 팝업 렌더
-- [drf-server/static/js/shared/worker-ws.js](../../../drf-server/static/js/shared/worker-ws.js) — 작업자 개인 채널
-- [drf-server/static/js/detail/event_list.js](../../../drf-server/static/js/detail/event_list.js)
-- [drf-server/static/js/detail/event_detail.js](../../../drf-server/static/js/detail/event_detail.js)
-- [drf-server/templates/components/alarm_popup.html](../../../drf-server/templates/components/alarm_popup.html)
-- [drf-server/templates/snb_details/monitoring_events.html](../../../drf-server/templates/snb_details/monitoring_events.html), [event_detail.html](../../../drf-server/templates/snb_details/event_detail.html)
+- [drf-server/static/js/shared/alarm-ws.js](../../../../drf-server/static/js/shared/alarm-ws.js) — 35줄, 비대시보드 페이지용 알람 수신
+- [drf-server/static/js/shared/alarm-popup.js](../../../../drf-server/static/js/shared/alarm-popup.js) — 팝업 렌더
+- [drf-server/static/js/shared/worker-ws.js](../../../../drf-server/static/js/shared/worker-ws.js) — 작업자 개인 채널
+- [drf-server/static/js/detail/event_list.js](../../../../drf-server/static/js/detail/event_list.js)
+- [drf-server/static/js/detail/event_detail.js](../../../../drf-server/static/js/detail/event_detail.js)
+- [drf-server/templates/components/alarm_popup.html](../../../../drf-server/templates/components/alarm_popup.html)
+- [drf-server/templates/snb_details/monitoring_events.html](../../../../drf-server/templates/snb_details/monitoring_events.html), [event_detail.html](../../../../drf-server/templates/snb_details/event_detail.html)
 
 ## 2. 기능 흐름
 
@@ -92,15 +92,15 @@
 
 ### 3.1 일반 코드 리뷰
 - **[중] 응답 봉투 일관성 결여**
-  [MyStatusView/WorkerSummaryView](../../../drf-server/apps/alerts/views/alarm_record.py#L80)는 `{"status":"success","code":200,"data":{...}}` 봉투. 한편 [AlarmRecordViewSet.summary](../../../drf-server/apps/alerts/views/alarm_record.py#L280)는 `{"last_24h_total":..,"last_24h_danger":..}` raw. drf-server 전반의 봉투 정책이 settings의 `EXCEPTION_HANDLER`(standard_exception_handler)와 어긋남 — 실패 시는 표준화, 성공 시는 view마다 자유. 정책 통일 필요.
+  [MyStatusView/WorkerSummaryView](../../../../drf-server/apps/alerts/views/alarm_record.py#L80)는 `{"status":"success","code":200,"data":{...}}` 봉투. 한편 [AlarmRecordViewSet.summary](../../../../drf-server/apps/alerts/views/alarm_record.py#L280)는 `{"last_24h_total":..,"last_24h_danger":..}` raw. drf-server 전반의 봉투 정책이 settings의 `EXCEPTION_HANDLER`(standard_exception_handler)와 어긋남 — 실패 시는 표준화, 성공 시는 view마다 자유. 정책 통일 필요.
 - **[중] 권한 체크가 view body에서 raise**
-  [WorkerSummaryView.get:150-151](../../../drf-server/apps/alerts/views/alarm_record.py#L150-L151) `if user_type not in (...) raise PermissionDenied`. `permission_classes = [IsSuperAdminOrFacilityAdmin]`로 옮기는 게 일관·테스트 쉬움.
+  [WorkerSummaryView.get:150-151](../../../../drf-server/apps/alerts/views/alarm_record.py#L150-L151) `if user_type not in (...) raise PermissionDenied`. `permission_classes = [IsSuperAdminOrFacilityAdmin]`로 옮기는 게 일관·테스트 쉬움.
 - **[중] WorkerSummaryView 집계 Python에서 수행**
-  [alarm_record.py:199-215](../../../drf-server/apps/alerts/views/alarm_record.py#L199-L215) defaultdict + for loop. Django ORM의 `Case/When` + aggregate로 1쿼리 처리 가능. 작업자 수가 많아질수록 비효율.
+  [alarm_record.py:199-215](../../../../drf-server/apps/alerts/views/alarm_record.py#L199-L215) defaultdict + for loop. Django ORM의 `Case/When` + aggregate로 1쿼리 처리 가능. 작업자 수가 많아질수록 비효율.
 - **[중] view에서 직접 Event/AlarmRecord ORM 조회**
-  alerts에는 selectors/가 풀 구조로 존재하는데 [MyStatusView.get:81-87](../../../drf-server/apps/alerts/views/alarm_record.py#L81-L87)가 직접 `Event.objects.filter(...)`. selectors/active_events.py로 위임하면 정의 한 곳·캐시·테스트 모두 이득.
+  alerts에는 selectors/가 풀 구조로 존재하는데 [MyStatusView.get:81-87](../../../../drf-server/apps/alerts/views/alarm_record.py#L81-L87)가 직접 `Event.objects.filter(...)`. selectors/active_events.py로 위임하면 정의 한 곳·캐시·테스트 모두 이득.
 - **[하] LEVEL_PRIORITY = {DANGER:2, WARNING:1}**
-  [alarm_record.py:31](../../../drf-server/apps/alerts/views/alarm_record.py#L31) 모듈 상수. RiskLevel enum에 priority property로 두는 게 더 응집도 높음.
+  [alarm_record.py:31](../../../../drf-server/apps/alerts/views/alarm_record.py#L31) 모듈 상수. RiskLevel enum에 priority property로 두는 게 더 응집도 높음.
 - **[중] tasks.py 432줄 — 매우 큰 단일 파일**
   실제 본문은 보지 않았지만 432줄에 정책 매칭·병합·Celery·HTTP 호출·로깅이 한데. 도메인별 분리(`tasks/alarm_create.py`, `tasks/notification_send.py` 등) 고려.
 
@@ -112,30 +112,30 @@
 
 ### 3.3 보안 관점 (요약)
 - **[상] /internal/alarms/push/ — localhost 검증만으로 충분한가**
-  [alarm_router.py:48-50](../../../fastapi-server/internal/routers/alarm_router.py#L48-L50) `request.client.host in (127.0.0.1, ::1, localhost)`. 같은 호스트의 다른 프로세스가 알람을 임의 push할 수 있음. **추가 인증** 권장: shared secret(`DRF_SERVICE_TOKEN`을 양방향 사용) 또는 mutual auth. 현재 fastapi → drf 방향엔 토큰을 보내지만 drf → fastapi 방향엔 없음.
+  [alarm_router.py:48-50](../../../../fastapi-server/internal/routers/alarm_router.py#L48-L50) `request.client.host in (127.0.0.1, ::1, localhost)`. 같은 호스트의 다른 프로세스가 알람을 임의 push할 수 있음. **추가 인증** 권장: shared secret(`DRF_SERVICE_TOKEN`을 양방향 사용) 또는 mutual auth. 현재 fastapi → drf 방향엔 토큰을 보내지만 drf → fastapi 방향엔 없음.
 - **[상] /ws/worker/{user_id}/ 인증 부재 (가능성)**
   worker_clients 채널이 user_id만으로 식별 → 임의 user_id로 접속 시 다른 사람의 개인 알람 수신 가능 여부 확인 필요. JWT 핸드셰이크 토큰(쿼리 또는 첫 메시지)으로 인증 필수. (09 도메인에서 정밀 검증)
 - **[중] AlarmPayload `extra: "allow"`**
-  [alarm_router.py:18](../../../fastapi-server/internal/routers/alarm_router.py#L18) Pydantic이 미정의 필드를 통과시킴. DRF 측이 임의 키를 넣어도 그대로 active_alarms에 적재. 의도(유연성)는 이해되나, 알람 페이로드는 정확히 명세되어야 다운스트림(브라우저)에서 안전. `extra="ignore"` + 명시 필드만 허용 권장.
+  [alarm_router.py:18](../../../../fastapi-server/internal/routers/alarm_router.py#L18) Pydantic이 미정의 필드를 통과시킴. DRF 측이 임의 키를 넣어도 그대로 active_alarms에 적재. 의도(유연성)는 이해되나, 알람 페이로드는 정확히 명세되어야 다운스트림(브라우저)에서 안전. `extra="ignore"` + 명시 필드만 허용 권장.
 - **[중] `except Exception: worker_clients.pop()`**
-  [alarm_router.py:62-63](../../../fastapi-server/internal/routers/alarm_router.py#L62-L63) 광범위 except. 어떤 에러든 클라이언트를 큐에서 제거. 일시적 네트워크 오류로도 영구 제거 → 다음 메시지부터 미수신. 적어도 로깅 + WebSocket 관련 예외만 잡도록 좁히기.
+  [alarm_router.py:62-63](../../../../fastapi-server/internal/routers/alarm_router.py#L62-L63) 광범위 except. 어떤 에러든 클라이언트를 큐에서 제거. 일시적 네트워크 오류로도 영구 제거 → 다음 메시지부터 미수신. 적어도 로깅 + WebSocket 관련 예외만 잡도록 좁히기.
 
 ## 4. 프론트엔드(JS/HTML) 소견
 
 ### 4.1 백엔드 contract 정합성
 - **[상] alarm-ws.js의 키 리네이밍이 fragility 핵심**
-  [alarm-ws.js:16-23](../../../drf-server/static/js/shared/alarm-ws.js#L16-L23):
+  [alarm-ws.js:16-23](../../../../drf-server/static/js/shared/alarm-ws.js#L16-L23):
   - `risk_level` → `alarm_level`
   - `summary` → `message`
   - `source_label` → `sensor_name`
   - 그 외(`is_new_event`, `gas_type`, `event_id`) 그대로
   서버가 `summary`를 `description`으로 바꾸면 silent 누락. 백엔드와 프론트가 같은 이름을 쓰는 게 fragility 최소. 정 리네이밍이 필요하면 `shared/alarm-mapper.js`에 매핑 함수 단일화 + 단위 테스트.
 - **[중] CustomEvent 'newAlarmEvent' — 누가 구독?**
-  [alarm-ws.js:28](../../../drf-server/static/js/shared/alarm-ws.js#L28) document.dispatchEvent. 어떤 모듈이 listen 하는지 grep 필요. 명시되지 않은 의존 — 문서화 또는 EventBus 패턴(`shared/event-bus.js`)으로 단일화.
+  [alarm-ws.js:28](../../../../drf-server/static/js/shared/alarm-ws.js#L28) document.dispatchEvent. 어떤 모듈이 listen 하는지 grep 필요. 명시되지 않은 의존 — 문서화 또는 EventBus 패턴(`shared/event-bus.js`)으로 단일화.
 
 ### 4.2 알람 노이즈/UX
 - **[중] alarms[] 배열 모두 즉시 팝업?**
-  [alarm-ws.js:25-27](../../../drf-server/static/js/shared/alarm-ws.js#L25-L27) `is_new_event=true`인 모든 알람에 `AlarmPopup.show`. 1초 broadcast tick에 5개 이상 알람 동시 도착 시 팝업 5개 → UX 폭주. 큐잉/throttle 또는 그룹핑(같은 sensor 1개로) 검토.
+  [alarm-ws.js:25-27](../../../../drf-server/static/js/shared/alarm-ws.js#L25-L27) `is_new_event=true`인 모든 알람에 `AlarmPopup.show`. 1초 broadcast tick에 5개 이상 알람 동시 도착 시 팝업 5개 → UX 폭주. 큐잉/throttle 또는 그룹핑(같은 sensor 1개로) 검토.
 - **[하] AlarmToast 미정의 시 silent skip**
   `if (typeof AlarmToast !== 'undefined')` — 페이지에 로드 안 됐을 때 silent. 의도이긴 하나 디버깅 시 혼란.
 
@@ -149,13 +149,13 @@
 - **왜 필요?**: localhost 검증만으로 같은 호스트의 다른 프로세스 위변조 가능. 컨테이너/호스트 공유 환경에서 위험.
 - **장점**: 호스트 내 격리·추적 가능.
 - **단점**: Celery 태스크가 토큰을 헤더에 추가해야 함 (1줄).
-- **변경 위치**: [tasks.py](../../../drf-server/apps/alerts/tasks.py) FASTAPI 호출 시 `Authorization: Bearer <DRF_SERVICE_TOKEN>` 헤더, [alarm_router.py:47](../../../fastapi-server/internal/routers/alarm_router.py#L47) 진입점에서 토큰 검증.
+- **변경 위치**: [tasks.py](../../../../drf-server/apps/alerts/tasks.py) FASTAPI 호출 시 `Authorization: Bearer <DRF_SERVICE_TOKEN>` 헤더, [alarm_router.py:47](../../../../fastapi-server/internal/routers/alarm_router.py#L47) 진입점에서 토큰 검증.
 
 ### D2. /ws/worker/{user_id}/ JWT 인증 [상 · 중]
 - **왜 필요?**: 임의 user_id로 접속 시 다른 사용자의 개인 알람을 가로챌 가능성.
 - **장점**: 개인 알림 격리 / 정보 누출 차단.
 - **단점**: JS도 JWT를 쿼리/첫 메시지로 전송 (1줄).
-- **변경 위치**: 09 도메인의 ws_router worker 엔드포인트, [shared/worker-ws.js](../../../drf-server/static/js/shared/worker-ws.js).
+- **변경 위치**: 09 도메인의 ws_router worker 엔드포인트, [shared/worker-ws.js](../../../../drf-server/static/js/shared/worker-ws.js).
 
 ### D3. 응답 봉투 정책 통일 [중 · 중]
 - **왜 필요?**: 일부 view는 `{status, code, data}` 봉투, 일부는 raw. 클라이언트가 두 가지 패턴 모두 처리해야 함.
@@ -167,31 +167,31 @@
 - **왜 필요?**: view body의 if-raise는 권한 클래스보다 발견 어려움. 집계는 ORM에서.
 - **장점**: 일관성·성능 향상.
 - **단점**: 없음.
-- **변경 위치**: `permission_classes = [IsSuperAdminOrFacilityAdmin]` 추가, aggregation을 [selectors/active_events.py](../../../drf-server/apps/alerts/selectors/active_events.py)에 위임 (Case/When + Count).
+- **변경 위치**: `permission_classes = [IsSuperAdminOrFacilityAdmin]` 추가, aggregation을 [selectors/active_events.py](../../../../drf-server/apps/alerts/selectors/active_events.py)에 위임 (Case/When + Count).
 
 ### D5. AlarmPayload 명시 필드만 허용 [중 · 소]
 - **왜 필요?**: `extra="allow"`는 위변조·타이포에 무방비.
 - **장점**: 다운스트림 안전·OpenAPI 문서 정확.
 - **단점**: 신규 필드 추가 시 schema 갱신 필요(좋은 일).
-- **변경 위치**: [alarm_router.py:18](../../../fastapi-server/internal/routers/alarm_router.py#L18) `extra="ignore"` 또는 `forbid`.
+- **변경 위치**: [alarm_router.py:18](../../../../fastapi-server/internal/routers/alarm_router.py#L18) `extra="ignore"` 또는 `forbid`.
 
 ### D6. selectors 적극 활용 [중 · 중]
 - **왜 필요?**: alerts는 selectors가 풀 구조인데 view에서 직접 ORM 호출. 같은 정책이 여러 view에서 반복.
 - **장점**: 정책 변경 1곳·캐시·테스트 용이.
 - **단점**: import 정리.
-- **변경 위치**: [MyStatusView.get](../../../drf-server/apps/alerts/views/alarm_record.py#L80), [WorkerSummaryView.get](../../../drf-server/apps/alerts/views/alarm_record.py#L149) 모두 selectors/active_events.py 위임.
+- **변경 위치**: [MyStatusView.get](../../../../drf-server/apps/alerts/views/alarm_record.py#L80), [WorkerSummaryView.get](../../../../drf-server/apps/alerts/views/alarm_record.py#L149) 모두 selectors/active_events.py 위임.
 
 ### D7. alarm-ws.js 키 매핑 단일화 [중 · 소]
 - **왜 필요?**: 백엔드 키 변경 시 silent 누락 위험. 매핑이 한 줄씩 흩어져 있음.
 - **장점**: 한 곳 변경 / 테스트 가능.
 - **단점**: 가장 좋은 건 매핑 자체를 없애고 백엔드와 동일 키 사용.
-- **변경 위치**: 추천 — 백엔드 키 그대로 사용. 차선 — [shared/alarm-mapper.js](../../../drf-server/static/js/shared/) 신규.
+- **변경 위치**: 추천 — 백엔드 키 그대로 사용. 차선 — [shared/alarm-mapper.js](../../../../drf-server/static/js/shared/) 신규.
 
 ### D8. 알람 폭주 방지 (UX) [중 · 소]
 - **왜 필요?**: 동시 알람 다수 시 팝업 누적 → 사용자 차단.
 - **장점**: 사용자 신뢰 향상.
 - **단점**: 그룹핑 정책 합의 필요(예: 같은 source_label은 5초 내 1개만).
-- **변경 위치**: [alarm-popup.js](../../../drf-server/static/js/shared/alarm-popup.js)에 throttle/queue.
+- **변경 위치**: [alarm-popup.js](../../../../drf-server/static/js/shared/alarm-popup.js)에 throttle/queue.
 
 ### D9. tasks.py 분할 [하 · 중]
 - **왜 필요?**: 432줄 단일 파일은 추적·git 충돌 어려움.
@@ -199,7 +199,7 @@
 
 ### D10. CustomEvent → EventBus [하 · 소]
 - **왜 필요?**: document.dispatchEvent는 누가 구독하는지 grep해야 알 수 있음.
-- **변경 위치**: [shared/event-bus.js](../../../drf-server/static/js/shared/) 신규.
+- **변경 위치**: [shared/event-bus.js](../../../../drf-server/static/js/shared/) 신규.
 
 ## 6. 구현 추천 순서
 
