@@ -22,7 +22,7 @@ DIM    := \033[2m
 RESET  := \033[0m
 
 .PHONY: help up down start stop restart ps build rebuild logs sh exec \
-        test test-drf test-fastapi migrate super seed showmigrations shell-drf \
+        test test-drf test-fastapi test-map migrate super seed showmigrations shell-drf \
         health metrics targets clean prune \
         logs-drf logs-fastapi logs-celery logs-beat logs-all \
         logs-locks logs-timeouts logs-errors logs-ai logs-retention \
@@ -180,6 +180,9 @@ test-drf:     ## drf-server pytest만 실행 (Django 측 변경 시)
 
 test-fastapi: ## fastapi-server pytest만 실행 (FastAPI 측 변경 시)
 	docker compose exec fastapi pytest -q
+
+test-map:     ## 테스트 커버리지 맵 생성 (docstring 기반·항상 최신)
+	@python3 scripts/gen_test_map.py
 
 shell-drf:    ## Django shell 진입 (ORM 조작, 디버깅용)
 	docker compose exec drf python manage.py shell
