@@ -18,7 +18,7 @@
 ## 목차
 
 - [프로젝트 소개](#프로젝트-소개) · [기술 스택](#기술-스택) · [아키텍처](#아키텍처) · [주요 기능](#주요-기능) · [데모 화면](#데모-화면)
-- [실행 방법](#실행-방법) · [Docker 통합 환경](#docker-통합-환경-대안) · [환경 변수](#환경-변수)
+- [실행 방법](#실행-방법) · [Docker 통합 환경](#docker-통합-환경) · [환경 변수](#환경-변수)
 - [API 엔드포인트](#api-엔드포인트) · [DB 설계](#db-설계) · [프로젝트 구조](#프로젝트-구조)
 - [테스트](#테스트) · [트러블슈팅](#트러블슈팅) · [향후 개선 포인트](#향후-개선-포인트) · [관련 문서](#관련-문서)
 
@@ -108,121 +108,51 @@
 
 ## 데모 화면
 
-> 직접 캡처한 이미지를 `docs/img/`에 저장한 뒤 아래 주석(`<!-- -->`)을 해제하면 렌더링됩니다.
+### 메인 대시보드
 
-| 슬롯 | 캡처할 화면 |
-|---|---|
-| **메인 대시보드** | 공장 도면 위 가스·전력 센서 상태 + 작업자 실시간 위치 마커가 보이는 전체 관제 화면 |
-| **위험 알람 팝업** | 가스/전력 DANGER 발생 시 뜨는 알람 모달 (위험도·위치·발생시각) |
-| **지오펜스 진입** | 작업자 마커가 위험구역(다각형) 안으로 들어가 알람이 뜬 순간 |
-| **Grafana 대시보드** | HTTP·Celery 큐·DB 메트릭 패널 (관측 스택 증빙) |
+공장 도면 위 가스·전력 센서 상태 + 작업자 실시간 위치 마커 + 우측 이벤트 이력 + 하단 도메인별 차트가 한 화면에 모인 통합 관제 뷰.
 
-<!-- 캡처 후 아래 주석을 해제하세요
-![메인 대시보드](docs/img/demo-dashboard.png)
-![위험 알람 팝업](docs/img/demo-alarm.png)
-![지오펜스 진입](docs/img/demo-geofence.png)
-![Grafana 대시보드](docs/img/demo-grafana.png)
--->
+![메인 대시보드 — 도면·센서·작업자 위치·이벤트 이력 통합 관제](docs/img/메인대시보드.png)
+
+### 위험 알람 (AI 이상 탐지 발화)
+
+위험 발생 시 도면 위에 알람 모달이 떠 위험도·위치·권고 조치를 전달합니다.
+
+![가스 위험 알람 팝업](docs/img/가스알람팝업.png)
+![전력 위험 알람 팝업 — AI 이상 패턴 감지](docs/img/전력알람팝업.png)
+
+### AI 이상탐지 관측 (Grafana)
+
+룰 임계와 AI(IsolationForest·ARIMA·Change Point) 판정을 함께 관측하는 대시보드.
+
+![가스 AI — 추론 빈도·change point 감지·발화·rate limit 억제](docs/img/가스AI관측1.png)
+![가스 AI — 추론 지연(p95/p99)·AI vs 임계치 발화 비교](docs/img/가스AI관측2.png)
+![전력 AI — 최종 판정 분포·발화·AI vs 임계치 비교](docs/img/전력AI관측.png)
 
 ---
 
 ## 실행 방법
 
-> **처음이라면 → [docs/QUICKSTART.md](docs/QUICKSTART.md)** — 클론부터 가동까지 Docker 한 경로로 정리한 빠른 시작 가이드.
-> 아래는 로컬(uv) 개발 방식이며, Docker 통합 환경은 하단 `Docker 통합 환경 (대안)` 절을 참고.
-
-### Prerequisites
-
-- Python 3.12
-- [uv](https://docs.astral.sh/uv/) (패키지 매니저)
-- Redis 6+ (Celery 브로커)
-- PostgreSQL 16 *(선택 — `POSTGRES_HOST` 미설정 시 SQLite로 폴백)*
-
-### 1. Clone & 루트 설치
+표준 실행 방식은 **Docker 통합 환경**입니다. 클론부터 가동까지 전체 절차(`make` 기반)는 [docs/QUICKSTART.md](docs/QUICKSTART.md)에 있습니다.
 
 ```bash
-git clone https://github.com/checkCJY/diconai.git
-cd diconai
-uv venv && source .venv/bin/activate
-uv pip install -r requirements.txt
-pre-commit install
+cp .env.docker.example .env.docker   # 시크릿 채우기 (아래 환경 변수)
+make up                              # 12개 서비스 빌드+기동 (migrate·collectstatic 자동)
+make seed && make super              # 마스터 데이터 시드 → 슈퍼유저 (순서 중요)
+make dummies-start                   # (선택) 가스·전력·위치 실시간 더미 송출
 ```
 
-### 2. DRF 서버 (:8000)
-
-```bash
-cd drf-server
-uv venv && source .venv/bin/activate
-uv pip install -r requirements.txt
-cp .env.example .env.dev      # manage.py 기본값(config.settings.dev)이 .env.dev를 읽음 — 아래 섹션 참고
-python manage.py migrate
-python manage.py runserver
-```
-
-### 3. FastAPI 서버 (:8001)
-
-```bash
-cd fastapi-server
-uv venv && source .venv/bin/activate
-uv pip install -r requirements.txt
-cp .env.example .env          # 환경변수 작성 (아래 섹션 참고)
-uvicorn app:app --reload --port 8001
-```
-
-### 4. Celery 워커 *(알람 비동기 처리용 — 필수)*
-
-알람 영속화·이벤트 변환·실시간 push가 모두 Celery 태스크로 처리되므로 워커가 떠 있지 않으면 알람 흐름이 동작하지 않습니다. Celery는 Redis를 브로커로 사용하므로 **Redis가 설치되어 있고 서버가 실행 중**이어야 합니다.
-
-```bash
-# 1) Redis 설치 (한 번만)
-sudo apt install redis-server   # Ubuntu / WSL
-# brew install redis            # macOS
-
-# 2) Redis 서버 실행 (별도 터미널)
-redis-server                    # 또는 sudo service redis-server start
-
-# 3) Celery 워커 실행 (알람 태스크는 alarm 큐, 주기 메트릭은 metric 큐로 라우팅됨)
-cd drf-server
-celery -A config worker -Q alarm,metric -l info
-```
-
-> 태스크가 `alarm`/`metric` 큐로 라우팅되므로(`config/settings/base.py`의 `CELERY_TASK_ROUTES`), 큐를 지정하지 않은 워커는 알람을 소비하지 못합니다. Docker 환경은 두 큐를 별도 워커(`celery-worker-alarm`/`celery-worker-metric`)로 분리합니다. 주기 메트릭·보관 정책 스케줄을 쓰려면 `celery -A config beat -l info`도 함께 띄우세요.
-
-### 5. 마스터 데이터 시드 *(더미·센서 연동 시 필수)*
-
-DRF는 수신된 `device_id`로 `GasSensor` / `PowerDevice` 마스터를 조회하므로, **마스터가 등록되지 않은 device_id의 데이터는 404로 거부됩니다.** 위치 더미도 `worker_id=1~4`에 해당하는 `CustomUser`가 사전에 존재해야 합니다.
-
-아래 명령이 더미 송출에 필요한 마스터 데이터를 한 번에 생성합니다 (재실행 안전).
-
-> **`createsuperuser`는 반드시 시드 이후에 실행하세요.** 시드가 worker `id=1~4`를 먼저 점유해야 슈퍼유저가 `id=5` 이상으로 부여되어 위치 더미와 충돌하지 않습니다.
-
-```bash
-cd drf-server
-python manage.py seed_dummy_data        # Facility, Worker × 4, GasSensor, PowerDevice 생성
-python manage.py createsuperuser        # 슈퍼유저 (id=5+ 자동 부여)
-```
-
-생성 항목:
+### 시드 데이터 (`make seed` 생성 항목)
 
 | 항목 | 값 |
 |---|---|
 | `Facility(id=1)` | 도면 1290×590 |
-| `CustomUser × 4` | `id=1~4` (`worker_a~d`, user_type=WORKER, 비밀번호 `worker1234!`) |
-| `GasSensor` | `device_id="63200c3afd12"` |
-| `PowerDevice` | `device_id="63200c3afd12"`, 16채널 |
+| `CustomUser × 4` | `id=1~4` (`worker_a~d`, WORKER, 비밀번호 `worker1234!`) |
+| `GasSensor` · `PowerDevice` | `device_id="63200c3afd12"` (전력 16채널) |
 
-> 부서/직급 13종은 마이그레이션이 자동으로 채워줍니다 ([accounts/migrations/0005_seed_department_position.py](drf-server/apps/accounts/migrations/0005_seed_department_position.py)). 시드 명령 본체는 [apps/core/management/commands/seed_dummy_data.py](drf-server/apps/core/management/commands/seed_dummy_data.py).
+> `make super`는 **반드시 시드 이후**에 — 시드가 worker `id=1~4`를 점유해야 슈퍼유저가 `id=5+`로 부여되어 위치 더미와 충돌하지 않습니다. 마스터 미등록 `device_id`의 센서 데이터는 404로 거부됩니다.
 
-### 6. 더미 데이터 송출 *(개발·시연용 — 선택)*
-
-```bash
-cd fastapi-server   # FastAPI 가상환경 활성화 상태에서
-python -m dummies.gas_dummy        # 가스 9종 (DEVICE_ID="63200c3afd12")
-python -m dummies.power_dummy      # 전력 16채널 (DEVICE_ID="63200c3afd12")
-python -m dummies.position_dummy   # 작업자 4명 위치 (worker_id=1~4)
-```
-
-각각 별도 터미널에서 실행. 송출 주기·위험 발생 확률 등은 `fastapi-server/.env`의 `DUMMY_*` 변수로 조절합니다.
+> **Docker 없이 로컬(uv) 개발** — 각 서버에서 `uv pip install -r requirements.txt` 후 `python manage.py migrate && runserver`(DRF) · `uvicorn app:app --port 8001`(FastAPI) · `celery -A config worker -Q alarm,metric -l info`(큐 지정 필수)를 띄웁니다. DB는 `POSTGRES_HOST` 미설정 시 SQLite로 폴백.
 
 ### 접속
 
@@ -237,189 +167,47 @@ python -m dummies.position_dummy   # 작업자 4명 위치 (worker_id=1~4)
 
 ---
 
-## Docker 통합 환경 (대안)
+## Docker 통합 환경
 
-위 1~6번을 한 번에 띄우는 Docker Compose 환경입니다. 12개 서비스(`postgres` + `redis` + `drf` + `fastapi` + `celery-worker-alarm` + `celery-worker-metric` + `celery-beat` + `prometheus` + `grafana` + `redis_exporter` + `postgres_exporter` + `node_exporter`)가 함께 기동됩니다. **DB는 PostgreSQL 16**(`postgres:16-alpine`)을 사용하며 데이터는 `postgres_data` 명명 볼륨에 영속됩니다. (로컬 수동 실행 시에는 `POSTGRES_HOST` 미설정으로 SQLite로 폴백합니다.)
+클론→가동 전체 절차(`make` 기반)와 명령·트러블슈팅은 [docs/QUICKSTART.md](docs/QUICKSTART.md)에 있습니다. 여기서는 **구성과 접속 정보**만 정리합니다.
 
-### 사전 요구사항
+12개 서비스가 한 번에 기동됩니다 — `postgres` · `redis` · `drf`(:8000) · `fastapi`(:8001) · `celery-worker-alarm` · `celery-worker-metric` · `celery-beat` · `prometheus`(:9090) · `grafana`(:3000) · `redis_exporter` · `postgres_exporter` · `node_exporter`. DB는 PostgreSQL 16(`postgres:16-alpine`), 데이터는 `postgres_data` 볼륨에 영속됩니다.
 
-- Docker Engine 24+ / Docker Compose v2
-- WSL2: Docker Desktop의 **Settings → Resources → WSL Integration**에서 현재 배포 토글 ON
-- 호스트에 빈 디렉토리 미리 생성 (bind mount 자동 생성 시 root 소유 문제 방지):
-  ```bash
-  mkdir -p drf-server/media
-  ```
-
-### 첫 실행
-
-```bash
-# 1) 환경변수 작성
-cp .env.docker.example .env.docker
-python -c "import secrets; print(secrets.token_urlsafe(50))"   # DJANGO_SECRET_KEY 용
-python -c "import secrets; print(secrets.token_urlsafe(32))"   # INTERNAL_SERVICE_TOKEN 용
-python -c "import secrets; print(secrets.token_urlsafe(32))"   # JWT_SIGNING_KEY 용
-# .env.docker 에 위 값들 채워넣기 (DRF_SERVICE_TOKEN = INTERNAL_SERVICE_TOKEN 동일 값 권장)
-
-# 2) 빌드 + 기동
-docker compose build
-docker compose up -d
-
-# 3) 상태 확인
-docker compose ps
-docker compose logs -f drf fastapi
-```
-
-기동되면 마이그레이션 + collectstatic이 `drf` 컨테이너 entrypoint에서 자동 실행됩니다 (`celery-worker-alarm`/`celery-worker-metric`/`celery-beat`는 `RUN_MIGRATIONS=0`로 중복 방지).
-
-### 접속
+### 접속 · 포트
 
 | 서비스 | URL | 비고 |
 |---|---|---|
 | 대시보드 (DRF) | http://localhost:8000/dashboard/ | |
 | FastAPI Docs | http://localhost:8001/docs | |
 | WebSocket | `ws://localhost:8001/ws/worker/{user_id}/` | 브라우저 직접 연결 |
-| DRF `/metrics` | http://localhost:8000/metrics | prometheus-client (커스텀 미들웨어 + 멀티프로세스 합산) |
-| FastAPI `/metrics` | http://localhost:8001/metrics | prometheus-client (직접 노출, 외부 instrumentator 미사용) |
-| Prometheus | http://localhost:9090 | targets 모두 UP 확인 |
-| Grafana | http://localhost:3000 | id `admin` / pw `.env.docker`의 `GRAFANA_PASSWORD` |
-| PostgreSQL | `127.0.0.1:5432` | DBeaver 등 GUI 클라이언트 접속용 (호스트 바인딩, 외부 노출 차단) |
-| node_exporter | http://localhost:9100/metrics | 호스트 자원 메트릭 |
-| postgres_exporter | http://localhost:9187/metrics | PostgreSQL 메트릭 |
-| redis_exporter | http://localhost:9121/metrics | Redis 메트릭 |
+| DRF `/metrics` | http://localhost:8000/metrics | prometheus-client (커스텀 미들웨어·멀티프로세스 합산) |
+| FastAPI `/metrics` | http://localhost:8001/metrics | prometheus-client (직접 노출) |
+| Prometheus | http://localhost:9090 | targets 모두 UP |
+| Grafana | http://localhost:3000 | `admin` / `.env.docker`의 `GRAFANA_PASSWORD` |
+| PostgreSQL | `127.0.0.1:5432` | GUI 클라이언트용 (호스트 바인딩, 외부 노출 차단) |
+| node / postgres / redis exporter | `:9100` / `:9187` / `:9121` `/metrics` | 호스트·DB·캐시 메트릭 |
 
-> 위 12개 서비스는 `docker compose ps`에서 모두 `Up (healthy)`로 확인됩니다. Redis(6379)·Celery 워커(8000)는 호스트로 포트를 노출하지 않고 컨테이너 네트워크 내부에서만 통신합니다.
-
-### 자주 쓰는 명령
-
-```bash
-# Django 명령 (시드, createsuperuser 등)
-docker compose exec drf python manage.py seed_dummy_data
-docker compose exec drf python manage.py createsuperuser
-docker compose exec drf python manage.py showmigrations
-
-# 테스트
-docker compose exec drf pytest -q
-docker compose exec fastapi pytest -q
-
-# 한 서비스만 재기동 (코드 수정 후)
-docker compose build drf && docker compose up -d drf
-
-# 로그 모니터링 (stdout — 휘발성)
-docker compose logs -f celery-worker-alarm
-docker compose logs -f --tail=50 fastapi
-
-# 영속 파일 로그 (RotatingFileHandler) — 시연·사고 추적용
-make logs-err-all                # 양 서버 ERROR 실시간 (1순위)
-make logs-stat                   # 파일 크기·회전 백업 확인
-# 상세: docs/conventions/COMMANDS.md "파일 로그 보기" 절
-
-# 정리
-docker compose down              # 컨테이너만 제거 (볼륨 유지)
-docker compose down -v           # 볼륨까지 제거 (Redis/Prometheus/Grafana 데이터 삭제)
-```
-
-### 검증 체크리스트
-
-```bash
-curl -fsS http://localhost:8000/health/ && echo OK
-curl -fsS http://localhost:8001/health/ && echo OK
-curl -s http://localhost:8000/metrics | head -5
-curl -s http://localhost:8001/metrics | head -5
-# Prometheus targets — 모두 state="up"
-curl -s http://localhost:9090/api/v1/targets | python -m json.tool | grep -E '"job"|"health"'
-```
-
-> DB는 PostgreSQL 16 컨테이너로 운영되며 다중 컨테이너(drf·celery 워커들)가 `postgres` 서비스를 공유합니다. PG 연결은 `CONN_MAX_AGE=60`으로 재사용됩니다.
-
-> 도커 도입 배경 · 서비스 구조 · 서버별 일상 워크플로우 · 트러블슈팅 · 남은 과제는 [docs/infra/docker_setup.md](docs/infra/docker_setup.md) 에 정리되어 있습니다. 명령어 모음은 [docs/conventions/COMMANDS.md](docs/conventions/COMMANDS.md).
+> Redis(6379)·Celery 워커(8000)는 호스트 미노출(컨테이너 내부 통신). 도입 배경·일상 워크플로우·트러블슈팅은 [docs/infra/docker_setup.md](docs/infra/docker_setup.md), 명령어는 `make help` / [docs/conventions/COMMANDS.md](docs/conventions/COMMANDS.md).
 
 ---
 
 ## 환경 변수
 
-> **설정 구조 요약**
-> - 로컬 개발: `drf-server/.env.dev` 작성 → `manage.py`가 `config.settings.dev` 자동 로드
-> - Docker 운영: `.env.docker` 작성 → `docker-compose.yml`이 컨테이너에 주입, `config.settings.prod` 고정
-> - `DEBUG` 값은 환경변수로 조정하지 않음 — `dev.py`=`True`, `prod.py`=`False` 하드코딩
-> - 실제 비밀값이 담긴 `.env*` 파일은 `.gitignore`로 git 추적 차단. git에는 `.env.example`(placeholder)만 포함.
+- **로컬 개발**: `drf-server/.env.dev` (manage.py 기본 `config.settings.dev`)
+- **Docker**: `.env.docker` (compose가 주입, `config.settings.prod` 고정)
+- `DEBUG`는 코드 하드코딩(dev=`True`/prod=`False`). 비밀값 `.env*`는 git 미추적 — `.env.example`만 포함.
 
-> **처음이라면 이 5개만 설정하면 동작합니다** — `DJANGO_SECRET_KEY` · `POSTGRES_PASSWORD` · `INTERNAL_SERVICE_TOKEN`(= `DRF_SERVICE_TOKEN` 동일 값) · `JWT_SIGNING_KEY` · `DJANGO_ALLOWED_HOSTS`. 나머지는 기본값으로 동작합니다.
-> Docker 전체 변수 상세는 [docs/env-guide.md](docs/env-guide.md), 로컬·FastAPI 변수는 각 `.env.example` 주석을 참고하세요. 아래는 자주 쓰는 변수만 추린 표입니다.
+> **처음이라면 이 5개만 채우면 동작합니다** — `DJANGO_SECRET_KEY` · `POSTGRES_PASSWORD` · `INTERNAL_SERVICE_TOKEN`(=`DRF_SERVICE_TOKEN` **동일 값**, 다르면 가스 더미 전부 502) · `JWT_SIGNING_KEY` · `DJANGO_ALLOWED_HOSTS`.
 
----
+**전체 변수**는 [docs/env-guide.md](docs/env-guide.md)와 각 `.env.example` 주석에 정리돼 있습니다. 자주 만지는 토글만 추리면:
 
-### 로컬 개발 — `drf-server/.env.dev`
-
-```bash
-cp drf-server/.env.example drf-server/.env.dev
-```
-
-| 변수 | 예시 | 비고 |
+| 변수 | 기본 | 용도 |
 |---|---|---|
-| `DJANGO_SECRET_KEY` | `django-insecure-...` | **필수** — 로컬은 임의값 가능 |
-| `DJANGO_ALLOWED_HOSTS` | `*` | 로컬은 `*` 허용 |
-| `DJANGO_LOG_LEVEL` | `INFO` | DEBUG/INFO/WARNING/ERROR |
-| `REDIS_URL` | `redis://localhost:6379/0` | Celery 브로커 + 캐시 |
-| `JWT_ACCESS_TOKEN_LIFETIME_HOURS` | `1` | JWT 액세스 토큰 만료 |
-| `JWT_REFRESH_TOKEN_LIFETIME_DAYS` | `30` | JWT 리프레시 토큰 만료 |
-| `JWT_SIGNING_KEY` | (빈 문자열) | 빈 값 = `SECRET_KEY` 폴백 |
-| `INTERNAL_SERVICE_TOKEN` | (빈 문자열) | drf ↔ fastapi 서비스 간 인증 토큰 |
-| `FASTAPI_INTERNAL_URL` | `http://127.0.0.1:8001` | Celery → FastAPI 알람 브리지 |
-| `FRONTEND_WS_BASE_URL` | `ws://127.0.0.1:8001` | 브라우저 WebSocket 접속 URL |
-| `ALARM_REPOPUP_COOLDOWN_SEC` | `15` | 시연용 — 운영은 `60` |
-| `DISCORD_ALARM_ENABLED` | `False` | Discord 미러 발송 토글 (`True` 시 아래 webhook 필요) |
-| `DISCORD_WEBHOOK_ADMIN` | (빈 문자열) | 관리자 채널 webhook URL |
-| `DISCORD_WEBHOOK_WORKER` | (빈 문자열) | 작업자 채널 webhook URL (DANGER `@here` 대피용) |
-
----
-
-### Docker 운영 — `.env.docker`
-
-```bash
-cp .env.docker.example .env.docker
-# 아래 명령으로 각 키 값 생성 후 .env.docker에 기입
-python -c "import secrets; print(secrets.token_urlsafe(50))"  # DJANGO_SECRET_KEY
-python -c "import secrets; print(secrets.token_urlsafe(32))"  # INTERNAL_SERVICE_TOKEN, JWT_SIGNING_KEY
-```
-
-| 변수 | 예시 | 비고 |
-|---|---|---|
-| `DJANGO_SECRET_KEY` | (긴 랜덤 문자열) | **필수** — 운영은 반드시 랜덤값 |
-| `DJANGO_ALLOWED_HOSTS` | `localhost,127.0.0.1` | **필수** — 미설정 시 서버 기동 실패 |
-| `POSTGRES_DB` | `diconai` | PostgreSQL DB명 |
-| `POSTGRES_USER` | `diconai` | PostgreSQL 사용자 |
-| `POSTGRES_PASSWORD` | (랜덤값) | **필수** |
-| `POSTGRES_HOST` | `postgres` | docker-compose 서비스명 |
-| `POSTGRES_PORT` | `5432` | 기본값 |
-| `JWT_SIGNING_KEY` | (랜덤값) | 빈 값 = `SECRET_KEY` 폴백 (비권장) |
-| `INTERNAL_SERVICE_TOKEN` | (랜덤값) | drf ↔ fastapi 서비스 간 인증 토큰 |
-| `DRF_SERVICE_TOKEN` | (랜덤값) | **`INTERNAL_SERVICE_TOKEN`과 반드시 동일 값** — 다르면 가스 더미가 전부 502 |
-| `GRAFANA_PASSWORD` | (임의값) | Grafana admin 비밀번호 |
-
-> `REDIS_URL` · `FASTAPI_INTERNAL_URL` · `DRF_BASE_URL`은 `.env.docker`가 아니라 [docker-compose.yml](docker-compose.yml)의 `environment` 블록이 서비스명 기반으로 직접 주입합니다 — `.env.docker`에 적지 않아도 됩니다. `ALARM_REPOPUP_COOLDOWN_SEC`는 미설정 시 코드 기본값(`60`)이 적용됩니다.
-
----
-
-### FastAPI — `fastapi-server/.env`
-
-```bash
-cp fastapi-server/.env.example fastapi-server/.env
-```
-
-| 변수 | 예시 | 비고 |
-|---|---|---|
-| `LOG_LEVEL` | `INFO` | DEBUG/INFO/WARNING/ERROR |
-| `DRF_BASE_URL` | `http://localhost:8000` | DRF 호출용 (Docker: `http://drf:8000`) |
-| `DRF_SERVICE_TOKEN` | (빈 문자열) | fastapi → drf 인증 토큰. `INTERNAL_SERVICE_TOKEN`과 동일 값 |
-| `INTERNAL_SERVICE_TOKEN` | (빈 문자열) | drf가 보내는 헤더 검증용. drf와 동일 값 |
-| `JWT_SIGNING_KEY` | (빈 문자열) | WS JWT 검증용. drf와 동일 값 |
-| `DRF_REQUEST_TIMEOUT_SEC` | `5.0` | fastapi → drf 호출 타임아웃 (초) |
-| `BROADCAST_INTERVAL_SEC` | `5.0` | 센서 WebSocket 브로드캐스트 주기 |
-| `DATA_STALE_THRESHOLD_SEC` | `8.0` | 데이터 미수신 판정 임계 |
-| `DUMMY_TARGET_HOST` | `127.0.0.1` | 더미 송출 대상 호스트 |
-| `DUMMY_TARGET_PORT` | `8001` | 더미 송출 대상 포트 |
-| `DUMMY_SEND_INTERVAL_SEC` | `1.0` | 더미 송출 주기 (초) |
-| `DUMMY_RISK_PROBABILITY` | `0.1` | 더미 위험 발생 확률 (0~1) |
+| `ALARM_REPOPUP_COOLDOWN_SEC` | `60` (시연 `15`) | 알람 재팝업 쿨다운 |
+| `DISCORD_ALARM_ENABLED` | `False` | Discord 미러 (+`DISCORD_WEBHOOK_ADMIN`/`WORKER`) |
+| `DUMMY_SEND_INTERVAL_SEC` | `1.0` | 더미 송출 주기 (가스·전력·위치 공통) |
+| `DUMMY_RISK_PROBABILITY` | `0.1` | 더미 위험 발생 확률 |
+| `BROADCAST_INTERVAL_SEC` | `5.0` | 센서 broadcast 주기 |
 
 ---
 
@@ -538,14 +326,13 @@ fastapi-server/ai/         # 실시간 추론
 ## 테스트
 
 ```bash
-# Docker (권장)
-docker compose exec drf pytest -q
-docker compose exec fastapi pytest -q
-
-# 로컬 — 각 서버 venv 활성화 후
-cd drf-server && pytest -q
-cd fastapi-server && pytest -q
+make test           # drf + fastapi pytest 일괄 (회귀 검증)
+make test-drf       # Django(DRF) 측만
+make test-fastapi   # FastAPI 측만
+make test-map       # 테스트 커버리지 맵 생성 (docstring 기반)
 ```
+
+> `make test`는 컨테이너 안에서 `pytest -q`를 실행합니다. Docker 없이 로컬은 각 서버 venv에서 `pytest -q` (drf는 `config.settings.dev` 기준).
 
 pytest 설정: [drf-server/pytest.ini](drf-server/pytest.ini) · [fastapi-server/pytest.ini](fastapi-server/pytest.ini)
 
