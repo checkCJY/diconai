@@ -358,3 +358,9 @@ ALARM_REPOPUP_COOLDOWN_SEC = env.int("ALARM_REPOPUP_COOLDOWN_SEC", default=60)
 # 억제. 1=즉시 발화(기존 동작), 2=2틱 confirm(≈송신주기×2). 시연 직전 1로 되돌리면
 # 즉시성 복원. 가스/전력 룰 danger 분기(gas_alarm/power_alarm)에서 사용.
 DANGER_CONFIRM_TICKS = env.int("DANGER_CONFIRM_TICKS", default=2)
+
+# 지오펜스(센서 종속 구역) 진입 알람에서 센서 측정값을 '현재 상태'로 인정하는 최신성
+# 윈도우 (초). 이 시간보다 오래된 마지막 측정값은 센서 정지로 보고 무시한다 — 더미/실
+# 센서가 멈춘 뒤 마지막 danger 값이 무한정 '현재 위험'으로 남아 진입 알람이 계속 발화되는
+# 문제 방지. 0 이하면 최신성 검사 비활성(모든 최신값 인정).
+GEOFENCE_SENSOR_FRESHNESS_SEC = env.int("GEOFENCE_SENSOR_FRESHNESS_SEC", default=60)

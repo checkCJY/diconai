@@ -15,6 +15,9 @@
 호출 안 함을 검증.
 """
 
+from datetime import timedelta
+from unittest.mock import patch
+
 import pytest
 from django.utils import timezone
 
@@ -108,6 +111,126 @@ def test_position_with_none_node_id_keeps_received_node_null(
     )
     pos = WorkerPosition.objects.get(pk=result["position_id"])
     assert pos.received_node is None
+
+
+@pytest.mark.django_db
+def test_zone_risk_alone_fires_alarm_without_dangerous_sensor(
+    facility, worker_user, geofence
+):
+    """센서 무관 구역(폴리곤 안에 센서 없음) 진입만으로 알람 발화.
+
+    구역 안에 센서가 전혀 없으면 관리자가 지정한 정적 risk_level 로 발화한다.
+    sensor_source_label 은 None (센서 임계치 초과 문구 없음).
+    """
+    with patch("apps.alerts.tasks.fire_geofence_alarm_task") as mock_task:
+        result = handle_position_receive(
+            worker_id=worker_user.id,
+            facility_id=facility.id,
+            x=50.0,  # warning 구역 내부, 구역 안에 센서 없음
+            y=50.0,
+            movement_status="moving",
+            measured_at=timezone.now(),
+            node_id=None,
+        )
+
+    assert result["risk_level"] == "warning"  # 구역 위험도가 risk_level 로 반영
+    mock_task.delay.assert_called_once()
+    kwargs = mock_task.delay.call_args.kwargs
+    assert kwargs["risk_level"] == "warning"
+    assert kwargs["geofence_id"] == geofence.id
+    assert kwargs["worker_id"] == worker_user.id
+    assert kwargs["sensor_source_label"] is None
+
+
+@pytest.mark.django_db
+def test_sensor_bound_zone_with_normal_sensor_does_not_fire(
+    facility, worker_user, geofence, gas_sensor
+):
+    """센서 종속 구역(폴리곤 안에 센서 존재)은 센서 실시간 상태만 따른다.
+
+    관리자가 구역을 warning 으로 지정했어도 안의 센서가 normal 이면 진입해도
+    알람을 발화하지 않는다 — 정적 risk_level 이 센서 상태를 덮어쓰지 않게.
+    """
+    # gas_sensor 는 (10,20) 으로 geofence(0~100) 내부. GasData 미생성 → normal 취급.
+    with patch("apps.alerts.tasks.fire_geofence_alarm_task") as mock_task:
+        result = handle_position_receive(
+            worker_id=worker_user.id,
+            facility_id=facility.id,
+            x=50.0,  # warning 구역 내부, 단 안의 센서가 normal
+            y=50.0,
+            movement_status="moving",
+            measured_at=timezone.now(),
+            node_id=None,
+        )
+
+    assert result["risk_level"] == "normal"  # 센서 normal → 정적 risk_level 무시
+    mock_task.delay.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_sensor_bound_zone_with_stale_danger_does_not_fire(
+    facility, worker_user, geofence, gas_sensor
+):
+    """묵은 danger 측정값은 현재 위험으로 인정 안 함 (최신성 가드).
+
+    더미/센서가 멈춘 뒤 마지막 danger 값이 DB에 남아도, freshness 윈도우(기본 60s)를
+    넘으면 센서 정지로 보고 무시한다 — 진입해도 알람 미발화.
+    """
+    from apps.monitoring.models import GasData
+
+    # GasData.save()는 raw 측정값으로 max_risk_level을 재계산하므로, create 후 update로
+    # danger를 강제(저장 우회)해 위험 상태를 명시한다.
+    gd = GasData.objects.create(
+        gas_sensor=gas_sensor,
+        measured_at=timezone.now() - timedelta(minutes=10),  # 윈도우(60s) 초과
+    )
+    GasData.objects.filter(pk=gd.pk).update(max_risk_level="danger")
+
+    with patch("apps.alerts.tasks.fire_geofence_alarm_task") as mock_task:
+        result = handle_position_receive(
+            worker_id=worker_user.id,
+            facility_id=facility.id,
+            x=50.0,
+            y=50.0,
+            movement_status="moving",
+            measured_at=timezone.now(),
+            node_id=None,
+        )
+
+    assert result["risk_level"] == "normal"  # 묵은 danger → 무시
+    mock_task.delay.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_sensor_bound_zone_with_fresh_danger_fires(
+    facility, worker_user, geofence, gas_sensor
+):
+    """최신 danger 측정값(윈도우 이내)은 정상적으로 진입 알람을 발화한다."""
+    from apps.monitoring.models import GasData
+
+    # save() 재계산 우회 — danger 강제 (위 stale 테스트와 동일 패턴).
+    gd = GasData.objects.create(
+        gas_sensor=gas_sensor,
+        measured_at=timezone.now(),  # 방금 측정 — 윈도우 이내
+    )
+    GasData.objects.filter(pk=gd.pk).update(max_risk_level="danger")
+
+    with patch("apps.alerts.tasks.fire_geofence_alarm_task") as mock_task:
+        result = handle_position_receive(
+            worker_id=worker_user.id,
+            facility_id=facility.id,
+            x=50.0,
+            y=50.0,
+            movement_status="moving",
+            measured_at=timezone.now(),
+            node_id=None,
+        )
+
+    assert result["risk_level"] == "danger"
+    mock_task.delay.assert_called_once()
+    kwargs = mock_task.delay.call_args.kwargs
+    assert kwargs["risk_level"] == "danger"
+    assert kwargs["sensor_source_label"] == gas_sensor.device_name
 
 
 @pytest.mark.django_db

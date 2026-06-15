@@ -2,6 +2,7 @@
 import math
 import time
 
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from datetime import timedelta
@@ -31,9 +32,19 @@ def _get_dangerous_sensors_in_geofence(geofence) -> dict | None:
     지오펜스 polygon 안에 위치한 GasSensor/PowerDevice 중
     현재 warning/danger 상태인 것이 있으면 가장 높은 위험도 정보를 반환한다.
     없으면 None.
+
+    '현재 상태'는 settings.GEOFENCE_SENSOR_FRESHNESS_SEC 이내의 최신 측정값만 인정한다.
+    그보다 오래된 마지막 측정값은 센서 정지로 보고 무시 — 더미/센서가 멈춘 뒤 마지막
+    danger 값이 무한정 '현재 위험'으로 남아 진입 알람이 계속 발화되는 문제 방지.
+    윈도우가 0 이하면 최신성 검사 비활성(기존처럼 모든 최신값 인정).
     """
     from apps.facilities.models import GasSensor, PowerDevice
     from apps.monitoring.models import GasData, PowerData
+
+    freshness = settings.GEOFENCE_SENSOR_FRESHNESS_SEC
+    fresh_cutoff = (
+        timezone.now() - timedelta(seconds=freshness) if freshness > 0 else None
+    )
 
     best = None
 
@@ -43,11 +54,13 @@ def _get_dangerous_sensors_in_geofence(geofence) -> dict | None:
         latest = (
             GasData.objects.filter(gas_sensor=sensor)
             .order_by("-measured_at")
-            .only("max_risk_level")
+            .only("max_risk_level", "measured_at")
             .first()
         )
         if not latest or latest.max_risk_level == "normal":
             continue
+        if fresh_cutoff and latest.measured_at < fresh_cutoff:
+            continue  # 묵은 측정값 — 센서 정지 간주, 현재 위험 아님
         if (
             best is None
             or _RISK_ORDER[latest.max_risk_level] > _RISK_ORDER[best["risk_level"]]
@@ -65,11 +78,13 @@ def _get_dangerous_sensors_in_geofence(geofence) -> dict | None:
         latest = (
             PowerData.objects.filter(power_device=device)
             .order_by("-measured_at")
-            .only("risk_level")
+            .only("risk_level", "measured_at")
             .first()
         )
         if not latest or latest.risk_level == "normal":
             continue
+        if fresh_cutoff and latest.measured_at < fresh_cutoff:
+            continue  # 묵은 측정값 — 센서 정지 간주, 현재 위험 아님
         if (
             best is None
             or _RISK_ORDER[latest.risk_level] > _RISK_ORDER[best["risk_level"]]
@@ -77,6 +92,27 @@ def _get_dangerous_sensors_in_geofence(geofence) -> dict | None:
             best = {"risk_level": latest.risk_level, "source_label": device.device_name}
 
     return best
+
+
+def _geofence_has_any_sensor(geofence) -> bool:
+    """지오펜스 polygon 안에 활성 가스/전력 센서가 하나라도 있는지.
+
+    진입 알람의 위험도 출처를 가른다:
+    - 센서 종속 구역(센서 존재): 센서 실시간 상태만 따른다. 관리자가 위험/주의로
+      지정했어도 센서가 normal 이면 알람 없음.
+    - 센서 무관 구역(센서 없음): 관리자가 지정한 정적 risk_level 을 그대로 쓴다.
+    """
+    from apps.facilities.models import GasSensor, PowerDevice
+
+    for sensor in GasSensor.objects.filter(facility=geofence.facility, is_active=True):
+        if geofence.contains_point(sensor.x, sensor.y):
+            return True
+    for device in PowerDevice.objects.filter(
+        facility=geofence.facility, is_active=True
+    ):
+        if geofence.contains_point(device.x, device.y):
+            return True
+    return False
 
 
 # 지오펜스 경계 근접 감지 거리 (픽셀)
@@ -190,9 +226,21 @@ def handle_position_receive(
     else:
         danger_info = None
 
-    risk_level = danger_info["risk_level"] if danger_info else "normal"
+    # 진입 알람 위험도 출처는 구역 안에 센서가 있느냐로 갈린다:
+    #  - 센서 종속 구역(센서 존재): 센서 실시간 상태만 따른다. 관리자가 위험/주의로
+    #    지정했어도 센서가 normal(danger_info=None)이면 알람 없음.
+    #  - 센서 무관 구역(센서 없음): 관리자가 지정한 정적 geofence.risk_level 로 발화.
+    if geofence and danger_info:
+        risk_level = danger_info["risk_level"]
+        sensor_source_label = danger_info["source_label"]
+    elif geofence and not _geofence_has_any_sensor(geofence):
+        risk_level = geofence.risk_level
+        sensor_source_label = None
+    else:
+        risk_level = "normal"
+        sensor_source_label = None
 
-    if danger_info:
+    if geofence and risk_level in ("warning", "danger"):
         from apps.alerts.tasks import fire_geofence_alarm_task
 
         fire_geofence_alarm_task.delay(
@@ -201,7 +249,7 @@ def handle_position_receive(
             geofence_id=geofence.id,
             geofence_name=geofence.name,
             risk_level=risk_level,
-            sensor_source_label=danger_info["source_label"],
+            sensor_source_label=sensor_source_label,
         )
 
     return {
