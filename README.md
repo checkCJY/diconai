@@ -13,14 +13,25 @@
 ![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)
 ![Prometheus](https://img.shields.io/badge/Prometheus-2.55-E6522C?logo=prometheus&logoColor=white)
 ![Grafana](https://img.shields.io/badge/Grafana-11.3-F46800?logo=grafana&logoColor=white)
+
+---
+
+## 30초 요약
+
+- **무엇** — 유해가스·전력설비·작업자 위치를 실시간 수집·검증하고 AI로 위험을 예측해 운영자·작업자에게 즉시 알람하는 **산재 예방 통합 관제 PoC**.
+- **E2E 동작** — 수집 → 검증 → 저장 → 위험 판단 → AI 분석 → 실시간 송출 → 알람까지 더미 기반으로 실제 동작.
+- **3대 설계 과제** — ① 임계 도달 전 조기경고(다축 AI: 전력 5축·가스 3축 + 정적 임계 결합) ② 비동기 운영(Redis Stream + Celery 워커 분리 + 2-서버 역할 분리) ③ 관찰 가능(Prometheus + Grafana 6 대시보드).
+- **규모·성과** — 12-서비스 Docker Compose · PostgreSQL 16 · 기능 구현률 **79%**(전체 249). 가스 부하 병목 진단·해소(p95 **4.2s→0.9s**, 에러 **91%→0%**).
+- **성격** — 완성품이 아니라 **동작이 검증된 아키텍처 PoC** — "결승선이 아니라 출발선".
+
 ---
 
 ## 목차
 
-- [프로젝트 소개](#프로젝트-소개) · [기술 스택](#기술-스택) · [아키텍처](#아키텍처) · [주요 기능](#주요-기능) · [데모 화면](#데모-화면)
+- [30초 요약](#30초-요약) · [프로젝트 소개](#프로젝트-소개) · [기술 스택](#기술-스택) · [아키텍처](#아키텍처) · [데이터 처리 흐름](#데이터-처리-흐름) · [주요 기능](#주요-기능) · [핵심 성과](#핵심-성과) · [데모 화면](#데모-화면)
 - [실행 방법](#실행-방법) · [Docker 통합 환경](#docker-통합-환경) · [환경 변수](#환경-변수)
 - [API 엔드포인트](#api-엔드포인트) · [DB 설계](#db-설계) · [프로젝트 구조](#프로젝트-구조)
-- [테스트](#테스트) · [트러블슈팅](#트러블슈팅) · [향후 개선 포인트](#향후-개선-포인트) · [관련 문서](#관련-문서)
+- [테스트](#테스트) · [트러블슈팅](#트러블슈팅) · [향후 개선 포인트](#향후-개선-포인트) · [팀원 기여](#팀원-기여) · [문서 / Contact](#문서--contact)
 
 > 바로 띄워보려면 → [docs/QUICKSTART.md](docs/QUICKSTART.md) (Docker 한 경로, 클론→가동)
 
@@ -91,6 +102,19 @@
 
 ---
 
+## 데이터 처리 흐름
+
+센서 데이터는 **지연에 민감한 실시간 경로**와 **무거운 영속 경로**를 FastAPI에서 분리해 처리합니다 — 한 요청 안에서 저장까지 끝내면 DB 쓰기가 화면 갱신을 붙잡기 때문입니다.
+
+1. **수신** — IoT/더미가 `POST /api/sensors/gas` · `/api/power/watt` · `/api/positioning/receive`로 FastAPI에 송신.
+2. **검증·전달** — FastAPI가 Pydantic 검증·정규화 후 DRF 내부 API(`POST /api/monitoring/gas/` 등)로 forward → DB 저장 (전력은 fire-and-forget).
+3. **실시간 송출** — `broadcast_loop`이 5초마다 `WS /ws/sensors/`로 통합 상태를, 위치는 `WS /ws/positions/`로 1초마다 송신.
+4. **알람 (이벤트 즉시)** — Celery가 임계 초과 감지 → `AlarmRecord` 저장 → `POST /internal/alarms/push/` → 큐 적재 → `alarm_flush_loop`이 `WS /ws/sensors/`로 즉시 broadcast.
+
+> 단계별 페이로드 정의(37종)는 [docs/specs/json_fields_specification.md](docs/specs/json_fields_specification.md), 가스 수신 파이프라인은 [docs/features/gas_sensor_http_pipeline.md](docs/features/gas_sensor_http_pipeline.md), AI 추론 흐름은 [docs/ai/pipeline.md](docs/ai/pipeline.md) 참고.
+
+---
+
 ## 주요 기능
 
 - **다종 가스 모니터링** — CO·H2S·CO2·O2·NO2·SO2·O3·NH3·VOC 9종을 1초 주기로 수신, 임계치별 위험도(NORMAL/WARNING/DANGER) 자동 산정
@@ -103,6 +127,17 @@
 - **JWT 인증 + 4단계 권한** — SUPER_ADMIN / FACILITY_ADMIN / WORKER / VIEWER
 - **실시간 관측** — Prometheus 메트릭 수집 + Grafana 대시보드 (HTTP·Celery 큐·DB 상태)
 - **자동 OpenAPI 문서** — drf-spectacular Swagger UI + FastAPI `/docs`
+
+---
+
+## 핵심 성과
+
+> 데모/스터디 환경(단일 머신·더미 IoT) 측정값 — 운영 벤치마크 아님. 방법·상세는 [docs/results.md](docs/results.md).
+
+- **부하 병목 진단 & 개선** — 50대 동시 가스 송신의 congestion collapse를 진단·해소: 가스 p95 **4.2s→0.9s**, RPS **8.5→33**, 에러율 **91%→0%**. 전력은 fire-and-forget 설계로 50대까지 선형 확장(에러 0).
+- **AI 이상탐지 정확도 (오프라인 재현)** — 가스 recall **0.65**, 전력 5축 recall **0.87**. 야간 격상 룰 제거로 오탐 **34%→3%**(탐지 유지).
+- **관측성** — Prometheus 6타깃 + Grafana 대시보드(HTTP·큐·DB·AI 메트릭), 멀티프로세스 메트릭 합산.
+- **인프라** — PostgreSQL 16 전환, Celery alarm/metric 큐 분리, 데이터 수명 3계층 + 파일 로그.
 
 ---
 
@@ -245,6 +280,33 @@ make dummies-start                   # (선택) 가스·전력·위치 실시간
 > - **DRF Swagger UI** — http://localhost:8000/api/schema/swagger-ui/
 > - **FastAPI Docs** — http://localhost:8001/docs
 
+### 요청 · 응답 예시
+
+**가스 측정값 수신** — `POST /api/sensors/gas` (검증 스키마 `GasDataPayload`, `status`는 서버가 임계치로 재계산)
+
+```json
+{
+  "timestamp": "2026-05-07T08:00:00+00:00",
+  "device_id": "63200c3afd12", "device_name": "63200c3afd12",
+  "location": { "x": 140, "y": 160 },
+  "co": 18, "h2s": 4, "co2": 720, "o2": 20.4, "lel": 2,
+  "no2": 1.2, "so2": 0.8, "o3": 0.03, "nh3": 12, "voc": 0.21
+}
+```
+
+**WebSocket 알람 메시지** — `WS /ws/sensors/` 스트림의 `alarms[]` 항목
+
+```json
+{
+  "alarm_type": "gas_threshold", "risk_level": "danger",
+  "source_label": "CO 누출", "summary": "작업 구역 CO 위험 — 즉시 대피",
+  "is_new_event": true, "event_id": 1024,
+  "gas_type": "co", "measured_value": 210, "threshold_value": 200
+}
+```
+
+> 전체 payload(센서 통합·위치 스트림 포함 37종)는 [docs/specs/json_fields_specification.md](docs/specs/json_fields_specification.md), API 그룹 개요는 [docs/api.md](docs/api.md), WS 클라이언트 패턴은 [docs/domains/websocket.md](docs/domains/websocket.md).
+
 ---
 
 ## DB 설계
@@ -344,12 +406,19 @@ pytest 설정: [drf-server/pytest.ini](drf-server/pytest.ini) · [fastapi-server
 
 - **알람 실시간 전파 지연** — Celery DB 저장 후에야 broadcast → 내부 push 엔드포인트(`/internal/alarms/push/`) + `alarm_flush_loop` 도입으로 즉시 전송 ([7a0f390](https://github.com/checkCJY/diconai/commit/7a0f390))
 - **전력 임계치 양쪽 하드코딩** — DRF/JS 동기화 깨짐 → DRF `/api/monitoring/power/thresholds/` 단일 출처 API로 통일 ([34e808c](https://github.com/checkCJY/diconai/commit/34e808c))
-- **DRF 레이어 책임 혼재** — view에 비즈니스 로직 섞임, 예외 응답 형식 제각각 → service/selector 분리 + 글로벌 예외 핸들러 도입 ([Phase 4](docs/changelog/phase4_drf_layer_exceptions_swagger.md))
-- **프론트 HTTP·WebSocket 호출 분산** — 페이지마다 fetch/ws URL 하드코딩 → 단일 클라이언트 모듈로 통일, 인증 헤더 중앙 처리 ([Phase 3](docs/changelog/phase3_frontend_http_ws_unification.md))
+- **DRF 레이어 책임 혼재** — view에 비즈니스 로직 섞임, 예외 응답 형식 제각각 → service/selector 분리 + 글로벌 예외 핸들러 도입 ([Phase 4](docs/changelog/phase1-5_refactoring/phase4_drf_layer_exceptions_swagger.md))
+- **프론트 HTTP·WebSocket 호출 분산** — 페이지마다 fetch/ws URL 하드코딩 → 단일 클라이언트 모듈로 통일, 인증 헤더 중앙 처리 ([Phase 3](docs/changelog/phase1-5_refactoring/phase3_frontend_http_ws_unification.md))
 
 ---
 
 ## 향후 개선 포인트
+
+### 한계
+
+- **시뮬레이션 기반** — 전 도메인이 더미 시뮬레이터 입력이라 현장 노이즈·통신 유실·센서 드리프트는 미검증. 게이트웨이·측위 하드웨어는 외부 의존.
+- **수평 확장 제약** — WebSocket 연결과 AI 윈도우가 프로세스 메모리에 상주해 `replicas=1`이 강제됨. 다중 replica·HA는 추론 서버 3-Tier 분리가 선행돼야 함.
+- **AI 데이터 전제** — SARIMA·auto-arima·채널별 baseline은 1~2주 이상 실운영 데이터가 전제라, 시연 단계는 고정 order `(1,1,1)` 휴리스틱을 택함.
+- **검증 재현성** — 정확도는 in-sample·합성 데이터 기준(가스 recall 0.65 · 전력 recall 0.869/FP 33.9%, 야간 격상 제거 시 FP 3.2%)이라 held-out·eval 정식화 전엔 일반화 미보장.
 
 ### 브로드캐스트 주기 단축 (5초 → 3초)
 
@@ -367,16 +436,32 @@ pytest 설정: [drf-server/pytest.ini](drf-server/pytest.ini) · [fastapi-server
 - PostgreSQL 인덱스·쿼리 플랜 튜닝 (DB 운영 전환은 완료 — `postgres:16-alpine`)
 - FastAPI ↔ DRF 내부 호출의 connection pool 재사용
 
-### 그 외 로드맵
+### 중·장기 로드맵
 
-- **FastAPI 수평 확장(멀티 레플리카)** — WebSocket 공유 상태를 프로세스 메모리 → Redis로 이관해 replica ≥ 2 지원
-- **AI 이상탐지 고도화** — 임계 돌파 조기예측 리드타임 개선 (현재는 룰 기반이 1차 판정, AI는 보조)
-- **실 IoT 하드웨어 연동** — 현재 더미 송출을 실제 센서 수신으로 대체
-- **다중 공장 지원** — 단일 `Facility(id=1)` → 멀티 테넌시 확장
+- **AI 추론 채널 확장** — 전력 4채널 → 16채널 다변량(A/V축 추론)
+- **정확도 평가 파이프라인 정식화** — held-out·eval 스크립트화로 일반화 검증
+- **추론 서버 3-Tier 분리** — Kubernetes 실클러스터 배포·HA·멀티 레플리카(`replicas=1` 제약 해소)
+- **AI 모델 고도화** — SARIMA(seasonal) 도입 + IsolationForest 피처 확장
+- **DB** — TimescaleDB 전환으로 시계열 성능 향상
+- **실 IoT 게이트웨이·하드웨어 연동** — 실제 센서 데이터 구조 적용
+
+> 전체 한계·향후 로드맵 상세는 기술문서 14장 참고.
 
 ---
 
-## 관련 문서
+## 팀원 기여
+
+| 구성원 | 주 도메인 | 주요 담당 업무 |
+|---|---|---|
+| **최재용** (팀장) | 전력 · 알람 · 대시보드 | 전력 5축 AI, PG 마이그레이션, `decide_alarm` 결정 로직, 알람 팝업, 메인 대시보드 프론트엔드 전반(차트/WS/이벤트/작업자 패널), 백오피스(사용자/조직/정책/메뉴), 인증, PM |
+| **이성현** | 가스 · 운영 · 인프라 | 가스 9종 AI, CP 사전필터, 시나리오 더미, Docker/k8s/CI, Redis 이관, Grafana 패널(DB/Redis), 설비 등록·관리 백오피스, 지오펜스(geofence) 설정 |
+| **정휘훈** | 백오피스 · 모니터링 | 어드민 기준정보 CRUD 백엔드(공지/코드/위험기준/임계치/로그), 대시보드 가스 패널, Grafana(전력/가스 AI), Prometheus 메트릭, Dev/Prod 설정 분리 |
+
+> **공통** — 메인 대시보드 및 관리자 페이지는 기능별로 분담하여 구현했습니다.
+
+---
+
+## 문서 / Contact
 
 - [docs/QUICKSTART.md](docs/QUICKSTART.md) — **빠른 시작** (클론→가동 한 경로)
 - [docs/specs/api_specification.md](docs/specs/api_specification.md) — API 상세 명세
@@ -387,3 +472,11 @@ pytest 설정: [drf-server/pytest.ini](drf-server/pytest.ini) · [fastapi-server
 - [docs/refactor/waves/2026_05_09/CHANGES_REVIEW.md](docs/refactor/waves/2026_05_09/CHANGES_REVIEW.md) — **이번 브랜치 종합 변경 인벤토리** (5 카테고리 + 리뷰어 체크리스트)
 - [docs/refactor/waves/2026_05_09/TEAM_BRIEF.md](docs/refactor/waves/2026_05_09/TEAM_BRIEF.md) — 이번 브랜치 팀 공유용 진입 문서 (5분 cheatsheet 포함)
 - [docs/refactor/waves/2026_05_09/MIGRATION_GUIDE.md](docs/refactor/waves/2026_05_09/MIGRATION_GUIDE.md) — 머지·적용 5단계 + 트러블슈팅
+
+### Contact
+
+| 이름 | 역할 | 이메일 | GitHub |
+|---|---|---|---|
+| 최재용 | 팀장 | sapla@naver.com | [checkCJY](https://github.com/checkCJY) |
+| 이성현 | 팀원 | dbst0508@gmail.com | — |
+| 정휘훈 | 팀원 | hwihun5623@naver.com | — |
