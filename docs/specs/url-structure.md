@@ -1,6 +1,6 @@
 # URL 구조
 
-> 기준일: 2026-06-02 / 브랜치: feature/0602_power_alarm_flood
+> 기준일: 2026-06-15 / 브랜치: fix/0615_docs
 
 URL 분리 원칙:
 - **페이지** (HTML): 루트 경로 (`/dashboard/...`, `/admin-panel/...`)
@@ -48,16 +48,16 @@ URL 분리 원칙:
 | GET | `/admin-panel/data/gas/` | 유해가스 데이터 관리 페이지 |
 | GET | `/admin-panel/data/power/` | 전력 데이터 관리 페이지 |
 | GET | `/admin-panel/data/retention-policy/` | 데이터 보관 정책 관리 페이지 |
-| GET | `/admin-panel/safety/checklist/` | 작업 전 안전 점검 관리 (★ 신규) |
-| GET | `/admin-panel/safety/vr-training/` | VR 교육 콘텐츠 관리 (★ 신규) |
-| GET | `/admin-panel/notices/` | 공지사항 목록 (★ 신규) |
-| GET | `/admin-panel/notices/create/` | 공지사항 등록 (★ 신규) |
-| GET | `/admin-panel/notices/<pk>/` | 공지사항 상세 (★ 신규) |
-| GET | `/admin-panel/notices/<pk>/edit/` | 공지사항 수정 (★ 신규) |
-| GET | `/admin-panel/logs/system/` | 시스템 로그 (★ 신규) |
-| GET | `/admin-panel/logs/activity/` | 사용자 활동 로그 (★ 신규) |
-| GET | `/admin-panel/logs/integration/` | 통합 로그 (★ 신규) |
-| GET | `/admin-panel/logs/map-edit/` | 지도 편집 로그 (★ 신규) |
+| GET | `/admin-panel/safety/checklist/` | 작업 전 안전 점검 관리 |
+| GET | `/admin-panel/safety/vr-training/` | VR 교육 콘텐츠 관리 |
+| GET | `/admin-panel/notices/` | 공지사항 목록 |
+| GET | `/admin-panel/notices/create/` | 공지사항 등록 |
+| GET | `/admin-panel/notices/<pk>/` | 공지사항 상세 |
+| GET | `/admin-panel/notices/<pk>/edit/` | 공지사항 수정 |
+| GET | `/admin-panel/logs/system/` | 시스템 로그 |
+| GET | `/admin-panel/logs/activity/` | 사용자 활동 로그 |
+| GET | `/admin-panel/logs/integration/` | 통합 로그 |
+| GET | `/admin-panel/logs/map-edit/` | 지도 편집 로그 |
 | GET | `/admin-panel/alerts/policies/` | 알림 정책 관리 페이지 |
 | GET | `/admin-panel/events/history/` | 이벤트 이력 조회 페이지 |
 | GET | `/admin-panel/common-codes/` | 공통 코드 관리 페이지 |
@@ -85,7 +85,7 @@ URL 분리 원칙:
 | GET | `/dashboard/api/workers-list/` | 작업자 목록 |
 | GET | `/dashboard/api/refresh/` | 대시보드 갱신 데이터 |
 | GET/POST | `/dashboard/api/vr-progress/` | VR 진행률 조회·저장 |
-| GET | `/dashboard/api/vr-content/active/` | 현재 facility 활성 VR 콘텐츠 (★ 신규) |
+| GET | `/dashboard/api/vr-content/active/` | 현재 facility 활성 VR 콘텐츠 |
 
 ### 1.5 알람·이벤트 API (`/alerts/api/` 프리픽스)
 
@@ -93,12 +93,12 @@ URL 분리 원칙:
 |--------|------|------|
 | GET | `/alerts/api/my-status/` | 내 알람 현황 |
 | GET | `/alerts/api/worker-summary/` | 작업자별 알람 요약 |
-| POST | `/alerts/api/anomaly-alarm-records/` | AI 이상탐지 알람 생성 (FastAPI → DRF) (★ 신규) |
+| POST | `/alerts/api/anomaly-alarm-records/` | AI 이상탐지 알람 생성 (FastAPI → DRF) |
 | GET/POST | `/alerts/api/alarms/` | AlarmRecord 목록·생성 |
 | GET/PATCH/DELETE | `/alerts/api/alarms/<pk>/` | AlarmRecord 상세·수정·삭제 |
-| GET | `/alerts/api/events/` | Event 목록 |
+| GET | `/alerts/api/events/` | Event 목록 (`?status=` 필터) |
 | GET | `/alerts/api/events/<pk>/` | Event 상세 |
-| POST | `/alerts/api/events/<pk>/resolve/` | 이벤트 RESOLVED 처리 |
+| PATCH | `/alerts/api/events/<pk>/update-status/` | 이벤트 상태 전환 (active → acknowledged → in_progress → resolved) |
 
 ### 1.6 지오펜스 API (`/api/` 프리픽스)
 
@@ -136,7 +136,7 @@ URL 분리 원칙:
 | GET | `/api/admin/power-data/export/` | 전력 데이터 CSV 내보내기 |
 | GET | `/api/admin/power-data/devices/` | 전력 장비 드롭다운용 목록 |
 
-### 1.9 어드민 API — 안전 점검 (`/api/admin/safety/` 프리픽스) ★ 신규
+### 1.9 어드민 API — 안전 점검 (`/api/admin/safety/` 프리픽스)
 
 | Method | Path | 설명 |
 |--------|------|------|
@@ -158,7 +158,7 @@ URL 분리 원칙:
 |--------|------|------|
 | GET | `/api/safety/checklist/active/` | 현재 활성 Revision 스냅샷 (현장 작업자용) |
 
-### 1.11 어드민 API — VR 교육 (`/api/admin/training/` 프리픽스) ★ 신규
+### 1.11 어드민 API — VR 교육 (`/api/admin/training/` 프리픽스)
 
 | Method | Path | 설명 |
 |--------|------|------|
@@ -167,7 +167,7 @@ URL 분리 원칙:
 | GET/PATCH | `/api/admin/training/vr-training/<pk>/` | 메타 조회·수정 |
 | GET | `/api/admin/training/vr-training/<pk>/revisions/` | 콘텐츠 변경 이력 |
 
-### 1.12 공지사항 API (`/api/admin/` 프리픽스) ★ 신규
+### 1.12 공지사항 API (`/api/admin/` 프리픽스)
 
 | Method | Path | 설명 |
 |--------|------|------|
@@ -176,7 +176,7 @@ URL 분리 원칙:
 | POST | `/api/admin/notices/<pk>/attachments/` | 첨부파일 업로드 |
 | DELETE | `/api/admin/notices/<pk>/attachments/<att_id>/` | 첨부파일 삭제 |
 
-### 1.13 로그 관리 API (`/api/admin/` 프리픽스) ★ 신규
+### 1.13 로그 관리 API (`/api/admin/` 프리픽스)
 
 | Method | Path | 설명 | 출처 |
 |--------|------|------|------|
@@ -185,14 +185,14 @@ URL 분리 원칙:
 | GET | `/api/admin/system-logs/` | 시스템 애플리케이션 로그 | apps.operations |
 | GET | `/api/admin/integration-logs/` | 통합/외부 호출 로그 | apps.operations |
 
-### 1.14 ML API (`/api/ml/` 프리픽스) ★ 신규
+### 1.14 ML API (`/api/ml/` 프리픽스)
 
 | Method | Path | 설명 |
 |--------|------|------|
 | GET | `/api/ml/models/active/` | 활성 MLModel 메타 (sensor_type, algorithm, sensor_identifier 3축 매칭) |
 | POST | `/api/ml/anomaly-results/` | MLAnomalyResult 생성 (FastAPI 추론 결과 영속화) |
 
-### 1.15 어드민 API — 알림정책·이벤트이력 (`/api/admin/alerts/` 프리픽스) ★ 신규
+### 1.15 어드민 API — 알림정책·이벤트이력 (`/api/admin/alerts/` 프리픽스)
 
 | Method | Path | 설명 |
 |--------|------|------|
@@ -200,14 +200,14 @@ URL 분리 원칙:
 | GET/PATCH/DELETE | `/api/admin/alerts/policies/<pk>/` | 알림 정책 상세·수정·삭제 |
 | GET | `/api/admin/alerts/events/` | 이벤트 이력 조회 (읽기 전용) |
 
-### 1.16 어드민 API — 위험기준 (`/api/admin/` 프리픽스, apps.core) ★ 신규
+### 1.16 어드민 API — 위험기준 (`/api/admin/` 프리픽스, apps.core)
 
 | Method | Path | 설명 |
 |--------|------|------|
 | GET/POST | `/api/admin/risk-standards/` | 위험 기준 목록·생성 |
 | GET/PATCH/DELETE | `/api/admin/risk-standards/<pk>/` | 위험 기준 상세·수정·삭제 |
 
-### 1.17 어드민 API — 임계치 (`/api/admin/` 프리픽스, apps.facilities) ★ 신규
+### 1.17 어드민 API — 임계치 (`/api/admin/` 프리픽스, apps.facilities)
 
 | Method | Path | 설명 |
 |--------|------|------|
@@ -217,7 +217,7 @@ URL 분리 원칙:
 | GET/PATCH/DELETE | `/api/admin/thresholds/<pk>/` | 임계치 상세·수정·삭제 |
 | POST | `/api/admin/thresholds/bulk-deactivate/` | 임계치 일괄 미사용 전환 |
 
-### 1.18 어드민 API — 공통코드 (`/api/admin/` 프리픽스, apps.reference) ★ 신규
+### 1.18 어드민 API — 공통코드 (`/api/admin/` 프리픽스, apps.reference)
 
 | Method | Path | 설명 |
 |--------|------|------|
@@ -227,7 +227,7 @@ URL 분리 원칙:
 | GET/PATCH/DELETE | `/api/admin/codes/<pk>/` | 코드 상세·수정·삭제 |
 | POST | `/api/admin/codes/bulk-deactivate/` | 코드 일괄 미사용 전환 |
 
-### 1.19 어드민 API — 데이터 보관 (`/api/admin/` 프리픽스, apps.operations) ★ 신규
+### 1.19 어드민 API — 데이터 보관 (`/api/admin/` 프리픽스, apps.operations)
 
 | Method | Path | 설명 |
 |--------|------|------|
@@ -244,12 +244,12 @@ URL 분리 원칙:
 | GET | `/api/monitoring/power/thresholds/` | FastAPI | 전력 임계치 조회 |
 | GET | `/api/monitoring/power/threshold-meta/` | FastAPI | 정격 % 임계치(power_facility_default) 동기화 |
 | GET | `/api/monitoring/gas/thresholds/` | FastAPI | 가스 임계치 조회 |
-| POST | `/api/monitoring/power/channel-meta/` | FastAPI channel_meta_cache | 채널 메타 동기화 (★ 신규) |
+| GET | `/api/monitoring/power/channel-meta/` | FastAPI channel_meta_cache | 채널 메타 조회 (5분 주기 캐시 갱신, POST도 지원) |
 | POST | `/api/monitoring/power/event/` | FastAPI power_service | 전력 ON/OFF 스냅샷 저장 |
 | POST | `/api/monitoring/power/data/` | FastAPI power_service | 전력 측정값 저장 |
 | GET | `/api/internal/workers/` | FastAPI | worker 목록 내부 조회 (apps.operations) |
 | POST | `/api/positioning/receive/` | FastAPI position_router | 작업자 위치 수신·저장 |
-| POST | `/api/internal/integration-logs/` | FastAPI | 통합 로그 적재 (★ 신규) |
+| POST | `/api/internal/integration-logs/` | FastAPI | 통합 로그 적재 |
 
 ### 1.21 설비·장치 관리 API (`/api/` 프리픽스)
 
@@ -263,9 +263,9 @@ URL 분리 원칙:
 | GET | `/api/facilities/select/` | 공장 드롭다운용 목록 |
 | GET | `/api/facilities/power-device-options/` | 공장 등록 시 전력 장치 옵션 |
 | GET | `/api/facilities/devices/select/` | 미연결 전력 장치 드롭다운 |
-| GET/POST | `/api/equipments/` | 설비(Equipment) 목록·생성 (★ 신규) |
-| GET/PATCH/DELETE | `/api/equipments/<pk>/` | 설비 상세·수정·삭제 (★ 신규) |
-| POST | `/api/equipments/bulk-delete/` | 설비 일괄 삭제 (★ 신규) |
+| GET/POST | `/api/equipments/` | 설비(Equipment) 목록·생성 |
+| GET/PATCH/DELETE | `/api/equipments/<pk>/` | 설비 상세·수정·삭제 |
+| POST | `/api/equipments/bulk-delete/` | 설비 일괄 삭제 |
 | GET | `/api/gas-sensors/` | 유해가스 센서 목록 |
 | GET/PATCH/DELETE | `/api/gas-sensors/<pk>/` | 센서 상세·수정·삭제 |
 | POST | `/api/gas-sensors/bulk-delete/` | 센서 일괄 삭제 |
@@ -310,7 +310,7 @@ URL 분리 원칙:
 | GET | `/health/` | 헬스 체크 | `{"status": "ok"}` |
 | GET | `/metrics` | Prometheus | 메트릭 노출 |
 
-### 2.2 AI 추론 API (`/ai/` 프리픽스) ★ 신규
+### 2.2 AI 추론 API (`/ai/` 프리픽스)
 
 | Method | Path | 설명 |
 |--------|------|------|
@@ -323,7 +323,7 @@ URL 분리 원칙:
 
 | Method | Path | 호출 주체 | 설명 |
 |--------|------|----------|------|
-| POST | `/internal/alarms/push/` | DRF Celery | Redis 알람 큐(LPUSH) 추가 → alarm_flush_loop 즉시 소비 (★ Phase 1 C4) |
+| POST | `/internal/alarms/push/` | DRF Celery | Redis 알람 스트림(XADD) 추가 → alarm_flush_loop XREAD 즉시 소비 |
 | GET | `/internal/scenario/mode` | 더미 polling | 현재 시나리오 모드 조회 |
 | POST | `/internal/scenario/mode` | 운영자/대시보드 | 시나리오 모드 변경 |
 
@@ -332,13 +332,13 @@ URL 분리 원칙:
 시나리오 모드 (allowed):
 - 공통: `mixed` / `normal` / `warning` / `danger`
 - 전력 전용 (가스·위치는 `mixed` fallback): `overload` / `voltage_drop` / `phase_loss` / `degradation` / `night_abnormal` / `motor_stuck`
-- 가스 전용 (전력·위치는 `mixed` fallback): `co_leak` / `h2s_leak` / `fire` / `chemical_spill`
+- 가스 전용 (전력·위치는 `mixed` fallback): `co_leak` / `h2s_leak` / `fire` / `chemical_spill` / `o2_depletion` / `sensor_fault`
 
 ### 2.4 WebSocket
 
 | Path | 접속 주체 | 설명 |
 |------|----------|------|
-| `ws://localhost:8001/ws/sensors/` | 브라우저 | broadcast_loop 가 `BROADCAST_INTERVAL_SEC` 마다 통합 페이로드 송출 (가스+전력+위치). 별도 `alarm_flush_loop` 가 Redis 큐 pop 즉시 같은 채널로 알람 push |
+| `ws://localhost:8001/ws/sensors/` | 브라우저 | broadcast_loop 가 `BROADCAST_INTERVAL_SEC` 마다 통합 페이로드 송출 (가스+전력+위치). 별도 `alarm_flush_loop` 가 Redis Stream XREAD 즉시 같은 채널로 알람 push |
 | `ws://localhost:8001/ws/worker/{user_id}/` | 브라우저 (작업자) | 작업자 개인 알림 (지오펜스 진입 등 1:1 푸시) |
 | `ws://localhost:8001/ws/position/` | IoT 위치 장비 | 위치 수신 → DRF 저장 + 공유 상태 갱신 |
 | `ws://localhost:8001/ws/positions/` | 브라우저 | 1초마다 작업자 위치 배열 스트리밍 |
@@ -356,7 +356,7 @@ URL 분리 원칙:
 [가스 센서 장비]
   POST :8001/api/sensors/gas
     └→ DRF POST :8000/api/monitoring/gas/  (DB 영속)
-       + websocket/state.latest_gas_snapshot 갱신
+       + snap_store(Redis) gas 스냅샷 갱신
        + Z-score 발화 시 Celery → /internal/alarms/push/
 
 [전력 센서 장비]
@@ -372,23 +372,24 @@ URL 분리 원칙:
     └→ DRF POST :8000/api/positioning/receive/
 
 [채널 메타 동기화 (5분 주기, fastapi 내부 loop)]
-  GET  :8000/api/admin/power-data/devices/ → channel_meta 캐시 갱신
+  GET  :8000/api/monitoring/power/channel-meta/  → channel_meta 캐시 갱신
+  GET  :8000/api/monitoring/power/threshold-meta/ → 정격 % 임계치 캐시 갱신
 ```
 
-### 3.2 알람 흐름 (Phase 1 C4 — Redis 큐 기반)
+### 3.2 알람 흐름 (Redis Stream 기반)
 
 ```
 [가스/전력 임계 초과 또는 AI 이상탐지]
-  DRF Celery task (apps/alerts/tasks.py / apps/ml/tasks/)
+  DRF Celery task (apps/alerts/tasks.py)
     └→ POST :8001/internal/alarms/push/   (localhost / Bearer 토큰)
-        └→ Redis LPUSH diconai:ws:alarms
-            └→ alarm_flush_loop BRPOP (즉시)
+        └→ Redis XADD diconai:ws:alarms
+            └→ alarm_flush_loop XREAD (즉시)
                 └→ /ws/sensors/ broadcast (sensor_clients 전체)
                 + alarm_type=geofence_intrusion 시
                   worker_clients[worker_id] 에 1:1 push (/ws/worker/{id}/)
 
 [운영자가 알람 팝업 확인]
-  POST :8000/alerts/api/events/<id>/resolve/
+  PATCH :8000/alerts/api/events/<id>/update-status/
     └→ 같은 event_id 로 ANOMALY 알람 재push (event_resolved_at 박힘)
         → 클라가 팝업 닫고 "위험 해소" 토스트
 ```
@@ -398,27 +399,40 @@ URL 분리 원칙:
 ```
 WS :8001/ws/sensors/   ← broadcast_loop (주기) + alarm_flush_loop (이벤트)
    payload: {
-     gas: latest_gas_snapshot,
-     power: power_latest,
-     workers: worker_positions,
-     alarms: [<single alarm from Redis pop>]  // alarm_flush 시점에만
+     gas: snap_store gas 스냅샷,
+     power: snap_store power 스냅샷,
+     workers: snap_store worker 스냅샷,
+     alarms: [<single alarm from Redis Stream XREAD>]  // alarm_flush 시점에만
    }
 
-WS :8001/ws/positions/ ← 1초 주기 worker_positions 단독 송출
+WS :8001/ws/positions/ ← 1초 주기 worker 스냅샷 단독 송출
 WS :8001/ws/worker/{user_id}/ ← 본인용 alarm 1:1 push (지오펜스 진입 등)
 ```
 
 ---
 
-## §4. 공유 상태 (fastapi-server/websocket/state.py)
+## §4. 공유 상태
+
+계층 1 Redis 이관 이후, **WebSocket 연결 목록만** 프로세스 메모리(`websocket/state.py`)에 남고
+broadcast 스냅샷·시나리오 모드는 모두 **Redis(`websocket/snap_store.py`)** 로 외부화됨.
+
+### 4.1 프로세스 메모리 (`websocket/state.py`)
 
 | 변수 | 갱신 주체 | 소비 주체 |
 |------|----------|----------|
-| `latest_gas_snapshot` | gas_service | broadcast.py (`/ws/sensors/`) |
-| `power_latest` | power_service | broadcast.py |
-| `worker_positions` | position_router(HTTP) · ws_router(`/ws/position/`) | broadcast.py · `/ws/positions/` |
 | `sensor_clients` | ws_router(`/ws/sensors/`) | broadcast_loop · alarm_flush_loop |
 | `worker_clients` | ws_router(`/ws/worker/`) | internal alarm_router (1:1 push) |
-| `scenario_mode` | internal scenario_router | 모든 dummy 스크립트 polling |
 
-알람 큐는 더 이상 프로세스 메모리(`active_alarms`)가 아니라 **Redis LIST `diconai:ws:alarms`** 로 외부화됨 (Phase 1 C4 — set/clear race 및 정상화 알림 silent drop 해결).
+연결 목록은 각 pod 가 자기 연결만 관리하면 되므로 프로세스 메모리에 둔다.
+
+### 4.2 Redis 공유 스냅샷 (`websocket/snap_store.py`)
+
+| Redis 키 | 갱신 주체 | 소비 주체 |
+|----------|----------|----------|
+| `diconai:snap:gas` | gas_service | broadcast.py (`/ws/sensors/`) |
+| `diconai:snap:power:*` | power_service | broadcast.py |
+| `diconai:snap:worker_ids` + worker 해시 | position_router(HTTP) · ws_router(`/ws/position/`) | broadcast.py · `/ws/positions/` |
+| `diconai:snap:scenario` | internal scenario_router | 모든 dummy 스크립트 polling |
+
+알람 큐는 프로세스 메모리(`active_alarms`)가 아니라 **Redis Stream `diconai:ws:alarms`** 로 외부화됨
+(XADD/XREAD — set/clear race 및 정상화 알림 silent drop 해결).
