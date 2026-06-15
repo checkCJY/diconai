@@ -36,7 +36,7 @@ _DRF_BASE = settings.DRF_BASE_URL
 # 브라우저가 주기적으로 호출하는 엔드포인트 (실제 사용 패턴 반영)
 _HTTP_TARGETS = [
     (_FASTAPI_BASE, "/health/"),
-    (_DRF_BASE,     "/health/"),
+    (_DRF_BASE, "/health/"),
 ]
 
 # 유저당 HTTP 요청 간격 (초) — 실제 브라우저 폴링 주기
@@ -48,7 +48,9 @@ def _make_token() -> str:
     if not settings.JWT_SIGNING_KEY:
         return ""
     payload = {"user_id": 0, "exp": int(time.time()) + 3600}
-    return jwt.encode(payload, settings.JWT_SIGNING_KEY, algorithm=settings.JWT_ALGORITHM)
+    return jwt.encode(
+        payload, settings.JWT_SIGNING_KEY, algorithm=settings.JWT_ALGORITHM
+    )
 
 
 def _ws_url() -> str:
@@ -142,7 +144,7 @@ def _report(n: int, stats: list[_Stats], http: _HttpStats, elapsed: float) -> No
     print(sep)
     print(f"  테스트 시간  : {elapsed:.1f}s")
 
-    print(f"\n  [WebSocket]")
+    print("\n  [WebSocket]")
     print(f"    성공 접속  : {len(ok)} / {n}")
     print(f"    실패 접속  : {len(fail)}")
     if latencies:
@@ -151,7 +153,7 @@ def _report(n: int, stats: list[_Stats], http: _HttpStats, elapsed: float) -> No
     if ok:
         print(f"    수신 메시지  : {total_msgs}건 ({total_msgs / elapsed:.2f} msg/s)")
 
-    print(f"\n  [HTTP]")
+    print("\n  [HTTP]")
     print(f"    총 요청 수   : {http.total}건")
     print(f"    에러 수      : {http.errors}건")
     if http.latencies_ms:
@@ -162,13 +164,13 @@ def _report(n: int, stats: list[_Stats], http: _HttpStats, elapsed: float) -> No
     print(f"    대상         : {[p for _, p in _HTTP_TARGETS]}")
 
     if fail:
-        print(f"\n  [WS 실패]")
+        print("\n  [WS 실패]")
         for s in fail[:5]:
             print(f"    client#{s.cid}: {s.error}")
         if len(fail) > 5:
             print(f"    ... 외 {len(fail) - 5}건")
 
-    print(f"\n  Grafana Overview → FastAPI/DRF 요청 수·응답시간 패널 확인")
+    print("\n  Grafana Overview → FastAPI/DRF 요청 수·응답시간 패널 확인")
     print(sep)
 
 
