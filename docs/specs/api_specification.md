@@ -421,12 +421,12 @@ GET /api/admin/accounts/?page=1&page_size=20
 
 | 일자 | 내용 | 관련 변경기록 |
 |---|---|---|
-| 2026-05-04 | drf-spectacular 도입 + 글로벌 예외 핸들러 + 응답 봉투 표준 | [phase4_drf_layer_exceptions_swagger.md](changelog/phase4_drf_layer_exceptions_swagger.md) |
-| 2026-05-04 | FastAPI 정리 + 양 서버 로거 통일 | [phase5_fastapi_cleanup.md](changelog/phase5_fastapi_cleanup.md) |
+| 2026-05-04 | drf-spectacular 도입 + 글로벌 예외 핸들러 + 응답 봉투 표준 | [phase4_drf_layer_exceptions_swagger.md](../archive/changelog/phase1-5_refactoring/phase4_drf_layer_exceptions_swagger.md) |
+| 2026-05-04 | FastAPI 정리 + 양 서버 로거 통일 | [phase5_fastapi_cleanup.md](../archive/changelog/phase1-5_refactoring/phase5_fastapi_cleanup.md) |
 | 2026-05-06 | 본 명세서 작성 + Tier 1 `@extend_schema` + FastAPI `response_model` 보강 | (별도 변경기록 작성 예정) |
 | 2026-06-15 | OpenAPI 스냅샷 재생성 (DRF 78→132 path, FastAPI 10→12 path: `ai` 태그 추가). 카탈로그·인증우회 목록 갱신 | — |
 
-자세한 변경 이력은 [docs/changelog/](changelog/) 참조.
+자세한 변경 이력은 [docs/archive/changelog/](../archive/changelog/) 참조.
 
 ---
 

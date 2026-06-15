@@ -109,7 +109,7 @@
 | **DRF :8000** | 인증(JWT), DB 영속성, REST API, HTML 렌더링, ML 모델 학습 커맨드 |
 | **Celery 워커 (alarm 큐)** | 알람 비동기 처리·이벤트 변환·실시간 push |
 | **Celery 워커 (metric 큐)** | 보관 정책·큐 길이·DB 상태 등 주기 메트릭 수집 |
-| **Redis** | Celery 브로커 + 캐시 |
+| **Redis** | Celery 브로커 + 캐시 + 알람 Stream 큐(XADD/XREAD, replica별 커서 fan-out) |
 | **PostgreSQL 16** | 영속 저장소 (로컬 개발 시 SQLite 폴백) |
 | **Prometheus** | 메트릭 수집·시계열 저장 (drf·fastapi·exporter 6개 타깃 scrape) |
 | **Grafana** | 메트릭 시각화 대시보드 (`:3000`) |
@@ -417,12 +417,12 @@ pytest 설정: [drf-server/pytest.ini](drf-server/pytest.ini) · [fastapi-server
 
 ## 트러블슈팅
 
-주요 이슈와 해결 과정은 [docs/changelog/](docs/changelog/)에 페이즈별로 정리되어 있습니다.
+주요 이슈와 해결 과정은 [docs/archive/changelog/](docs/archive/changelog/)에 페이즈별로 정리되어 있습니다.
 
 - **알람 실시간 전파 지연** — Celery DB 저장 후에야 broadcast → 내부 push 엔드포인트(`/internal/alarms/push/`) + `alarm_flush_loop` 도입으로 즉시 전송 ([7a0f390](https://github.com/checkCJY/diconai/commit/7a0f390))
 - **전력 임계치 양쪽 하드코딩** — DRF/JS 동기화 깨짐 → DRF `/api/monitoring/power/thresholds/` 단일 출처 API로 통일 ([34e808c](https://github.com/checkCJY/diconai/commit/34e808c))
-- **DRF 레이어 책임 혼재** — view에 비즈니스 로직 섞임, 예외 응답 형식 제각각 → service/selector 분리 + 글로벌 예외 핸들러 도입 ([Phase 4](docs/changelog/phase1-5_refactoring/phase4_drf_layer_exceptions_swagger.md))
-- **프론트 HTTP·WebSocket 호출 분산** — 페이지마다 fetch/ws URL 하드코딩 → 단일 클라이언트 모듈로 통일, 인증 헤더 중앙 처리 ([Phase 3](docs/changelog/phase1-5_refactoring/phase3_frontend_http_ws_unification.md))
+- **DRF 레이어 책임 혼재** — view에 비즈니스 로직 섞임, 예외 응답 형식 제각각 → service/selector 분리 + 글로벌 예외 핸들러 도입 ([Phase 4](docs/archive/changelog/phase1-5_refactoring/phase4_drf_layer_exceptions_swagger.md))
+- **프론트 HTTP·WebSocket 호출 분산** — 페이지마다 fetch/ws URL 하드코딩 → 단일 클라이언트 모듈로 통일, 인증 헤더 중앙 처리 ([Phase 3](docs/archive/changelog/phase1-5_refactoring/phase3_frontend_http_ws_unification.md))
 
 ---
 
@@ -483,10 +483,10 @@ pytest 설정: [drf-server/pytest.ini](drf-server/pytest.ini) · [fastapi-server
 - [docs/specs/url-structure.md](docs/specs/url-structure.md) — 전체 URL 맵
 - [docs/conventions/dev_convention.md](docs/conventions/dev_convention.md) — 코딩 컨벤션
 - [docs/conventions/github_convention.md](docs/conventions/github_convention.md) — 이슈/PR/커밋 컨벤션
-- [docs/changelog/](docs/changelog/) — 페이즈별 변경 이력
-- [docs/refactor/waves/2026_05_09/CHANGES_REVIEW.md](docs/refactor/waves/2026_05_09/CHANGES_REVIEW.md) — **이번 브랜치 종합 변경 인벤토리** (5 카테고리 + 리뷰어 체크리스트)
-- [docs/refactor/waves/2026_05_09/TEAM_BRIEF.md](docs/refactor/waves/2026_05_09/TEAM_BRIEF.md) — 이번 브랜치 팀 공유용 진입 문서 (5분 cheatsheet 포함)
-- [docs/refactor/waves/2026_05_09/MIGRATION_GUIDE.md](docs/refactor/waves/2026_05_09/MIGRATION_GUIDE.md) — 머지·적용 5단계 + 트러블슈팅
+- [docs/archive/changelog/](docs/archive/changelog/) — 페이즈별 변경 이력
+- [docs/archive/refactor/waves/2026_05_09/CHANGES_REVIEW.md](docs/archive/refactor/waves/2026_05_09/CHANGES_REVIEW.md) — 2026-05-09 리팩토링 종합 변경 인벤토리 (5 카테고리 + 리뷰어 체크리스트)
+- [docs/archive/refactor/waves/2026_05_09/TEAM_BRIEF.md](docs/archive/refactor/waves/2026_05_09/TEAM_BRIEF.md) — 당시 브랜치 팀 공유용 진입 문서 (5분 cheatsheet 포함)
+- [docs/archive/refactor/waves/2026_05_09/MIGRATION_GUIDE.md](docs/archive/refactor/waves/2026_05_09/MIGRATION_GUIDE.md) — 머지·적용 5단계 + 트러블슈팅
 
 ### Contact
 

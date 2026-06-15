@@ -108,7 +108,7 @@
 
 <<<<<<< Updated upstream
 =======
-> ⚠️ 본 단계 진입 시 [postgres-migration-code-review.md](postgres-migration-code-review.md) 동반 참조 — 사전 검증 SQL 10건 + 코드 레벨 위험 카탈로그 18건 + Runbook 포함.
+> ⚠️ 본 단계 진입 시 [postgres-migration-code-review.md](../archive/plan/postgres-migration-code-review.md) 동반 참조 — 사전 검증 SQL 10건 + 코드 레벨 위험 카탈로그 18건 + Runbook 포함.
 
 >>>>>>> Stashed changes
 ### 작업

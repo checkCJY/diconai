@@ -313,7 +313,7 @@ def combine_risk_5axis(threshold, if_pred, arima, z, cp) -> tuple[str, str]:
 | 상위 plan (5축 도입 의도) | [skill/plan/anomaly-detection-zscore-changepoint.md](../plan/anomaly-detection-zscore-changepoint.md) |
 | 적용 plan (본 sprint) | [skill/plan/power-zscore-changepoint-apply.md](../plan/power-zscore-changepoint-apply.md) |
 | 적용 보고 (refactor) | [drf-server/docs/refactoring/power-ai-zscore-changepoint-2026-05-19.md](../../drf-server/docs/refactoring/power-ai-zscore-changepoint-2026-05-19.md) |
-| 코드 흐름 분석 (codereview) | [docs/codereviews/2026_05_19/power-5axis-policy-flow.md](../../docs/codereviews/2026_05_19/power-5axis-policy-flow.md) |
+| 코드 흐름 분석 (codereview) | [docs/codereviews/2026_05_19/power-5axis-policy-flow.md](../../docs/archive/codereviews/2026_05_19/power-5axis-policy-flow.md) |
 | 살아있는 spec (전력 시스템 §4) | [docs/features/power_system/cjy_그_외_기술문서.md](../../docs/features/power_system/cjy_그_외_기술문서.md) |
 | 직전 sprint (3축 un-downgrade) | [skill/전력 AI un-downgrade ... 보고.md](../전력%20AI%20un-downgrade%20(IF%20%2B%20ARIMA)%20통합%20작업%20복습%20및%20보고.md) |
 

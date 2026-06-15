@@ -19,16 +19,19 @@ diconai/                              # 프로젝트 루트
 ├── .env.docker · .env.docker.example · .dockerignore
 ├── .pre-commit-config.yaml           # ruff + ruff-format (drf-server, fastapi-server `.py` 한정)
 │
-├── docs/                             # 프로젝트 전체 공통 문서
+├── docs/                             # 프로젝트 전체 공통 문서 (진입점은 docs/README.md)
+│   ├── (루트 가이드)                  # QUICKSTART·architecture·database·deployment·env-guide·api·results·troubleshooting
 │   ├── specs/                        # 명세 (본 문서, URL 구조, API, JSON 필드)
-│   ├── conventions/                  # dev/github/api response/docstring 컨벤션 + COMMANDS
+│   ├── conventions/                  # dev/github/api response 컨벤션 + COMMANDS
 │   ├── features/                     # 기능 정의서 (전력/가스/안전/공지 등)
-│   ├── phases/                       # 단계별 plan & report (Phase 1~4, Post-Phase 4 B-track)
-│   ├── changelog/                    # 단일 기능·웨이브 단위 변경 이력
-│   ├── codereviews/                  # 코드리뷰 보고서 (날짜별)
-│   ├── incidents/                    # 장애 리포트 (e.g. SQLite 락·DB 폭증)
-│   ├── infra/                        # docker_setup, troubleshooting 등
-│   └── refactor/                     # JS·웨이브 리팩토링 가이드
+│   ├── domains/                      # 도메인별 아키텍처 SoT (gas/power/alerts/ai-ml 등)
+│   ├── ai/                           # AI 이상탐지 의사결정·파이프라인·적용현황
+│   ├── infra/                        # docker_setup, redis-celery, websocket-scaling 등
+│   ├── incidents/ · migration/       # 장애 리포트 · DB 마이그레이션 가이드
+│   ├── plan/                         # 진행 중 로드맵 (전력 AI 센싱, PG 안정화 등)
+│   ├── api/                          # 자동 생성 OpenAPI 스냅샷 (yaml/json; html은 gitignore)
+│   ├── submission/                   # 제출 산출물 (tech-doc, team-tech-doc, templates/)
+│   └── archive/                      # 시점성 작업기록 (changelog·phases·codereviews·refactor·폐기 plan)
 │
 ├── skill/                            # Claude Code skill (plan, ISH, CJY 등 — 메모리/플랜 보관)
 │
