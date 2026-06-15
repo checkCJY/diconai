@@ -51,6 +51,7 @@ def test_alarm_payload_silent_drops_unknown_key():
 
 
 def test_alarm_payload_with_anomaly_meta_ok():
+    """anomaly_meta nested dict 가 AnomalyMeta 로 파싱·필드 보존."""
     p = AlarmPayload(
         **_base_payload(),
         anomaly_meta={

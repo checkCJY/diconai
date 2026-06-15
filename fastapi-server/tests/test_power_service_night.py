@@ -37,6 +37,7 @@ from power.services.power_service import _is_night_kst_iso
     ],
 )
 def test_is_night_kst_iso(iso, expected, desc):
+    """ISO 시각의 KST 야간(22~05) 판정 + wrap-around 경계 일치."""
     assert _is_night_kst_iso(iso) is expected, f"failed: {desc}"
 
 
