@@ -78,6 +78,10 @@ paths:
           description: ''
         '401':
           description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /alerts/api/alarms/summary/:
     get:
       operationId: alerts_api_alarms_summary_retrieve
@@ -99,6 +103,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -133,6 +141,10 @@ paths:
           description: ''
         '404':
           description: 발생원 장비/센서를 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /alerts/api/events/:
     get:
       operationId: alerts_api_events_list
@@ -216,8 +228,16 @@ paths:
           description: ''
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '404':
           description: 이벤트 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /alerts/api/events/{id}/update_status/:
     patch:
       operationId: alerts_api_events_update_status_partial_update
@@ -250,6 +270,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -258,8 +282,16 @@ paths:
           description: ''
         '400':
           description: 허용되지 않은 상태 전환
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '404':
           description: 이벤트 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /alerts/api/my-status/:
     get:
       operationId: alerts_api_my_status_retrieve
@@ -298,6 +330,10 @@ paths:
           description: ''
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /alerts/api/worker-summary/:
     get:
       operationId: alerts_api_worker_summary_retrieve
@@ -328,8 +364,16 @@ paths:
           description: ''
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '403':
           description: 관리자 권한 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/accounts/:
     get:
       operationId: admin_accounts_list
@@ -391,6 +435,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -422,6 +470,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '201':
           content:
             application/json:
@@ -430,6 +482,10 @@ paths:
           description: ''
         '400':
           description: 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/accounts/{id}/:
     get:
       operationId: admin_accounts_retrieve
@@ -451,6 +507,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -459,6 +519,10 @@ paths:
           description: ''
         '404':
           description: 사용자 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     patch:
       operationId: admin_accounts_partial_update
       description: |-
@@ -490,6 +554,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -498,8 +566,16 @@ paths:
           description: ''
         '400':
           description: 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '404':
           description: 사용자 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     delete:
       operationId: admin_accounts_destroy
       description: 본인 계정은 비활성화 불가.
@@ -517,12 +593,24 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '204':
           description: 삭제 완료
         '400':
           description: 본인 계정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '404':
           description: 사용자 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/accounts/{id}/{action}/:
     post:
       operationId: admin_accounts_create_2
@@ -547,6 +635,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -555,8 +647,16 @@ paths:
           description: ''
         '400':
           description: 잘못된 action 값
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '404':
           description: 사용자 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/activity-logs/:
     get:
       operationId: admin_activity_logs_list
@@ -617,8 +717,16 @@ paths:
           description: ''
         '401':
           description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '403':
           description: 관리자 권한 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/alerts/events/:
     get:
       operationId: admin_alerts_events_list
@@ -724,6 +832,10 @@ paths:
           description: ''
         '401':
           description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     post:
       operationId: admin_alerts_policies_create
       description: |-
@@ -763,8 +875,16 @@ paths:
           description: ''
         '400':
           description: 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '401':
           description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/alerts/policies/{id}/:
     get:
       operationId: admin_alerts_policies_retrieve
@@ -792,6 +912,10 @@ paths:
           description: ''
         '404':
           description: 정책 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     patch:
       operationId: admin_alerts_policies_partial_update
       description: |-
@@ -829,8 +953,16 @@ paths:
           description: ''
         '400':
           description: 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '404':
           description: 정책 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     delete:
       operationId: admin_alerts_policies_destroy
       description: |-
@@ -853,6 +985,10 @@ paths:
           description: 삭제 완료
         '404':
           description: 정책 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/code-groups/:
     get:
       operationId: admin_code_groups_list
@@ -936,6 +1072,10 @@ paths:
           description: ''
         '404':
           description: 코드 그룹을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     post:
       operationId: admin_code_groups_codes_create
       description: |-
@@ -973,6 +1113,10 @@ paths:
           description: ''
         '404':
           description: 코드 그룹을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/code-groups/{id}/:
     patch:
       operationId: admin_code_groups_partial_update
@@ -1012,6 +1156,10 @@ paths:
           description: ''
         '404':
           description: 코드 그룹을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     delete:
       operationId: admin_code_groups_destroy
       description: |-
@@ -1035,8 +1183,16 @@ paths:
           description: 삭제 성공
         '400':
           description: 하위 코드가 있어 삭제 불가
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '404':
           description: 코드 그룹을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/codes/{id}/:
     patch:
       operationId: admin_codes_partial_update
@@ -1074,6 +1230,10 @@ paths:
           description: ''
         '404':
           description: 코드를 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     delete:
       operationId: admin_codes_destroy
       description: |-
@@ -1095,6 +1255,10 @@ paths:
           description: 삭제 성공
         '404':
           description: 코드를 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/codes/bulk-deactivate/:
     post:
       operationId: admin_codes_bulk_deactivate_create
@@ -1153,6 +1317,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '201':
           content:
             application/json:
@@ -1161,6 +1329,10 @@ paths:
           description: ''
         '400':
           description: 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/departments/{id}/:
     get:
       operationId: admin_departments_retrieve
@@ -1182,6 +1354,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -1190,6 +1366,10 @@ paths:
           description: ''
         '404':
           description: 부서 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     patch:
       operationId: admin_departments_partial_update
       description: |-
@@ -1221,6 +1401,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -1229,8 +1413,16 @@ paths:
           description: ''
         '400':
           description: 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '404':
           description: 부서 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     delete:
       operationId: admin_departments_destroy
       description: |-
@@ -1251,10 +1443,18 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '204':
           description: 삭제 완료
         '404':
           description: 부서 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/departments/{id}/members/:
     get:
       operationId: admin_departments_members_list
@@ -1286,6 +1486,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -1296,6 +1500,10 @@ paths:
           description: ''
         '404':
           description: 부서 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/departments/{id}/members/add/:
     post:
       operationId: admin_departments_members_add_create
@@ -1326,6 +1534,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -1334,8 +1546,16 @@ paths:
           description: ''
         '400':
           description: user_ids 누락
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '404':
           description: 부서 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/departments/{id}/members/assign-leader/:
     post:
       operationId: admin_departments_members_assign_leader_create
@@ -1366,6 +1586,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -1374,8 +1598,16 @@ paths:
           description: ''
         '400':
           description: user_id 누락
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '404':
           description: 부서/사용자 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/departments/{id}/members/move/:
     post:
       operationId: admin_departments_members_move_create
@@ -1408,6 +1640,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -1416,8 +1652,16 @@ paths:
           description: ''
         '400':
           description: 필수 필드 누락
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '404':
           description: 대상 부서 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/departments/{id}/members/remove/:
     post:
       operationId: admin_departments_members_remove_create
@@ -1448,6 +1692,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -1456,8 +1704,16 @@ paths:
           description: ''
         '400':
           description: user_ids 누락
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '404':
           description: 부서 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/gas-data/:
     get:
       operationId: admin_gas_data_list
@@ -1498,6 +1754,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -1535,6 +1795,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           description: CSV 파일 (text/csv)
   /api/admin/gas-data/sensors/:
@@ -1556,6 +1820,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -1591,6 +1859,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -1623,6 +1895,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '201':
           content:
             application/json:
@@ -1631,6 +1907,10 @@ paths:
           description: ''
         '400':
           description: 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/geofences/{id}/:
     get:
       operationId: admin_geofences_retrieve_2
@@ -1653,6 +1933,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -1661,6 +1945,10 @@ paths:
           description: ''
         '404':
           description: 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     put:
       operationId: admin_geofences_update
       description: |-
@@ -1694,6 +1982,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -1702,8 +1994,16 @@ paths:
           description: ''
         '400':
           description: 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '404':
           description: 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     delete:
       operationId: admin_geofences_destroy
       description: |-
@@ -1725,10 +2025,18 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '204':
           description: 삭제 완료
         '404':
           description: 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/integration-logs/:
     get:
       operationId: admin_integration_logs_list
@@ -1783,8 +2091,16 @@ paths:
           description: ''
         '401':
           description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '403':
           description: 관리자 권한 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/map-edit-logs/:
     get:
       operationId: admin_map_edit_logs_list
@@ -1841,8 +2157,16 @@ paths:
           description: ''
         '401':
           description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '403':
           description: 관리자 권한 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/notices/:
     get:
       operationId: admin_notices_list
@@ -1893,8 +2217,16 @@ paths:
           description: ''
         '401':
           description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '403':
           description: 관리자 권한 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     post:
       operationId: admin_notices_create
       description: |-
@@ -1928,10 +2260,22 @@ paths:
           description: ''
         '400':
           description: 입력값 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '401':
           description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '403':
           description: 관리자 권한 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/notices/{id}/:
     get:
       operationId: admin_notices_retrieve
@@ -1960,6 +2304,10 @@ paths:
           description: ''
         '404':
           description: 공지사항 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     patch:
       operationId: admin_notices_partial_update
       description: |-
@@ -2001,8 +2349,16 @@ paths:
           description: ''
         '400':
           description: 입력값 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '404':
           description: 공지사항 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     delete:
       operationId: admin_notices_destroy
       description: |-
@@ -2033,6 +2389,10 @@ paths:
           description: 삭제 성공
         '404':
           description: 공지사항 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/notices/{id}/attachments/:
     post:
       operationId: admin_notices_attachments_create
@@ -2077,8 +2437,16 @@ paths:
           description: ''
         '400':
           description: 파일 없음 또는 유효성 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '404':
           description: 공지사항 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     delete:
       operationId: admin_notices_attachments_destroy
       description: |-
@@ -2104,6 +2472,10 @@ paths:
           description: 삭제 성공
         '404':
           description: 첨부파일 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/notices/{id}/attachments/{att_id}/:
     post:
       operationId: admin_notices_attachments_create_2
@@ -2153,8 +2525,16 @@ paths:
           description: ''
         '400':
           description: 파일 없음 또는 유효성 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '404':
           description: 공지사항 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     delete:
       operationId: admin_notices_attachments_destroy_2
       description: |-
@@ -2185,6 +2565,10 @@ paths:
           description: 삭제 성공
         '404':
           description: 첨부파일 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/organizations/tree/:
     get:
       operationId: admin_organizations_tree_retrieve
@@ -2199,6 +2583,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -2259,6 +2647,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -2284,6 +2676,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -2330,6 +2726,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           description: CSV 파일 (text/csv)
   /api/admin/retention-policies/:
@@ -2372,6 +2772,10 @@ paths:
           description: ''
         '404':
           description: 정책을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     patch:
       operationId: admin_retention_policies_partial_update
       description: '수정 가능: raw_retention_days, history_retention_days, delete_cycle,
@@ -2408,8 +2812,16 @@ paths:
           description: ''
         '400':
           description: 유효성 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '404':
           description: 정책을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/retention-policies/{id}/preview/:
     get:
       operationId: admin_retention_policies_preview_retrieve
@@ -2563,8 +2975,16 @@ paths:
           description: ''
         '400':
           description: 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '404':
           description: 항목 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/safety/checklist/publish/:
     post:
       operationId: admin_safety_checklist_publish_create
@@ -2588,6 +3008,10 @@ paths:
           description: ''
         '400':
           description: 변경 사항 없음 (active revision과 동일)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/safety/checklist/revisions/:
     get:
       operationId: admin_safety_checklist_revisions_list
@@ -2947,8 +3371,16 @@ paths:
           description: ''
         '401':
           description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '403':
           description: 관리자 권한 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/threshold-groups/:
     get:
       operationId: admin_threshold_groups_list
@@ -3034,6 +3466,10 @@ paths:
           description: ''
         '404':
           description: 그룹을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     post:
       operationId: admin_threshold_groups_thresholds_create
       description: |-
@@ -3073,6 +3509,10 @@ paths:
           description: ''
         '404':
           description: 그룹을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/threshold-groups/{id}/:
     patch:
       operationId: admin_threshold_groups_partial_update
@@ -3112,6 +3552,10 @@ paths:
           description: ''
         '404':
           description: 그룹을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     delete:
       operationId: admin_threshold_groups_destroy
       description: |-
@@ -3135,8 +3579,16 @@ paths:
           description: 삭제 성공
         '400':
           description: 하위 임계치가 있어 삭제 불가
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '404':
           description: 그룹을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/thresholds/{id}/:
     patch:
       operationId: admin_thresholds_partial_update
@@ -3174,6 +3626,10 @@ paths:
           description: ''
         '404':
           description: 임계치를 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     delete:
       operationId: admin_thresholds_destroy
       description: |-
@@ -3195,6 +3651,10 @@ paths:
           description: 삭제 성공
         '404':
           description: 임계치를 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/thresholds/bulk-deactivate/:
     post:
       operationId: admin_thresholds_bulk_deactivate_create
@@ -3254,6 +3714,10 @@ paths:
           description: ''
         '400':
           description: facility_id 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/admin/training/vr-training/{id}/:
     patch:
       operationId: admin_training_vr_training_partial_update
@@ -3414,8 +3878,16 @@ paths:
           description: ''
         '400':
           description: 필드 검증 실패 (username/password 누락 등)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '401':
           description: 인증 실패 (비밀번호 불일치 / 계정 잠금 / 비활성)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/auth/logout/:
     post:
       operationId: auth_logout_create
@@ -3448,6 +3920,10 @@ paths:
           description: ''
         '401':
           description: JWT 누락/만료
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/auth/me/:
     get:
       operationId: auth_me_retrieve
@@ -3495,6 +3971,10 @@ paths:
           description: ''
         '401':
           description: JWT 누락/만료
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/auth/password/change/:
     post:
       operationId: auth_password_change_create
@@ -3525,8 +4005,16 @@ paths:
           description: ''
         '400':
           description: 검증 실패 (현재 비밀번호 불일치, 새 비밀번호 정책 위반 등)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '401':
           description: JWT 누락/만료
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/auth/profile/:
     get:
       operationId: auth_profile_retrieve
@@ -3545,6 +4033,10 @@ paths:
           description: ''
         '401':
           description: JWT 누락/만료
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/auth/token/refresh/:
     post:
       operationId: auth_token_refresh_create
@@ -3583,6 +4075,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -3629,6 +4125,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -3659,6 +4159,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '201':
           content:
             application/json:
@@ -3667,6 +4171,10 @@ paths:
           description: ''
         '400':
           description: 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/equipments/{id}/:
     get:
       operationId: equipments_retrieve
@@ -3684,6 +4192,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -3692,6 +4204,10 @@ paths:
           description: ''
         '404':
           description: 설비 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     put:
       operationId: equipments_update
       description: 활성 설비에 신규 전력장치가 연결되면 그 장치도 자동 재활성화됨.
@@ -3721,6 +4237,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -3729,8 +4249,16 @@ paths:
           description: ''
         '400':
           description: 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '404':
           description: 설비 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     delete:
       operationId: equipments_destroy
       summary: 설비 비활성화 (Soft Delete)
@@ -3747,10 +4275,18 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '204':
           description: 삭제 완료
         '404':
           description: 설비 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/equipments/bulk-delete/:
     post:
       operationId: equipments_bulk_delete_create
@@ -3774,6 +4310,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -3782,6 +4322,10 @@ paths:
           description: ''
         '400':
           description: ids 누락
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/facilities/:
     get:
       operationId: facilities_list
@@ -3820,6 +4364,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -3850,6 +4398,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '201':
           content:
             application/json:
@@ -3858,6 +4410,10 @@ paths:
           description: ''
         '400':
           description: 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/facilities/{id}/:
     put:
       operationId: facilities_update
@@ -3887,6 +4443,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -3895,8 +4455,16 @@ paths:
           description: ''
         '400':
           description: 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '404':
           description: 공장 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     delete:
       operationId: facilities_destroy
       summary: 공장 비활성화 (Soft Delete)
@@ -3913,10 +4481,18 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '204':
           description: 삭제 완료
         '404':
           description: 공장 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/facilities/bulk-delete/:
     post:
       operationId: facilities_bulk_delete_create
@@ -3940,6 +4516,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -3948,6 +4528,10 @@ paths:
           description: ''
         '400':
           description: ids 누락
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/facilities/devices/:
     get:
       operationId: facilities_devices_list
@@ -3987,6 +4571,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -4017,6 +4605,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '201':
           content:
             application/json:
@@ -4025,6 +4617,10 @@ paths:
           description: ''
         '400':
           description: 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/facilities/devices/{id}/:
     get:
       operationId: facilities_devices_retrieve
@@ -4042,6 +4638,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -4050,6 +4650,10 @@ paths:
           description: ''
         '404':
           description: 장치 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     put:
       operationId: facilities_devices_update
       summary: 전력 장비 수정 (Partial)
@@ -4078,6 +4682,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -4086,8 +4694,16 @@ paths:
           description: ''
         '400':
           description: 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '404':
           description: 장치 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     delete:
       operationId: facilities_devices_destroy
       summary: 전력 장비 비활성화 (Soft Delete)
@@ -4104,10 +4720,18 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '204':
           description: 삭제 완료
         '404':
           description: 장치 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/facilities/devices/bulk-delete/:
     post:
       operationId: facilities_devices_bulk_delete_create
@@ -4131,6 +4755,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -4139,6 +4767,10 @@ paths:
           description: ''
         '400':
           description: ids 누락
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/facilities/devices/select/:
     get:
       operationId: facilities_devices_select_list
@@ -4157,6 +4789,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -4176,6 +4812,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -4195,6 +4835,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -4240,6 +4884,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -4270,6 +4918,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '201':
           content:
             application/json:
@@ -4278,6 +4930,10 @@ paths:
           description: ''
         '400':
           description: 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/gas-sensors/{id}/:
     get:
       operationId: gas_sensors_retrieve
@@ -4295,6 +4951,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -4303,6 +4963,10 @@ paths:
           description: ''
         '404':
           description: 센서 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     put:
       operationId: gas_sensors_update
       summary: 가스 센서 수정 (Partial)
@@ -4331,6 +4995,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -4339,8 +5007,16 @@ paths:
           description: ''
         '400':
           description: 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '404':
           description: 센서 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     delete:
       operationId: gas_sensors_destroy
       summary: 가스 센서 비활성화 (Soft Delete)
@@ -4357,10 +5033,18 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '204':
           description: 삭제 완료
         '404':
           description: 센서 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/gas-sensors/{sensor_pk}/inspections/:
     get:
       operationId: gas_sensors_inspections_list
@@ -4378,6 +5062,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -4414,6 +5102,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '201':
           content:
             application/json:
@@ -4422,6 +5114,10 @@ paths:
           description: ''
         '400':
           description: 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/gas-sensors/bulk-delete/:
     post:
       operationId: gas_sensors_bulk_delete_create
@@ -4445,6 +5141,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -4453,6 +5153,10 @@ paths:
           description: ''
         '400':
           description: ids 누락
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/gas-sensors/check-connection/:
     post:
       operationId: gas_sensors_check_connection_create
@@ -4476,6 +5180,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -4484,6 +5192,10 @@ paths:
           description: ''
         '400':
           description: IP/Port 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/gas-sensors/inspections/{inspection_pk}/action/:
     post:
       operationId: gas_sensors_inspections_action_create
@@ -4513,6 +5225,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -4521,8 +5237,16 @@ paths:
           description: ''
         '400':
           description: 이미 조치 완료 / 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '404':
           description: 점검 이력 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/gas-sensors/next-code/:
     get:
       operationId: gas_sensors_next_code_retrieve
@@ -4534,6 +5258,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -4731,6 +5459,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '204':
           description: 삭제 완료
   /api/geofences/by_facility/:
@@ -4751,6 +5483,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -4761,6 +5497,10 @@ paths:
           description: ''
         '400':
           description: facility_id 누락
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/internal/integration-logs/:
     post:
       operationId: internal_integration_logs_create
@@ -4841,6 +5581,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -4867,6 +5611,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -4897,6 +5645,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -4905,6 +5657,10 @@ paths:
           description: ''
         '400':
           description: 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/ml/anomaly-results/:
     post:
       operationId: ml_anomaly_results_create
@@ -5026,6 +5782,10 @@ paths:
           description: ''
         '400':
           description: 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/monitoring/gas/thresholds/:
     get:
       operationId: monitoring_gas_thresholds_retrieve
@@ -5105,6 +5865,10 @@ paths:
           description: ''
         '400':
           description: 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/monitoring/power/event/:
     post:
       operationId: monitoring_power_event_create
@@ -5136,6 +5900,10 @@ paths:
           description: ''
         '400':
           description: 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/monitoring/power/threshold-meta/:
     get:
       operationId: monitoring_power_threshold_meta_retrieve
@@ -5204,6 +5972,10 @@ paths:
           description: ''
         '400':
           description: 검증 실패 또는 배열이 아님
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/power-devices/:
     get:
       operationId: power_devices_list
@@ -5242,6 +6014,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -5272,6 +6048,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '201':
           content:
             application/json:
@@ -5280,6 +6060,10 @@ paths:
           description: ''
         '400':
           description: 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/power-devices/{device_pk}/inspections/:
     get:
       operationId: power_devices_inspections_list
@@ -5297,6 +6081,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -5333,6 +6121,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '201':
           content:
             application/json:
@@ -5341,6 +6133,10 @@ paths:
           description: ''
         '400':
           description: 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/power-devices/{id}/:
     get:
       operationId: power_devices_retrieve
@@ -5358,6 +6154,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -5366,6 +6166,10 @@ paths:
           description: ''
         '404':
           description: 장치 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     put:
       operationId: power_devices_update
       summary: 전력 장비 수정 (Partial)
@@ -5394,6 +6198,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -5402,8 +6210,16 @@ paths:
           description: ''
         '400':
           description: 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '404':
           description: 장치 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     delete:
       operationId: power_devices_destroy
       summary: 전력 장비 비활성화 (Soft Delete)
@@ -5420,10 +6236,18 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '204':
           description: 삭제 완료
         '404':
           description: 장치 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/power-devices/bulk-delete/:
     post:
       operationId: power_devices_bulk_delete_create
@@ -5447,6 +6271,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -5455,6 +6283,10 @@ paths:
           description: ''
         '400':
           description: ids 누락
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/power-devices/check-connection/:
     post:
       operationId: power_devices_check_connection_create
@@ -5479,6 +6311,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -5487,6 +6323,10 @@ paths:
           description: ''
         '400':
           description: IP/Port 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/power-devices/codes/:
     get:
       operationId: power_devices_codes_retrieve
@@ -5498,6 +6338,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -5536,6 +6380,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -5544,8 +6392,16 @@ paths:
           description: ''
         '400':
           description: 이미 조치 완료 / 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '404':
           description: 점검 이력 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/power-devices/next-code/:
     get:
       operationId: power_devices_next_code_retrieve
@@ -5558,6 +6414,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -5579,6 +6439,10 @@ paths:
           description: active revision 스냅샷
         '404':
           description: 활성 체크리스트 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /dashboard/api/menu/:
     get:
       operationId: dashboard_api_menu_retrieve
@@ -5592,6 +6456,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -5600,6 +6468,10 @@ paths:
           description: ''
         '500':
           description: 메뉴 조회 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /dashboard/api/refresh/:
     get:
       operationId: dashboard_api_refresh_retrieve
@@ -5613,6 +6485,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -5642,6 +6518,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -5650,6 +6530,10 @@ paths:
           description: ''
         '404':
           description: 작업자 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /dashboard/api/safety-status/:
     get:
       operationId: dashboard_api_safety_status_retrieve
@@ -5697,6 +6581,10 @@ paths:
           description: ''
         '400':
           description: 허용되지 않은 key값
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /dashboard/api/vr-content/active/:
     get:
       operationId: dashboard_api_vr_content_active_retrieve
@@ -5816,6 +6704,10 @@ paths:
       responses:
         '401':
           description: 인증 필요 (토큰 누락/만료)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '200':
           content:
             application/json:
@@ -5824,6 +6716,10 @@ paths:
           description: ''
         '403':
           description: 관리자 권한 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
 components:
   schemas:
     AccountLockResponse:
@@ -11271,6 +12167,30 @@ components:
       - prediction
       - sensor_identifier
       - sensor_type
+    ErrorEnvelope:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              description: '표준 에러 코드 (예: not_found, authentication_required).'
+              example: not_found
+            message:
+              type: string
+              description: 사람이 읽을 한 줄 메시지.
+              example: 요청하신 리소스를 찾을 수 없습니다.
+            details:
+              type: object
+              nullable: true
+              additionalProperties: true
+              description: 필드 단위 검증 오류 (검증 실패 시에만 포함).
+          required:
+          - code
+          - message
+      required:
+      - error
   securitySchemes:
     jwtAuth:
       type: http

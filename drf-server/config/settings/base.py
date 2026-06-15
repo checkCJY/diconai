@@ -149,6 +149,11 @@ SPECTACULAR_SETTINGS = {
     "SERVE_INCLUDE_SCHEMA": False,
     "SCHEMA_PATH_PREFIX": r"/api/",
     "COMPONENT_SPLIT_REQUEST": True,
+    # 기본 enum 후처리 훅 보존 + 4xx/5xx 표준 에러 봉투 본문 주입
+    "POSTPROCESSING_HOOKS": [
+        "drf_spectacular.hooks.postprocess_schema_enums",
+        "apps.core.schema_hooks.add_error_envelope_responses",
+    ],
 }
 
 # ── JWT 토큰 설정 ─────────────────────────────────────────────
