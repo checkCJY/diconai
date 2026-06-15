@@ -43,22 +43,22 @@
 
 | 시점 | 작업 | 의사결정 | 산출물 |
 |---|---|---|---|
-| 2026-05-09 | 알람 코드리뷰 | 전체 alerts/events 영역 회고 | [docs/codereviews/2026_05_09/04_alerts_events.md](../../docs/codereviews/2026_05_09/04_alerts_events.md) |
-| 2026-05-14 | IF + 알람 binding (전력) | AI 결과 → AlarmRecord 영속화 | [docs/changelog/ml/if_alarm_binding_power_2026_05_14.md](../../docs/changelog/ml/if_alarm_binding_power_2026_05_14.md) |
-| 2026-05-15 | **알람 시스템 재설계 ★** | PR #57 — 3대 요구 + 회색지대 5건 결정 | [skill/plan/alarm-system-redesign.md](../plan/alarm-system-redesign.md) · [drf-server/docs/refactoring/alarm-system-redesign-2026-05-15.md](../../drf-server/docs/refactoring/alarm-system-redesign-2026-05-15.md) · [memory: alarm-system-redesign-2026-05-15](../../../../.claude/projects/-home-cjy-diconai/memory/alarm_system_redesign_2026_05_15.md) |
-| 2026-05-15 | **AI mute + cooldown** | `ai_fired:*` Redis 키 도입 — AI vs rule 중복 알람 차단 | [docs/changelog/alarm_reliability/alarm_ai_mute_and_cooldown_2026_05_15.md](../../docs/changelog/alarm_reliability/alarm_ai_mute_and_cooldown_2026_05_15.md) · [memory: alarm-popup-policy-followups-2026-05-15](../../../../.claude/projects/-home-cjy-diconai/memory/alarm_popup_policy_followups_2026_05_15.md) |
-| 2026-05-15 | 알람 흐름도 stale 인지 | 5초 폴링 → Redis BRPOP 즉시 전환. 문서 stale 만 정정 (코드 truth source) | [memory: alarm-flow-doc-stale-2026-05-15](../../../../.claude/projects/-home-cjy-diconai/memory/alarm_flow_doc_stale_2026_05_15.md) |
-| 2026-05-17 | **D 옵션 (도메인별 결정)** | 가스 = 격하 / 전력 = un-downgrade — 알람 algorithm_source 분기 출발 | [docs/codereviews/2026_05_17/alarm-d-option-flow.md](../../docs/codereviews/2026_05_17/alarm-d-option-flow.md) · [drf-server/docs/refactoring/alarm-d-option-2026-05-17.md](../../drf-server/docs/refactoring/alarm-d-option-2026-05-17.md) |
-| 2026-05-17 | **Phase 2 — UI refactor** | 알람 팝업 UI 정리 (모달 vs 토스트 분리) | [drf-server/docs/refactoring/alarm-phase2-completion-2026-05-17.md](../../drf-server/docs/refactoring/alarm-phase2-completion-2026-05-17.md) · [docs/codereviews/2026_05_17/alarm-phase2-flow.md](../../docs/codereviews/2026_05_17/alarm-phase2-flow.md) · [docs/changelog/alarm_reliability/ui_refactor_phase2.md](../../docs/changelog/alarm_reliability/ui_refactor_phase2.md) |
-| 2026-05-19 | **T1+T6 (정보 통일)** | 알람 message·summary·algorithm_source workspace 통일. ML 용어 제거 (운영자 톤) | [skill/plan/alarm-t1-t6-info-unification.md](../plan/alarm-t1-t6-info-unification.md) · [drf-server/docs/refactoring/2026_05_19_alarm_t1_t6.md](../../drf-server/docs/refactoring/2026_05_19_alarm_t1_t6.md) |
-| 2026-05-19 | **T3 (dedup 통일)** | push_alarm fingerprint dedup (NX EX 30s) — Celery retry 중복 차단 | [skill/plan/alarm-t3-dedup-unification.md](../plan/alarm-t3-dedup-unification.md) · [drf-server/docs/refactoring/2026_05_20_alarm_t3_troubleshooting.md](../../drf-server/docs/refactoring/2026_05_20_alarm_t3_troubleshooting.md) |
-| 2026-05-19 | 알람 현황 코드리뷰 | as-is 전체 정리 | [docs/codereviews/2026_05_19/alarm-business-logic-as-is.md](../../docs/codereviews/2026_05_19/alarm-business-logic-as-is.md) · [integrated-issues-triage.md](../../docs/codereviews/2026_05_19/integrated-issues-triage.md) |
-| 2026-05-19 | 5축 정책 → 알람 흐름 | 전력 5축 결합 결과를 algorithm_source 로 → AlarmRecord 영속화 | [docs/codereviews/2026_05_19/power-5axis-policy-flow.md](../../docs/codereviews/2026_05_19/power-5axis-policy-flow.md) |
-| 2026-05-20 | **T4 (AI vs 정적 계층화) ★** | decide_alarm 6 매트릭스 + AI state 5종 — fastapi 가 단일 결정자 | [skill/plan/alarm-t4-ai-static-hierarchy.md](../plan/alarm-t4-ai-static-hierarchy.md) + T4 changelogs 5종 |
-| 2026-05-20 | **알람 3대 증상 진단** | `_AckStore` 24h 영구 차단 가설 + ack/RESOLVED 멘탈 모델 충돌 진단 | [docs/codereviews/2026_05_20/alarm-symptom-bottleneck-diagnosis.md](../../docs/codereviews/2026_05_20/alarm-symptom-bottleneck-diagnosis.md) · [memory: alarm-symptom-diagnosis-2026-05-20](../../../../.claude/projects/-home-cjy-diconai/memory/alarm_symptom_diagnosis_2026_05_20.md) |
-| 2026-05-20 | 외부 리뷰 피드백 | a/c path 충돌 가능성 — AI 알람 시 시그널 누락 위험 | [memory: alarm-dataflow-review-2026-05-20](../../../../.claude/projects/-home-cjy-diconai/memory/alarm_dataflow_review_2026_05_20.md) |
-| 2026-05-20 | **T1+T3 완료** | feature/0519_alarm_business_logic 10 commit 완료. 시연 전 적용 끝 | [memory: alarm-t1-t3-pause-2026-05-20](../../../../.claude/projects/-home-cjy-diconai/memory/alarm_t1_t3_pause_2026_05_20.md) |
-| 2026-05-20 | T4 진입 전 검증 | 12-step 코드 매핑 + source 5종 직교 도입 확정 | [memory: alarm-t4-pre-entry-verified-2026-05-20](../../../../.claude/projects/-home-cjy-diconai/memory/alarm_t4_pre_entry_verified_2026_05_20.md) |
+| 2026-05-09 | 알람 코드리뷰 | 전체 alerts/events 영역 회고 | [docs/codereviews/2026_05_09/04_alerts_events.md](../../../docs/archive/codereviews/2026_05_09/04_alerts_events.md) |
+| 2026-05-14 | IF + 알람 binding (전력) | AI 결과 → AlarmRecord 영속화 | [docs/changelog/ml/if_alarm_binding_power_2026_05_14.md](../../../docs/archive/changelog/ml/if_alarm_binding_power_2026_05_14.md) |
+| 2026-05-15 | **알람 시스템 재설계 ★** | PR #57 — 3대 요구 + 회색지대 5건 결정 | [skill/plan/alarm-system-redesign.md](../../plan/alarm-system-redesign.md) · [drf-server/docs/refactoring/alarm-system-redesign-2026-05-15.md](../../../drf-server/docs/refactoring/alarm-system-redesign-2026-05-15.md) · [memory: alarm-system-redesign-2026-05-15](../../../../../.claude/projects/-home-cjy-diconai/memory/alarm_system_redesign_2026_05_15.md) |
+| 2026-05-15 | **AI mute + cooldown** | `ai_fired:*` Redis 키 도입 — AI vs rule 중복 알람 차단 | [docs/changelog/alarm_reliability/alarm_ai_mute_and_cooldown_2026_05_15.md](../../../docs/archive/changelog/alarm_reliability/alarm_ai_mute_and_cooldown_2026_05_15.md) · [memory: alarm-popup-policy-followups-2026-05-15](../../../../../.claude/projects/-home-cjy-diconai/memory/alarm_popup_policy_followups_2026_05_15.md) |
+| 2026-05-15 | 알람 흐름도 stale 인지 | 5초 폴링 → Redis BRPOP 즉시 전환. 문서 stale 만 정정 (코드 truth source) | [memory: alarm-flow-doc-stale-2026-05-15](../../../../../.claude/projects/-home-cjy-diconai/memory/alarm_flow_doc_stale_2026_05_15.md) |
+| 2026-05-17 | **D 옵션 (도메인별 결정)** | 가스 = 격하 / 전력 = un-downgrade — 알람 algorithm_source 분기 출발 | [docs/codereviews/2026_05_17/alarm-d-option-flow.md](../../../docs/archive/codereviews/2026_05_17/alarm-d-option-flow.md) · [drf-server/docs/refactoring/alarm-d-option-2026-05-17.md](../../../drf-server/docs/refactoring/alarm-d-option-2026-05-17.md) |
+| 2026-05-17 | **Phase 2 — UI refactor** | 알람 팝업 UI 정리 (모달 vs 토스트 분리) | [drf-server/docs/refactoring/alarm-phase2-completion-2026-05-17.md](../../../drf-server/docs/refactoring/alarm-phase2-completion-2026-05-17.md) · [docs/codereviews/2026_05_17/alarm-phase2-flow.md](../../../docs/archive/codereviews/2026_05_17/alarm-phase2-flow.md) · [docs/changelog/alarm_reliability/ui_refactor_phase2.md](../../../docs/archive/changelog/alarm_reliability/ui_refactor_phase2.md) |
+| 2026-05-19 | **T1+T6 (정보 통일)** | 알람 message·summary·algorithm_source workspace 통일. ML 용어 제거 (운영자 톤) | [skill/plan/alarm-t1-t6-info-unification.md](../../plan/alarm-t1-t6-info-unification.md) · [drf-server/docs/refactoring/2026_05_19_alarm_t1_t6.md](../../../drf-server/docs/refactoring/2026_05_19_alarm_t1_t6.md) |
+| 2026-05-19 | **T3 (dedup 통일)** | push_alarm fingerprint dedup (NX EX 30s) — Celery retry 중복 차단 | [skill/plan/alarm-t3-dedup-unification.md](../../plan/alarm-t3-dedup-unification.md) · [drf-server/docs/refactoring/2026_05_20_alarm_t3_troubleshooting.md](../../../drf-server/docs/refactoring/2026_05_20_alarm_t3_troubleshooting.md) |
+| 2026-05-19 | 알람 현황 코드리뷰 | as-is 전체 정리 | [docs/codereviews/2026_05_19/alarm-business-logic-as-is.md](../../../docs/archive/codereviews/2026_05_19/alarm-business-logic-as-is.md) · [integrated-issues-triage.md](../../../docs/archive/codereviews/2026_05_19/integrated-issues-triage.md) |
+| 2026-05-19 | 5축 정책 → 알람 흐름 | 전력 5축 결합 결과를 algorithm_source 로 → AlarmRecord 영속화 | [docs/codereviews/2026_05_19/power-5axis-policy-flow.md](../../../docs/archive/codereviews/2026_05_19/power-5axis-policy-flow.md) |
+| 2026-05-20 | **T4 (AI vs 정적 계층화) ★** | decide_alarm 6 매트릭스 + AI state 5종 — fastapi 가 단일 결정자 | [skill/plan/alarm-t4-ai-static-hierarchy.md](../../plan/alarm-t4-ai-static-hierarchy.md) + T4 changelogs 5종 |
+| 2026-05-20 | **알람 3대 증상 진단** | `_AckStore` 24h 영구 차단 가설 + ack/RESOLVED 멘탈 모델 충돌 진단 | [docs/codereviews/2026_05_20/alarm-symptom-bottleneck-diagnosis.md](../../../docs/archive/codereviews/2026_05_20/alarm-symptom-bottleneck-diagnosis.md) · [memory: alarm-symptom-diagnosis-2026-05-20](../../../../../.claude/projects/-home-cjy-diconai/memory/alarm_symptom_diagnosis_2026_05_20.md) |
+| 2026-05-20 | 외부 리뷰 피드백 | a/c path 충돌 가능성 — AI 알람 시 시그널 누락 위험 | [memory: alarm-dataflow-review-2026-05-20](../../../../../.claude/projects/-home-cjy-diconai/memory/alarm_dataflow_review_2026_05_20.md) |
+| 2026-05-20 | **T1+T3 완료** | feature/0519_alarm_business_logic 10 commit 완료. 시연 전 적용 끝 | [memory: alarm-t1-t3-pause-2026-05-20](../../../../../.claude/projects/-home-cjy-diconai/memory/alarm_t1_t3_pause_2026_05_20.md) |
+| 2026-05-20 | T4 진입 전 검증 | 12-step 코드 매핑 + source 5종 직교 도입 확정 | [memory: alarm-t4-pre-entry-verified-2026-05-20](../../../../../.claude/projects/-home-cjy-diconai/memory/alarm_t4_pre_entry_verified_2026_05_20.md) |
 
 ---
 
@@ -68,9 +68,9 @@
 
 | 자료 | 인용 |
 |---|---|
-| [fastapi-server/power/services/decide_alarm.py](../../fastapi-server/power/services/decide_alarm.py) | 6 매트릭스 (AI state 5종 × static_risk → source 결정) — 순수 함수 |
-| [skill/alarm/t4-d2-implementation-spec.md](../alarm/t4-d2-implementation-spec.md) | T4 D2 구현 spec |
-| [skill/alarm/t4-d2-changelog.md](../alarm/t4-d2-changelog.md) | D2 적용 결과 |
+| [fastapi-server/power/services/decide_alarm.py](../../../fastapi-server/power/services/decide_alarm.py) | 6 매트릭스 (AI state 5종 × static_risk → source 결정) — 순수 함수 |
+| [skill/alarm/t4-d2-implementation-spec.md](../../alarm/t4-d2-implementation-spec.md) | T4 D2 구현 spec |
+| [skill/alarm/t4-d2-changelog.md](../../alarm/t4-d2-changelog.md) | D2 적용 결과 |
 
 ```
 | AI 상태             | 정적 결과 | source                       |
@@ -88,9 +88,9 @@
 
 | 자료 | 인용 |
 |---|---|
-| [fastapi-server/websocket/services/alarm_queue.py](../../fastapi-server/websocket/services/alarm_queue.py) | `push_alarm` + `_payload_fingerprint` (event_id / ai_meta / clear / cover 4 분기) |
-| [drf-server/apps/alerts/services/alarm_dedupe.py](../../drf-server/apps/alerts/services/alarm_dedupe.py) | DRF 측 dedupe + AI mute 가드 |
-| [docs/changelog/alarm_reliability/alarm_reliability_phase1.md](../../docs/changelog/alarm_reliability/alarm_reliability_phase1.md) | Phase 1 신뢰성 작업 |
+| [fastapi-server/websocket/services/alarm_queue.py](../../../fastapi-server/websocket/services/alarm_queue.py) | `push_alarm` + `_payload_fingerprint` (event_id / ai_meta / clear / cover 4 분기) |
+| [drf-server/apps/alerts/services/alarm_dedupe.py](../../../drf-server/apps/alerts/services/alarm_dedupe.py) | DRF 측 dedupe + AI mute 가드 |
+| [docs/changelog/alarm_reliability/alarm_reliability_phase1.md](../../../docs/archive/changelog/alarm_reliability/alarm_reliability_phase1.md) | Phase 1 신뢰성 작업 |
 
 **dedup fingerprint 4 종**:
 1. 룰 알람 — `event:{event_id}:{risk_level}` (RESOLVED 신호는 `:resolved` 별 suffix)
@@ -102,10 +102,10 @@
 
 | 자료 | 인용 |
 |---|---|
-| [fastapi-server/services/ai_mute.py](../../fastapi-server/services/ai_mute.py) | `mark_ai_recent` / `mark_ai_state` / `AIInferenceState` 5종 |
-| [drf-server/apps/alerts/services/alarm_dedupe.py:60-132](../../drf-server/apps/alerts/services/alarm_dedupe.py) | `is_ai_mute_active` 가드 |
-| [docs/changelog/alarm_reliability/alarm_ai_mute_and_cooldown_2026_05_15.md](../../docs/changelog/alarm_reliability/alarm_ai_mute_and_cooldown_2026_05_15.md) | AI mute + cooldown 도입 |
-| [skill/study/power-ai-종합문서 §4.4](../study/power-ai-종합문서-2026-05-21.md) | rate limit (60s) + AI mute 동기 |
+| [fastapi-server/services/ai_mute.py](../../../fastapi-server/services/ai_mute.py) | `mark_ai_recent` / `mark_ai_state` / `AIInferenceState` 5종 |
+| [drf-server/apps/alerts/services/alarm_dedupe.py:60-132](../../../drf-server/apps/alerts/services/alarm_dedupe.py) | `is_ai_mute_active` 가드 |
+| [docs/changelog/alarm_reliability/alarm_ai_mute_and_cooldown_2026_05_15.md](../../../docs/archive/changelog/alarm_reliability/alarm_ai_mute_and_cooldown_2026_05_15.md) | AI mute + cooldown 도입 |
+| [skill/study/power-ai-종합문서 §4.4](../../study/power-ai-종합문서-2026-05-21.md) | rate limit (60s) + AI mute 동기 |
 
 **의도**: AI 가 발화하면 Redis 에 `ai_fired:{device_id}:{channel}` 키 60s TTL → DRF Celery 의 rule 알람이 이 키 보고 mute. **운영자에게 같은 채널 알람 중복 표시 차단**.
 
@@ -113,30 +113,30 @@
 
 | 자료 | 인용 |
 |---|---|
-| [fastapi-server/power/services/anomaly_inference.py:416-440](../../fastapi-server/power/services/anomaly_inference.py#L416-L440) | `_last_fired_at` dict + RATE_LIMIT_SEC=60 |
-| [skill/study/power-ai-종합문서 §4.4.2 30s vs 60s 검토](../study/power-ai-종합문서-2026-05-21.md) | "폭주 회피 > 시연 가시성" 결정 |
+| [fastapi-server/power/services/anomaly_inference.py:416-440](../../../fastapi-server/power/services/anomaly_inference.py#L416-L440) | `_last_fired_at` dict + RATE_LIMIT_SEC=60 |
+| [skill/study/power-ai-종합문서 §4.4.2 30s vs 60s 검토](../../study/power-ai-종합문서-2026-05-21.md) | "폭주 회피 > 시연 가시성" 결정 |
 
 ### 2.5 Event lifecycle (create / merge / acknowledge / resolve)
 
 | 자료 | 인용 |
 |---|---|
-| [drf-server/apps/alerts/services/event_service.py](../../drf-server/apps/alerts/services/event_service.py) | `create_alarm_and_event` (atomic + select_for_update) |
-| [drf-server/apps/alerts/services/merge_policy.py](../../drf-server/apps/alerts/services/merge_policy.py) | 동일 이벤트 중복 병합 정책 |
-| [skill/DB/alerts/event.py.md](../DB/alerts/event.py.md) | Event 모델 |
-| [skill/DB/alerts/event_acknowledgement.py.md](../DB/alerts/event_acknowledgement.py.md) | EventAcknowledgement (`_AckStore` 와 연계) |
-| [skill/DB/alerts/event_log.py.md](../DB/alerts/event_log.py.md) | EventLog (CREATED / ACK / RESOLVED) |
-| [skill/plan/alarm-record-integration.md](../plan/alarm-record-integration.md) | AlarmRecord ↔ Event 통합 plan |
+| [drf-server/apps/alerts/services/event_service.py](../../../drf-server/apps/alerts/services/event_service.py) | `create_alarm_and_event` (atomic + select_for_update) |
+| [drf-server/apps/alerts/services/merge_policy.py](../../../drf-server/apps/alerts/services/merge_policy.py) | 동일 이벤트 중복 병합 정책 |
+| [skill/DB/alerts/event.py.md](../../DB/alerts/event.py.md) | Event 모델 |
+| [skill/DB/alerts/event_acknowledgement.py.md](../../DB/alerts/event_acknowledgement.py.md) | EventAcknowledgement (`_AckStore` 와 연계) |
+| [skill/DB/alerts/event_log.py.md](../../DB/alerts/event_log.py.md) | EventLog (CREATED / ACK / RESOLVED) |
+| [skill/plan/alarm-record-integration.md](../../plan/alarm-record-integration.md) | AlarmRecord ↔ Event 통합 plan |
 
 ### 2.6 algorithm_source 6 종 + 운영자 워딩 (T1+T6)
 
 | 자료 | 인용 |
 |---|---|
-| [drf-server/apps/core/constants.py `ALGORITHM_SOURCE_PHRASE`](../../drf-server/apps/core/constants.py) | 6 라벨 한글 워딩 (운영자 톤 통일) |
-| [fastapi-server/power/services/anomaly_inference.py `_ALGORITHM_SOURCE_PHRASE`](../../fastapi-server/power/services/anomaly_inference.py) | fastapi 측 동일 (단일 동기) |
-| [skill/alarm/t4-source-message-spec.md](../alarm/t4-source-message-spec.md) | source 별 메시지 패턴 spec |
-| [skill/plan/alarm-t1-t6-info-unification.md](../plan/alarm-t1-t6-info-unification.md) | T1+T6 통일 plan |
-| [drf-server/docs/refactoring/2026_05_19_alarm_t1_t6.md](../../drf-server/docs/refactoring/2026_05_19_alarm_t1_t6.md) | T1+T6 적용 보고 |
-| [memory: operator-mental-model-simplicity](../../../../.claude/projects/-home-cjy-diconai/memory/operator_mental_model_simplicity.md) | "운영자 멘탈 모델 단순함 우선 — AI/ML 출처는 엔지니어 채널로" — T1 칩 제거 사례 |
+| [drf-server/apps/core/constants.py `ALGORITHM_SOURCE_PHRASE`](../../../drf-server/apps/core/constants.py) | 6 라벨 한글 워딩 (운영자 톤 통일) |
+| [fastapi-server/power/services/anomaly_inference.py `_ALGORITHM_SOURCE_PHRASE`](../../../fastapi-server/power/services/anomaly_inference.py) | fastapi 측 동일 (단일 동기) |
+| [skill/alarm/t4-source-message-spec.md](../../alarm/t4-source-message-spec.md) | source 별 메시지 패턴 spec |
+| [skill/plan/alarm-t1-t6-info-unification.md](../../plan/alarm-t1-t6-info-unification.md) | T1+T6 통일 plan |
+| [drf-server/docs/refactoring/2026_05_19_alarm_t1_t6.md](../../../drf-server/docs/refactoring/2026_05_19_alarm_t1_t6.md) | T1+T6 적용 보고 |
+| [memory: operator-mental-model-simplicity](../../../../../.claude/projects/-home-cjy-diconai/memory/operator_mental_model_simplicity.md) | "운영자 멘탈 모델 단순함 우선 — AI/ML 출처는 엔지니어 채널로" — T1 칩 제거 사례 |
 
 | algorithm_source | 운영자 워딩 |
 |---|---|
@@ -151,22 +151,22 @@
 
 | 자료 | 인용 |
 |---|---|
-| [docs/features/cjy_MN-04_geofence_alarm.md](../../docs/features/cjy_MN-04_geofence_alarm.md) | geofence 알람 기능정의서 (본인) |
-| [skill/지오펜스 알람 경로에 대해서.md](../지오펜스%20알람%20경로에%20대해서.md) | geofence 알람 경로 정리 (본인) |
-| [skill/알람 시나리오 관련 파일과 흐름도.md](../알람%20시나리오%20관련%20파일과%20흐름도.md) | 위치 → 지오펜스 진입 → 알람 발화 시나리오 (본인) |
-| [drf-server/apps/positioning/services/position_service.py](../../drf-server/apps/positioning/services/position_service.py) | 핵심 오케스트레이터 (`update_geofence_cache` + `_get_dangerous_sensors_in_geofence`) |
-| [drf-server/apps/geofence/models/geofence.py](../../drf-server/apps/geofence/models/geofence.py) | `contains_point` Ray Casting 알고리즘 |
-| [drf-server/apps/alerts/tasks.py `fire_geofence_alarm_task`](../../drf-server/apps/alerts/tasks.py) | geofence 알람 발화 Celery 태스크 |
+| [docs/features/cjy_MN-04_geofence_alarm.md](../../../docs/features/cjy_MN-04_geofence_alarm.md) | geofence 알람 기능정의서 (본인) |
+| [skill/지오펜스 알람 경로에 대해서.md](../../지오펜스%20알람%20경로에%20대해서.md) | geofence 알람 경로 정리 (본인) |
+| [skill/알람 시나리오 관련 파일과 흐름도.md](../../알람%20시나리오%20관련%20파일과%20흐름도.md) | 위치 → 지오펜스 진입 → 알람 발화 시나리오 (본인) |
+| [drf-server/apps/positioning/services/position_service.py](../../../drf-server/apps/positioning/services/position_service.py) | 핵심 오케스트레이터 (`update_geofence_cache` + `_get_dangerous_sensors_in_geofence`) |
+| [drf-server/apps/geofence/models/geofence.py](../../../drf-server/apps/geofence/models/geofence.py) | `contains_point` Ray Casting 알고리즘 |
+| [drf-server/apps/alerts/tasks.py `fire_geofence_alarm_task`](../../../drf-server/apps/alerts/tasks.py) | geofence 알람 발화 Celery 태스크 |
 
 ### 2.8 알람 팝업 UI (CM-07)
 
 | 자료 | 인용 |
 |---|---|
-| [docs/features/cjy_CM-07_알람팝업개선_기능정의서.md](../../docs/features/cjy_CM-07_알람팝업개선_기능정의서.md) | 알람 팝업 기능정의서 (본인) |
-| [drf-server/static/js/shared/alarm-popup.js](../../drf-server/static/js/shared/alarm-popup.js) | AlarmPopup 컨트롤러 |
-| [drf-server/static/js/shared/alarm-popup.css](../../drf-server/static/js/shared/alarm-popup.css) | 색상 토큰 + 토스트/모달 스타일 |
-| [drf-server/static/js/dashboard/websocket.js](../../drf-server/static/js/dashboard/websocket.js) | WS 수신 → `AlarmPopup.show()` |
-| [drf-server/docs/refactoring/alarm-phase2-completion-2026-05-17.md](../../drf-server/docs/refactoring/alarm-phase2-completion-2026-05-17.md) | UI Phase 2 refactor |
+| [docs/features/cjy_CM-07_알람팝업개선_기능정의서.md](../../../docs/features/cjy_CM-07_알람팝업개선_기능정의서.md) | 알람 팝업 기능정의서 (본인) |
+| [drf-server/static/js/shared/alarm-popup.js](../../../drf-server/static/js/shared/alarm-popup.js) | AlarmPopup 컨트롤러 |
+| [drf-server/static/js/shared/alarm-popup.css](../../../drf-server/static/js/shared/alarm-popup.css) | 색상 토큰 + 토스트/모달 스타일 |
+| [drf-server/static/js/dashboard/websocket.js](../../../drf-server/static/js/dashboard/websocket.js) | WS 수신 → `AlarmPopup.show()` |
+| [drf-server/docs/refactoring/alarm-phase2-completion-2026-05-17.md](../../../drf-server/docs/refactoring/alarm-phase2-completion-2026-05-17.md) | UI Phase 2 refactor |
 
 ---
 
@@ -233,18 +233,18 @@ position_dummy → POST /api/positioning/receive → position_router
 
 | 모델 | 자료 | 핵심 필드 |
 |---|---|---|
-| **AlarmRecord** | [skill/DB/alerts/alarm_record.py.md](../DB/alerts/alarm_record.py.md) | event(FK), risk_level, source, source_device_id, channel, **algorithm_source**, summary, measured_value, detected_at |
-| **Event** | [skill/DB/alerts/event.py.md](../DB/alerts/event.py.md) | facility(FK), alarm_type, status(ACTIVE/RESOLVED), opened_at, resolved_at — 중복 발화는 같은 활성 Event 에 AlarmRecord 만 추가 |
-| **EventAcknowledgement** | [skill/DB/alerts/event_acknowledgement.py.md](../DB/alerts/event_acknowledgement.py.md) | event(FK), user(FK), acknowledged_at — 다중 관리자 환경의 "확인 중" 시그널 |
-| **EventLog** | [skill/DB/alerts/event_log.py.md](../DB/alerts/event_log.py.md) | event(FK), log_type(CREATED/ACK/RESOLVED), timestamp — APPEND-ONLY |
-| **HazardType** | [skill/DB/alerts/hazard_type.py.md](../DB/alerts/hazard_type.py.md) | 알람 type 분류 (gas_danger / power_overload / power_anomaly_ai / geofence 등) |
-| **HazardTypeGroup** | [skill/DB/alerts/hazard_type_group.py.md](../DB/alerts/hazard_type_group.py.md) | 알람 type 카테고리 그룹 |
-| **AlertPolicy** | [skill/DB/alerts/alert_policy.py.md](../DB/alerts/alert_policy.py.md) | 알람 정책 (자동 해제 vs 수동 해제 등) |
+| **AlarmRecord** | [skill/DB/alerts/alarm_record.py.md](../../DB/alerts/alarm_record.py.md) | event(FK), risk_level, source, source_device_id, channel, **algorithm_source**, summary, measured_value, detected_at |
+| **Event** | [skill/DB/alerts/event.py.md](../../DB/alerts/event.py.md) | facility(FK), alarm_type, status(ACTIVE/RESOLVED), opened_at, resolved_at — 중복 발화는 같은 활성 Event 에 AlarmRecord 만 추가 |
+| **EventAcknowledgement** | [skill/DB/alerts/event_acknowledgement.py.md](../../DB/alerts/event_acknowledgement.py.md) | event(FK), user(FK), acknowledged_at — 다중 관리자 환경의 "확인 중" 시그널 |
+| **EventLog** | [skill/DB/alerts/event_log.py.md](../../DB/alerts/event_log.py.md) | event(FK), log_type(CREATED/ACK/RESOLVED), timestamp — APPEND-ONLY |
+| **HazardType** | [skill/DB/alerts/hazard_type.py.md](../../DB/alerts/hazard_type.py.md) | 알람 type 분류 (gas_danger / power_overload / power_anomaly_ai / geofence 등) |
+| **HazardTypeGroup** | [skill/DB/alerts/hazard_type_group.py.md](../../DB/alerts/hazard_type_group.py.md) | 알람 type 카테고리 그룹 |
+| **AlertPolicy** | [skill/DB/alerts/alert_policy.py.md](../../DB/alerts/alert_policy.py.md) | 알람 정책 (자동 해제 vs 수동 해제 등) |
 
 **연관 모델**:
-- [MLAnomalyResult](../DB/ml/ml_anomaly_result.py.md) — AI 추론 결과 영속화 (AlarmRecord 와 ml_id FK 연계)
-- [SystemLog](../DB/core/system_log.py.md) — 알람 lifecycle 감사 로그 (APPEND-ONLY)
-- [Notification](../DB/notifications/notification.py.md) — 채널별 알림 발송 이력
+- [MLAnomalyResult](../../DB/ml/ml_anomaly_result.py.md) — AI 추론 결과 영속화 (AlarmRecord 와 ml_id FK 연계)
+- [SystemLog](../../DB/core/system_log.py.md) — 알람 lifecycle 감사 로그 (APPEND-ONLY)
+- [Notification](../../DB/notifications/notification.py.md) — 채널별 알림 발송 이력
 
 ---
 
@@ -252,7 +252,7 @@ position_dummy → POST /api/positioning/receive → position_router
 
 ### 5.1 알람 시스템 재설계 3대 요구 (2026-05-15)
 
-[memory: alarm-system-redesign-2026-05-15](../../../../.claude/projects/-home-cjy-diconai/memory/alarm_system_redesign_2026_05_15.md) 가 명시:
+[memory: alarm-system-redesign-2026-05-15](../../../../../.claude/projects/-home-cjy-diconai/memory/alarm_system_redesign_2026_05_15.md) 가 명시:
 
 | 요구 | 결정 |
 |---|---|
@@ -292,8 +292,8 @@ position_dummy → POST /api/positioning/receive → position_router
 
 | 자료 | 핵심 |
 |---|---|
-| [docs/codereviews/2026_05_20/alarm-symptom-bottleneck-diagnosis.md](../../docs/codereviews/2026_05_20/alarm-symptom-bottleneck-diagnosis.md) | 진단 보고서 |
-| [memory: alarm-symptom-diagnosis-2026-05-20](../../../../.claude/projects/-home-cjy-diconai/memory/alarm_symptom_diagnosis_2026_05_20.md) | 1순위 `_AckStore` 24h 영구 차단 가설 + ack/RESOLVED 멘탈 모델 충돌 |
+| [docs/codereviews/2026_05_20/alarm-symptom-bottleneck-diagnosis.md](../../../docs/archive/codereviews/2026_05_20/alarm-symptom-bottleneck-diagnosis.md) | 진단 보고서 |
+| [memory: alarm-symptom-diagnosis-2026-05-20](../../../../../.claude/projects/-home-cjy-diconai/memory/alarm_symptom_diagnosis_2026_05_20.md) | 1순위 `_AckStore` 24h 영구 차단 가설 + ack/RESOLVED 멘탈 모델 충돌 |
 
 **문제**: 운영자가 ack 한 알람이 24h 동안 재발화 안 됨 (의도 vs 실제 충돌).
 **원인**: localStorage `_AckStore` TTL 24h 가 RESOLVED 신호와 분리 안 됨 — 운영자 멘탈 모델 ("ack 했다고 영구 차단 아님") 과 코드 동작 충돌.
@@ -303,8 +303,8 @@ position_dummy → POST /api/positioning/receive → position_router
 
 | 자료 | 핵심 |
 |---|---|
-| [drf-server/docs/refactoring/2026_05_20_alarm_t3_troubleshooting.md](../../drf-server/docs/refactoring/2026_05_20_alarm_t3_troubleshooting.md) | T3 적용 후 트러블슈팅 |
-| [skill/plan/alarm-t3-dedup-unification.md](../plan/alarm-t3-dedup-unification.md) | T3 plan |
+| [drf-server/docs/refactoring/2026_05_20_alarm_t3_troubleshooting.md](../../../drf-server/docs/refactoring/2026_05_20_alarm_t3_troubleshooting.md) | T3 적용 후 트러블슈팅 |
+| [skill/plan/alarm-t3-dedup-unification.md](../../plan/alarm-t3-dedup-unification.md) | T3 plan |
 
 **문제**: Celery `_push_to_ws` retry (max 3) 가 같은 payload 를 최대 3번 push → Redis 큐 중복 적재.
 **원인**: choke point 부재.
@@ -315,8 +315,8 @@ position_dummy → POST /api/positioning/receive → position_router
 
 | 자료 | 핵심 |
 |---|---|
-| [docs/changelog/alarm_reliability/alarm_ai_mute_and_cooldown_2026_05_15.md](../../docs/changelog/alarm_reliability/alarm_ai_mute_and_cooldown_2026_05_15.md) | AI mute 도입 |
-| [memory: alarm-popup-policy-followups-2026-05-15](../../../../.claude/projects/-home-cjy-diconai/memory/alarm_popup_policy_followups_2026_05_15.md) | Phase 1 후속 |
+| [docs/changelog/alarm_reliability/alarm_ai_mute_and_cooldown_2026_05_15.md](../../../docs/archive/changelog/alarm_reliability/alarm_ai_mute_and_cooldown_2026_05_15.md) | AI mute 도입 |
+| [memory: alarm-popup-policy-followups-2026-05-15](../../../../../.claude/projects/-home-cjy-diconai/memory/alarm_popup_policy_followups_2026_05_15.md) | Phase 1 후속 |
 
 **문제**: 같은 채널의 AI 알람 + rule 기반 알람 동시 발화 → 운영자에게 같은 신호 2개 표시.
 **원인**: fastapi (AI) 와 DRF Celery (rule) 가 같은 신호에 각자 발화.
@@ -327,7 +327,7 @@ position_dummy → POST /api/positioning/receive → position_router
 
 | 자료 | 핵심 |
 |---|---|
-| [memory: alarm-flow-doc-stale-2026-05-15](../../../../.claude/projects/-home-cjy-diconai/memory/alarm_flow_doc_stale_2026_05_15.md) | skill/알람*.md 의 WS broadcast 섹션은 옛 5초 폴링 — 현재는 Redis BRPOP 즉시 |
+| [memory: alarm-flow-doc-stale-2026-05-15](../../../../../.claude/projects/-home-cjy-diconai/memory/alarm_flow_doc_stale_2026_05_15.md) | skill/알람*.md 의 WS broadcast 섹션은 옛 5초 폴링 — 현재는 Redis BRPOP 즉시 |
 
 **교훈**: 문서 stale 발견. **코드를 truth source 로**. 메모리에 포인터만 — 본인이 작업 시 코드 우선 확인.
 
@@ -335,19 +335,19 @@ position_dummy → POST /api/positioning/receive → position_router
 
 | 자료 | 핵심 |
 |---|---|
-| [skill/troubleshooting/0519_alarm-toast-escalate-timer-race.md](../troubleshooting/0519_alarm-toast-escalate-timer-race.md) | 토스트 격상 타이머 race |
+| [skill/troubleshooting/0519_alarm-toast-escalate-timer-race.md](../../troubleshooting/0519_alarm-toast-escalate-timer-race.md) | 토스트 격상 타이머 race |
 
 ### 6.6 alarm-popup Docker 트러블슈팅
 
 | 자료 | 핵심 |
 |---|---|
-| [docs/infra/troubleshooting_alarm_popup_docker.md](../../docs/infra/troubleshooting_alarm_popup_docker.md) | Docker 환경 알람 팝업 이슈 |
+| [docs/infra/troubleshooting_alarm_popup_docker.md](../../../docs/infra/troubleshooting_alarm_popup_docker.md) | Docker 환경 알람 팝업 이슈 |
 
 ### 6.7 외부 리뷰 a/c path 충돌 (2026-05-20)
 
 | 자료 | 핵심 |
 |---|---|
-| [memory: alarm-dataflow-review-2026-05-20](../../../../.claude/projects/-home-cjy-diconai/memory/alarm_dataflow_review_2026_05_20.md) | 외부 리뷰어 4가지 지적. #1 (a/c path 충돌) — AI 알람 시 시그널 누락 위험. 조치 보류 → 시연 후. |
+| [memory: alarm-dataflow-review-2026-05-20](../../../../../.claude/projects/-home-cjy-diconai/memory/alarm_dataflow_review_2026_05_20.md) | 외부 리뷰어 4가지 지적. #1 (a/c path 충돌) — AI 알람 시 시그널 누락 위험. 조치 보류 → 시연 후. |
 
 ---
 
@@ -357,13 +357,13 @@ position_dummy → POST /api/positioning/receive → position_router
 
 | 요구사항 | 본 인덱스 | 자료 |
 |---|---|---|
-| CM-07 알람 팝업 개선 | §2.8 | [docs/features/cjy_CM-07_알람팝업개선_기능정의서.md](../../docs/features/cjy_CM-07_알람팝업개선_기능정의서.md) |
-| MN-04 geofence 알람 | §2.7 | [docs/features/cjy_MN-04_geofence_alarm.md](../../docs/features/cjy_MN-04_geofence_alarm.md) |
-| 알람 시스템 재설계 | §1, §5.1 | [skill/plan/alarm-system-redesign.md](../plan/alarm-system-redesign.md) |
-| T1+T6 정보 통일 | §2.6 | [skill/plan/alarm-t1-t6-info-unification.md](../plan/alarm-t1-t6-info-unification.md) |
-| T3 dedup 통일 | §2.2, §6.2 | [skill/plan/alarm-t3-dedup-unification.md](../plan/alarm-t3-dedup-unification.md) |
-| T4 AI vs 정적 계층화 | §2.1, §5.2 #7 | [skill/plan/alarm-t4-ai-static-hierarchy.md](../plan/alarm-t4-ai-static-hierarchy.md) |
-| AI mute (Phase 1) | §2.3 | [docs/changelog/alarm_reliability/alarm_ai_mute_and_cooldown_2026_05_15.md](../../docs/changelog/alarm_reliability/alarm_ai_mute_and_cooldown_2026_05_15.md) |
+| CM-07 알람 팝업 개선 | §2.8 | [docs/features/cjy_CM-07_알람팝업개선_기능정의서.md](../../../docs/features/cjy_CM-07_알람팝업개선_기능정의서.md) |
+| MN-04 geofence 알람 | §2.7 | [docs/features/cjy_MN-04_geofence_alarm.md](../../../docs/features/cjy_MN-04_geofence_alarm.md) |
+| 알람 시스템 재설계 | §1, §5.1 | [skill/plan/alarm-system-redesign.md](../../plan/alarm-system-redesign.md) |
+| T1+T6 정보 통일 | §2.6 | [skill/plan/alarm-t1-t6-info-unification.md](../../plan/alarm-t1-t6-info-unification.md) |
+| T3 dedup 통일 | §2.2, §6.2 | [skill/plan/alarm-t3-dedup-unification.md](../../plan/alarm-t3-dedup-unification.md) |
+| T4 AI vs 정적 계층화 | §2.1, §5.2 #7 | [skill/plan/alarm-t4-ai-static-hierarchy.md](../../plan/alarm-t4-ai-static-hierarchy.md) |
+| AI mute (Phase 1) | §2.3 | [docs/changelog/alarm_reliability/alarm_ai_mute_and_cooldown_2026_05_15.md](../../../docs/archive/changelog/alarm_reliability/alarm_ai_mute_and_cooldown_2026_05_15.md) |
 
 ### 7.2 6장 DB 설계
 
@@ -408,103 +408,103 @@ position_dummy → POST /api/positioning/receive → position_router
 
 | 자료 | 핵심 |
 |---|---|
-| [alarm-system-redesign.md](../plan/alarm-system-redesign.md) | 2026-05-15 전체 재설계 plan (3대 요구 + 회색지대 5건) |
-| [alarm-reliability-phase1.md](../plan/alarm-reliability-phase1.md) | Phase 1 신뢰성 plan (AI mute + cooldown) |
-| [alarm-popup-policy-followups.md](../plan/alarm-popup-policy-followups.md) | 팝업 정책 follow-up |
-| [alarm-t1-t6-info-unification.md](../plan/alarm-t1-t6-info-unification.md) | T1+T6 정보 통일 |
-| [alarm-t3-dedup-unification.md](../plan/alarm-t3-dedup-unification.md) | T3 dedup 통일 |
-| [alarm-t4-ai-static-hierarchy.md](../plan/alarm-t4-ai-static-hierarchy.md) | T4 AI vs 정적 계층화 |
-| [alarm-record-integration.md](../plan/alarm-record-integration.md) | AlarmRecord ↔ Event 통합 |
-| [alarm-post-ai-redesign.md](../plan/alarm-post-ai-redesign.md) | AI 도입 후 알람 재설계 |
-| [if-data-prep-and-alarm-binding.md](../plan/if-data-prep-and-alarm-binding.md) | IF 학습 데이터 + 알람 binding |
+| [alarm-system-redesign.md](../../plan/alarm-system-redesign.md) | 2026-05-15 전체 재설계 plan (3대 요구 + 회색지대 5건) |
+| [alarm-reliability-phase1.md](../../plan/alarm-reliability-phase1.md) | Phase 1 신뢰성 plan (AI mute + cooldown) |
+| [alarm-popup-policy-followups.md](../../plan/alarm-popup-policy-followups.md) | 팝업 정책 follow-up |
+| [alarm-t1-t6-info-unification.md](../../plan/alarm-t1-t6-info-unification.md) | T1+T6 정보 통일 |
+| [alarm-t3-dedup-unification.md](../../plan/alarm-t3-dedup-unification.md) | T3 dedup 통일 |
+| [alarm-t4-ai-static-hierarchy.md](../../plan/alarm-t4-ai-static-hierarchy.md) | T4 AI vs 정적 계층화 |
+| [alarm-record-integration.md](../../plan/alarm-record-integration.md) | AlarmRecord ↔ Event 통합 |
+| [alarm-post-ai-redesign.md](../../plan/alarm-post-ai-redesign.md) | AI 도입 후 알람 재설계 |
+| [if-data-prep-and-alarm-binding.md](../../plan/if-data-prep-and-alarm-binding.md) | IF 학습 데이터 + 알람 binding |
 
 ### 8.2 T4 작업 changelogs (skill/alarm/) — 7개
 
 | 자료 | 핵심 |
 |---|---|
-| [t4-source-message-spec.md](../alarm/t4-source-message-spec.md) | source 별 메시지 패턴 spec |
-| [t4-d1a-changelog.md](../alarm/t4-d1a-changelog.md) | D1a 적용 |
-| [t4-d1b-changelog.md](../alarm/t4-d1b-changelog.md) | D1b 적용 |
-| [t4-d2-implementation-spec.md](../alarm/t4-d2-implementation-spec.md) | D2 구현 spec |
-| [t4-d2-changelog.md](../alarm/t4-d2-changelog.md) | D2 적용 |
-| [t4-d3-changelog.md](../alarm/t4-d3-changelog.md) | D3 적용 |
-| [t4-d4-changelog.md](../alarm/t4-d4-changelog.md) | D4 적용 |
+| [t4-source-message-spec.md](../../alarm/t4-source-message-spec.md) | source 별 메시지 패턴 spec |
+| [t4-d1a-changelog.md](../../alarm/t4-d1a-changelog.md) | D1a 적용 |
+| [t4-d1b-changelog.md](../../alarm/t4-d1b-changelog.md) | D1b 적용 |
+| [t4-d2-implementation-spec.md](../../alarm/t4-d2-implementation-spec.md) | D2 구현 spec |
+| [t4-d2-changelog.md](../../alarm/t4-d2-changelog.md) | D2 적용 |
+| [t4-d3-changelog.md](../../alarm/t4-d3-changelog.md) | D3 적용 |
+| [t4-d4-changelog.md](../../alarm/t4-d4-changelog.md) | D4 적용 |
 
 ### 8.3 코드리뷰 (docs/codereviews/) — 8개
 
 | 자료 | 핵심 |
 |---|---|
-| [2026_05_09/04_alerts_events.md](../../docs/codereviews/2026_05_09/04_alerts_events.md) | 알람 시스템 초기 리뷰 |
-| [2026_05_15/alarm-system-redesign-flow.md](../../docs/codereviews/2026_05_15/alarm-system-redesign-flow.md) | 재설계 flow |
-| [2026_05_17/alarm-d-option-flow.md](../../docs/codereviews/2026_05_17/alarm-d-option-flow.md) | D 옵션 (도메인별) |
-| [2026_05_17/alarm-phase2-flow.md](../../docs/codereviews/2026_05_17/alarm-phase2-flow.md) | Phase 2 UI flow |
-| [2026_05_19/alarm-business-logic-as-is.md](../../docs/codereviews/2026_05_19/alarm-business-logic-as-is.md) | as-is 전체 |
-| [2026_05_19/integrated-issues-triage.md](../../docs/codereviews/2026_05_19/integrated-issues-triage.md) | 통합 이슈 triage |
-| [2026_05_19/power-5axis-policy-flow.md](../../docs/codereviews/2026_05_19/power-5axis-policy-flow.md) | 5축 → algorithm_source 흐름 |
-| [2026_05_20/alarm-symptom-bottleneck-diagnosis.md](../../docs/codereviews/2026_05_20/alarm-symptom-bottleneck-diagnosis.md) | 3대 증상 진단 |
+| [2026_05_09/04_alerts_events.md](../../../docs/archive/codereviews/2026_05_09/04_alerts_events.md) | 알람 시스템 초기 리뷰 |
+| [2026_05_15/alarm-system-redesign-flow.md](../../../docs/archive/codereviews/2026_05_15/alarm-system-redesign-flow.md) | 재설계 flow |
+| [2026_05_17/alarm-d-option-flow.md](../../../docs/archive/codereviews/2026_05_17/alarm-d-option-flow.md) | D 옵션 (도메인별) |
+| [2026_05_17/alarm-phase2-flow.md](../../../docs/archive/codereviews/2026_05_17/alarm-phase2-flow.md) | Phase 2 UI flow |
+| [2026_05_19/alarm-business-logic-as-is.md](../../../docs/archive/codereviews/2026_05_19/alarm-business-logic-as-is.md) | as-is 전체 |
+| [2026_05_19/integrated-issues-triage.md](../../../docs/archive/codereviews/2026_05_19/integrated-issues-triage.md) | 통합 이슈 triage |
+| [2026_05_19/power-5axis-policy-flow.md](../../../docs/archive/codereviews/2026_05_19/power-5axis-policy-flow.md) | 5축 → algorithm_source 흐름 |
+| [2026_05_20/alarm-symptom-bottleneck-diagnosis.md](../../../docs/archive/codereviews/2026_05_20/alarm-symptom-bottleneck-diagnosis.md) | 3대 증상 진단 |
 
 ### 8.4 Refactoring 보고서 (drf-server/docs/refactoring/) — 5개
 
 | 자료 | 핵심 |
 |---|---|
-| [alarm-system-redesign-2026-05-15.md](../../drf-server/docs/refactoring/alarm-system-redesign-2026-05-15.md) | 재설계 적용 보고 |
-| [alarm-d-option-2026-05-17.md](../../drf-server/docs/refactoring/alarm-d-option-2026-05-17.md) | D 옵션 적용 |
-| [alarm-phase2-completion-2026-05-17.md](../../drf-server/docs/refactoring/alarm-phase2-completion-2026-05-17.md) | UI Phase 2 완료 |
-| [2026_05_19_alarm_t1_t6.md](../../drf-server/docs/refactoring/2026_05_19_alarm_t1_t6.md) | T1+T6 적용 |
-| [2026_05_20_alarm_t3_troubleshooting.md](../../drf-server/docs/refactoring/2026_05_20_alarm_t3_troubleshooting.md) | T3 트러블슈팅 |
+| [alarm-system-redesign-2026-05-15.md](../../../drf-server/docs/refactoring/alarm-system-redesign-2026-05-15.md) | 재설계 적용 보고 |
+| [alarm-d-option-2026-05-17.md](../../../drf-server/docs/refactoring/alarm-d-option-2026-05-17.md) | D 옵션 적용 |
+| [alarm-phase2-completion-2026-05-17.md](../../../drf-server/docs/refactoring/alarm-phase2-completion-2026-05-17.md) | UI Phase 2 완료 |
+| [2026_05_19_alarm_t1_t6.md](../../../drf-server/docs/refactoring/2026_05_19_alarm_t1_t6.md) | T1+T6 적용 |
+| [2026_05_20_alarm_t3_troubleshooting.md](../../../drf-server/docs/refactoring/2026_05_20_alarm_t3_troubleshooting.md) | T3 트러블슈팅 |
 
 ### 8.5 Changelog (docs/changelog/alarm_reliability/) — 3개
 
 | 자료 | 핵심 |
 |---|---|
-| [alarm_ai_mute_and_cooldown_2026_05_15.md](../../docs/changelog/alarm_reliability/alarm_ai_mute_and_cooldown_2026_05_15.md) | AI mute + cooldown 도입 |
-| [alarm_reliability_phase1.md](../../docs/changelog/alarm_reliability/alarm_reliability_phase1.md) | Phase 1 신뢰성 |
-| [ui_refactor_phase2.md](../../docs/changelog/alarm_reliability/ui_refactor_phase2.md) | UI refactor Phase 2 |
+| [alarm_ai_mute_and_cooldown_2026_05_15.md](../../../docs/archive/changelog/alarm_reliability/alarm_ai_mute_and_cooldown_2026_05_15.md) | AI mute + cooldown 도입 |
+| [alarm_reliability_phase1.md](../../../docs/archive/changelog/alarm_reliability/alarm_reliability_phase1.md) | Phase 1 신뢰성 |
+| [ui_refactor_phase2.md](../../../docs/archive/changelog/alarm_reliability/ui_refactor_phase2.md) | UI refactor Phase 2 |
 
 ### 8.6 Memory (.claude/projects/-home-cjy-diconai/memory/) — 7개
 
 | 자료 | 핵심 |
 |---|---|
-| [alarm-system-redesign-2026-05-15](../../../../.claude/projects/-home-cjy-diconai/memory/alarm_system_redesign_2026_05_15.md) | 재설계 진입 + 3대 요구 결정 |
-| [alarm-popup-policy-followups-2026-05-15](../../../../.claude/projects/-home-cjy-diconai/memory/alarm_popup_policy_followups_2026_05_15.md) | Phase 1 후속 |
-| [alarm-flow-doc-stale-2026-05-15](../../../../.claude/projects/-home-cjy-diconai/memory/alarm_flow_doc_stale_2026_05_15.md) | 흐름도 stale 인지 |
-| [alarm-t1-t3-pause-2026-05-20](../../../../.claude/projects/-home-cjy-diconai/memory/alarm_t1_t3_pause_2026_05_20.md) | T1+T3 완료 + 시연 후 sprint 계획 |
-| [alarm-t4-pre-entry-verified-2026-05-20](../../../../.claude/projects/-home-cjy-diconai/memory/alarm_t4_pre_entry_verified_2026_05_20.md) | T4 진입 전 검증 |
-| [alarm-symptom-diagnosis-2026-05-20](../../../../.claude/projects/-home-cjy-diconai/memory/alarm_symptom_diagnosis_2026_05_20.md) | 3대 증상 진단 + 시연 후 sprint |
-| [alarm-dataflow-review-2026-05-20](../../../../.claude/projects/-home-cjy-diconai/memory/alarm_dataflow_review_2026_05_20.md) | 외부 리뷰 4지적 |
+| [alarm-system-redesign-2026-05-15](../../../../../.claude/projects/-home-cjy-diconai/memory/alarm_system_redesign_2026_05_15.md) | 재설계 진입 + 3대 요구 결정 |
+| [alarm-popup-policy-followups-2026-05-15](../../../../../.claude/projects/-home-cjy-diconai/memory/alarm_popup_policy_followups_2026_05_15.md) | Phase 1 후속 |
+| [alarm-flow-doc-stale-2026-05-15](../../../../../.claude/projects/-home-cjy-diconai/memory/alarm_flow_doc_stale_2026_05_15.md) | 흐름도 stale 인지 |
+| [alarm-t1-t3-pause-2026-05-20](../../../../../.claude/projects/-home-cjy-diconai/memory/alarm_t1_t3_pause_2026_05_20.md) | T1+T3 완료 + 시연 후 sprint 계획 |
+| [alarm-t4-pre-entry-verified-2026-05-20](../../../../../.claude/projects/-home-cjy-diconai/memory/alarm_t4_pre_entry_verified_2026_05_20.md) | T4 진입 전 검증 |
+| [alarm-symptom-diagnosis-2026-05-20](../../../../../.claude/projects/-home-cjy-diconai/memory/alarm_symptom_diagnosis_2026_05_20.md) | 3대 증상 진단 + 시연 후 sprint |
+| [alarm-dataflow-review-2026-05-20](../../../../../.claude/projects/-home-cjy-diconai/memory/alarm_dataflow_review_2026_05_20.md) | 외부 리뷰 4지적 |
 
 ### 8.7 트러블슈팅 (skill/troubleshooting/ + docs/infra/) — 2개
 
 | 자료 | 핵심 |
 |---|---|
-| [skill/troubleshooting/0519_alarm-toast-escalate-timer-race.md](../troubleshooting/0519_alarm-toast-escalate-timer-race.md) | 토스트 격상 타이머 race |
-| [docs/infra/troubleshooting_alarm_popup_docker.md](../../docs/infra/troubleshooting_alarm_popup_docker.md) | Docker 환경 팝업 이슈 |
+| [skill/troubleshooting/0519_alarm-toast-escalate-timer-race.md](../../troubleshooting/0519_alarm-toast-escalate-timer-race.md) | 토스트 격상 타이머 race |
+| [docs/infra/troubleshooting_alarm_popup_docker.md](../../../docs/infra/troubleshooting_alarm_popup_docker.md) | Docker 환경 팝업 이슈 |
 
 ### 8.8 기능정의서 (docs/features/) — 5개
 
 | 자료 | 핵심 | 본인? |
 |---|---|---|
-| [cjy_CM-07_알람팝업개선_기능정의서.md](../../docs/features/cjy_CM-07_알람팝업개선_기능정의서.md) | 알람 팝업 개선 | ★ 본인 |
-| [cjy_MN-04_geofence_alarm.md](../../docs/features/cjy_MN-04_geofence_alarm.md) | geofence 알람 | ★ 본인 |
-| [hjh_alarm-core-service_기능정의서.md](../../docs/features/hjh_alarm-core-service_기능정의서.md) | 알람 core 서비스 | 참조 |
-| [cm07_mn03_가스알람_이벤트.md](../../docs/features/cm07_mn03_가스알람_이벤트.md) | 가스 알람 이벤트 | 참조 |
-| [hjh_CM-07_MN-03_이벤트현황_유해가스현황_기능정의서.md](../../docs/features/hjh_CM-07_MN-03_이벤트현황_유해가스현황_기능정의서.md) | 이벤트현황 + 유해가스현황 | 참조 |
+| [cjy_CM-07_알람팝업개선_기능정의서.md](../../../docs/features/cjy_CM-07_알람팝업개선_기능정의서.md) | 알람 팝업 개선 | ★ 본인 |
+| [cjy_MN-04_geofence_alarm.md](../../../docs/features/cjy_MN-04_geofence_alarm.md) | geofence 알람 | ★ 본인 |
+| [hjh_alarm-core-service_기능정의서.md](../../../docs/features/hjh_alarm-core-service_기능정의서.md) | 알람 core 서비스 | 참조 |
+| [cm07_mn03_가스알람_이벤트.md](../../../docs/features/cm07_mn03_가스알람_이벤트.md) | 가스 알람 이벤트 | 참조 |
+| [hjh_CM-07_MN-03_이벤트현황_유해가스현황_기능정의서.md](../../../docs/features/hjh_CM-07_MN-03_이벤트현황_유해가스현황_기능정의서.md) | 이벤트현황 + 유해가스현황 | 참조 |
 
 ### 8.9 skill 일반 자료 + skill/CJY/
 
 | 자료 | 핵심 |
 |---|---|
-| [skill/알람 시나리오 관련 파일과 흐름도.md](../알람%20시나리오%20관련%20파일과%20흐름도.md) | 알람 시나리오 파일 + 흐름도 (본인 정리) |
-| [skill/지오펜스 알람 경로에 대해서.md](../지오펜스%20알람%20경로에%20대해서.md) | geofence 경로 (본인 정리) |
-| [skill/CJY/초안_알람_이벤트_관리.md](../CJY/초안_알람_이벤트_관리.md) | 알람·이벤트 관리 초안 (본인) |
-| [skill/CJY/02.알림 이벤트 관리 분석에 대해서.md](../CJY/02.알림%20이벤트%20관리%20분석에%20대해서.md) | 알림 이벤트 관리 분석 (본인) |
-| [skill/CJY/03.2 알림 발송 이력 관리 기준에 대해서.md](../CJY/03.2%20알림%20발송%20이력%20관리%20기준에%20대해서.md) | 알림 발송 이력 |
+| [skill/알람 시나리오 관련 파일과 흐름도.md](../../알람%20시나리오%20관련%20파일과%20흐름도.md) | 알람 시나리오 파일 + 흐름도 (본인 정리) |
+| [skill/지오펜스 알람 경로에 대해서.md](../../지오펜스%20알람%20경로에%20대해서.md) | geofence 경로 (본인 정리) |
+| [skill/CJY/초안_알람_이벤트_관리.md](../../CJY/초안_알람_이벤트_관리.md) | 알람·이벤트 관리 초안 (본인) |
+| [skill/CJY/02.알림 이벤트 관리 분석에 대해서.md](../../CJY/02.알림%20이벤트%20관리%20분석에%20대해서.md) | 알림 이벤트 관리 분석 (본인) |
+| [skill/CJY/03.2 알림 발송 이력 관리 기준에 대해서.md](../../CJY/03.2%20알림%20발송%20이력%20관리%20기준에%20대해서.md) | 알림 발송 이력 |
 
 ### 8.10 .claude/skills/diconai/
 
 | 자료 | 핵심 |
 |---|---|
-| [.claude/skills/diconai/alarm-flow.md](../../.claude/skills/diconai/alarm-flow.md) | 알람 생성·전파 흐름 전체 가이드 (5 단계 architecture) |
+| [.claude/skills/diconai/alarm-flow.md](../../../.claude/skills/diconai/alarm-flow.md) | 알람 생성·전파 흐름 전체 가이드 (5 단계 architecture) |
 
 ---
 
@@ -514,37 +514,37 @@ position_dummy → POST /api/positioning/receive → position_router
 
 | 영역 | 파일 |
 |---|---|
-| decide_alarm 매트릭스 | [power/services/decide_alarm.py](../../fastapi-server/power/services/decide_alarm.py) |
-| push_alarm + fingerprint dedup | [websocket/services/alarm_queue.py](../../fastapi-server/websocket/services/alarm_queue.py) |
-| AI state + mark_ai_recent | [services/ai_mute.py](../../fastapi-server/services/ai_mute.py) |
-| WS broadcast | [websocket/services/broadcast.py](../../fastapi-server/websocket/services/broadcast.py) |
-| 전력 알람 결정 호출 | [power/services/anomaly_inference.py](../../fastapi-server/power/services/anomaly_inference.py) |
-| 가스 알람 결정 호출 | [gas/services/gas_service.py](../../fastapi-server/gas/services/gas_service.py) |
-| Celery → fastapi 알람 push 수신 | [internal/routers/alarm_router.py](../../fastapi-server/internal/routers/alarm_router.py) `/internal/alarms/push/` |
-| DRF forward | [services/anomaly_alarm.py](../../fastapi-server/services/anomaly_alarm.py) |
+| decide_alarm 매트릭스 | [power/services/decide_alarm.py](../../../fastapi-server/power/services/decide_alarm.py) |
+| push_alarm + fingerprint dedup | [websocket/services/alarm_queue.py](../../../fastapi-server/websocket/services/alarm_queue.py) |
+| AI state + mark_ai_recent | [services/ai_mute.py](../../../fastapi-server/services/ai_mute.py) |
+| WS broadcast | [websocket/services/broadcast.py](../../../fastapi-server/websocket/services/broadcast.py) |
+| 전력 알람 결정 호출 | [power/services/anomaly_inference.py](../../../fastapi-server/power/services/anomaly_inference.py) |
+| 가스 알람 결정 호출 | [gas/services/gas_service.py](../../../fastapi-server/gas/services/gas_service.py) |
+| Celery → fastapi 알람 push 수신 | [internal/routers/alarm_router.py](../../../fastapi-server/internal/routers/alarm_router.py) `/internal/alarms/push/` |
+| DRF forward | [services/anomaly_alarm.py](../../../fastapi-server/services/anomaly_alarm.py) |
 
 ### A.2 drf-server
 
 | 영역 | 파일 |
 |---|---|
-| Celery 알람 태스크 | [apps/alerts/tasks.py](../../drf-server/apps/alerts/tasks.py) (`fire_danger_alarm_task` / `fire_warning_alarm_task` / `fire_geofence_alarm_task` / `fire_clear_notification_task`) |
-| Event 생성·병합 | [apps/alerts/services/event_service.py](../../drf-server/apps/alerts/services/event_service.py) `create_alarm_and_event` |
-| 동일 이벤트 병합 정책 | [apps/alerts/services/merge_policy.py](../../drf-server/apps/alerts/services/merge_policy.py) |
-| AI mute 가드 | [apps/alerts/services/alarm_dedupe.py](../../drf-server/apps/alerts/services/alarm_dedupe.py) `is_ai_mute_active` |
-| ALGORITHM_SOURCE_PHRASE | [apps/core/constants.py](../../drf-server/apps/core/constants.py) |
-| WS push 수신 view | [apps/alerts/views/anomaly_alarm_record.py](../../drf-server/apps/alerts/views/anomaly_alarm_record.py) |
-| AlarmRecord model | [apps/alerts/models/alarm_record.py](../../drf-server/apps/alerts/models/alarm_record.py) |
-| Event model | [apps/alerts/models/event.py](../../drf-server/apps/alerts/models/event.py) |
+| Celery 알람 태스크 | [apps/alerts/tasks.py](../../../drf-server/apps/alerts/tasks.py) (`fire_danger_alarm_task` / `fire_warning_alarm_task` / `fire_geofence_alarm_task` / `fire_clear_notification_task`) |
+| Event 생성·병합 | [apps/alerts/services/event_service.py](../../../drf-server/apps/alerts/services/event_service.py) `create_alarm_and_event` |
+| 동일 이벤트 병합 정책 | [apps/alerts/services/merge_policy.py](../../../drf-server/apps/alerts/services/merge_policy.py) |
+| AI mute 가드 | [apps/alerts/services/alarm_dedupe.py](../../../drf-server/apps/alerts/services/alarm_dedupe.py) `is_ai_mute_active` |
+| ALGORITHM_SOURCE_PHRASE | [apps/core/constants.py](../../../drf-server/apps/core/constants.py) |
+| WS push 수신 view | [apps/alerts/views/anomaly_alarm_record.py](../../../drf-server/apps/alerts/views/anomaly_alarm_record.py) |
+| AlarmRecord model | [apps/alerts/models/alarm_record.py](../../../drf-server/apps/alerts/models/alarm_record.py) |
+| Event model | [apps/alerts/models/event.py](../../../drf-server/apps/alerts/models/event.py) |
 
 ### A.3 frontend (drf-server/static/js/)
 
 | 영역 | 파일 |
 |---|---|
-| 알람 팝업 컨트롤러 | [shared/alarm-popup.js](../../drf-server/static/js/shared/alarm-popup.js) |
-| 알람 팝업 스타일 | [shared/alarm-popup.css](../../drf-server/static/js/shared/alarm-popup.css) |
-| WS 수신 라우터 | [dashboard/websocket.js](../../drf-server/static/js/dashboard/websocket.js) |
-| AlarmMapper (정규화) | [shared/alarm-mapper.js](../../drf-server/static/js/shared/alarm-mapper.js) |
-| 알람 WS handler | [shared/alarm-ws.js](../../drf-server/static/js/shared/alarm-ws.js) (있다면) |
+| 알람 팝업 컨트롤러 | [shared/alarm-popup.js](../../../drf-server/static/js/shared/alarm-popup.js) |
+| 알람 팝업 스타일 | [shared/alarm-popup.css](../../../drf-server/static/js/shared/alarm-popup.css) |
+| WS 수신 라우터 | [dashboard/websocket.js](../../../drf-server/static/js/dashboard/websocket.js) |
+| AlarmMapper (정규화) | [shared/alarm-mapper.js](../../../drf-server/static/js/shared/alarm-mapper.js) |
+| 알람 WS handler | [shared/alarm-ws.js](../../../drf-server/static/js/shared/alarm-ws.js) (있다면) |
 
 ---
 
@@ -552,13 +552,13 @@ position_dummy → POST /api/positioning/receive → position_router
 
 | 우선 | 작업 | 자료 |
 |---|---|---|
-| 1 | `_AckStore` 멘탈 모델 패치 — 24h 영구 차단 분리 | [memory: alarm-symptom-diagnosis-2026-05-20](../../../../.claude/projects/-home-cjy-diconai/memory/alarm_symptom_diagnosis_2026_05_20.md) |
-| 2 | T2 (역할 분리) | [memory: alarm-t1-t3-pause-2026-05-20](../../../../.claude/projects/-home-cjy-diconai/memory/alarm_t1_t3_pause_2026_05_20.md) |
+| 1 | `_AckStore` 멘탈 모델 패치 — 24h 영구 차단 분리 | [memory: alarm-symptom-diagnosis-2026-05-20](../../../../../.claude/projects/-home-cjy-diconai/memory/alarm_symptom_diagnosis_2026_05_20.md) |
+| 2 | T2 (역할 분리) | [memory: alarm-t1-t3-pause-2026-05-20](../../../../../.claude/projects/-home-cjy-diconai/memory/alarm_t1_t3_pause_2026_05_20.md) |
 | 3 | T4 D5 (정적 cover AlarmRecord 영속화) | 동일 |
 | 4 | T5 / T7 | 동일 |
-| 5 | a/c path 충돌 — AI 알람 시그널 누락 위험 패치 | [memory: alarm-dataflow-review-2026-05-20](../../../../.claude/projects/-home-cjy-diconai/memory/alarm_dataflow_review_2026_05_20.md) |
-| 6 | 정상화 → 회색 처리 디자인 결정 | [memory: alarm-popup-policy-followups-2026-05-15](../../../../.claude/projects/-home-cjy-diconai/memory/alarm_popup_policy_followups_2026_05_15.md) |
-| 7 | 작업자 디바이스 UX (Phase 3) | [memory: worker-device-undecided-2026-05-15](../../../../.claude/projects/-home-cjy-diconai/memory/worker_device_undecided_2026_05_15.md) |
+| 5 | a/c path 충돌 — AI 알람 시그널 누락 위험 패치 | [memory: alarm-dataflow-review-2026-05-20](../../../../../.claude/projects/-home-cjy-diconai/memory/alarm_dataflow_review_2026_05_20.md) |
+| 6 | 정상화 → 회색 처리 디자인 결정 | [memory: alarm-popup-policy-followups-2026-05-15](../../../../../.claude/projects/-home-cjy-diconai/memory/alarm_popup_policy_followups_2026_05_15.md) |
+| 7 | 작업자 디바이스 UX (Phase 3) | [memory: worker-device-undecided-2026-05-15](../../../../../.claude/projects/-home-cjy-diconai/memory/worker_device_undecided_2026_05_15.md) |
 
 ---
 
