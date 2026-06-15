@@ -18,10 +18,10 @@
 
 ## 30초 요약
 
-- **무엇** — 유해가스·전력설비·작업자 위치를 실시간 수집·검증하고 AI로 위험을 예측해 운영자·작업자에게 즉시 알람하는 **산재 예방 통합 관제 PoC**.
+- **무엇** — 유해가스·전력설비·작업자 위치를 실시간 수집·검증하고 AI 이상탐지로 위험 징후를 조기 감지해 운영자·작업자에게 즉시 알람하는 **산재 예방 통합 관제 PoC**.
 - **E2E 동작** — 수집 → 검증 → 저장 → 위험 판단 → AI 분석 → 실시간 송출 → 알람까지 더미 기반으로 실제 동작.
-- **3대 설계 과제** — ① 임계 도달 전 조기경고(다축 AI: 전력 5축·가스 3축 + 정적 임계 결합) ② 비동기 운영(Redis Stream + Celery 워커 분리 + 2-서버 역할 분리) ③ 관찰 가능(Prometheus + Grafana 6 대시보드).
-- **규모·성과** — 12-서비스 Docker Compose · PostgreSQL 16 · 기능 구현률 **79%**(전체 249). 가스 부하 병목 진단·해소(p95 **4.2s→0.9s**, 에러 **91%→0%**).
+- **3대 설계 과제** — ① 임계 도달 전 조기경고(다축 AI: 전력 5축·가스 3축 + 정적 임계 결합) ② 비동기 운영(Celery + Redis 브로커, 알람 Redis Stream(XADD/XREAD), alarm/metric 워커 분리, DRF/FastAPI 역할 분리) ③ 관찰 가능(Prometheus + Grafana 6 대시보드).
+- **규모·성과** — 12-서비스 Docker Compose · PostgreSQL 16 · 기능 구현률 **79%**(전체 249개 기능 체크리스트 기준). 가스 부하 병목 진단·해소(p95 **4.2s→0.9s**, 에러 **91%→0%**).
 - **성격** — 완성품이 아니라 **동작이 검증된 아키텍처 PoC** — "결승선이 아니라 출발선".
 
 ---
@@ -124,7 +124,7 @@
 1. **수신** — IoT/더미가 `POST /api/sensors/gas` · `/api/power/watt` · `/api/positioning/receive`로 FastAPI에 송신.
 2. **검증·전달** — FastAPI가 Pydantic 검증·정규화 후 DRF 내부 API(`POST /api/monitoring/gas/` 등)로 forward → DB 저장 (전력은 fire-and-forget).
 3. **실시간 송출** — `broadcast_loop`이 5초마다 `WS /ws/sensors/`로 통합 상태를, 위치는 `WS /ws/positions/`로 1초마다 송신.
-4. **알람 (이벤트 즉시)** — Celery가 임계 초과 감지 → `AlarmRecord` 저장 → `POST /internal/alarms/push/` → 큐 적재 → `alarm_flush_loop`이 `WS /ws/sensors/`로 즉시 broadcast.
+4. **알람 (이벤트 즉시)** — Celery가 임계 초과 감지 → `AlarmRecord` 저장 → `POST /internal/alarms/push/` → **Redis Stream `XADD`(MAXLEN cap)** 적재 → `alarm_flush_loop`이 **`XREAD`**로 소비해 `WS /ws/sensors/`로 즉시 broadcast.
 
 > 단계별 페이로드 정의(37종)는 [docs/specs/json_fields_specification.md](docs/specs/json_fields_specification.md), 가스 수신 파이프라인은 [docs/features/gas_sensor_http_pipeline.md](docs/features/gas_sensor_http_pipeline.md), AI 추론 흐름은 [docs/ai/pipeline.md](docs/ai/pipeline.md) 참고.
 
