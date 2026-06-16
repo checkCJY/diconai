@@ -17,6 +17,8 @@
     <h2>작업자 현황</h2>
   </div>
 
+  {% include 'components/ws_conn_banner.html' %}
+
   <div class="panel">
 
     <!-- ============================================================
@@ -250,9 +252,11 @@
 <script src="{% static 'js/shared/config.js' %}"></script>
 <script src="{% static 'js/shared/auth.js' %}"></script>
 <script src="{% static 'js/shared/ws-client.js' %}"></script>
+<script src="{% static 'js/shared/ws-conn-banner.js' %}"></script>
 <script src="{% static 'js/shared/layout.js' %}"></script>
 <script src="{% static 'js/shared/app-sub.js' %}"></script>
 <script src="{% static 'js/detail/monitoring_workers.js' %}"></script>
 
+{% include "components/alarm_stack.html" %}
 </body>
 </html>

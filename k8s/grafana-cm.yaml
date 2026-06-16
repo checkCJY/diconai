@@ -1,0 +1,1221 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources # grafana.yaml volumes에서 참조하는 이름
+  namespace: diconai
+data:
+  prometheus.yml: | # Grafana가 Prometheus를 데이터소스로 자동 등록하는 설정
+    apiVersion: 1
+
+    datasources:
+      - name: Prometheus
+        uid: prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus:9090 # prometheus = k8s Service 이름
+        isDefault: true
+        editable: false
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards # grafana.yaml volumes에서 참조하는 이름
+  namespace: diconai
+data:
+  dashboards.yml: | # Grafana가 아래 JSON 파일들을 자동으로 읽는 provisioning 설정
+    apiVersion: 1
+
+    providers:
+      - name: diconai
+        orgId: 1
+        folder: ""
+        type: file
+        disableDeletion: false
+        updateIntervalSeconds: 30
+        allowUiUpdates: true
+        options:
+          path: /etc/grafana/provisioning/dashboards # 이 ConfigMap이 마운트되는 경로
+
+  diconai-overview.json: |
+    {
+      "annotations": {
+        "list": []
+      },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
+      "id": null,
+      "links": [],
+      "panels": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 4
+          },
+          "id": 1,
+          "title": "서비스 가동 상태 (1=정상, 0=중단)",
+          "description": "Prometheus가 각 서버의 /metrics 수집에 성공하면 1, 실패하면 0. DRF/FastAPI 둘 다 1이어야 정상 운영 상태. redis는 redis_up(Redis 서버 자체 상태)으로 표시.",
+          "type": "stat",
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "colorMode": "background",
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "red",
+                  "value": 0
+                },
+                {
+                  "color": "green",
+                  "value": 1
+                }
+              ]
+            }
+          },
+          "targets": [
+            {
+              "expr": "up{job!=\"redis\"}",
+              "legendFormat": "{{job}}",
+              "refId": "A"
+            },
+            {
+              "expr": "redis_up",
+              "legendFormat": "redis",
+              "refId": "B"
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 4,
+            "w": 12,
+            "h": 8
+          },
+          "id": 2,
+          "title": "DRF — 요청 수 (RPS, 5m)",
+          "description": "Django 서버로 들어오는 초당 요청 수. 경로별로 분리해 어느 API가 가장 많이 호출되는지 확인한다. 급격히 떨어지면 서버 다운 또는 네트워크 이상.",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "sum by (path) (rate(http_requests_total{job=\"drf\"}[5m]))",
+              "legendFormat": "{{path}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 4,
+            "w": 12,
+            "h": 8
+          },
+          "id": 3,
+          "title": "FastAPI — 요청 수 (RPS, 5m)",
+          "description": "FastAPI 서버로 들어오는 초당 요청 수. 센서 데이터 수신(/api/sensors/gas, /api/power/*), WebSocket, 내부 알람 푸시 등이 포함된다.",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "sum by (path) (rate(http_requests_total{job=\"fastapi\"}[5m]))",
+              "legendFormat": "{{path}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 12,
+            "w": 12,
+            "h": 8
+          },
+          "id": 4,
+          "title": "DRF — 응답시간 p95 (5m)",
+          "description": "상위 5% 느린 요청의 응답시간. 평균보다 실제 사용자가 체감하는 속도에 가깝다. 이 값이 올라가면 특정 API에 병목이 생긴 것.",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"drf\"}[5m])))",
+              "legendFormat": "p95",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 12,
+            "w": 12,
+            "h": 8
+          },
+          "id": 5,
+          "title": "FastAPI — 응답시간 p95 (5m)",
+          "description": "FastAPI 응답시간 p95. 센서 ingest는 1초 간격으로 들어오므로 여기가 느려지면 데이터 수신 지연으로 이어진다.",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"fastapi\"}[5m])))",
+              "legendFormat": "p95",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 20,
+            "w": 12,
+            "h": 8
+          },
+          "id": 6,
+          "title": "DRF — 에러율 5xx (5m)",
+          "description": "전체 요청 중 500번대 응답 비율. 0에 가까워야 정상. 올라가면 Django 서버 내부 오류 발생 중 — AppLog(시스템 로그)와 함께 확인한다.",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "sum(rate(http_requests_total{job=\"drf\", status=~\"5..\"}[5m])) / sum(rate(http_requests_total{job=\"drf\"}[5m]))",
+              "legendFormat": "에러율",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 20,
+            "w": 12,
+            "h": 8
+          },
+          "id": 7,
+          "title": "FastAPI — 에러율 5xx (5m)",
+          "description": "FastAPI 500번대 응답 비율. 올라가면 센서 데이터 처리 실패 or DRF 저장 실패 가능성 — IntegrationLog(연동 로그)와 함께 확인한다.",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "sum(rate(http_requests_total{job=\"fastapi\", status=~\"5..\"}[5m])) / sum(rate(http_requests_total{job=\"fastapi\"}[5m]))",
+              "legendFormat": "에러율",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 28,
+            "w": 24,
+            "h": 8
+          },
+          "id": 8,
+          "title": "DRF vs FastAPI — 응답시간 비교 p95 (5m)",
+          "description": "두 서버의 p95 응답시간을 같은 그래프에 표시. Django가 느린지 FastAPI가 느린지 한눈에 구분 — 병목 서버 특정에 사용한다.",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum by (le, job) (rate(http_request_duration_seconds_bucket[5m])))",
+              "legendFormat": "{{job}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 36,
+            "w": 24,
+            "h": 8
+          },
+          "id": 9,
+          "title": "지오펜스 — 위험도 판정 시간 p95 / p99 (5m)",
+          "description": "작업자 진입 시 위험 센서 판정에 걸린 시간. p99 ≥ 100ms이면 알람 지연 가능 → DB 인덱스 점검. 산업안전 도메인: 판정 지연이 실제 사고로 이어질 수 있다.",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum by (le) (rate(geofence_check_duration_seconds_bucket[5m])))",
+              "legendFormat": "p95",
+              "refId": "A"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum by (le) (rate(geofence_check_duration_seconds_bucket[5m])))",
+              "legendFormat": "p99",
+              "refId": "B"
+            }
+          ]
+        }
+      ],
+      "schemaVersion": 39,
+      "tags": ["diconai"],
+      "templating": {"list": []},
+      "time": {"from": "now-1h", "to": "now"},
+      "timepicker": {},
+      "timezone": "",
+      "title": "diconai — Overview",
+      "uid": "diconai-overview",
+      "version": 2,
+      "weekStart": ""
+    }
+
+  diconai-db-redis.json: |
+    {
+      "annotations": {"list": []},
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
+      "id": null,
+      "links": [],
+      "panels": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {"defaults": {"unit": "cps"}, "overrides": []},
+          "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+          "id": 1,
+          "title": "DB 저장 — 성공 / 에러 타입별 (5m)",
+          "description": "가스·전력 DB 저장 시도를 결과별로 표시. db_locked 에러가 5분간 5회 이상이면 SQLite 동시성 한계 → PostgreSQL 마이그레이션 검토. integrity 에러는 중복 데이터 수신 가능성.",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "sum by (model, result, error_type) (rate(drf_db_save_total[5m]))",
+              "legendFormat": "{{model}} / {{result}} / {{error_type}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+          "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+          "id": 2,
+          "title": "DB 저장 latency p95 (gas / power, 5m)",
+          "description": "GasData·PowerData ORM 저장에 걸린 시간. SQLite p95 ≥ 50ms이면 동시 쓰기 병목. PG 전환 전후 이 값을 비교해 전환 효과를 수치로 확인한다.",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum by (le, model) (rate(db_save_duration_seconds_bucket[5m])))",
+              "legendFormat": "{{model}} p95",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "Redis 명령 latency p95 (P1 — lpush / brpop, 5m)",
+          "description": "alarm_queue LPUSH/BRPOP 명령 실행 시간. E2E latency 급등 시 Redis 병목 여부 판단용.",
+          "type": "timeseries",
+          "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "color": {"mode": "palette-classic"},
+              "custom": {"lineWidth": 2, "fillOpacity": 10, "spanNulls": false}
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {"mode": "multi", "sort": "none"},
+            "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}
+          },
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "prometheus"},
+              "expr": "histogram_quantile(0.95, sum by (le, command) (rate(redis_command_duration_seconds_bucket{job=\"fastapi\"}[5m])))",
+              "legendFormat": "{{command}} p95",
+              "refId": "A"
+            },
+            {
+              "datasource": {"type": "prometheus", "uid": "prometheus"},
+              "expr": "histogram_quantile(0.99, sum by (le, command) (rate(redis_command_duration_seconds_bucket{job=\"fastapi\"}[5m])))",
+              "legendFormat": "{{command}} p99",
+              "refId": "B"
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "Redis 연결 클라이언트 수",
+          "description": "현재 Redis에 연결된 클라이언트 수. 50 이상이면 연결 풀 점검, 100 이상이면 이상 신호.",
+          "type": "stat",
+          "gridPos": {"x": 12, "y": 8, "w": 6, "h": 4},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {"color": "green", "value": null},
+                  {"color": "yellow", "value": 50},
+                  {"color": "red", "value": 100}
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {"calcs": ["lastNotNull"]},
+            "orientation": "auto",
+            "textMode": "auto",
+            "colorMode": "background"
+          },
+          "targets": [
+            {
+              "expr": "redis_connected_clients",
+              "legendFormat": "연결 수",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "Redis 메모리 사용량",
+          "description": "Redis가 현재 사용 중인 메모리. 256MB 이상이면 점검, 512MB 이상이면 maxmemory 정책 확인.",
+          "type": "stat",
+          "gridPos": {"x": 18, "y": 8, "w": 6, "h": 4},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {"color": "green", "value": null},
+                  {"color": "yellow", "value": 268435456},
+                  {"color": "red", "value": 536870912}
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {"calcs": ["lastNotNull"]},
+            "orientation": "auto",
+            "textMode": "auto",
+            "colorMode": "background"
+          },
+          "targets": [
+            {
+              "expr": "redis_memory_used_bytes",
+              "legendFormat": "메모리",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "title": "Redis keyspace hit ratio (5m)",
+          "description": "Redis 키 조회 중 캐시 히트 비율. 0.8 미만이면 TTL 설정 또는 캐시 워밍 전략 점검.",
+          "type": "timeseries",
+          "gridPos": {"x": 12, "y": 12, "w": 12, "h": 4},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "color": {"mode": "palette-classic"},
+              "custom": {"lineWidth": 2, "fillOpacity": 10, "spanNulls": false}
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {"mode": "multi", "sort": "none"},
+            "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}
+          },
+          "targets": [
+            {
+              "expr": "rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m]))",
+              "legendFormat": "keyspace hit ratio",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 8,
+          "title": "Cache hit rate — prefix별 (5m)",
+          "description": "Django 애플리케이션 캐시(alert_policies, menu_tree)의 히트율. 알람 발화마다 alert_policies를 조회하므로 hit rate가 낮으면 DB 부하 증가.",
+          "type": "timeseries",
+          "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "color": {"mode": "palette-classic"},
+              "custom": {"lineWidth": 2, "fillOpacity": 10, "spanNulls": false}
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {"mode": "multi", "sort": "none"},
+            "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}
+          },
+          "targets": [
+            {
+              "expr": "sum by (prefix) (rate(cache_hit_total[5m])) / (sum by (prefix) (rate(cache_hit_total[5m])) + sum by (prefix) (rate(cache_miss_total[5m])))",
+              "legendFormat": "{{prefix}} hit rate",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 9,
+          "title": "Cache hit / miss 건수 — prefix별 (5m)",
+          "description": "prefix별 캐시 히트·미스 건수. miss가 급증하면 TTL 만료 또는 캐시 무효화 빈도 점검.",
+          "type": "timeseries",
+          "gridPos": {"x": 12, "y": 16, "w": 12, "h": 8},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {
+              "unit": "cps",
+              "color": {"mode": "palette-classic"},
+              "custom": {"lineWidth": 2, "fillOpacity": 10, "spanNulls": false}
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {"mode": "multi", "sort": "none"},
+            "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}
+          },
+          "targets": [
+            {
+              "expr": "sum by (prefix) (rate(cache_hit_total[5m]))",
+              "legendFormat": "{{prefix}} hit",
+              "refId": "A"
+            },
+            {
+              "expr": "sum by (prefix) (rate(cache_miss_total[5m]))",
+              "legendFormat": "{{prefix}} miss",
+              "refId": "B"
+            }
+          ]
+        }
+      ],
+      "schemaVersion": 39,
+      "tags": ["diconai"],
+      "templating": {"list": []},
+      "time": {"from": "now-1h", "to": "now"},
+      "timepicker": {},
+      "timezone": "",
+      "title": "diconai — DB & Redis",
+      "uid": "diconai-db-redis",
+      "version": 2,
+      "weekStart": ""
+    }
+
+  diconai-alarm.json: |
+    {
+      "annotations": {"list": []},
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
+      "id": null,
+      "links": [],
+      "panels": [
+        {
+          "id": 1,
+          "title": "E2E 알람 latency p95 — danger / warning 분리 (C7, 5m)",
+          "description": "danger SLO: p95 ≤ 1.5s. warning은 countdown=3s 설계상 항상 3.5s 이상 — 참고용.",
+          "type": "timeseries",
+          "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "color": {"mode": "palette-classic"},
+              "custom": {"lineWidth": 2, "fillOpacity": 10, "spanNulls": false},
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {"color": "green", "value": null},
+                  {"color": "yellow", "value": 1.0},
+                  {"color": "red", "value": 1.5}
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {"mode": "multi", "sort": "none"},
+            "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(e2e_alarm_latency_seconds_bucket{risk_level=\"danger\"}[5m])) by (le))",
+              "legendFormat": "danger p95",
+              "refId": "A"
+            },
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(e2e_alarm_latency_seconds_bucket{risk_level=\"warning\"}[5m])) by (le))",
+              "legendFormat": "warning p95 (참고용)",
+              "refId": "B"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "FastAPI WS 알람 큐 길이 (A3 — Redis LIST)",
+          "type": "timeseries",
+          "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {"mode": "palette-classic"},
+              "custom": {"lineWidth": 2, "fillOpacity": 10, "spanNulls": false},
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {"color": "green", "value": null},
+                  {"color": "yellow", "value": 50},
+                  {"color": "red", "value": 100}
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {"mode": "multi", "sort": "none"},
+            "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}
+          },
+          "targets": [
+            {
+              "expr": "fastapi_alarm_queue_length",
+              "legendFormat": "WS 알람 큐",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "WebSocket 연결 수 (타입별)",
+          "description": "현재 연결된 WebSocket 수. sensor=브라우저, worker=작업자 앱, position=IoT 위치 장비. 갑자기 0이 되면 전체 연결 끊김.",
+          "type": "timeseries",
+          "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {"mode": "palette-classic"},
+              "custom": {"lineWidth": 2, "fillOpacity": 10, "spanNulls": false}
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {"mode": "multi", "sort": "none"},
+            "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}
+          },
+          "targets": [
+            {
+              "expr": "fastapi_ws_connections{job=\"fastapi\"}",
+              "legendFormat": "{{type}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "FastAPI → DRF 호출 실패 횟수 (A1 — 에러 타입별, 5m)",
+          "type": "timeseries",
+          "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {"mode": "palette-classic"},
+              "custom": {"lineWidth": 2, "fillOpacity": 10, "spanNulls": false}
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {"mode": "multi", "sort": "none"},
+            "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}
+          },
+          "targets": [
+            {
+              "expr": "sum by (error_type) (rate(fastapi_drf_call_failed_total[5m]))",
+              "legendFormat": "{{error_type}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "Celery — 알람 발송 횟수 (5m)",
+          "description": "Celery worker가 실제로 WebSocket에 푸시한 알람 초당 건수.",
+          "type": "timeseries",
+          "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {"defaults": {"unit": "cps"}, "overrides": []},
+          "targets": [
+            {
+              "expr": "sum by (alarm_type, risk_level) (rate(alarm_fired_total[5m]))",
+              "legendFormat": "{{alarm_type}} / {{risk_level}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "Celery — WS 푸시 실패 횟수 (5m)",
+          "description": "FastAPI /internal/alarms/push/ 호출 실패 횟수.",
+          "type": "timeseries",
+          "gridPos": {"x": 12, "y": 16, "w": 12, "h": 8},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {"defaults": {"unit": "cps"}, "overrides": []},
+          "targets": [
+            {
+              "expr": "sum by (alarm_type) (rate(alarm_ws_push_failed_total[5m]))",
+              "legendFormat": "{{alarm_type}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "title": "Celery — 큐 대기 태스크 수",
+          "description": "Redis에 쌓인 미처리 Celery 태스크 수. 50 이상이 지속되면 worker 증설 검토.",
+          "type": "timeseries",
+          "gridPos": {"x": 0, "y": 24, "w": 12, "h": 8},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {"defaults": {"unit": "short", "min": 0}, "overrides": []},
+          "targets": [
+            {
+              "expr": "celery_queue_length",
+              "legendFormat": "{{queue}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 8,
+          "title": "Celery 태스크 실패 / 재시도 횟수 (5m)",
+          "description": "실패는 예외로 최종 종료된 태스크. 재시도는 실패 후 재큐잉된 횟수.",
+          "type": "timeseries",
+          "gridPos": {"x": 12, "y": 24, "w": 12, "h": 8},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {"mode": "palette-classic"},
+              "custom": {"lineWidth": 2, "fillOpacity": 10, "spanNulls": false}
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {"mode": "multi", "sort": "none"},
+            "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}
+          },
+          "targets": [
+            {
+              "expr": "rate(celery_task_failed_total{job=\"drf\"}[5m]) by (task_name)",
+              "legendFormat": "실패 — {{task_name}}",
+              "refId": "A"
+            },
+            {
+              "expr": "rate(celery_task_retried_total{job=\"drf\"}[5m]) by (task_name)",
+              "legendFormat": "재시도 — {{task_name}}",
+              "refId": "B"
+            }
+          ]
+        },
+        {
+          "id": 9,
+          "title": "Celery — 태스크 실행시간 p95 (task별, 5m)",
+          "description": "워커가 태스크를 실제로 처리한 시간. p95 ≥ 500ms이면 태스크 로직 자체가 느린 것.",
+          "type": "timeseries",
+          "gridPos": {"x": 0, "y": 32, "w": 12, "h": 8},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum by (le, task_name) (rate(celery_task_duration_seconds_bucket[5m])))",
+              "legendFormat": "{{task_name}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 10,
+          "title": "Celery — 태스크 대기시간 p95 (task별, 5m)",
+          "description": "태스크가 큐에 들어간 후 워커가 꺼낼 때까지 기다린 시간.",
+          "type": "timeseries",
+          "gridPos": {"x": 12, "y": 32, "w": 12, "h": 8},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum by (le, task_name) (rate(celery_task_queued_seconds_bucket[5m])))",
+              "legendFormat": "{{task_name}}",
+              "refId": "A"
+            }
+          ]
+        }
+      ],
+      "schemaVersion": 39,
+      "tags": ["diconai"],
+      "templating": {"list": []},
+      "time": {"from": "now-1h", "to": "now"},
+      "timepicker": {},
+      "timezone": "",
+      "title": "diconai — 알람 파이프라인",
+      "uid": "diconai-alarm",
+      "version": 1,
+      "weekStart": ""
+    }
+
+  diconai-power-ai.json: |
+    {
+      "annotations": {"list": []},
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
+      "id": null,
+      "links": [],
+      "panels": [
+        {
+          "id": 1,
+          "title": "AI 추론 소요시간 p95 (gas_if / power_if, 5m)",
+          "description": "Isolation Forest 추론 실행 시간. E2E latency 급등 시 Celery·DB·Redis가 정상이면 여기를 확인.",
+          "type": "timeseries",
+          "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "color": {"mode": "palette-classic"},
+              "custom": {"lineWidth": 2, "fillOpacity": 10, "spanNulls": false}
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {"mode": "multi", "sort": "none"},
+            "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, rate(ai_inference_duration_seconds_bucket{job=\"fastapi\"}[5m])) by (model_type)",
+              "legendFormat": "{{model_type}} p95",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "AI 추론 실패 횟수 (model_type / reason, 5m)",
+          "description": "추론 실패 시 서비스는 유지되지만 AI 없이 룰 기반으로만 알람 발생. 카운터가 올라가면 AI가 꺼진 상태.",
+          "type": "timeseries",
+          "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {"mode": "palette-classic"},
+              "custom": {"lineWidth": 2, "fillOpacity": 10, "spanNulls": false}
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {"mode": "multi", "sort": "none"},
+            "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}
+          },
+          "targets": [
+            {
+              "expr": "rate(ai_inference_failed_total{job=\"fastapi\"}[5m])",
+              "legendFormat": "{{model_type}} / {{reason}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "전력 AI — quality_guard skip 횟수 (reason별, 5m)",
+          "description": "센서 불량으로 AI 윈도우 적재가 skip된 횟수.",
+          "type": "timeseries",
+          "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {"mode": "palette-classic"},
+              "custom": {"lineWidth": 2, "fillOpacity": 10, "spanNulls": false}
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {"mode": "multi", "sort": "none"},
+            "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}
+          },
+          "targets": [
+            {
+              "expr": "sum by (reason) (rate(power_ai_quality_skip_total{job=\"fastapi\"}[5m]))",
+              "legendFormat": "{{reason}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "전력 AI — 5축 발화 횟수 (axis별, 5m)",
+          "description": "IF / ARIMA / Z-score / Change Point / 야간 가동 중 어느 축이 이상 판정에 기여했는지.",
+          "type": "timeseries",
+          "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {"mode": "palette-classic"},
+              "custom": {"lineWidth": 2, "fillOpacity": 10, "spanNulls": false}
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {"mode": "multi", "sort": "none"},
+            "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}
+          },
+          "targets": [
+            {
+              "expr": "sum by (axis) (rate(power_ai_axis_fired_total{job=\"fastapi\"}[5m]))",
+              "legendFormat": "{{axis}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "전력 AI — 추론 실행 횟수 (5m)",
+          "description": "quality_guard·윈도우 warmup을 통과해 실제로 추론이 실행된 횟수.",
+          "type": "timeseries",
+          "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {"mode": "palette-classic"},
+              "custom": {"lineWidth": 2, "fillOpacity": 10, "spanNulls": false}
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {"mode": "multi", "sort": "none"},
+            "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}
+          },
+          "targets": [
+            {
+              "expr": "rate(power_ai_inference_total{job=\"fastapi\"}[5m])",
+              "legendFormat": "추론 실행",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "전력 AI — 최종 판정 분포 (combined별, 5m)",
+          "description": "5축 종합 후 나온 판정(normal / caution / predict_warn / danger) 비율.",
+          "type": "timeseries",
+          "gridPos": {"x": 12, "y": 16, "w": 12, "h": 8},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {"mode": "palette-classic"},
+              "custom": {"lineWidth": 2, "fillOpacity": 10, "spanNulls": false}
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {"mode": "multi", "sort": "none"},
+            "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}
+          },
+          "targets": [
+            {
+              "expr": "sum by (combined) (rate(power_ai_combined_total{job=\"fastapi\"}[5m]))",
+              "legendFormat": "{{combined}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "title": "전력 AI — 실제 알람 발화 횟수 (algorithm_source별, 5m)",
+          "description": "rate limit을 통과해서 실제로 Redis 큐까지 전달된 알람.",
+          "type": "timeseries",
+          "gridPos": {"x": 0, "y": 24, "w": 12, "h": 8},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {"mode": "palette-classic"},
+              "custom": {"lineWidth": 2, "fillOpacity": 10, "spanNulls": false}
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {"mode": "multi", "sort": "none"},
+            "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}
+          },
+          "targets": [
+            {
+              "expr": "sum by (algorithm_source) (rate(power_ai_alarm_fired_total{job=\"fastapi\"}[5m]))",
+              "legendFormat": "{{algorithm_source}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 8,
+          "title": "전력 AI — rate limit 억제 횟수 (5m)",
+          "description": "같은 채널에서 60초 이내 재발화가 억제된 횟수.",
+          "type": "timeseries",
+          "gridPos": {"x": 12, "y": 24, "w": 12, "h": 8},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {"mode": "palette-classic"},
+              "custom": {"lineWidth": 2, "fillOpacity": 10, "spanNulls": false}
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {"mode": "multi", "sort": "none"},
+            "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}
+          },
+          "targets": [
+            {
+              "expr": "rate(power_ai_rate_limited_total{job=\"fastapi\"}[5m])",
+              "legendFormat": "rate limit 억제",
+              "refId": "A"
+            }
+          ]
+        }
+      ],
+      "schemaVersion": 39,
+      "tags": ["diconai"],
+      "templating": {"list": []},
+      "time": {"from": "now-1h", "to": "now"},
+      "timepicker": {},
+      "timezone": "",
+      "title": "diconai — 전력 AI",
+      "uid": "diconai-power-ai",
+      "version": 1,
+      "weekStart": ""
+    }
+
+  diconai-sensor.json: |
+    {
+      "annotations": {"list": []},
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
+      "id": null,
+      "links": [],
+      "panels": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {"defaults": {"unit": "reqps"}, "overrides": []},
+          "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+          "id": 1,
+          "title": "센서 데이터 ingest 건수 (가스, 5m)",
+          "description": "FastAPI가 수신하는 가스 센서 데이터 초당 건수. 뚝 떨어지면 센서 연결 끊김 또는 FastAPI 수신 장애.",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "rate(http_requests_total{job=\"fastapi\", path=\"/api/sensors/gas\", method=\"POST\"}[5m])",
+              "legendFormat": "가스 ingest",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "IoT 데이터 거부율 (A2 — 가스/전력/위치 4xx·5xx, 5m)",
+          "type": "timeseries",
+          "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "color": {"mode": "palette-classic"},
+              "custom": {"lineWidth": 2, "fillOpacity": 10, "spanNulls": false}
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {"mode": "multi", "sort": "none"},
+            "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}
+          },
+          "targets": [
+            {
+              "expr": "sum by (path, status) (rate(http_requests_total{job=\"fastapi\", path=~\"/api/gas.*|/api/power.*|/api/positioning.*\", status=~\"4..|5..\"}[5m]))",
+              "legendFormat": "{{path}} {{status}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "센서 마지막 수신 경과시간 (P1 — 가스/전력 통신 상태)",
+          "description": "IoT 센서에서 마지막으로 데이터가 들어온 이후 경과 시간. 300초(5분) 이상이면 통신 이상.",
+          "type": "timeseries",
+          "gridPos": {"x": 0, "y": 8, "w": 24, "h": 8},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "color": {"mode": "palette-classic"},
+              "custom": {"lineWidth": 2, "fillOpacity": 10, "spanNulls": false},
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {"color": "green", "value": 0},
+                  {"color": "yellow", "value": 60},
+                  {"color": "red", "value": 300}
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {"mode": "multi", "sort": "none"},
+            "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}
+          },
+          "targets": [
+            {
+              "expr": "time() - sensor_last_received_seconds{job=\"fastapi\"}",
+              "legendFormat": "{{sensor_type}} / {{sensor_id}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "통신 이상 센서 (P1 — 5분 이상 무응답)",
+          "description": "마지막 수신으로부터 300초(5분) 이상 데이터가 없는 센서 목록.",
+          "type": "stat",
+          "gridPos": {"x": 0, "y": 16, "w": 24, "h": 4},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "options": {
+            "reduceOptions": {"calcs": ["lastNotNull"]},
+            "colorMode": "background",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "red", "value": 1}
+              ]
+            }
+          },
+          "targets": [
+            {
+              "expr": "count(time() - sensor_last_received_seconds{job=\"fastapi\"} > 300) or vector(0)",
+              "legendFormat": "이상 센서 수",
+              "refId": "A"
+            }
+          ]
+        }
+      ],
+      "schemaVersion": 39,
+      "tags": ["diconai"],
+      "templating": {"list": []},
+      "time": {"from": "now-1h", "to": "now"},
+      "timepicker": {},
+      "timezone": "",
+      "title": "diconai — 센서 & IoT",
+      "uid": "diconai-sensor",
+      "version": 1,
+      "weekStart": ""
+    }

@@ -330,6 +330,7 @@ function _processPositions(workerPositions) {
 ══════════════════════════════════════════════════════════ */
 function _connectWebSocket() {
   const ws = WSClient.connect('/ws/sensors/', { attachToken: true });
+  if (typeof WsConnBanner !== 'undefined') WsConnBanner.attach(ws);  // P3 공용 배너
   ws.onOpen(() => console.log('[작업자 현황] WebSocket 연결됨'));
   ws.onClose(() => console.warn('[작업자 현황] 연결 끊김, WSClient 자동 재연결'));
   ws.onMessage((data) => {
@@ -347,13 +348,17 @@ async function loadWorkers() {
     const data = await res.json();
 
     const workerList = (data.workers || []).map(w => ({
-      id:        w.id,
-      name:      w.name,
-      dept:      w.department ?? '-',
-      zone:      '-',
-      last_seen: null,
-      connected: false,
-      status:    'normal',
+      id:          w.id,
+      name:        w.name,
+      employee_id: w.employee_id ?? '-',
+      dept:        w.department  ?? '-',
+      position:    w.position    ?? '-',
+      email:       w.email       ?? '-',
+      phone:       w.phone       ?? '-',
+      zone:        '-',
+      last_seen:   null,
+      connected:   false,
+      status:      'normal',
     }));
 
     renderWorkerTable(workerList);

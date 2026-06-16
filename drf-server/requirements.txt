@@ -1,26 +1,21 @@
-asgiref==3.11.1
-attrs==26.1.0
+# 직접(top-level) 의존성만 명시. transitive 의존성은 pip이 해결.
+# 추가/삭제 시 다른 패키지의 호환 범위와 충돌 안 나도록 핀 버전 신중히 변경.
+
 celery==5.4.0
-certifi==2026.2.25
-charset-normalizer==3.4.7
 django==6.0.4
 django-environ==0.13.0
 djangorestframework==3.17.1
 djangorestframework-simplejwt==5.5.1
 drf-spectacular==0.29.0
+gunicorn==23.0.0
 httpx==0.28.1
-idna==3.11
-inflection==0.5.1
-jsonschema-specifications==2025.9.1
+joblib==1.5.3
+numpy==2.4.4
 pillow==12.2.0
+statsmodels==0.14.2
+prometheus-client==0.21.1
 psycopg2-binary==2.9.11
-pyjwt==2.12.1
-python-dotenv==1.2.2
-pyyaml==6.0.3
 redis==5.2.1
-referencing==0.37.0
 requests==2.33.1
-rpds-py==0.30.0
-sqlparse==0.5.5
-uritemplate==4.2.0
-urllib3==2.6.3
+scikit-learn==1.8.0
+whitenoise==6.8.2

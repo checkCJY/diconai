@@ -19,11 +19,7 @@ class SensorLocation(BaseModel):
     y: float
 
 
-# ============================================================
-# 기기 정보 (부팅 시 1회)  →  POST /api/sensors/info
-# ============================================================
-
-
+# 기기 정보 (부팅 시 1회) → POST /api/sensors/info
 class DeviceInfoPayload(BaseModel):
     """
     기기 부팅 시 1회 전송하는 식별 정보.
@@ -41,11 +37,7 @@ class DeviceInfoPayload(BaseModel):
     location: SensorLocation
 
 
-# ============================================================
-# 기기 환경 데이터 (1초마다)  →  POST /api/sensors/gas
-# ============================================================
-
-
+# 기기 환경 데이터 (1초마다) → POST /api/sensors/gas
 class GasDataPayload(BaseModel):
     """
     가스 센서 실시간 측정값.
@@ -83,6 +75,22 @@ class GasDataPayload(BaseModel):
     # 센서 전송값을 초기값으로 받지만 model_validator에서 서버 재계산으로 덮어씀
     status: Literal["normal", "warning", "danger"] = "normal"
 
+    # IF 학습 라벨 — 더미 시뮬레이터에서만 채워서 전송. 운영 센서는 미전송.
+    # 값: GasData.AnomalyType code (gas_dummy SCENARIOS 와 1:1).
+    # 이 필드가 채워져 있으면 GasData.is_anomaly=True 로 저장된다.
+    # Literal 화이트리스트 — 임의 문자열 차단 (DRF 단계 422 회피, fastapi 단에서 cut).
+    anomaly_type: (
+        Literal[
+            "co_leak",
+            "h2s_leak",
+            "fire",
+            "chemical_spill",
+            "o2_depletion",
+            "sensor_fault",
+        ]
+        | None
+    ) = None  # 이성현 수정 — 9종 확장 (o2_depletion, sensor_fault 추가)
+
     @field_validator("timestamp")
     @classmethod
     def ensure_timezone_aware(cls, v: datetime) -> datetime:
@@ -110,11 +118,7 @@ class GasDataPayload(BaseModel):
         return self
 
 
-# ============================================================
 # 응답 스키마 (OpenAPI 자동 문서화용)
-# ============================================================
-
-
 class DeviceInfoResponse(BaseModel):
     """기기 식별 정보 수신 확인 응답."""
 

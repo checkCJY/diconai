@@ -1,0 +1,155 @@
+{% extends 'admin_panel/base.html' %}
+{% load static %}
+
+{% block title %}이벤트 이력 조회{% endblock %}
+
+{% block content %}
+<!-- 페이지 헤더 -->
+<section class="page-header">
+    <div class="header-titles">
+        <div class="breadcrumb">알림/이벤트 관리 &gt; 이벤트 이력 조회</div>
+        <h2 class="page-title">이벤트 이력 조회</h2>
+        <p class="page-desc">발생한 이벤트의 이력과 연결된 정책 정보를 조회합니다.</p>
+    </div>
+</section>
+
+<!-- 검색 필터 -->
+<section class="filter-card">
+    <div class="filter-inputs">
+        <div class="input-group">
+            <label>조회 날짜</label>
+            <!-- date 미입력 시 전체 조회 (오늘 날짜를 기본값으로 설정) -->
+            <input type="date" id="filterDate">
+        </div>
+        <div class="input-group">
+            <label>이벤트 구분</label>
+            <select id="filterEventType">
+                <option value="">전체</option>
+                {% for at in alarm_types %}
+                <option value="{{ at.value }}">{{ at.label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="input-group">
+            <label>이벤트 상태</label>
+            <select id="filterStatus">
+                <option value="">전체</option>
+                {% for es in event_statuses %}
+                <option value="{{ es.value }}">{{ es.label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+    <div class="filter-actions">
+        <button class="btn-outline" id="btnReset">초기화</button>
+        <button class="btn-dark" id="btnSearch">검색</button>
+    </div>
+</section>
+
+<!-- 목록 테이블 -->
+<section class="table-card">
+    <div class="table-toolbar">
+        <div class="toolbar-left">
+            <span class="total-count">전체 <strong id="totalCount">0</strong>건</span>
+            <span class="toolbar-desc">행을 클릭하면 이벤트 상세를 확인할 수 있습니다.</span>
+        </div>
+        <div class="toolbar-right">
+            <select class="sort-select" id="sortSelect">
+                <option value="desc">발생시간 최신순</option>
+                <option value="asc">발생시간 오래된순</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>발생시간</th>
+                    <th>이벤트 구분</th>
+                    <th>발생 대상</th>
+                    <th>연결 정책</th>
+                    <th>이벤트 상태</th>
+                    <th>발생 내용</th>
+                </tr>
+            </thead>
+            <tbody id="eventTableBody">
+                <tr>
+                    <td colspan="6" class="empty-state">데이터를 불러오는 중...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="table-footer">
+        <span class="page-info" id="pageInfo">0 - 0 / 0</span>
+        <div class="pagination" id="pagination"></div>
+    </div>
+</section>
+
+<!-- 이벤트 상세 팝업 -->
+<div class="modal-overlay" id="detailOverlay" style="display:none;">
+    <div class="event-detail-modal">
+        <div class="modal-header">
+            <h3 class="modal-title">이벤트 상세</h3>
+            <button class="modal-close" id="btnDetailClose">&times;</button>
+        </div>
+        <div class="modal-body">
+            <!-- 기본 정보 -->
+            <div class="detail-grid">
+                <div class="detail-field">
+                    <span class="detail-label">이벤트 구분</span>
+                    <span class="detail-value" id="detailEventType">-</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">발생 대상</span>
+                    <span class="detail-value" id="detailSourceLabel">-</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">이벤트 상태</span>
+                    <span class="detail-value" id="detailStatus">-</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">발생시간</span>
+                    <span class="detail-value" id="detailFirstDetected">-</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">해제시간</span>
+                    <span class="detail-value" id="detailResolvedAt">-</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">연결 정책</span>
+                    <span class="detail-value" id="detailPolicyName">-</span>
+                </div>
+            </div>
+            <!-- 발생 내용 -->
+            <div class="detail-textarea-wrap">
+                <span class="detail-label">발생 내용</span>
+                <div class="detail-textarea" id="detailDescription">-</div>
+            </div>
+            <!-- 상태 메모 -->
+            <div class="detail-textarea-wrap">
+                <span class="detail-label">상태 메모</span>
+                <div class="detail-textarea" id="detailStatusNote">-</div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-outline" id="btnDetailClose2">닫기</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/admin/event_history.css' %}">
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  /* 이벤트 구분 한글 라벨 매핑 — JS에서 뱃지 색상 분기 등에 사용 */
+  window.ALARM_TYPE_LABELS = {
+    {% for at in alarm_types %}'{{ at.value }}': '{{ at.label }}'{% if not forloop.last %},{% endif %}{% endfor %}
+  };
+</script>
+<script src="{% static 'js/admin/events/event_history.js' %}"></script>
+{% endblock %}

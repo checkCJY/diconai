@@ -59,3 +59,37 @@ th{background-color:#f8fafc;color:#64748b;font-weight:600;font-size:13px}
 .pagination{display:flex;gap:4px}
 .pagination button{width:32px;height:32px;border:1px solid #cbd5e1;background:#fff;border-radius:4px;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .pagination button.active{background:#1e293b;color:#fff;border-color:#1e293b}
+
+/* ── 사이드바 그룹 (로그 등 하위 메뉴) ─────────────────────── */
+.snb-group-btn{display:flex;align-items:center;width:100%;padding:10px 20px;background:none;border:none;color:#64748b;font-size:13px;gap:10px;cursor:pointer;text-align:left;white-space:nowrap}
+.snb-group-btn:hover{background:#f8fafc}
+.snb-group-btn .snb-arrow{margin-left:auto;font-size:10px;transition:transform .2s}
+.snb-group.open .snb-arrow{transform:rotate(180deg)}
+.snb-sub{display:none;padding-left:16px}
+.snb-group.open .snb-sub{display:block}
+.snb-sub a{display:flex;align-items:center;padding:8px 20px;color:#94a3b8;text-decoration:none;font-size:12px;gap:8px;white-space:nowrap}
+.snb-sub a:hover{background:#f8fafc;color:#64748b}
+.snb-sub a.active{background:#eff6ff;color:#3b82f6}
+
+/* 사이트 전체 스크롤바 (라이트 테마 — 2026-05-17). admin_panel 공용 로드 위치.
+   header.css 의 다크 톤과 짝 — 사이트 톤 일관 + 테마별 색만 분리. */
+::-webkit-scrollbar      { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: #cbd5e1; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+::-webkit-scrollbar-corner { background: transparent; }
+* { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+
+/* 알람 미확인 배지 (라이트 테마 — 2026-05-17 D 옵션). header.css 의 다크 톤과 짝.
+   admin_panel/base.html 의 topbar 안 #btnAlarmBadge 에 적용. 종 SVG 는 admin
+   라이트 텍스트 색 따라감, 카운트 동그라미만 빨간색 (대비). */
+.alarm-badge-btn { position: relative; }
+.alarm-badge-count {
+  position: absolute; top: -2px; right: -2px;
+  background: #ef4444; color: #fff;
+  font-size: 9px; font-weight: 700; line-height: 1;
+  min-width: 14px; height: 14px;
+  padding: 0 4px; border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+}

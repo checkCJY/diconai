@@ -1,0 +1,12 @@
+{% comment %}
+  공용 WebSocket 연결 상태 배너 (Phase 2 P3)
+  - 비대시보드 모니터링 페이지에서 include 후 WsConnBanner.attach(ws)로 자동 작동
+  - 연결 시도 중·재연결 중·최대 시도 초과 3가지 상태를 표시
+  - 정상 연결 시 자동 숨김
+{% endcomment %}
+<div class="ws-conn-banner" id="ws-conn-banner" style="display:none;">
+  <div class="ws-conn-msg">
+    <span class="conn-spinner"></span>
+    <span class="ws-conn-text">연결 시도 중...</span>
+  </div>
+</div>

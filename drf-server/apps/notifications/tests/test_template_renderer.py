@@ -1,50 +1,58 @@
 """Phase 4-f — template_renderer 단위 테스트."""
 
-from django.test import SimpleTestCase
+# 이성현 수정 — Django SimpleTestCase → pytest 스타일로 전환
+# SimpleTestCase는 DB 접근 없는 순수 Python 로직 테스트용.
+# pytest 함수 스타일로 전환 시 @pytest.mark.django_db 불필요 — DB 미사용.
 
 from apps.notifications.services.template_renderer import render_alert_message
 
 
-class TemplateRendererTest(SimpleTestCase):
-    def test_simple_substitution(self):
-        rendered = render_alert_message(
-            template="{{ source_label }}에서 {{ value }}{{ unit }} 초과",
-            context={"source_label": "GS-001", "value": 50, "unit": "ppm"},
-        )
-        self.assertEqual(rendered, "GS-001에서 50ppm 초과")
+def test_simple_substitution():
+    """변수 치환 템플릿이 context 값으로 렌더링됨 확인."""
+    rendered = render_alert_message(
+        template="{{ source_label }}에서 {{ value }}{{ unit }} 초과",
+        context={"source_label": "GS-001", "value": 50, "unit": "ppm"},
+    )
+    assert rendered == "GS-001에서 50ppm 초과"
 
-    def test_if_branch_danger(self):
-        template = (
-            "{{ source_label }}: "
-            "{% if level == 'danger' %}🚨 긴급{% else %}⚠️ 주의{% endif %}"
-        )
-        rendered = render_alert_message(
-            template=template,
-            context={"source_label": "GS-001", "level": "danger"},
-        )
-        self.assertEqual(rendered, "GS-001: 🚨 긴급")
 
-    def test_if_branch_warning(self):
-        template = (
-            "{% if level == 'danger' %}🚨{% else %}⚠️{% endif %} {{ source_label }}"
-        )
-        rendered = render_alert_message(
-            template=template,
-            context={"source_label": "GS-001", "level": "warning"},
-        )
-        self.assertEqual(rendered, "⚠️ GS-001")
+def test_if_branch_danger():
+    """level=='danger' → if 분기 참 가지로 렌더링됨 확인."""
+    template = (
+        "{{ source_label }}: "
+        "{% if level == 'danger' %}🚨 긴급{% else %}⚠️ 주의{% endif %}"
+    )
+    rendered = render_alert_message(
+        template=template,
+        context={"source_label": "GS-001", "level": "danger"},
+    )
+    assert rendered == "GS-001: 🚨 긴급"
 
-    def test_empty_template_returns_fallback(self):
-        rendered = render_alert_message(
-            template="", context={"source_label": "GS-001"}, fallback="기본 메시지"
-        )
-        self.assertEqual(rendered, "기본 메시지")
 
-    def test_syntax_error_returns_fallback(self):
-        # 잘못된 문법 — fallback
-        rendered = render_alert_message(
-            template="{% if %}",  # 표현식 누락
-            context={},
-            fallback="안전 메시지",
-        )
-        self.assertEqual(rendered, "안전 메시지")
+def test_if_branch_warning():
+    """level!='danger' → if 분기 else 가지로 렌더링됨 확인."""
+    template = "{% if level == 'danger' %}🚨{% else %}⚠️{% endif %} {{ source_label }}"
+    rendered = render_alert_message(
+        template=template,
+        context={"source_label": "GS-001", "level": "warning"},
+    )
+    assert rendered == "⚠️ GS-001"
+
+
+def test_empty_template_returns_fallback():
+    """빈 템플릿 → fallback 문자열 반환 확인."""
+    rendered = render_alert_message(
+        template="", context={"source_label": "GS-001"}, fallback="기본 메시지"
+    )
+    assert rendered == "기본 메시지"
+
+
+def test_syntax_error_returns_fallback():
+    """문법 오류 템플릿 → fallback 문자열 반환 확인."""
+    # 잘못된 문법 — fallback
+    rendered = render_alert_message(
+        template="{% if %}",  # 표현식 누락
+        context={},
+        fallback="안전 메시지",
+    )
+    assert rendered == "안전 메시지"

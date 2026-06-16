@@ -1,0 +1,367 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 4
+      },
+      "id": 1,
+      "title": "서비스 가동 상태 (1=정상, 0=중단)",
+      "description": "Prometheus가 각 서버의 /metrics 수집에 성공하면 1, 실패하면 0. DRF/FastAPI 둘 다 1이어야 정상 운영 상태. redis는 redis_up(Redis 서버 자체 상태)으로 표시.",
+      "type": "stat",
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "thresholds": {
+          "steps": [
+            {
+              "color": "red",
+              "value": 0
+            },
+            {
+              "color": "green",
+              "value": 1
+            }
+          ]
+        }
+      },
+      "targets": [
+        {
+          "expr": "up{job!=\"redis\"}",
+          "legendFormat": "{{job}}",
+          "refId": "A"
+        },
+        {
+          "expr": "redis_up",
+          "legendFormat": "redis",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
+      "id": 2,
+      "title": "DRF — 요청 수 (RPS, 5m)",
+      "description": "Django 서버로 들어오는 초당 요청 수. 경로별로 분리해 어느 API가 가장 많이 호출되는지 확인한다. 급격히 떨어지면 서버 다운 또는 네트워크 이상.",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum by (path) (rate(http_requests_total{job=\"drf\"}[5m]))",
+          "legendFormat": "{{path}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
+      "id": 3,
+      "title": "FastAPI — 요청 수 (RPS, 5m)",
+      "description": "FastAPI 서버로 들어오는 초당 요청 수. 센서 데이터 수신(/api/sensors/gas, /api/power/*), WebSocket, 내부 알람 푸시 등이 포함된다.",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum by (path) (rate(http_requests_total{job=\"fastapi\"}[5m]))",
+          "legendFormat": "{{path}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 12,
+        "h": 8
+      },
+      "id": 4,
+      "title": "DRF — 응답시간 p95 / p99 (5m)",
+      "description": "상위 5% 느린 요청의 응답시간. 평균보다 실제 사용자가 체감하는 속도에 가깝다. 이 값이 올라가면 특정 API에 병목이 생긴 것.",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"drf\"}[5m])))",
+          "legendFormat": "p95",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"drf\"}[5m])))",
+          "legendFormat": "p99",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 12,
+        "w": 12,
+        "h": 8
+      },
+      "id": 5,
+      "title": "FastAPI — 응답시간 p95 / p99 (5m)",
+      "description": "FastAPI 응답시간 p95. 센서 ingest는 1초 간격으로 들어오므로 여기가 느려지면 데이터 수신 지연으로 이어진다.",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"fastapi\"}[5m])))",
+          "legendFormat": "p95",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"fastapi\"}[5m])))",
+          "legendFormat": "p99",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 12,
+        "h": 8
+      },
+      "id": 6,
+      "title": "DRF — 에러율 5xx (5m)",
+      "description": "전체 요청 중 500번대 응답 비율. 0에 가까워야 정상. 올라가면 Django 서버 내부 오류 발생 중 — AppLog(시스템 로그)와 함께 확인한다.",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{job=\"drf\", status=~\"5..\"}[5m])) / sum(rate(http_requests_total{job=\"drf\"}[5m]))",
+          "legendFormat": "에러율",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 20,
+        "w": 12,
+        "h": 8
+      },
+      "id": 7,
+      "title": "FastAPI — 에러율 5xx (5m)",
+      "description": "FastAPI 500번대 응답 비율. 올라가면 센서 데이터 처리 실패 or DRF 저장 실패 가능성 — IntegrationLog(연동 로그)와 함께 확인한다.",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{job=\"fastapi\", status=~\"5..\"}[5m])) / sum(rate(http_requests_total{job=\"fastapi\"}[5m]))",
+          "legendFormat": "에러율",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 28,
+        "w": 24,
+        "h": 8
+      },
+      "id": 8,
+      "title": "DRF vs FastAPI — 응답시간 비교 p95 / p99 (5m)",
+      "description": "두 서버의 p95 응답시간을 같은 그래프에 표시. Django가 느린지 FastAPI가 느린지 한눈에 구분 — 병목 서버 특정에 사용한다.",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, job) (rate(http_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{job}}",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, job) (rate(http_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{job}} p99",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 36,
+        "w": 24,
+        "h": 8
+      },
+      "id": 9,
+      "title": "지오펜스 — 위험도 판정 시간 p95 / p99 (5m)",
+      "description": "작업자 진입 시 위험 센서 판정에 걸린 시간. p99 ≥ 100ms이면 알람 지연 가능 → DB 인덱스 점검. 산업안전 도메인: 판정 지연이 실제 사고로 이어질 수 있다.",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(geofence_check_duration_seconds_bucket[5m])))",
+          "legendFormat": "p95",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(geofence_check_duration_seconds_bucket[5m])))",
+          "legendFormat": "p99",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 44,
+        "w": 24,
+        "h": 8
+      },
+      "id": 10,
+      "title": "FastAPI — /api/sensors/gas 응답시간 p95 / p99 (5m)",
+      "description": "가스 센서 ingest 엔드포인트 응답시간. DRF 저장 비동기 분리 전후 비교용.",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"fastapi\", path=\"/api/sensors/gas\"}[5m])))",
+          "legendFormat": "p95",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"fastapi\", path=\"/api/sensors/gas\"}[5m])))",
+          "legendFormat": "p99",
+          "refId": "B"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": [
+    "diconai"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "diconai — Overview",
+  "uid": "diconai-overview",
+  "version": 2,
+  "weekStart": ""
+}

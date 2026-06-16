@@ -1,0 +1,364 @@
+/* ==========================================================
+   alarm-popup.css — 알람 팝업 자가완결 스타일 (Phase 2, 2026-05-15)
+   ==========================================================
+   dashboard.css 의 :root 색상 토큰이 없는 페이지 (admin-panel 등) 에서도
+   동작하도록 #alarm-popup / #alarm-toast 스코프에 변수 정의. 페이지 다른
+   영역에 영향 없음 (스코프 격리). CSS 변수 inheritance 로 자식 selector 가 접근.
+   ========================================================== */
+#alarm-popup,
+#alarm-toast {
+  --bg: #0d1117;
+  --bg2: #161b22;
+  --bg3: #1c2128;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text2: #8b949e;
+  --danger: #f85149;
+  --caution: #e3b341;
+  --safe: #3fb950;
+  --blue: #58a6ff;
+  --accent: #1f6feb;
+}
+
+/* ── CM-07 실시간 알림 팝업 ──────────────────────────────── */
+/* ── CM-07 알람 팝업 ──────────────────────────────────────── */
+#alarm-popup {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1100;
+  width: 440px; border-radius: 12px;
+  padding: 20px;  /* 4면 균등 */
+  background: #1e1e2e;
+  /* 4면 균일 2px — 좌측 강조는 글로우 펄스(level-danger/warning)가 담당 */
+  border: 2px solid var(--danger);
+  box-shadow: 0 6px 24px rgba(0,0,0,.5), 0 0 20px rgba(248,81,73,.35);
+  transition: border-color .2s, box-shadow .2s;
+}
+/* danger 레벨 — 빨간 글로우 펄스로 운영자 시선 강제 (P2 추가) */
+#alarm-popup.level-danger {
+  animation: alarm-popup-glow-danger 1.4s ease-in-out infinite;
+}
+@keyframes alarm-popup-glow-danger {
+  0%, 100% { box-shadow: 0 6px 24px rgba(0,0,0,.5), 0 0 16px rgba(248,81,73,.4); }
+  50%      { box-shadow: 0 6px 24px rgba(0,0,0,.5), 0 0 36px rgba(248,81,73,.85); }
+}
+/* warning 레벨 — 노란 테두리 + 약한 펄스 */
+#alarm-popup.level-warning {
+  border-color: var(--caution);
+  box-shadow: 0 6px 24px rgba(0,0,0,.5), 0 0 18px rgba(227,179,65,.35);
+  animation: alarm-popup-glow-warning 1.8s ease-in-out infinite;
+}
+@keyframes alarm-popup-glow-warning {
+  0%, 100% { box-shadow: 0 6px 24px rgba(0,0,0,.5), 0 0 14px rgba(227,179,65,.35); }
+  50%      { box-shadow: 0 6px 24px rgba(0,0,0,.5), 0 0 28px rgba(227,179,65,.65); }
+}
+/* 상단 행: 발생 시간 + 닫기 */
+.alarm-popup-top {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 14px;
+}
+.alarm-popup-time-badge {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,.06); border-radius: 20px;
+  padding: 3px 10px; font-size: 11px; color: var(--text2);
+}
+.alarm-popup-time-label {
+  font-weight: 600; color: var(--text2);
+}
+#alarm-popup-time { color: var(--text); }
+#alarm-popup-close {
+  background: none; border: none; color: var(--text2);
+  cursor: pointer; font-size: 16px; padding: 0; line-height: 1;
+}
+/* 그룹 카운트 — 우상단 원형 뱃지 (동일 센서·레벨 연속 알람) */
+.alarm-popup-count {
+  position: absolute; top: -10px; right: -10px;
+  min-width: 26px; height: 26px; padding: 0 7px;
+  border-radius: 13px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--danger); color: #fff;
+  font-size: 12px; font-weight: 700;
+  box-shadow: 0 2px 6px rgba(0,0,0,.4);
+  border: 2px solid #1e1e2e;
+}
+.alarm-popup-count.pulse {
+  animation: alarm-count-pulse 1.2s ease-in-out infinite;
+}
+@keyframes alarm-count-pulse {
+  0%, 100% { transform: scale(1);   box-shadow: 0 2px 6px rgba(0,0,0,.4); }
+  50%      { transform: scale(1.15); box-shadow: 0 0 0 6px rgba(248,81,73,.25); }
+}
+/* 큐 풀 누락 배지 — 헤더 가운데 (확인 가능 영역으로 클릭 유도) */
+.alarm-popup-drop-badge {
+  background: rgba(248,81,73,.18); border: 1px solid var(--danger);
+  color: var(--danger); border-radius: 12px;
+  padding: 2px 9px; font-size: 10.5px; font-weight: 600;
+  cursor: pointer; line-height: 1.4;
+  margin: 0 6px;
+}
+.alarm-popup-drop-badge:hover { background: rgba(248,81,73,.3); }
+/* 중앙: 아이콘 + 알림 유형 */
+.alarm-popup-icon-wrap {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 6px; margin-bottom: 12px;
+}
+.alarm-popup-icon {
+  width: 52px; height: 52px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px;
+  background: rgba(248,81,73,.15); color: var(--danger);
+}
+.alarm-popup-icon.caution { background: rgba(227,179,65,.15); color: var(--caution); }
+.alarm-popup-icon.safe    { background: rgba(63,185,80,.15);  color: var(--safe); }
+.alarm-popup-type-label {
+  font-size: 11px; color: var(--text2); letter-spacing: .5px;
+}
+/* 행동 메시지 — T2+T6 (2026-05-20) — 도메인별 긴 문구 가독성. 기존 18px·bold·center
+   유지 + line-height 1.45 (긴 문구 줄바꿈 자연) + word-break: keep-all (한글 단어
+   중간 깨짐 방지). 한 줄 짧은 워딩 ("즉시 대피하세요!") 도 시각 변화 X. */
+.alarm-popup-action {
+  text-align: center; font-size: 18px; font-weight: 700;
+  margin: 0 0 12px; color: var(--danger);
+  line-height: 1.45; word-break: keep-all;
+}
+.alarm-popup-action.caution-text { color: var(--caution); }
+.alarm-popup-action.safe-text    { color: var(--safe); }
+/* 배지 + 상세 내용 행 */
+.alarm-popup-desc-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  margin-bottom: 14px; font-size: 12px; color: var(--text);
+}
+/* "위험"/"주의" 배지 — 폭/폰트 키워 가독성 강화 */
+.alarm-popup-desc-row .brisk {
+  font-size: 13px; font-weight: 700;
+  padding: 4px 10px; border-radius: 4px;
+  flex-shrink: 0; line-height: 1.2;
+  letter-spacing: 0.5px;
+}
+.alarm-popup-desc { line-height: 1.65; flex: 1; font-size: 13px; word-break: keep-all; }
+/* 센서 이름 — 메시지와 분리해 한 줄로 강조 */
+.alarm-popup-desc .sensor-name {
+  display: block;
+  font-size: 14px; font-weight: 700; color: var(--text);
+  margin-bottom: 4px;
+}
+/* 메시지 본문 — 운영자가 가장 빨리 읽어야 하므로 밝은 색상 */
+.alarm-popup-desc .msg-body {
+  display: block;
+  color: var(--text);
+}
+/* 임계값 컨텍스트 — 메시지 아래 한 줄로 "기준 X 초과 (측정 Y)" 표시 */
+.alarm-popup-desc .msg-threshold {
+  display: block;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255,255,255,.1);
+  font-size: 12px; font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.2px;
+}
+/* T3 ack 시그널 — "(N 확인 중)" 작은 텍스트로 다중 관리자 코디네이션 시그널 */
+.alarm-popup-desc .msg-ack-signal {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px; font-weight: 500;
+  color: var(--text2);
+  font-style: italic;
+}
+/* 하단 버튼 행 */
+.alarm-popup-btn-row {
+  display: flex; gap: 8px;
+}
+.alarm-popup-btn-detail,
+.alarm-popup-btn-confirm {
+  flex: 1; padding: 7px 0; border-radius: 5px;
+  font-size: 12px; font-family: inherit; cursor: pointer;
+}
+.alarm-popup-btn-detail {
+  background: none; border: 1px solid var(--border); color: var(--text2);
+}
+.alarm-popup-btn-detail:hover { border-color: var(--text); color: var(--text); }
+.alarm-popup-btn-confirm {
+  background: var(--blue); border: 1px solid var(--blue); color: #fff;
+}
+.alarm-popup-btn-confirm:hover { opacity: .85; }
+
+/* ── CM-07 정상화 토스트 (우하단 비차단형) ──────────────── */
+#alarm-toast {
+  position: fixed; bottom: 24px; right: 24px; z-index: 1100;
+  display: flex; align-items: center; gap: 10px;
+  width: 300px; padding: 12px 14px; border-radius: 8px;
+  background: #1e1e2e; border-left: 4px solid var(--safe);
+  box-shadow: 0 4px 16px rgba(0,0,0,.4);
+  animation: toast-in .25s ease;
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.alarm-toast-icon {
+  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(63,185,80,.15); color: var(--safe); font-size: 16px; font-weight: 700;
+}
+.alarm-toast-body  { flex: 1; min-width: 0; }
+.alarm-toast-title { font-size: 11px; font-weight: 600; color: var(--safe); margin-bottom: 2px; }
+.alarm-toast-msg   { font-size: 11px; color: var(--text2); line-height: 1.4;
+                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#alarm-toast-close {
+  background: none; border: none; color: var(--text2);
+  cursor: pointer; font-size: 14px; padding: 0; flex-shrink: 0;
+}
+
+/* ==========================================================
+   2026-05-15 Phase 2 A-mini — admin-panel UX 차별화: 토스트 stack
+   ==========================================================
+   admin-panel/* 페이지에서 차단형 모달 대신 우상단에 누적되는 비차단 토스트.
+   DANGER 토스트는 10초 무응답 시 모달로 격상 (alarm-popup.js 가 처리).
+   pointer-events:none 으로 컨테이너 클릭은 페이지로 통과, item 만 받음.
+   ========================================================== */
+#alarm-toast-stack {
+  position: fixed;
+  top: 60px;       /* 상단바 아래 (admin-panel topbar 높이) */
+  right: 20px;
+  z-index: 1090;   /* alarm-popup (1100) 보다 낮게 — 격상 시 모달이 토스트 위 */
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 340px;
+  pointer-events: none;
+}
+
+.alarm-toast-stack-item {
+  pointer-events: auto;
+  background: var(--bg2, #161b22);
+  border: 1px solid var(--border, #30363d);
+  border-left: 4px solid var(--danger, #f85149);
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: var(--text, #e6edf3);
+  font-size: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  cursor: pointer;
+  animation: alarmToastStackSlideIn 0.3s ease;
+}
+.alarm-toast-stack-item.warning {
+  border-left-color: var(--caution, #e3b341);
+}
+.alarm-toast-stack-item:hover {
+  background: var(--bg3, #1c2128);
+}
+.alarm-toast-stack-item.dismissing {
+  animation: alarmToastStackSlideOut 0.3s ease forwards;
+}
+
+@keyframes alarmToastStackSlideIn {
+  from { transform: translateX(110%); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+@keyframes alarmToastStackSlideOut {
+  from { transform: translateX(0); opacity: 1; }
+  to   { transform: translateX(110%); opacity: 0; }
+}
+
+.alarm-toast-stack-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 6px;
+}
+.alarm-toast-stack-badge {
+  background: var(--danger, #f85149); color: #fff;
+  padding: 2px 8px; border-radius: 4px;
+  font-size: 11px; font-weight: 600;
+}
+.alarm-toast-stack-item.warning .alarm-toast-stack-badge {
+  background: var(--caution, #e3b341); color: #000;
+}
+.alarm-toast-stack-close {
+  background: none; border: none; color: var(--text2, #8b949e);
+  cursor: pointer; font-size: 14px; padding: 0;
+}
+.alarm-toast-stack-close:hover {
+  color: var(--text, #e6edf3);
+}
+.alarm-toast-stack-sensor {
+  font-weight: 600; margin-bottom: 4px; word-break: keep-all;
+}
+.alarm-toast-stack-msg {
+  color: var(--text2, #8b949e); line-height: 1.4; word-break: keep-all;
+}
+/* T3 ack 시그널 — 토스트 본문 아래 "(N 확인 중)" 작은 italic 텍스트.
+   다중 관리자 환경에서 다른 운영자가 처리 중임을 인지 (dedup 과 별개 시그널). */
+.alarm-toast-stack-ack {
+  margin-top: 4px;
+  font-size: 11px; font-weight: 500;
+  color: var(--text2, #8b949e);
+  font-style: italic;
+}
+
+/* ==========================================================
+   T4 — source=static_cover_* 보완 알람 시각 톤
+   ==========================================================
+   AI 가 단일 결정자로 발화한 알람 (source=ai) 은 기존 빨강·노랑 그대로.
+   AI 미탐 의심 / 워밍업 / 추론 실패 / 비활성 채널은 "보완" 의미로 톤 약화 +
+   배지 라벨로 운영자가 "주역 vs 보조" 즉시 구분. plan §5.1 매트릭스 §6 D4.
+   ========================================================== */
+
+/* 모달 — danger 빨간 펄스 / warning 노란 펄스 모두 진정. cover 톤 source 는 어떤
+   risk_level (warning/danger) 이어도 시각은 "보조" — 노랑 단색·정적. specificity
+   강화 — id 1 + class 2 (.alarm-popup-static-cover.level-*) > level-* 단독 rule. */
+#alarm-popup.alarm-popup-static-cover,
+#alarm-popup.alarm-popup-static-cover.level-danger,
+#alarm-popup.alarm-popup-static-cover.level-warning {
+  border-color: var(--caution);
+  animation: none;
+  box-shadow: 0 6px 24px rgba(0,0,0,.5), 0 0 12px rgba(227,179,65,.25);
+}
+
+/* 토스트 — 노랑 좌측 보더, 펄스 제거. cover-badge 가 사유 라벨 노출. */
+.alarm-toast-stack-item.alarm-popup-static-cover,
+.alarm-toast-stack-item.danger.alarm-popup-static-cover,
+.alarm-toast-stack-item.warning.alarm-popup-static-cover {
+  border-left-color: var(--caution);
+  animation: none;
+}
+
+/* cover-badge — 모달 메시지 행 / 토스트 본문 아래 작은 노랑 칩.
+   reason 문구와 짝 — 배지 = 짧은 라벨, reason = 상세 사유. block 으로 강제해
+   다음 reason 행과 자연 줄바꿈 (이전 inline 인접 렌더 버그 fix). */
+.cover-badge {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(227,179,65,.18);
+  border: 1px solid var(--caution);
+  color: var(--caution);
+  font-size: 11px; font-weight: 600;
+}
+
+/* 모달 — 배지·reason 영역. 부모 flex/inline 영향 받아도 줄바꿈 보장 위해 div 사용
+   (alarm-popup.js 가 element 생성 — 본 CSS 와 짝). */
+.msg-cover-badge {
+  display: block;       /* 이전: inline-block + margin-left → 인접 인라인 붙음 */
+  margin-top: 6px;
+}
+.msg-cover-reason {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text2, #8b949e);
+}
+
+/* 토스트 reason — 토스트 본문 아래 작은 italic 텍스트 (ack 시그널 옆 패턴). */
+.alarm-toast-stack-cover-badge {
+  display: block;
+  margin-top: 6px;
+}
+.alarm-toast-stack-cover-reason {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--text2, #8b949e);
+  font-style: italic;
+}

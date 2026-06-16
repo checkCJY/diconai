@@ -14,6 +14,7 @@ from django.db import transaction
 
 from apps.facilities.models import Facility, GasSensor, PowerDevice, PositionNode
 from apps.geofence.models import GeoFence
+from apps.core.services.audit_service import log_action
 from apps.facilities.serializers.map_editor import (
     FacilityMapSerializer,
     GasSensorMapSerializer,
@@ -145,6 +146,14 @@ class MapEditorSaveView(APIView):
             "geofences_deleted": 0,
         }
 
+        # 정휘훈 작업 — 지도 편집 저장 시 SystemLog(지도 편집 로그) 기록 추가
+        # 저장 버튼 클릭(POST /api/map-editor/save/) 시 변경된 각 객체마다 log_action() 호출
+        # 기록된 로그는 어드민 패널 지도 편집 로그(/admin-panel/logs/map-edit/) 에서 조회 가능
+        actor_id = request.user.pk
+        ip = request.META.get("HTTP_X_FORWARDED_FOR", request.META.get("REMOTE_ADDR"))
+        if ip and "," in ip:
+            ip = ip.split(",")[0].strip()
+
         # 설비 위치/크기 저장
         for item in data["facilities"]:
             Facility.objects.filter(pk=item["id"]).update(
@@ -154,27 +163,72 @@ class MapEditorSaveView(APIView):
                 map_height=item["map_height"],
             )
             updated["facilities"] += 1
+            # 정휘훈 작업 — 설비 위치/크기 변경 로그
+            log_action(
+                actor_id=actor_id,
+                action_type="map_facility_update",
+                target_model="Facility",
+                target_id=item["id"],
+                description=f"설비 위치/크기 수정 (id={item['id']})",
+                ip_address=ip,
+            )
 
         # 가스 센서 위치 저장
         for item in data["gas_sensors"]:
             GasSensor.objects.filter(pk=item["id"]).update(x=item["x"], y=item["y"])
             updated["gas_sensors"] += 1
+            # 정휘훈 작업 — 가스센서 이동 로그
+            log_action(
+                actor_id=actor_id,
+                action_type="map_sensor_move",
+                target_model="GasSensor",
+                target_id=item["id"],
+                description=f"센서 위치 이동 (id={item['id']}, x={item['x']}, y={item['y']})",
+                ip_address=ip,
+            )
 
         # 전력 장치 위치 저장
         for item in data["power_devices"]:
             PowerDevice.objects.filter(pk=item["id"]).update(x=item["x"], y=item["y"])
             updated["power_devices"] += 1
+            # 정휘훈 작업 — 전력장치 이동 로그
+            log_action(
+                actor_id=actor_id,
+                action_type="map_facility_update",
+                target_model="PowerDevice",
+                target_id=item["id"],
+                description=f"전력장치 위치 수정 (id={item['id']}, x={item['x']}, y={item['y']})",
+                ip_address=ip,
+            )
 
         # 위치 노드 위치 저장
         for item in data["position_nodes"]:
             PositionNode.objects.filter(pk=item["id"]).update(x=item["x"], y=item["y"])
             updated["position_nodes"] += 1
+            # 정휘훈 작업 — 위치 노드 이동 로그
+            log_action(
+                actor_id=actor_id,
+                action_type="map_position_node_register",
+                target_model="PositionNode",
+                target_id=item["id"],
+                description=f"위치 노드 등록/이동 (id={item['id']}, x={item['x']}, y={item['y']})",
+                ip_address=ip,
+            )
 
         # 지오펜스 저장/삭제
         for item in data["geofences"]:
             if item.get("deleted") and item.get("id"):
                 GeoFence.objects.filter(pk=item["id"]).update(is_active=False)
                 updated["geofences_deleted"] += 1
+                # 정휘훈 작업 — 위험구역 삭제 로그
+                log_action(
+                    actor_id=actor_id,
+                    action_type="map_object_delete",
+                    target_model="GeoFence",
+                    target_id=item["id"],
+                    description=f"위험구역 삭제 (id={item['id']}, name={item.get('name', '')})",
+                    ip_address=ip,
+                )
                 continue
 
             # 원형이면 polygon 근사 계산
@@ -197,7 +251,7 @@ class MapEditorSaveView(APIView):
                     circle_radius=item.get("circle_radius"),
                 )
             else:
-                GeoFence.objects.create(
+                gf = GeoFence.objects.create(
                     facility_id=item["facility_id"],
                     name=item["name"],
                     risk_level=item["risk_level"],
@@ -206,6 +260,15 @@ class MapEditorSaveView(APIView):
                     circle_cx=item.get("circle_cx"),
                     circle_cy=item.get("circle_cy"),
                     circle_radius=item.get("circle_radius"),
+                )
+                # 정휘훈 작업 — 위험구역 신규 생성 로그
+                log_action(
+                    actor_id=actor_id,
+                    action_type="map_geofence_create",
+                    target_model="GeoFence",
+                    target_id=gf.pk,
+                    description=f"위험구역 생성 (name={item['name']}, risk_level={item['risk_level']})",
+                    ip_address=ip,
                 )
             updated["geofences_saved"] += 1
 

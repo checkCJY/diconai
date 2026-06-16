@@ -3,7 +3,6 @@
 from django.db import transaction
 from apps.notifications.models import Notification
 from apps.accounts.models import CustomUser
-from apps.core.constants import RiskLevel
 from apps.notifications.services.template_renderer import render_alert_message
 
 
@@ -19,8 +18,8 @@ def notify_event_created(event):
     - policy.message_template이 비어있지 않으면 Django Template으로 메시지 렌더,
       그 외에는 Event.summary fallback (render_alert_message가 처리)
     """
-    # 1. 심각도별 채널 결정
-    channels = resolve_channels(event.risk_level)
+    # 1. 정책 채널 우선, 미연결 시 심각도 기본값
+    channels = resolve_channels(event)
 
     # 2. 수신자 결정 — 공장 관리자 전원
     recipients = CustomUser.objects.filter(
@@ -67,32 +66,41 @@ def notify_event_created(event):
         dispatch_notification(notif)
 
 
-def resolve_channels(risk_level: str) -> list[str]:
-    """심각도별 발송 채널 결정"""
-    if risk_level == RiskLevel.DANGER:
-        return ["popup"]  # 4차에 'sms', 'push' 추가
-    elif risk_level == RiskLevel.WARNING:
-        return ["popup"]  # 4차에 'push' 추가
+def resolve_channels(event) -> list[str]:
+    """Event 의 발송 채널 결정.
+
+    AlertPolicy.channels 가 설정돼 있으면 그대로 사용 (어드민 정책 화면에서
+    선택한 채널이 그대로 발송 대상이 됨). 정책 미연결 또는 channels 가 비어
+    있으면 risk_level 기반 기본값 (popup) 으로 graceful fallback.
+    """
+    policy = getattr(event, "policy", None)
+    if policy and policy.channels:
+        valid = {c.value for c in Notification.Channel}
+        chosen = [c for c in policy.channels if c in valid]
+        if chosen:
+            return chosen
     return ["popup"]
 
 
 def dispatch_notification(notif: Notification):
-    """채널별 발송기 호출"""
-    from notifications.services.delivery import popup_delivery
+    """채널별 발송기 호출.
+
+    현재 POPUP 만 실제 발송. push/sms/email 은 delivery 모듈은 있으나 시연
+    scope 에서는 정책 연동 가시화 목적으로 Notification 레코드만 PENDING 상태로
+    남김 (실제 외부 발송은 4차에 자격증명 + delivery 모듈 본구현 후 분기 추가).
+    """
+    from apps.notifications.services.delivery import popup_delivery
 
     try:
         if notif.channel == Notification.Channel.POPUP:
             popup_delivery.send(notif)
-        # 4차: sms, push, email 분기 추가
-        else:
-            raise NotImplementedError(f"Channel {notif.channel} not implemented")
+            notif.delivery_status = Notification.DeliveryStatus.SENT
+            from django.utils import timezone
 
-        notif.delivery_status = Notification.DeliveryStatus.SENT
-        from django.utils import timezone
-
-        notif.sent_at = timezone.now()
-        notif.save(update_fields=["delivery_status", "sent_at"])
-
+            notif.sent_at = timezone.now()
+            notif.save(update_fields=["delivery_status", "sent_at"])
+        # 4차: PUSH/SMS/EMAIL — delivery 모듈 본구현 후 분기 추가.
+        # 현재는 PENDING 유지로 정책 연동(어떤 채널이 발송 의도였는지) 가시화.
     except Exception as e:
         notif.delivery_status = Notification.DeliveryStatus.FAILED
         notif.delivery_error = str(e)[:300]

@@ -15,6 +15,7 @@ class AlarmTypeConsistencyTest(TestCase):
     fixtures = ["hazard_type"]
 
     def test_alarm_type_enum_matches_hazard_type(self):
+        """AlarmType 이넘 코드와 활성 HazardType.type_code 집합 일치 확인."""
         db_codes = set(
             HazardType.objects.filter(is_active=True).values_list(
                 "type_code", flat=True

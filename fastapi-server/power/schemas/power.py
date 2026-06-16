@@ -28,10 +28,7 @@ DRF 모델과의 대응 관계:
 from pydantic import BaseModel, Field
 
 
-# ============================================================
 # 채널 슬레이브 키 목록 — power_dummy_sender.py POWER_CHANNELS 와 동일
-# ============================================================
-
 SLAVE_KEYS: list[str] = [
     "slave01",
     "slave02",
@@ -55,23 +52,18 @@ SLAVE_KEYS: list[str] = [
 SLAVE_TO_CHANNEL: dict[str, int] = {key: idx + 1 for idx, key in enumerate(SLAVE_KEYS)}
 
 
-# ============================================================
-# ON/OFF 상태 페이로드 — POST /api/power/onoff
-# PowerEvent 대응
+# ON/OFF 상태 페이로드 — POST /api/power/onoff → PowerEvent 대응
 #
-# [필드 대응]
+# 필드 대응:
 #   device_id        → PowerDevice.device_id
 #   timestamp        → PowerEvent.measured_at (장치 측정 시각, UTC 필수)
 #   slave01~slave72  → PowerEvent.snapshot  {"1": bool, ..., "16": bool}
 #                      값 변환: 255 → True, 0 → False
 #
-# [모델에 있으나 페이로드에 없는 필드]
+# 모델에 있으나 페이로드에 없는 필드:
 #   PowerEvent.trigger          → 기본값 "unknown" 사용
 #   PowerEvent.changed_channels → 직전 스냅샷과 비교해 FastAPI에서 계산
 #   PowerEvent.created_at       → auto_now_add (수신 시각, 자동)
-# ============================================================
-
-
 class PowerOnOffPayload(BaseModel):
     """
     16채널 ON/OFF 상태 스냅샷 페이로드.
@@ -110,21 +102,16 @@ class PowerOnOffPayload(BaseModel):
         }
 
 
-# ============================================================
 # 전력 측정값 공통 베이스 — PowerData 대응
 #
-# [필드 대응]
+# 필드 대응:
 #   device_id        → PowerDevice.device_id
-
 #   slave01~slave72  → PowerData.channel(1~16) + PowerData.value
 #                      정규화: 16행으로 분리 저장 (long-format)
 #
-# [모델에 있으나 페이로드에 없는 필드]
+# 모델에 있으나 페이로드에 없는 필드:
 #   PowerData.data_type  → 각 서브클래스에서 고정값으로 결정
 #   PowerData.risk_level → FastAPI에서 임계치 기준으로 계산
-# ============================================================
-
-
 class _PowerMeasurementBase(BaseModel):
     """16채널 측정값 페이로드 공통 베이스."""
 
@@ -149,6 +136,11 @@ class _PowerMeasurementBase(BaseModel):
     slave71: float = Field(ge=-1)
     slave72: float = Field(ge=-1)
 
+    # IF 학습 라벨링 — 더미 시뮬레이터에서만 채워서 전송. 운영 장비는 미전송.
+    # 키: 채널 번호(1~16) 문자열, 값: AnomalyType code (overload/voltage_drop/...)
+    # 채널 키가 anomaly_labels 에 있으면 PowerData.is_anomaly=True 로 저장된다.
+    anomaly_labels: dict[str, str] | None = None
+
     def to_channel_values(self) -> dict[int, float | None]:
         """채널 번호(1~16) → 측정값 매핑으로 변환. 통신 불능(-1)은 None으로 변환."""
         return {
@@ -158,51 +150,35 @@ class _PowerMeasurementBase(BaseModel):
             for key in SLAVE_KEYS
         }
 
+    def to_anomaly_map(self) -> dict[int, str]:
+        """anomaly_labels 를 채널 번호 키로 변환."""
+        if not self.anomaly_labels:
+            return {}
+        return {int(k): v for k, v in self.anomaly_labels.items()}
 
-# ============================================================
-# 전류 페이로드 — POST /api/power/current
-# PowerData(data_type="current") 대응
-# 단위: A
-# ============================================================
 
-
+# 전류 페이로드 — POST /api/power/current → PowerData(data_type="current"), 단위 A
 class PowerCurrentPayload(_PowerMeasurementBase):
     """16채널 전류(A) 측정값 페이로드."""
 
     pass
 
 
-# ============================================================
-# 전압 페이로드 — POST /api/power/voltage
-# PowerData(data_type="voltage") 대응
-# 단위: V
-# ============================================================
-
-
+# 전압 페이로드 — POST /api/power/voltage → PowerData(data_type="voltage"), 단위 V
 class PowerVoltagePayload(_PowerMeasurementBase):
     """16채널 전압(V) 측정값 페이로드."""
 
     pass
 
 
-# ============================================================
-# 전력 페이로드 — POST /api/power/watt
-# PowerData(data_type="watt") 대응
-# 단위: W
-# ============================================================
-
-
+# 전력 페이로드 — POST /api/power/watt → PowerData(data_type="watt"), 단위 W
 class PowerWattPayload(_PowerMeasurementBase):
     """16채널 전력(W) 측정값 페이로드."""
 
     pass
 
 
-# ============================================================
 # 응답 스키마 (OpenAPI 자동 문서화용)
-# ============================================================
-
-
 class PowerIngestResponse(BaseModel):
     """전력 측정값 수신 확인 응답.
 

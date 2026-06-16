@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Virtual envs (uv)
+.venv/
+*/.venv/
+venv/
+*/venv/
+
+# Env files (주입은 docker compose env_file 또는 environment로)
+.env
+*/.env
+.env.docker
+
+# Local DB / 미디어 / 정적 산출물 (volume 마운트로 처리)
+db.sqlite3
+db.sqlite3-journal
+*/db.sqlite3
+*/db.sqlite3-journal
+media/
+*/media/
+staticfiles/
+*/staticfiles/
+
+# Docker 자기 자신
+docker/
+docker-compose*.yml
+.dockerignore
+Dockerfile
+
+# Git / 에디터 / OS
+.git/
+.gitignore
+.github/
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# 문서/스킬/플랜 (이미지에 불필요)
+docs/
+skill/
+*.md
+!README.md
+
+# 로그
+*.log
+logs/
+
+# 임시 / 압축
+*.zip
+*.tar
+*.tar.gz
+tmp/

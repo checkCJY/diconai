@@ -32,7 +32,10 @@ body {
 .col-left   { display: flex; flex-direction: column; gap: 6px; width: 260px; flex-shrink: 0; }
 .col-mid    { flex: 1; display: flex; flex-direction: column; }
 .col-right  { width: 280px; flex-shrink: 0; display: flex; flex-direction: column; }
-.bottom-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; height: 320px; flex-shrink: 0; }
+/* 4 패널 비율 — 표:차트 = 1:1.2 (좌 가스 표/차트 / 우 전력 표/차트).
+   2026-05-27: 1:2 → 표 16.7% 너무 좁아 라벨 세로 줄바꿈, 1:1.5 → 전력 표 "보조 모터" 등 끊김.
+   1:1.2 로 보수적 절충 (표 22.7% / 차트 27.3%) — 표 라벨 가독성 확보 + 차트 폭 소폭 확장 유지. */
+.bottom-row { display: grid; grid-template-columns: 1fr 1.2fr 1fr 1.2fr; gap: 6px; height: 320px; flex-shrink: 0; }
 
 /* ── 공통 패널 ───────────────────────────────────────────── */
 .panel {
@@ -113,10 +116,127 @@ body {
 .ws-status.error     { background: #3d1a1a; color: #f85149; }
 
 /* ── 패널 10: 이벤트 현황 ───────────────────────────────── */
-.event-item    { padding: 7px 0; border-bottom: 1px solid var(--border); }
+.event-item    { padding: 7px 0; border-bottom: 1px solid var(--border); transition: background-color .3s ease, border-color .3s ease; }
+.event-item:hover { background: rgba(255, 255, 255, .03); }
 .event-head    { display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 12px; margin-bottom: 3px; }
-.event-desc    { font-size: 11px; padding-left: 13px; }
+.event-head > span:first-child { display: flex; align-items: center; gap: 6px; }
+.event-desc    { font-size: 11px; padding-left: 22px; }
+/* event-icon — alarm_type 별 Lucide SVG (2026-05-17 이모지 대체).
+   lucide.createIcons() 가 <i data-lucide> 를 <svg class="event-icon"> 로 replace.
+   width/height 는 CSS 우선 (HTML 속성보다 강함). stroke 는 currentColor 라
+   부모 텍스트 색 자동 적용 (위험도 색 매핑은 추후 .event-head 에 colorClass 도입 시). */
+.event-icon    { display: inline-block; vertical-align: middle; width: 16px; height: 16px; stroke-width: 1.75; flex-shrink: 0; }
 .event-summary { margin-top: 8px; padding: 7px; background: var(--bg3); border-radius: 5px; font-size: 11px; color: var(--text2); line-height: 1.8; }
+.event-summary-icon { color: var(--accent); margin-right: 4px; }
+
+/* 미확인 카운트 강조 박스 (원안 미확인 N건 표시) */
+.event-unack {
+  margin: 8px 0;
+  padding: 8px 10px;
+  background: rgba(248, 81, 73, .12);
+  border: 1px solid rgba(248, 81, 73, .4);
+  border-radius: 5px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.event-unack-label { font-weight: 700; color: var(--text); }
+.event-unack-count { font-weight: 800; font-size: 14px; }
+.event-unack-hint  { color: var(--text2); font-size: 11px; }
+
+/* 새 항목 강조 — fadeIn + border 깜빡 (3초) */
+@keyframes event-item-flash {
+  0%   { background: rgba(248, 81, 73, .25); border-color: var(--danger); }
+  60%  { background: rgba(248, 81, 73, .10); border-color: rgba(248, 81, 73, .5); }
+  100% { background: transparent; border-color: var(--border); }
+}
+.event-item--new {
+  animation: event-item-flash 3s ease-out;
+}
+
+/* 정상화 burst 그룹 — "외 N건" 배지 + 펼침 디바이스 목록 */
+.event-clear-more {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text2);
+  background: var(--bg3);
+  padding: 1px 6px;
+  border-radius: 8px;
+  user-select: none;
+}
+.event-clear-more:hover {
+  color: var(--text);
+  background: var(--bg2, #21262d);
+}
+.event-clear-sources {
+  margin: 6px 0 0 22px;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+  color: var(--text2);
+}
+.event-clear-sources li {
+  padding: 2px 0;
+}
+
+/* source 단위 그룹 (2026-05-17) — 같은 가스 센서/전력 장비/지오펜스의 30분 윈도우
+   알람 묶음. 1건일 땐 일반 event-item 과 외형 동일 (moreEl/itemsEl hidden).
+   추가 알람 도착 시 moreEl 표시 + 위험도 색 갱신 + 펼침 list 채움. */
+.event-source-more {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text2);
+  background: var(--bg3);
+  padding: 1px 6px;
+  border-radius: 8px;
+  user-select: none;
+}
+.event-source-more:hover {
+  color: var(--text);
+  background: var(--bg2, #21262d);
+}
+.event-source-other-types {
+  font-weight: 500;
+  margin-left: 3px;
+  opacity: 0.85;
+}
+.event-source-items {
+  margin: 6px 0 0 22px;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+  color: var(--text2);
+}
+.event-source-items li {
+  padding: 3px 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 3px;
+}
+.event-source-items li:hover {
+  background: rgba(255, 255, 255, .04);
+}
+.event-source-items li > i + span {
+  flex: 1;
+  min-width: 0;
+}
+.event-source-li-icon {
+  display: inline-block;
+  vertical-align: middle;
+  width: 12px;
+  height: 12px;
+  stroke-width: 1.75;
+  flex-shrink: 0;
+}
+.event-source-li-time {
+  color: var(--text2);
+  font-size: 10px;
+  flex-shrink: 0;
+}
 
 /* ── 공통 테이블 ────────────────────────────────────────── */
 .tbl          { width: 100%; border-collapse: collapse; font-size: 11px; }
@@ -230,12 +350,44 @@ a.more {
 }
 
 /* ── AI 예측 패널 KPI 박스 ──────────────────────────────── */
+/* AI 예측 KPI 박스 — hero 영역 (현재값 + 예측 최대값 강조).
+   2026-05-27 디자인 다듬기 2nd: 첫 시도 28px+padding 14 는 hero 비대 → 차트 영역 잠식.
+   20px + padding 6 로 축소해 차트 영역 회복하되 기본 .big 18px 보단 약간 키워 가독성 유지. */
 .ai-kpi-box {
   background: rgba(255,255,255,0.04);
   border-left: 3px solid var(--blue, #58a6ff);
   border-radius: 4px;
-  padding: 8px 12px;
-  margin-bottom: 8px;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+}
+.ai-kpi-box .big {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.ai-kpi-box .ai-kpi-item .sub {
+  font-size: 10px;
+  color: var(--text2, #8b949e);
+  margin-bottom: 2px;
+}
+.ai-kpi-box .eta-val {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--danger);
+  line-height: 1.15;
+}
+/* power 패널의 aiPowerMaxLoad 가 inline style font-size:14px 로 박혀있어 hero 와 안 맞음.
+   .ai-kpi-box 안의 .fw 를 .big 와 동일 시각으로 일치 (inline style override). */
+.ai-kpi-box .fw#aiPowerMaxLoad {
+  font-size: 18px !important;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
 }
 
 /* ── ai-nav: 장비명 + 방향 버튼 ─────────────────────────── */
@@ -436,10 +588,31 @@ a.more {
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
   z-index: 1100;
-  width: 340px; border-radius: 10px; padding: 18px 16px 14px;
-  box-shadow: 0 6px 24px rgba(0,0,0,.5);
-  background: #1e1e2e; border-left: 4px solid var(--danger);
-  transition: border-left-color .2s;
+  width: 440px; border-radius: 12px;
+  padding: 20px;  /* 4면 균등 */
+  background: #1e1e2e;
+  /* 4면 균일 2px — 좌측 강조는 글로우 펄스(level-danger/warning)가 담당 */
+  border: 2px solid var(--danger);
+  box-shadow: 0 6px 24px rgba(0,0,0,.5), 0 0 20px rgba(248,81,73,.35);
+  transition: border-color .2s, box-shadow .2s;
+}
+/* danger 레벨 — 빨간 글로우 펄스로 운영자 시선 강제 (P2 추가) */
+#alarm-popup.level-danger {
+  animation: alarm-popup-glow-danger 1.4s ease-in-out infinite;
+}
+@keyframes alarm-popup-glow-danger {
+  0%, 100% { box-shadow: 0 6px 24px rgba(0,0,0,.5), 0 0 16px rgba(248,81,73,.4); }
+  50%      { box-shadow: 0 6px 24px rgba(0,0,0,.5), 0 0 36px rgba(248,81,73,.85); }
+}
+/* warning 레벨 — 노란 테두리 + 약한 펄스 */
+#alarm-popup.level-warning {
+  border-color: var(--caution);
+  box-shadow: 0 6px 24px rgba(0,0,0,.5), 0 0 18px rgba(227,179,65,.35);
+  animation: alarm-popup-glow-warning 1.8s ease-in-out infinite;
+}
+@keyframes alarm-popup-glow-warning {
+  0%, 100% { box-shadow: 0 6px 24px rgba(0,0,0,.5), 0 0 14px rgba(227,179,65,.35); }
+  50%      { box-shadow: 0 6px 24px rgba(0,0,0,.5), 0 0 28px rgba(227,179,65,.65); }
 }
 /* 상단 행: 발생 시간 + 닫기 */
 .alarm-popup-top {
@@ -459,6 +632,33 @@ a.more {
   background: none; border: none; color: var(--text2);
   cursor: pointer; font-size: 16px; padding: 0; line-height: 1;
 }
+/* 그룹 카운트 — 우상단 원형 뱃지 (동일 센서·레벨 연속 알람) */
+.alarm-popup-count {
+  position: absolute; top: -10px; right: -10px;
+  min-width: 26px; height: 26px; padding: 0 7px;
+  border-radius: 13px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--danger); color: #fff;
+  font-size: 12px; font-weight: 700;
+  box-shadow: 0 2px 6px rgba(0,0,0,.4);
+  border: 2px solid #1e1e2e;
+}
+.alarm-popup-count.pulse {
+  animation: alarm-count-pulse 1.2s ease-in-out infinite;
+}
+@keyframes alarm-count-pulse {
+  0%, 100% { transform: scale(1);   box-shadow: 0 2px 6px rgba(0,0,0,.4); }
+  50%      { transform: scale(1.15); box-shadow: 0 0 0 6px rgba(248,81,73,.25); }
+}
+/* 큐 풀 누락 배지 — 헤더 가운데 (확인 가능 영역으로 클릭 유도) */
+.alarm-popup-drop-badge {
+  background: rgba(248,81,73,.18); border: 1px solid var(--danger);
+  color: var(--danger); border-radius: 12px;
+  padding: 2px 9px; font-size: 10.5px; font-weight: 600;
+  cursor: pointer; line-height: 1.4;
+  margin: 0 6px;
+}
+.alarm-popup-drop-badge:hover { background: rgba(248,81,73,.3); }
 /* 중앙: 아이콘 + 알림 유형 */
 .alarm-popup-icon-wrap {
   display: flex; flex-direction: column; align-items: center;
@@ -484,10 +684,38 @@ a.more {
 .alarm-popup-action.safe-text    { color: var(--safe); }
 /* 배지 + 상세 내용 행 */
 .alarm-popup-desc-row {
-  display: flex; align-items: flex-start; gap: 8px;
+  display: flex; align-items: flex-start; gap: 10px;
   margin-bottom: 14px; font-size: 12px; color: var(--text);
 }
-.alarm-popup-desc { line-height: 1.5; flex: 1; }
+/* "위험"/"주의" 배지 — 폭/폰트 키워 가독성 강화 */
+.alarm-popup-desc-row .brisk {
+  font-size: 13px; font-weight: 700;
+  padding: 4px 10px; border-radius: 4px;
+  flex-shrink: 0; line-height: 1.2;
+  letter-spacing: 0.5px;
+}
+.alarm-popup-desc { line-height: 1.65; flex: 1; font-size: 13px; word-break: keep-all; }
+/* 센서 이름 — 메시지와 분리해 한 줄로 강조 */
+.alarm-popup-desc .sensor-name {
+  display: block;
+  font-size: 14px; font-weight: 700; color: var(--text);
+  margin-bottom: 4px;
+}
+/* 메시지 본문 — 운영자가 가장 빨리 읽어야 하므로 밝은 색상 */
+.alarm-popup-desc .msg-body {
+  display: block;
+  color: var(--text);
+}
+/* 임계값 컨텍스트 — 메시지 아래 한 줄로 "기준 X 초과 (측정 Y)" 표시 */
+.alarm-popup-desc .msg-threshold {
+  display: block;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255,255,255,.1);
+  font-size: 12px; font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.2px;
+}
 /* 하단 버튼 행 */
 .alarm-popup-btn-row {
   display: flex; gap: 8px;
@@ -532,6 +760,31 @@ a.more {
   background: none; border: none; color: var(--text2);
   cursor: pointer; font-size: 14px; padding: 0; flex-shrink: 0;
 }
+
+/* ── WebSocket 연결 상태 배너 (P3 공용) ─────────────────── */
+/* monitoring_power/workers/realtime에서 include 후 사용. gas 페이지의
+   기존 #gas-conn-banner와는 별개 (마이그레이션 별도 sprint). */
+.ws-conn-banner {
+  margin-bottom: 10px;
+}
+.ws-conn-msg {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(56, 139, 253, 0.08);
+  border: 1px solid rgba(56, 139, 253, 0.3);
+  border-radius: 6px;
+  padding: 9px 14px;
+  font-size: 12px; color: var(--text2);
+}
+/* .conn-spinner는 gas_monitoring.css에서 정의됨 — 공유 사용.
+   gas 페이지 미로드 시(예: power 페이지) 정의 누락 방지를 위해 fallback 추가. */
+.ws-conn-banner .conn-spinner {
+  width: 14px; height: 14px;
+  border: 2px solid rgba(56, 139, 253, 0.25);
+  border-top-color: #58a6ff;
+  border-radius: 50%; flex-shrink: 0;
+  animation: conn-spin 0.8s linear infinite;
+}
+@keyframes conn-spin { to { transform: rotate(360deg); } }
 
 /* ── 서브 페이지 공통 ────────────────────────────────────── */
 .page-wrap        { padding: 16px; }

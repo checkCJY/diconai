@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     DRF_SERVICE_TOKEN: str = ""  # 빈 문자열이면 Authorization 헤더 미포함
     DRF_REQUEST_TIMEOUT_SEC: float = 5.0
 
+    # ── Redis (Phase 1 C4) ─────────────────────────────────────
+    # 알람 큐(diconai:ws:alarms) + 향후 IF rate limit/메트릭 공유 저장소.
+    # 로컬: redis://localhost:6379/0, 도커 컴포즈: redis://redis:6379/0 (compose가 주입).
+    REDIS_URL: str = "redis://localhost:6379/0"
+
     # ── 서비스 간 인증 토큰 (Phase 5) ──────────────────────────
     # /internal/alarms/push/ (Celery → FastAPI) 검증용. 빈 문자열이면 비활성.
     # 운영에서는 drf의 INTERNAL_SERVICE_TOKEN과 동일 값으로 설정.
@@ -46,6 +51,8 @@ class Settings(BaseSettings):
     # dummies/*.py 스크립트에서 fastapi-server 본인을 호출할 때 사용.
     DUMMY_TARGET_HOST: str = "127.0.0.1"
     DUMMY_TARGET_PORT: int = 8001
+    # [L-3] 더미 작업자가 속한 시설 ID. 하드코딩 제거 — env 로 주입 가능.
+    DUMMY_FACILITY_ID: int = 1
     # 송출 주기(초). 가스/전력/위치 3종 더미가 공유. 0 이하면 1회만 송출.
     DUMMY_SEND_INTERVAL_SEC: float = 3.0
     # 임계치 초과 케이스 발생 확률 (0.0 ~ 1.0).
@@ -53,6 +60,41 @@ class Settings(BaseSettings):
     # 시연 시나리오 모드. mixed=확률 기반, normal/warning/danger=고정.
     # 더미는 부팅 시 이 값을 초기 상태로 사용하고, 이후 FastAPI에 polling.
     DUMMY_SCENARIO_MODE: str = "mixed"
+
+    # ── 가스 `co_leak` 시연 override ──────────────────────────
+    # gas_dummy.SCENARIO_PATTERNS["co_leak"] 의 상태머신 틱 값을 env 로 외부화.
+    # 시연 시 RAMP_UP 을 늘려 "주의(60ppm) → 위험(200ppm) 격상" 단계가 운영자가
+    # 추적 가능한 속도로 진행되게 한다. 미설정 시 기본 5/30/5 = 코드 원래 값.
+    DEMO_CO_LEAK_RAMP_UP_TICKS: int = 5
+    DEMO_CO_LEAK_HOLD_TICKS: int = 30
+    DEMO_CO_LEAK_RAMP_DOWN_TICKS: int = 5
+
+    # ── 가스 AI Change Point penalty ──────────────────────────
+    # gas_service._detect_change_point penalty. 낮을수록 부드러운 ramp 도 감지
+    # → 시연용 1.0 권장. 운영 시 3.0 default — false positive 억제 의도.
+    DEMO_GAS_CP_PENALTY: float = 3.0
+
+    # ── 전력 `overload` 시연 override ─────────────────────────
+    # power_dummy.SCENARIO_PATTERNS["overload"] 의 상태머신 틱 값을 env 로 외부화.
+    # 시연 시 RAMP_UP 을 늘려 "정상(정격×1.0) → 주의 → 위험(정격×1.10)" 격상 흐름이
+    # 운영자가 추적 가능한 속도로 진행되게 한다. 미설정 시 기본 5/60/10 = 코드 원래 값.
+    DEMO_OVERLOAD_RAMP_UP_TICKS: int = 5
+    DEMO_OVERLOAD_HOLD_TICKS: int = 60
+    DEMO_OVERLOAD_RAMP_DOWN_TICKS: int = 10
+
+    # ── AI 알람 rate limit ────────────────────────────────────
+    # 같은 센서에서 AI 이상탐지 알람을 최소 이 초(秒) 이상 간격으로 발화.
+    # DRF 의 ALARM_REPOPUP_COOLDOWN_SEC (event_service 쿨다운, 기본 60s) 과
+    # 독립 튜닝 가능하나, 일반적으로 동일하게 맞추는 것을 권장.
+    # [M-3] gas_service.py 내 하드코딩(30)에서 settings 로 이전 — 환경별 분기 지원.
+    GAS_AI_RATE_LIMIT_SEC: int = 30
+
+    # ── ML 모델 (STEP B) ───────────────────────────────────────
+    # IF 모델 .pkl 디렉토리. drf-server 와 같은 volume 마운트 (다음 sprint).
+    # 로컬: /home/.../diconai/drf-server/ml_models, 컨테이너: /app/ml_models.
+    ML_MODELS_DIR: str = "/app/ml_models"
+    # 모델 캐시 TTL (초). 0 이하면 영구 캐시.
+    ML_MODEL_CACHE_TTL_SEC: int = 3600
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

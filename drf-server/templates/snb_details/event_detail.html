@@ -44,12 +44,9 @@
       </div>
       <div class="detail-section">
         <div class="detail-label">권고 조치</div>
-        <div class="detail-value">
-          1. 작업자 앱 긴급 알림 발송<br>
-          2. 현장 작업 중지 및 대피 안내<br>
-          3. 환기 설비 가동<br>
-          4. 센서/설비 상태 점검 후 조치 상태 갱신
-        </div>
+        <!-- T2+T6 (2026-05-20) — alarm_type × level 별 동적 채움 (event_detail.js
+             RECOMMENDED_ACTIONS dict). 정적 4 단계 가스 디폴트 → 도메인별 분기. -->
+        <div class="detail-value" id="detail-recommendation">-</div>
       </div>
       <div class="detail-section">
         <div class="detail-label">연관 대상 정보</div>
@@ -89,6 +86,12 @@
         </div>
       </div>
 
+      <!-- ❻ 공지사항 -->
+      <div class="panel" id="notice-panel" style="display:none;">
+        <div class="panel-title">공지사항</div>
+        <div id="notice-list"></div>
+      </div>
+
     </div>
   </div>
 
@@ -119,6 +122,7 @@
 <script src="{% static 'js/shared/layout.js' %}"></script>
 <script src="{% static 'js/shared/app-sub.js' %}"></script>
 <script src="{% static 'js/shared/alarm-popup.js' %}"></script>
+<script src="{% static 'js/shared/time-format.js' %}"></script>
 <script src="{% static 'js/shared/alarm-mapper.js' %}"></script>
 <script src="{% static 'js/shared/worker-ws.js' %}"></script>
 <script src="{% static 'js/shared/alarm-ws.js' %}"></script>

@@ -1,0 +1,204 @@
+{
+  "uid": "diconai-gas-ai",
+  "title": "diconai — 가스 AI",
+  "tags": [
+    "diconai",
+    "gas",
+    "ai"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "refresh": "10s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "가스 AI — 추론 실행 빈도 (req/s, 5m)",
+      "description": "change point 감지 후 IF 추론이 실제로 실행된 횟수. 0이 되면 change point가 감지 안 되거나 윈도우(30틱) 미충족 상태 — 더미 프로세스 확인.",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "rate(gas_ai_inference_total{job=\"fastapi\"}[5m])",
+          "legendFormat": "추론 실행"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cps",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "green"
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "가스 AI — change point 감지 횟수 (5m)",
+      "description": "co/h2s/co2 슬라이딩 윈도우에서 패턴 변화가 감지된 횟수. 시나리오 A RAMP_UP 시 이 수치가 올라온 뒤 AI 추론이 실행됨.",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "increase(gas_cp_detected_total{job=\"fastapi\"}[5m])",
+          "legendFormat": "change point 감지"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "가스 AI — 실제 알람 발화 횟수 (gas_type별, 5m)",
+      "description": "rate limit 통과 후 실제로 AlarmRecord가 생성된 횟수. 시나리오 A 시연 시 co 라인이 올라와야 정상. 0이면 rate limit 억제 중이거나 AI 미발화.",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum by (gas_type, risk_level) (increase(gas_ai_alarm_fired_total{job=\"fastapi\"}[5m]))",
+          "legendFormat": "{{gas_type}} / {{risk_level}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "가스 AI — rate limit 억제 횟수 (5m)",
+      "description": "AI가 이상 감지했지만 60초 이내 재발화라 억제된 횟수. 시나리오 A HOLD 구간에서 올라옴 — 알람이 60초에 1번만 발화하는 설계 증거.",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "increase(gas_ai_rate_limited_total{job=\"fastapi\"}[5m])",
+          "legendFormat": "rate limit 억제"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          }
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "가스 AI — 추론 소요시간 p95 / p99 (5m)",
+      "description": "gas_if 모델 추론 실행 시간. 100ms 이상 지속이면 모델 로드 이슈 또는 윈도우 크기 문제.",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(ai_inference_duration_seconds_bucket{job=\"fastapi\",model_type=\"gas_if\"}[5m]))",
+          "legendFormat": "gas_if p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(ai_inference_duration_seconds_bucket{job=\"fastapi\",model_type=\"gas_if\"}[5m]))",
+          "legendFormat": "gas_if p99",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "가스 AI — 추론 실패 횟수 (reason별, 5m)",
+      "description": "AI 추론 실패 횟수. model_not_loaded가 올라오면 gas IF 모델 미학습 상태 — train_anomaly_model 실행 필요. No data = 정상.",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "increase(ai_inference_failed_total{job=\"fastapi\",model_type=\"gas_if\"}[5m])",
+          "legendFormat": "gas_if / {{reason}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "red"
+          }
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "가스 AI vs 임계치 알람 발화 비교 (5m)",
+      "description": "AI 기반(gas_anomaly_ai)과 임계치 기반(gas_threshold) 알람 발화 비율 비교. AI mute 설계상 AI가 먼저 발화하면 임계치 danger가 억제됨 — AI 라인이 threshold danger보다 항상 높아야 정상.",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum by (alarm_type, risk_level) (increase(alarm_fired_total{job=\"drf\",alarm_type=~\"gas.*\"}[5m]))",
+          "legendFormat": "{{alarm_type}} / {{risk_level}}"
+        },
+        {
+          "expr": "sum by (gas_type, risk_level) (increase(gas_ai_alarm_fired_total{job=\"fastapi\"}[5m]))",
+          "legendFormat": "gas_anomaly_ai / {{gas_type}} (FastAPI)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      }
+    }
+  ]
+}

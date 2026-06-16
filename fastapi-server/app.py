@@ -4,26 +4,43 @@
 # 실행: uvicorn app:app --reload --port 8001
 import asyncio
 import logging
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.openapi.utils import get_openapi
+from fastapi.responses import JSONResponse, Response
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    Counter,
+    Histogram,
+    generate_latest,
+)
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from core.config import settings
 from core.logging import setup_logging
+from core.redis_client import close_redis
+from ai.router import router as ai_router
 from gas.routers.gas_router import router as gas_router
 from internal.routers.alarm_router import router as internal_alarm_router
 from internal.routers.scenario_router import router as internal_scenario_router
+from internal.routers.scenario_router import (
+    ALLOWED_MODES,
+)  # 이성현 추가 — 시나리오 초기화용
+from websocket.snap_store import store_scenario_mode  # 이성현 추가 — 시나리오 초기화용
 from positioning.routers.position_router import router as positioning_router
 from power.routers.power_router import router as power_router
+from power.services.channel_meta_cache import channel_meta_refresh_loop
+from power.services.threshold_sync import refresh_threshold_meta, threshold_sync_loop
 from websocket.routers.ws_router import (
     alarm_flush_loop,
     broadcast_loop,
     router as ws_router,
 )
+from websocket.services.alarm_queue import reset_stream_if_wrongtype
 
 
 setup_logging(settings.LOG_LEVEL)
@@ -36,15 +53,39 @@ async def lifespan(app: FastAPI):
         f"[app] action=startup log_level={settings.LOG_LEVEL} "
         f"broadcast_interval={settings.BROADCAST_INTERVAL_SEC}s"
     )
+    # [M-8] 요청 수락 전에 전력 임계치를 1회 즉시 로드한다.
+    # threshold_sync_loop 만 띄우면 create_task→yield 사이 첫 요청이 빈 캐시로
+    # 처리될 수 있다. 실패해도 loop 가 backoff 재시도하므로 startup 을 막지 않는다.
+    await refresh_threshold_meta()
+    # 이성현 추가 — 서버 시작 시 시나리오 모드를 환경변수 값으로 Redis 초기화
+    # scenario_router.py의 모듈 레벨 초기화 코드를 여기로 이동 (Redis 이관으로 async 필요)
+    # Redis 실패해도 서버 기동 막지 않음 — load_scenario_mode의 default "mixed" 로 폴백
+    try:
+        init_mode = settings.DUMMY_SCENARIO_MODE
+        if init_mode in ALLOWED_MODES:
+            await store_scenario_mode(init_mode)
+    except Exception:
+        logger.warning("[app] scenario_mode Redis 초기화 실패 — default 'mixed' 유지")
+    # LIST→Stream 전환: 잔존 LIST 키가 있으면 1회 정리 (WRONGTYPE 방지).
+    # alarm_flush_loop(XREAD)/push_alarm(XADD) 이 키를 건드리기 전에 실행.
+    await reset_stream_if_wrongtype()
     task1 = asyncio.create_task(
         broadcast_loop()
     )  # 센서 통합 페이로드 주기 브로드캐스트
     task2 = asyncio.create_task(alarm_flush_loop())  # 신규 알람 즉시 플러시
+    task3 = asyncio.create_task(
+        channel_meta_refresh_loop()
+    )  # PowerDevice.channel_meta 5분 주기 동기화
+    # T4 D1b — DRF power_facility_default threshold 5분 sync (단일 결정자 진입).
+    task4 = asyncio.create_task(threshold_sync_loop())
     try:
         yield
     finally:
         task1.cancel()
         task2.cancel()
+        task3.cancel()
+        task4.cancel()
+        await close_redis()  # Phase 1 C4 — Redis 연결 풀 정리
         logger.info("[app] action=shutdown")
 
 
@@ -72,6 +113,7 @@ app = FastAPI(
             "description": "서비스 간 통신 (Celery → FastAPI 브리지). localhost 전용",
         },
         {"name": "health", "description": "헬스체크"},
+        {"name": "ai", "description": "IF 이상탐지 추론 (STEP B)"},
     ],
     lifespan=lifespan,
 )
@@ -90,6 +132,41 @@ app.include_router(positioning_router)
 app.include_router(ws_router)
 app.include_router(internal_alarm_router)  # Celery → WS 브리지 (localhost 전용)
 app.include_router(internal_scenario_router)  # 시연 시나리오 모드 컨트롤
+app.include_router(ai_router)  # IF 이상탐지 추론 (STEP B)
+
+
+# ── Prometheus 메트릭 (직접 노출, 외부 instrumentator 패키지 미사용) ──
+# label에 raw path를 쓰면 path-param이 많은 라우트(/ws/worker/{user_id}/)에서
+# 카디널리티 폭발 → request.scope["route"].path (라우트 템플릿) 사용.
+_HTTP_REQUESTS_TOTAL = Counter(
+    "http_requests_total",
+    "Total HTTP requests",
+    ["method", "path", "status"],
+)
+_HTTP_REQUEST_DURATION = Histogram(
+    "http_request_duration_seconds",
+    "HTTP request latency in seconds",
+    ["method", "path"],
+)
+
+
+@app.middleware("http")
+async def prometheus_metrics_middleware(request: Request, call_next):
+    if request.url.path == "/metrics":
+        return await call_next(request)
+    start = time.perf_counter()
+    response = await call_next(request)
+    elapsed = time.perf_counter() - start
+    route = request.scope.get("route")
+    path = getattr(route, "path", request.url.path)
+    _HTTP_REQUESTS_TOTAL.labels(request.method, path, response.status_code).inc()
+    _HTTP_REQUEST_DURATION.labels(request.method, path).observe(elapsed)
+    return response
+
+
+@app.get("/metrics", include_in_schema=False)
+def prometheus_metrics() -> Response:
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 # ── 전역 예외 핸들러 ────────────────────────────────────────────
@@ -154,3 +231,99 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 async def health_check() -> dict[str, str]:
     """서버 생존 확인용 엔드포인트. Liveness probe 등 운영 모니터링에 사용."""
     return {"status": "ok"}
+
+
+# ── OpenAPI 후처리: 4xx/5xx 응답에 표준 에러 봉투 본문 주입 ──────────────
+# 예외 핸들러 3종이 모든 에러를 {error:{code,message,details?}} 로 일원화하지만,
+# 라우터의 responses= 선언은 description 만 있어 문서에 본문 형태가 안 보인다.
+# 코드별 예시를 붙여 401 에 not_found 예시가 뜨는 혼동을 막는다.
+_ERROR_ENVELOPE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "error": {
+            "type": "object",
+            "properties": {
+                "code": {"type": "string", "description": "표준 에러 코드."},
+                "message": {
+                    "type": "string",
+                    "description": "사람이 읽을 한 줄 메시지.",
+                },
+                "details": {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "nullable": True,
+                    "description": "검증 실패 시 필드별 오류 목록.",
+                },
+            },
+            "required": ["code", "message"],
+        }
+    },
+    "required": ["error"],
+}
+
+# 상태코드 → (코드, 예시 메시지). app.py 예외 핸들러 _HTTP_CODE_FALLBACK 과 동기화.
+_STATUS_EXAMPLE = {
+    400: ("validation_failed", "요청 데이터 검증에 실패했습니다."),
+    401: ("authentication_required", "인증이 필요합니다."),
+    403: ("permission_denied", "이 작업을 수행할 권한이 없습니다."),
+    404: ("not_found", "요청하신 리소스를 찾을 수 없습니다."),
+    422: ("validation_failed", "요청 데이터 검증에 실패했습니다."),
+    500: ("internal_error", "서버 내부 오류가 발생했습니다."),
+    502: ("upstream_unavailable", "상위 서비스에 연결할 수 없습니다."),
+    503: ("upstream_unavailable", "상위 서비스에 연결할 수 없습니다."),
+    504: ("upstream_unavailable", "상위 서비스에 연결할 수 없습니다."),
+}
+
+
+def _error_example(status_code: int) -> dict:
+    code, message = _STATUS_EXAMPLE.get(
+        status_code, ("internal_error", "오류가 발생했습니다.")
+    )
+    example: dict = {"error": {"code": code, "message": message}}
+    if code == "validation_failed":
+        example["error"]["details"] = [
+            {
+                "loc": ["body", "field"],
+                "msg": "field required",
+                "type": "value_error.missing",
+            }
+        ]
+    return example
+
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+        tags=app.openapi_tags,
+    )
+    schema.setdefault("components", {}).setdefault("schemas", {})["ErrorEnvelope"] = (
+        _ERROR_ENVELOPE_SCHEMA
+    )
+    ref = {"$ref": "#/components/schemas/ErrorEnvelope"}
+
+    for path_item in schema.get("paths", {}).values():
+        for method, operation in path_item.items():
+            if not isinstance(operation, dict):
+                continue
+            for code, response in operation.get("responses", {}).items():
+                if not (code.isdigit() and int(code) >= 400):
+                    continue
+                # 모든 에러 응답을 표준 봉투로 통일 (런타임 핸들러와 일치)
+                response["content"] = {
+                    "application/json": {
+                        "schema": ref,
+                        "example": _error_example(int(code)),
+                    }
+                }
+
+    app.openapi_schema = schema
+    return schema
+
+
+app.openapi = custom_openapi

@@ -25,13 +25,38 @@ class DataRetentionPolicy(BaseModel):
         GAS_SENSOR = "gas_sensor", "유해가스 센서"
         POWER = "power", "전력"
         POSITION_NODE = "position_node", "위치 노드"
+        # AI/ML 모델·추론 결과 (sensor 종류와 무관한 시스템 자산)
+        ML = "ml", "AI/ML"
+        # 로그·알림 등 도메인 횡단 시스템 데이터
+        SYSTEM = "system", "시스템"
 
     class DataCategory(models.TextChoices):
+        # ── 센서 원천 ─────────────────────────────────────────────
         GAS_RAW = "gas_raw", "가스 원천 데이터"
         GAS_ANOMALY = "gas_anomaly", "가스 이상 이력"
+        # GasDataHourly 집계 테이블 (Phase 4에서 모델 신설 예정)
+        GAS_HOURLY = "gas_hourly", "가스 시간 집계"
         POWER_RAW = "power_raw", "전력 원천 데이터"
         POWER_AGG = "power_agg", "전력 집계 이력"
+        # PowerDataHourly 집계 테이블 (Phase 4에서 모델 신설 예정)
+        POWER_HOURLY = "power_hourly", "전력 시간 집계"
         POSITION_HIST = "position_hist", "위치 이력"
+        # ── AI/ML ─────────────────────────────────────────────────
+        # MLAnomalyResult (IF) + GasArimaResult (ARIMA) 통합 관리
+        ML_RESULT = "ml_result", "AI 추론 결과"
+        # MLModel DB행 + .pkl 파일 — is_active=False + raw_retention_days 초과 시 삭제
+        ML_MODEL = "ml_model", "AI 모델 파일"
+        # ── 시스템 로그 ───────────────────────────────────────────
+        # SystemLog: 시스템·사용자활동·지도편집 로그 통합 테이블
+        SYSTEM_LOG = "system_log", "시스템 로그"
+        # IntegrationLog: FastAPI→DRF 연동 호출 기록
+        INTEGRATION_LOG = "integration_log", "연동 로그"
+        # AppLog: Python logging.error/warning 영속화
+        APP_LOG = "app_log", "앱 로그"
+        # LoginLog: 로그인·로그아웃 이력
+        LOGIN_LOG = "login_log", "로그인 로그"
+        # Notification: 발송 이력 (popup/push/sms/email)
+        NOTIFICATION = "notification", "알림 이력"
 
     class DeleteCycle(models.TextChoices):
         DAILY = "daily", "매일"

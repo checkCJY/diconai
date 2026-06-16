@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
 <link rel="stylesheet" href="{% static 'css/components/header.css' %}">
 <link rel="stylesheet" href="{% static 'css/detail/power_system.css' %}">
+<link rel="stylesheet" href="{% static 'css/shared/chart-helpers.css' %}">
 <!-- Chart.js 4.x -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <!-- chartjs-plugin-annotation 3.x -->
@@ -19,6 +20,9 @@
 <div class="body-wrap page-wrap">
 
   <H1> 실시간/AI 예측 스마트 전력 현황 </H1><br>
+
+  {% include 'components/ws_conn_banner.html' %}
+
   <div class="power-wrap">
 
     <!-- ❶ 좌측: 스마트 전력 위험 현황 -->
@@ -124,10 +128,13 @@
 <script src="{% static 'js/shared/config.js' %}"></script>
 <script src="{% static 'js/shared/auth.js' %}"></script>
 <script src="{% static 'js/shared/ws-client.js' %}"></script>
+<script src="{% static 'js/shared/ws-conn-banner.js' %}"></script>
 <script src="{% static 'js/shared/layout.js' %}"></script>
 <script src="{% static 'js/shared/app-sub.js' %}"></script>
 <script src="{% static 'js/detail/ui-exception.js' %}"></script>
+<script src="{% static 'js/shared/chart-helpers.js' %}"></script>
 <script src="{% static 'js/detail/power_system.js' %}"></script>
 <script src="{% static 'js/detail/websocket_power.js' %}"></script>
+{% include "components/alarm_stack.html" %}
 </body>
 </html>

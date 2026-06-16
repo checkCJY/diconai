@@ -42,6 +42,32 @@ python -m dummies.position_dummy
 | 전력 | 3초 (4개 엔드포인트 순차) |
 | 위치 | 1초 |
 
+### 압연기(channel 1) 단독 테스트
+
+특정 알람 워딩·시나리오 검증 시 16채널 동시 발화로 판단이 어려울 때 사용.
+다른 15채널은 정상값 (rated × 0.5) 고정, 압연기(slave01)만 시나리오별 값 주입.
+
+```bash
+python -m dummies.test_rolling_mill_only overload   # IF anomaly 발화 (정상 30회 → 스파이크)
+python -m dummies.test_rolling_mill_only extreme    # 룰 + IF combined 즉시 발화
+python -m dummies.test_rolling_mill_only normal     # 정상화 토스트 검증용
+```
+
+`Ctrl+C` 로 중단. AI 추론은 channel 1 + watt 만 활성화되어 있어 IF/ARIMA 알람은 압연기에서만 발화.
+
+### uv 다중 프로젝트 venv 주의
+
+root `/home/cjy/diconai/` 에 별도 `.venv` 가 있어 `uv run` 이 fastapi-server venv 를 못 찾는 경우:
+
+```bash
+# 옵션 1 — venv python 직접 호출
+.venv/bin/python -m dummies.power_dummy
+
+# 옵션 2 — --active 플래그
+source .venv/bin/activate
+uv run --active python -m dummies.power_dummy
+```
+
 ---
 
 ## 시연 시나리오 모드

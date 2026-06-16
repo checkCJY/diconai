@@ -26,3 +26,14 @@ POWER_THRESHOLDS: dict = {
     "caution": settings.POWER_THRESHOLD_CAUTION,
     "danger": settings.POWER_THRESHOLD_DANGER,
 }
+
+# 추론 측 sensor_fault_overflow 검출용 절대 상한.
+# 현실적으로 도달 불가능한 값 (펌웨어/센서 오버플로우 99999 같은 일탈 신호) 을
+# IF 학습/추론에서 배제하기 위해 사용. 채널 정격 최댓값(CHANNEL_RATED) 의
+# 안전 마진 위로 설정. 본 임계치는 raw 데이터 저장에는 영향 없음.
+# 추론 quality_guard 진입부에서만 참조 (power.services.quality_guard).
+UPPER_BOUND_BY_TYPE: dict[str, float] = {
+    "watt": 50000.0,
+    "current": 200.0,
+    "voltage": 600.0,
+}

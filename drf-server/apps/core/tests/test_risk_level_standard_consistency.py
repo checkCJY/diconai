@@ -15,6 +15,7 @@ class RiskLevelStandardConsistencyTest(TestCase):
     fixtures = ["risk_level_standard"]
 
     def test_enum_matches_db(self):
+        """RiskLevel 이넘 코드와 RiskLevelStandard.code 집합 일치 확인."""
         db_codes = set(RiskLevelStandard.objects.values_list("code", flat=True))
         enum_codes = set(RiskLevel.values)
         only_in_enum = enum_codes - db_codes
@@ -27,6 +28,7 @@ class RiskLevelStandardConsistencyTest(TestCase):
         )
 
     def test_priority_unique(self):
+        """RiskLevelStandard.event_priority 값이 중복 없이 유일함 확인."""
         priorities = list(
             RiskLevelStandard.objects.values_list("event_priority", flat=True)
         )

@@ -40,12 +40,17 @@
     </div>
   </div>
 
-  <!-- ④ VR 교육 플레이어 -->
+  <!-- ④ VR 교육 플레이어 — JS가 /dashboard/api/vr-content/active/로 fetch 후
+       콘텐츠 있으면 .video-container, 없으면 .video-empty를 토글한다. -->
   <div class="video-wrap">
-    <div class="video-container">
-      <!-- 실제 영상 파일 경로로 교체하세요 -->
-      <video id="vrVideo" preload="metadata">
-        <source src="{% static 'video/safety_vr.mp4' %}" type="video/mp4">
+    <div class="video-container" id="videoContainer" hidden>
+      <video id="vrVideo"
+             preload="metadata"
+             controls
+             controlslist="nodownload noplaybackrate noremoteplayback"
+             disablepictureinpicture
+             tabindex="-1"
+             data-content-id="">
       </video>
       <div class="play-overlay" id="playOverlay">
         <svg class="play-icon" viewBox="0 0 64 64" fill="none">
@@ -53,6 +58,10 @@
           <path d="M26 20l20 12-20 12V20z" fill="rgba(255,255,255,0.85)"/>
         </svg>
       </div>
+    </div>
+    <div class="video-empty" id="videoEmpty" role="status" hidden>
+      <div class="empty-title">등록된 VR 교육 영상이 없습니다.</div>
+      <div class="empty-sub">관리자가 영상을 등록한 뒤 다시 시도해 주세요.</div>
     </div>
   </div>
 
@@ -98,5 +107,6 @@
 <script src="{% static 'js/shared/layout.js' %}"></script>
 <script src="{% static 'js/shared/app-sub.js' %}"></script>
 <script src="{% static 'js/detail/safety_vr.js' %}"></script>
+{% include "components/alarm_stack.html" %}
 </body>
 </html>

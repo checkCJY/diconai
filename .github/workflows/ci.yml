@@ -1,0 +1,128 @@
+# GitHub Actions CI 파이프라인
+# PR이 devleop 브랜치로 올라올 때마다 자동 실행됨.
+# 구성:
+#   lint         : 루트에서 ruff 한 번으로 drf-server·fastapi-server 전체 스타일 검사
+#   test         : DRF pytest (PostgreSQL + Redis 서비스)
+#   test-fastapi : FastAPI pytest (전 테스트가 redis/DRF를 mock → 외부 서비스 불필요)
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - devleop  # PR 대상 브랜치
+
+jobs:
+  # ── 코드 스타일 (양쪽 서버 일괄) ─────────────────────────────────────────
+  # ruff는 런타임 의존성이 필요 없는 린터라 서버별 설치 없이 루트에서 한 번 실행한다.
+  # 루트 pyproject.toml [dependency-groups] dev 가 ruff 버전 단일 출처.
+  # ruff는 .gitignore를 존중하므로 skill/ 등 미추적 디렉토리는 자동 제외된다.
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Python 3.12 설치
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # ruff 버전은 루트 pyproject.toml [dependency-groups] dev 와 일치시킨다.
+      - name: ruff 설치
+        run: pip install ruff==0.11.2
+
+      - name: 코드 스타일 검사 (ruff)
+        run: ruff check .
+
+  # ── DRF 테스트 ──────────────────────────────────────────────────────────
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      # 테스트용 PostgreSQL 서버 — Django가 테스트 DB를 여기에 생성
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: diconai_test
+          POSTGRES_USER: diconai
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      # 테스트용 Redis 서버 — alarm_dedupe._redis()가 raw Redis 클라이언트(Lua eval)를
+      # 사용하므로 LocMemCache로는 불가, 실제 Redis 필요 (conftest가 db15로 격리).
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      POSTGRES_HOST: localhost
+      POSTGRES_DB: diconai_test
+      POSTGRES_USER: diconai
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      POSTGRES_PORT: 5432
+      DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+      DJANGO_DEBUG: "False"
+      REDIS_URL: redis://localhost:6379/0
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Python 3.12 설치
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: |
+            drf-server/requirements.txt
+            drf-server/requirements-dev.txt
+
+      - name: 의존성 설치
+        working-directory: drf-server
+        run: |
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: 테스트 실행 (pytest)
+        working-directory: drf-server
+        run: |
+          pytest apps/ -v --tb=short
+
+  # ── FastAPI 테스트 ──────────────────────────────────────────────────────
+  # 전 테스트가 redis/DRF를 mock(AsyncMock)으로 대체 → 외부 서비스·env 불필요.
+  test-fastapi:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Python 3.12 설치
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: |
+            fastapi-server/requirements.txt
+            fastapi-server/requirements-dev.txt
+
+      - name: 의존성 설치
+        working-directory: fastapi-server
+        run: |
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: 테스트 실행 (pytest)
+        working-directory: fastapi-server
+        run: |
+          pytest tests/ -v --tb=short

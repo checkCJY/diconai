@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="500" viewBox="0 0 1040 500" font-family="Pretendard, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif">
+<rect x="0" y="0" width="1040" height="500" fill="#FFFFFF"/>
+<rect x="24" y="10" width="992" height="44" fill="#F7F6F2"/>
+<text x="28" y="37.0" font-size="13" fill="#5F5E5A" font-weight="500" text-anchor="start">구성원</text>
+<text x="158" y="37.0" font-size="13" fill="#5F5E5A" font-weight="500" text-anchor="start">주 도메인</text>
+<text x="338" y="37.0" font-size="13" fill="#5F5E5A" font-weight="500" text-anchor="start">주요 담당 업무</text>
+<text x="1012" y="37.0" font-size="13" fill="#5F5E5A" font-weight="500" text-anchor="end">기능 수</text>
+<line x1="24" y1="54" x2="1016" y2="54" stroke="#B4B2A9" stroke-width="1"/>
+<text x="28" y="87" font-size="15" fill="#2C2C2A" font-weight="500" text-anchor="start">이성현</text>
+<rect x="158" y="72" width="137" height="24" rx="6" fill="#E1F5EE"/>
+<text x="168" y="89" font-size="12.5" fill="#0F6E56" font-weight="500" text-anchor="start">가스·운영·인프라</text>
+<text x="338" y="87" font-size="15" fill="#2C2C2A" font-weight="400" text-anchor="start">가스 9축 AI, CP 사전필터, 시나리오 더미, Docker/k8s/CI,</text>
+<text x="338" y="111" font-size="15" fill="#2C2C2A" font-weight="400" text-anchor="start">Redis 이관, Grafana 패널(DB/Redis), 설비 등록·관리 백오피스</text>
+<text x="338" y="135" font-size="15" fill="#2C2C2A" font-weight="400" text-anchor="start">(가스센서·전력장치·설비·위치노드), 지오펜스·실시간 지도</text>
+<text x="1012" y="87" font-size="17" fill="#2C2C2A" font-weight="500" text-anchor="end">56</text>
+<line x1="24" y1="162" x2="1016" y2="162" stroke="#E3E1DA" stroke-width="1"/>
+<text x="28" y="195" font-size="15" fill="#2C2C2A" font-weight="500" text-anchor="start">정휘훈</text>
+<rect x="158" y="180" width="137" height="24" rx="6" fill="#FAEEDA"/>
+<text x="168" y="197" font-size="12.5" fill="#854F0B" font-weight="500" text-anchor="start">백오피스·모니터링</text>
+<text x="338" y="195" font-size="15" fill="#2C2C2A" font-weight="400" text-anchor="start">어드민 기준정보 CRUD(공지·공통코드·위험기준·임계치·위험유형·로그), 메뉴</text>
+<text x="338" y="219" font-size="15" fill="#2C2C2A" font-weight="400" text-anchor="start">관리, 직위 모델(△), 운영데이터 어드민(가스·전력 데이터), 이벤트·가스</text>
+<text x="338" y="243" font-size="15" fill="#2C2C2A" font-weight="400" text-anchor="start">모니터링, Grafana(전력/가스 AI)·Prometheus, Dev/Prod</text>
+<text x="338" y="267" font-size="15" fill="#2C2C2A" font-weight="400" text-anchor="start">설정 분리</text>
+<text x="1012" y="195" font-size="17" fill="#2C2C2A" font-weight="500" text-anchor="end">69</text>
+<line x1="24" y1="294" x2="1016" y2="294" stroke="#E3E1DA" stroke-width="1"/>
+<text x="28" y="327" font-size="15" fill="#2C2C2A" font-weight="500" text-anchor="start">최재용</text>
+<text x="28" y="345" font-size="11" fill="#888780" font-weight="400" text-anchor="start">팀장</text>
+<rect x="158" y="312" width="150" height="24" rx="6" fill="#E6F1FB"/>
+<text x="168" y="329" font-size="12.5" fill="#0C447C" font-weight="500" text-anchor="start">전력·알람·대시보드</text>
+<text x="338" y="327" font-size="15" fill="#2C2C2A" font-weight="400" text-anchor="start">전력 5축 AI, PG 마이그레이션, decide_alarm 결정 로직, 알람</text>
+<text x="338" y="351" font-size="15" fill="#2C2C2A" font-weight="400" text-anchor="start">팝업, 알람 정책·이벤트 이력, 메인 대시보드 프론트 전반(차트·WS·전력·작업자</text>
+<text x="338" y="375" font-size="15" fill="#2C2C2A" font-weight="400" text-anchor="start">패널), 백오피스(사용자·조직), 안전관리(작업 전 확인·이력·VR 교육),</text>
+<text x="338" y="399" font-size="15" fill="#2C2C2A" font-weight="400" text-anchor="start">인증(프로필), PM</text>
+<text x="1012" y="327" font-size="17" fill="#2C2C2A" font-weight="500" text-anchor="end">107</text>
+<line x1="24" y1="426" x2="1016" y2="426" stroke="#E3E1DA" stroke-width="1"/>
+<rect x="24" y="438" width="992" height="52" rx="8" fill="#F1EFE8"/>
+<text x="38" y="460" font-size="12.5" fill="#2C2C2A" font-weight="500" text-anchor="start">비고</text>
+<text x="82" y="460" font-size="12.5" fill="#5F5E5A" font-weight="400" text-anchor="start">한지혜: 로그인/인증 설계·구현 후 중도 이탈 — 로그인(LGN 6건) 기여자로 별도 기록.</text>
+<text x="82" y="478" font-size="12.5" fill="#5F5E5A" font-weight="400" text-anchor="start">미구현 11건 별도 집계.  ·  합계 249건 (관리자 103 / 사용자 146).</text>
+</svg>

@@ -4,6 +4,9 @@ __pycache__/
 *.pyo
 *.pyd
 
+# Windows 복사 메타데이터 (NTFS ADS)
+*:Zone.Identifier
+
 # Virtual environments
 drf-server/.venv/
 fastapi-server/.venv/
@@ -11,12 +14,42 @@ fastapi-server/.venv/
 
 # Django
 drf-server/db.sqlite3
+drf-server/db.sqlite3-wal
+drf-server/db.sqlite3-shm
 drf-server/media/
 drf-server/staticfiles/
+
+# ML 모델 (.pkl) — STEP B IF 학습 산출물.
+# 코드와 분리해 별도 백업/배포. fastapi 가 같은 디렉토리 read-only 마운트.
+drf-server/ml_models/
+fastapi-server/ml_models/
+
+# ML 학습 데이터 스냅샷 (parquet) — ml_models와 동일 정책. 운영 DB와 분리해 별도 보관.
+# 디렉토리는 유지(.gitkeep)해서 신규 환경에서 mount 경로 보장.
+drf-server/ml_datasets/*
+!drf-server/ml_datasets/.gitkeep
+
+# DB 수동 백업 — backfill 같은 대량 작업 전 보존용. 수백 MB 단위라 git 부적합.
+drf-server/db.sqlite3.backup_*
+# 마이그레이션 전 보존용 (.bak.YYYYMMDD-* 패턴). 동일 사유 — 큰 용량 + 임시 보존.
+drf-server/db.sqlite3.bak*
+# truncate 전 cold copy 보관 디렉토리 (12GB 단위). 2026-05-14 도입.
+drf-server/db_backups/
+
+# 평가/EDA ad-hoc 스크립트 — sprint 단위 1회용. changelog 의 명령어로 재현 가능.
+# 보존하지만 git 추적 X (다음 sprint 시 새로 작성하거나 재사용).
+drf-server/_eval_*.py
 
 # Environment
 .env
 *.env
+.env.docker
+.env.dev
+.env.prod
+
+# DB backups & dumps (PG 전환 + 일상 백업)
+backup/
+*.sql
 
 # IDE
 .vscode/
@@ -31,8 +64,27 @@ Thumbs.db
 .mypy_cache/
 .ruff_cache/
 
-# Logs
-*.log
+# Logs (RotatingFileHandler 회전 백업 + logs/ 디렉토리 통째로)
+# *.log* 패턴으로 error.log / error.log.1 / app.log.10 모두 차단.
+# 디렉토리도 명시해 "왜 추적 안 되는지" .gitignore만 보고 이해 가능.
+*.log*
+drf-server/logs/
+fastapi-server/logs/
+
+# Prometheus multiprocess metric files (런타임 생성 파일, 커밋 불필요)
+drf-server/prometheus_multiproc/
+
+# API 명세 HTML (openapi-*.yaml/json 에서 Redoc 으로 재생성되는 산출물).
+# drf-api.html 은 2MB 라 large-file 게이트(500KB) 초과 — 소스만 커밋, HTML 은 로컬 생성.
+docs/api/*.html
+
+# Celery beat 런타임 schedule 상태 (PID·시각 기록, 사용자별).
+# 한 번 잘못 tracked되어 git rm --cached로 untrack 처리 (2026-05-14).
+drf-server/celerybeat-schedule
 
 .claude
 skill
+
+k8s/secret.yaml
+kubectl
+minikube-linux-amd64

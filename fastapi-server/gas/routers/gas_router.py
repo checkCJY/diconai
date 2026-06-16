@@ -6,6 +6,10 @@
 #   POST /api/sensors/gas  : 1초 주기로 전송되는 가스 측정값 수신
 from fastapi import APIRouter
 
+from core.redis_client import get_redis  # 이성현 추가 — 센서 등록 캐시용
+from gas.constants import REGISTERED_GAS_SENSORS_KEY  # 이성현 추가
+# 상수를 constants로 제외 순환 X
+
 from gas.schemas.gas import (
     DeviceInfoPayload,
     DeviceInfoResponse,
@@ -31,6 +35,10 @@ router = APIRouter(prefix="/api/sensors", tags=["sensors"])
     },
 )
 async def receive_device_info(payload: DeviceInfoPayload):
+    # 이성현 추가 — 부팅 시 보내는 device_id를 Redis Set에 등록.
+    # 가스 수신(STEP 3)에서 이 Set으로 등록 여부를 즉시 확인 → DRF 블로킹 없이 404 판정.
+    r = get_redis()
+    await r.sadd(REGISTERED_GAS_SENSORS_KEY, payload.device_id)
     return {"received": True, "device_id": payload.device_id}
 
 

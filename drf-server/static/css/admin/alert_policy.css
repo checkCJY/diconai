@@ -1,0 +1,329 @@
+/* admin/alert_policy.css — 알림 정책 관리 페이지 전용 스타일.
+ * 흰색 베이스, admin.css 톤 (#3b82f6 accent, slate 그레이) 과 일치.
+ * .ap- namespace 로 다른 admin 페이지와 격리.
+ */
+
+/* ── 모달 ─────────────────────────────────────────────── */
+
+.ap-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.4);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ap-modal {
+    background: #fff;
+    border-radius: 10px;
+    width: 680px;
+    max-width: 92vw;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+.ap-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.ap-modal-header h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #111827;
+    margin: 0 0 4px;
+}
+
+.ap-modal-desc {
+    font-size: 13px;
+    color: #6b7280;
+    margin: 0;
+}
+
+.ap-modal-close {
+    background: none;
+    border: none;
+    color: #9ca3af;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    padding: 0 0 0 12px;
+}
+
+.ap-modal-close:hover { color: #374151; }
+
+.ap-modal-body { padding: 20px 24px; }
+
+.ap-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 16px 24px;
+    border-top: 1px solid #f1f5f9;
+}
+
+/* ── 탭 ──────────────────────────────────────────────── */
+
+.ap-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 0 24px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.ap-tab {
+    background: none;
+    border: none;
+    color: #64748b;
+    padding: 10px 16px;
+    font-size: 14px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color 0.15s, border-color 0.15s;
+    font-family: inherit;
+}
+
+.ap-tab:hover { color: #1f2937; }
+
+.ap-tab.active {
+    color: #3b82f6;
+    border-bottom-color: #3b82f6;
+    font-weight: 600;
+}
+
+.ap-tab-panel { display: none; }
+.ap-tab-panel.active { display: block; }
+
+.ap-tab-hint {
+    font-size: 13px;
+    color: #94a3b8;
+    margin: 0 0 12px;
+}
+
+/* ── 폼 ──────────────────────────────────────────────── */
+
+.ap-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px 20px;
+}
+
+.ap-form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.ap-form-field label {
+    font-size: 13px;
+    color: #475569;
+    font-weight: 500;
+}
+
+.ap-form-field input,
+.ap-form-field select,
+.ap-form-field textarea {
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    color: #1f2937;
+    padding: 8px 12px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.15s;
+    width: 100%;
+    box-sizing: border-box;
+    font-family: inherit;
+}
+
+.ap-form-field input::placeholder,
+.ap-form-field textarea::placeholder { color: #94a3b8; }
+
+.ap-form-field input:focus,
+.ap-form-field select:focus,
+.ap-form-field textarea:focus { border-color: #3b82f6; }
+
+.ap-form-field textarea { resize: vertical; }
+
+.ap-form-field code {
+    background: #f1f5f9;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 11px;
+    color: #b45309;
+}
+
+.ap-required { color: #dc2626; }
+.ap-col-span-2 { grid-column: 1 / -1; }
+
+/* ── chip ────────────────────────────────────────────── */
+
+.ap-chip-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.ap-chip {
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    border-radius: 16px;
+    color: #64748b;
+    padding: 6px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    font-family: inherit;
+}
+
+.ap-chip:hover {
+    border-color: #3b82f6;
+    color: #3b82f6;
+}
+
+.ap-chip.selected {
+    background: #eff6ff;
+    color: #3b82f6;
+    border-color: #3b82f6;
+}
+
+/* ── 변수 칩 (알림 내용 변수 삽입) ──────────────────────── */
+
+.ap-var-chips {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.ap-var-chip {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #3b82f6;
+    border-radius: 16px;
+    padding: 4px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.ap-var-chip:hover {
+    background: #dbeafe;
+    border-color: #3b82f6;
+}
+
+/* ── 권고 조치 동적 라인 ────────────────────────────────── */
+
+.ap-action-section {
+    margin-bottom: 16px;
+    padding: 12px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+}
+
+.ap-action-header {
+    font-size: 14px;
+    color: #1f2937;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
+}
+
+.ap-action-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.ap-action-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.ap-action-index {
+    color: #64748b;
+    font-size: 13px;
+    width: 24px;
+    flex-shrink: 0;
+}
+
+.ap-action-input {
+    flex: 1;
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    color: #1f2937;
+    padding: 6px 10px;
+    font-size: 13px;
+    outline: none;
+}
+
+.ap-action-input:focus { border-color: #3b82f6; }
+
+.ap-action-del {
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    color: #dc2626;
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.ap-action-del:hover { border-color: #dc2626; }
+
+.ap-action-add {
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    color: #475569;
+    padding: 6px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+    font-family: inherit;
+}
+
+.ap-action-add:hover {
+    border-color: #3b82f6;
+    color: #3b82f6;
+}
+
+/* ── 행 클릭 / muted / badge ───────────────────────────── */
+
+#policiesTableBody tr { cursor: pointer; }
+#policiesTableBody tr:hover { background: #f8fafc; }
+
+.ap-muted {
+    color: #94a3b8;
+    font-style: italic;
+    font-size: 12px;
+}
+
+.ap-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.ap-badge-green  { background: #dcfce7; color: #15803d; }
+.ap-badge-gray   { background: #f1f5f9; color: #64748b; }
+.ap-badge-red    { background: #fee2e2; color: #b91c1c; }
+.ap-badge-orange { background: #fef3c7; color: #b45309; }

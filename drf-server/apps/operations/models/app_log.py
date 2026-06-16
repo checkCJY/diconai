@@ -1,6 +1,17 @@
 from django.db import models
 
 
+class _AppLogQuerySet(models.QuerySet):
+    def delete(self, *args, **kwargs):
+        # QuerySet.delete()는 model.delete()를 우회하므로 별도로 차단한다.
+        # 보관 정책 배치(data_retention_task)는 _retention_delete()를 사용.
+        raise ValueError("AppLog는 삭제할 수 없습니다. 보관 정책은 DataRetentionPolicy를 사용하세요.")
+
+    def _retention_delete(self):
+        """데이터 보관 정책 배치 전용 삭제 메서드. 일반 코드에서 직접 호출 금지."""
+        return super().delete()
+
+
 class AppLog(models.Model):
     """
     운영 로그 — Python logging.error/warning 등을 영속화
@@ -11,6 +22,7 @@ class AppLog(models.Model):
 
     [APPEND-ONLY]
     save() / delete() 차단. SystemLog와 동일 패턴.
+    QuerySet.delete()도 차단 — _AppLogQuerySet 참고.
 
     [Phase 2 시점]
     DBLogHandler가 동기 INSERT (운영 부하 측정 후 Phase 4에서 비동기/batch 검토).
@@ -36,6 +48,8 @@ class AppLog(models.Model):
     message = models.TextField()
     extra = models.JSONField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = _AppLogQuerySet.as_manager()
 
     def save(self, *args, **kwargs):
         if self.pk is not None:

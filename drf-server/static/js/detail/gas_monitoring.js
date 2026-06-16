@@ -5,30 +5,73 @@
 
 'use strict';
 
-/* ── 가스 9종 설정 (임계치·단위·라벨) ── */
+/* ── 가스 9종 표시 메타 (라벨·단위·차트 maxY fallback) ──────
+   임계치 (warning/danger) 는 DB(gas_legal 그룹) 의 SoT 를 API 로 fetch 후 덮어씀.
+   o2 만 양방향 (값 ↑/↓ 모두 위험) — isO2 플래그로 분기. */
 const GAS_CONFIG = {
-  o2:  { label: 'O2(산소)',          unit: '%',   warning: 18.0, danger: 16.0, maxY: 25,   isO2: true  },
-  co:  { label: 'CO(일산화탄소)',    unit: 'ppm', warning: 25,   danger: 200,  maxY: 300               },
-  co2: { label: 'CO2(이산화탄소)',   unit: 'ppm', warning: 1000, danger: 5000, maxY: 6000              },
-  h2s: { label: 'H2S(황화수소)',     unit: 'ppm', warning: 10,   danger: 15,   maxY: 30                },
-  no2: { label: 'NO2(이산화질소)',   unit: 'ppm', warning: 3,    danger: 5,    maxY: 10                },
-  so2: { label: 'SO2(이산화황)',     unit: 'ppm', warning: 2,    danger: 5,    maxY: 10                },
-  o3:  { label: 'O3(오존)',          unit: 'ppm', warning: 0.06, danger: 0.12, maxY: 0.2               },
-  nh3: { label: 'NH3(암모니아)',     unit: 'ppm', warning: 25,   danger: 35,   maxY: 50                },
-  voc: { label: 'VOC(유기화합물)',   unit: 'ppm', warning: 0.5,  danger: 1.0,  maxY: 2.0               },
+  o2:  { label: 'O2(산소)',          unit: '%',   maxY: 25,   isO2: true },
+  co:  { label: 'CO(일산화탄소)',    unit: 'ppm', maxY: 300              },
+  co2: { label: 'CO2(이산화탄소)',   unit: 'ppm', maxY: 6000             },
+  h2s: { label: 'H2S(황화수소)',     unit: 'ppm', maxY: 30               },
+  no2: { label: 'NO2(이산화질소)',   unit: 'ppm', maxY: 10               },
+  so2: { label: 'SO2(이산화황)',     unit: 'ppm', maxY: 10               },
+  o3:  { label: 'O3(오존)',          unit: 'ppm', maxY: 0.2              },
+  nh3: { label: 'NH3(암모니아)',     unit: 'ppm', maxY: 50               },
+  voc: { label: 'VOC(유기화합물)',   unit: 'ppm', maxY: 2.0              },
 };
 
 const GAS_KEYS = Object.keys(GAS_CONFIG);
 
-/* ── 색상 ── */
+/* ── 임계치 캐시: { co: {warning_max, danger_max, ...}, o2: {...}, ... }
+   GET /api/monitoring/gas/thresholds/ 로 페이지 진입 시 1회 fetch. */
+let GAS_THRESHOLDS = {};
+
+async function loadGasThresholds() {
+  try {
+    const res = await fetch('/api/monitoring/gas/thresholds/');
+    if (!res.ok) return;
+    GAS_THRESHOLDS = await res.json();
+  } catch (_) { /* 실패 시 빈 캐시 — _resolveGas 가 GAS_CONFIG.maxY fallback */ }
+}
+
+/* GAS_CONFIG (표시 메타) + GAS_THRESHOLDS (DB SoT) → 차트용 통합 설정.
+   단방향 (8가스): { warn, danger, maxY } — warn/danger 는 warning_max/danger_max.
+   양방향 (o2):    { warnLow, warnHigh, dangerLow, dangerHigh, maxY }.
+   DB 미입력 부분은 hardcoded fallback. */
+function _resolveGas(gas) {
+  const cfg = GAS_CONFIG[gas];
+  const t = GAS_THRESHOLDS[gas] || {};
+  if (cfg.isO2) {
+    return {
+      label: cfg.label,
+      unit: cfg.unit,
+      isO2: true,
+      warnLow:   t.warning_min ?? 18,
+      warnHigh:  t.warning_max ?? 23.5,
+      dangerLow: t.danger_min ?? 16,
+      dangerHigh: t.danger_max ?? cfg.maxY,  // DB 미입력 시 차트 상단까지 위험 없음으로 간주
+      maxY: t.chart_max ?? cfg.maxY,
+    };
+  }
+  const warn = t.warning_max ?? null;
+  const danger = t.danger_max ?? null;
+  return {
+    label: cfg.label,
+    unit: cfg.unit,
+    isO2: false,
+    warn,
+    danger,
+    maxY: t.chart_max ?? cfg.maxY,
+  };
+}
+
+/* ── 기타 색상 (chart-helpers 의 CHART_COLOR 외 페이지 고유) ── */
 const COLOR = {
-  danger:    '#f85149',
-  warning:   '#e3b341',
-  normal:    '#3fb950',
-  dangerBg:  'rgba(248,81,73,0.18)',
-  warningBg: 'rgba(227,179,65,0.18)',
-  gridLine:  'rgba(48,54,61,0.7)',
-  tickText:  '#8b949e',
+  danger:   CHART_COLOR.danger,
+  warning:  CHART_COLOR.warn,
+  normal:   CHART_COLOR.ok,
+  gridLine: CHART_COLOR.gridLine,
+  tickText: CHART_COLOR.text3,
 };
 
 /* ── 탭 상태 ── */
@@ -48,97 +91,165 @@ let _selectedGas = null;
 ────────────────────────────────────────────── */
 function getRiskFromData(gas, value, riskField) {
   if (riskField) return riskField;
-  const cfg = GAS_CONFIG[gas];
-  if (!cfg || value == null) return 'normal';
-  if (cfg.isO2) {
-    if (value < cfg.danger)  return 'danger';
-    if (value < cfg.warning) return 'warning';
+  const r = _resolveGas(gas);
+  if (value == null) return 'normal';
+  if (r.isO2) {
+    if (value <= r.dangerLow || value >= r.dangerHigh) return 'danger';
+    if (value <= r.warnLow || value >= r.warnHigh) return 'warning';
     return 'normal';
   }
-  if (value >= cfg.danger)  return 'danger';
-  if (value >= cfg.warning) return 'warning';
+  if (r.danger != null && value >= r.danger) return 'danger';
+  if (r.warn != null && value >= r.warn) return 'warning';
   return 'normal';
 }
 
 /* ────────────────────────────────────────────
-   Chart.js 막대 그래프 생성
+   Chart.js 막대 그래프 생성 — 시안 패턴
+   단방향 8가스: 3-segment stacked (정상/주의/위험 색 분리) + dashed line + chip
+   양방향 O2:    단일 막대 + safeBand (안전 범위 강조) + dashed line × 4
 ────────────────────────────────────────────── */
 function createGasChart(canvasId, gas, value, risk) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
   if (chartInstances[canvasId]) chartInstances[canvasId].destroy();
 
-  const cfg     = GAS_CONFIG[gas];
-  const barColor = COLOR[risk] ?? COLOR.normal;
-  const barValue = value ?? 0;
-  const maxY     = Math.max(cfg.maxY, barValue * 1.1);
+  const r = _resolveGas(gas);
+  const v = value ?? 0;
+  const status = getRiskFromData(gas, value, risk);
 
-  const annotations = {};
+  const labelColor = status === 'danger' ? CHART_COLOR.danger
+                   : status === 'warning' ? CHART_COLOR.warn
+                   : CHART_COLOR.text;
 
-  if (cfg.isO2) {
-    // O2: 위험 구간이 하단 (값이 낮을수록 위험)
-    annotations.dangerBox  = { type: 'box', yMin: 0,           yMax: cfg.danger,  backgroundColor: COLOR.dangerBg,  borderWidth: 0 };
-    annotations.warningBox = { type: 'box', yMin: cfg.danger,  yMax: cfg.warning, backgroundColor: COLOR.warningBg, borderWidth: 0 };
-    annotations.dangerLine  = { type: 'line', yMin: cfg.danger,  yMax: cfg.danger,  borderColor: COLOR.danger,  borderWidth: 1, borderDash: [4,3] };
-    annotations.warningLine = { type: 'line', yMin: cfg.warning, yMax: cfg.warning, borderColor: COLOR.warning, borderWidth: 1, borderDash: [4,3] };
+  const baseOpts = {
+    responsive: true,
+    maintainAspectRatio: false,
+    layout: { padding: { top: 18, right: 4, left: 0, bottom: 0 } },
+    animation: { duration: 600, easing: 'easeOutCubic' },
+    scales: {
+      x: {
+        grid: { display: false }, ticks: { display: false }, border: { display: false },
+        stacked: !r.isO2,
+      },
+      y: {
+        stacked: !r.isO2,
+        min: 0, max: r.maxY, beginAtZero: true,
+        grid: { color: CHART_COLOR.gridLine, drawTicks: false },
+        border: { display: false },
+        ticks: {
+          color: CHART_COLOR.text3, font: { size: 10 }, padding: 6, maxTicksLimit: 5,
+          callback: (val) => val >= 1000
+            ? `${(val / 1000).toFixed(1).replace(/\.0$/, '')}k`
+            : val,
+        },
+      },
+    },
+  };
+
+  let chartConfig;
+  if (r.isO2) {
+    // O2 양방향: 단일 막대 + safeBand + dashed line × 4
+    const barColor = status === 'danger' ? CHART_COLOR.danger
+                   : status === 'warning' ? CHART_COLOR.warn
+                   : CHART_COLOR.ok;
+    const thresholds = [
+      { at: r.dangerHigh, color: 'danger', label: `위험 ${r.dangerHigh}${r.unit}` },
+      { at: r.warnHigh,   color: 'warn',   label: `주의 ${r.warnHigh}${r.unit}` },
+      { at: r.warnLow,    color: 'warn',   label: `주의 ${r.warnLow}${r.unit}` },
+      { at: r.dangerLow,  color: 'danger', label: `위험 ${r.dangerLow}${r.unit}` },
+    ];
+    chartConfig = {
+      type: 'bar',
+      data: {
+        labels: [''],
+        datasets: [{
+          data: [v],
+          backgroundColor: barColor,
+          borderRadius: 4, borderSkipped: false,
+          barPercentage: 0.42, categoryPercentage: 1,
+        }],
+      },
+      options: {
+        ...baseOpts,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#1F2A48', borderColor: CHART_COLOR.border, borderWidth: 1, padding: 8,
+            callbacks: {
+              title: () => r.label,
+              label: () => value != null ? `${value} ${r.unit}` : ' 데이터 없음',
+            },
+          },
+          safeBand: { from: r.warnLow, to: r.warnHigh },
+          thresholdZones: { thresholds },
+          barValueLabel: {
+            show: value != null,
+            color: labelColor,
+            formatter: () => `${value}${r.unit}`,
+          },
+        },
+      },
+    };
   } else {
-    annotations.dangerBox  = { type: 'box', yMin: cfg.danger,  yMax: maxY,        backgroundColor: COLOR.dangerBg,  borderWidth: 0 };
-    annotations.warningBox = { type: 'box', yMin: cfg.warning, yMax: cfg.danger,  backgroundColor: COLOR.warningBg, borderWidth: 0 };
-    annotations.dangerLine  = { type: 'line', yMin: cfg.danger,  yMax: cfg.danger,  borderColor: COLOR.danger,  borderWidth: 1, borderDash: [4,3] };
-    annotations.warningLine = { type: 'line', yMin: cfg.warning, yMax: cfg.warning, borderColor: COLOR.warning, borderWidth: 1, borderDash: [4,3] };
+    // 단방향 8가스: 3-segment stacked
+    const warn = r.warn ?? r.maxY;
+    const danger = r.danger ?? r.maxY;
+    const normalSeg = Math.min(v, warn);
+    const warnSeg = Math.max(0, Math.min(v, danger) - warn);
+    const dangerSeg = Math.max(0, v - danger);
+    const topR = { topLeft: 4, topRight: 4, bottomLeft: 0, bottomRight: 0 };
+    const noR = 0;
+    const rNormal = warnSeg === 0 && dangerSeg === 0 ? topR : noR;
+    const rWarn = warnSeg > 0 && dangerSeg === 0 ? topR : noR;
+    const rDanger = dangerSeg > 0 ? topR : noR;
+
+    const thresholds = [];
+    if (r.danger != null) thresholds.push({ at: r.danger, color: 'danger', label: `위험 ${r.danger}${r.unit}` });
+    if (r.warn != null) thresholds.push({ at: r.warn, color: 'warn', label: `주의 ${r.warn}${r.unit}` });
+
+    chartConfig = {
+      type: 'bar',
+      data: {
+        labels: [''],
+        datasets: [
+          { label: '정상', data: [normalSeg], backgroundColor: CHART_COLOR.ok, stack: 's',
+            borderRadius: rNormal, borderSkipped: false,
+            barPercentage: 0.42, categoryPercentage: 1 },
+          { label: '주의', data: [warnSeg], backgroundColor: CHART_COLOR.warn, stack: 's',
+            borderRadius: rWarn, borderSkipped: false,
+            barPercentage: 0.42, categoryPercentage: 1 },
+          { label: '위험', data: [dangerSeg], backgroundColor: CHART_COLOR.danger, stack: 's',
+            borderRadius: rDanger, borderSkipped: false,
+            barPercentage: 0.42, categoryPercentage: 1 },
+        ],
+      },
+      options: {
+        ...baseOpts,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#1F2A48', borderColor: CHART_COLOR.border, borderWidth: 1, padding: 8,
+            filter: (item) => item.parsed.y > 0,
+            callbacks: {
+              title: () => r.label,
+              label: (ctx) => value != null
+                ? `${ctx.dataset.label}: ${ctx.parsed.y} ${r.unit}`
+                : ' 데이터 없음',
+              footer: () => value != null ? `현재 ${value} ${r.unit}` : '',
+            },
+          },
+          thresholdZones: { thresholds },
+          barValueLabel: {
+            show: value != null,
+            color: labelColor,
+            formatter: () => `${value}${r.unit}`,
+          },
+        },
+      },
+    };
   }
 
-  const chart = new Chart(canvas, {
-    type: 'bar',
-    data: {
-      labels: [''],
-      datasets: [{
-        data: [barValue],
-        backgroundColor: barColor,
-        borderColor:     barColor,
-        borderWidth:     0,
-        barPercentage:      0.5,
-        categoryPercentage: 0.6,
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          backgroundColor: 'rgba(22,27,34,0.95)',
-          borderColor:     'rgba(48,54,61,0.9)',
-          borderWidth:     1,
-          padding:         10,
-          titleColor:      '#8b949e',
-          bodyColor:       '#e6edf3',
-          bodyFont:        { size: 11 },
-          displayColors:   false,
-          callbacks: {
-            title: () => cfg.label,
-            label: () => value != null
-              ? `현재 농도   ${value} ${cfg.unit}`
-              : ' 데이터 없음',
-          },
-        },
-        annotation: { annotations },
-      },
-      scales: {
-        x: { grid: { color: COLOR.gridLine }, ticks: { color: COLOR.tickText, font: { size: 10 } }, border: { color: '#30363d' } },
-        y: {
-          min: 0, max: maxY,
-          grid:  { color: COLOR.gridLine },
-          ticks: { color: COLOR.tickText, font: { size: 10 },
-            callback: v => v >= 1000 ? `${(v/1000).toFixed(1)}k` : v,
-          },
-          border: { color: '#30363d' },
-        },
-      },
-    },
-  });
-
+  const chart = new Chart(canvas, chartConfig);
   chartInstances[canvasId] = chart;
   return chart;
 }
@@ -149,6 +260,20 @@ function createGasChart(canvasId, gas, value, risk) {
 function buildGasCard(gas, value, risk) {
   const cfg = GAS_CONFIG[gas];
   const borderClass = risk === 'danger' ? 'border-danger' : risk === 'warning' ? 'border-caution' : '';
+
+  // 카드 헤더 chip — 차트 안에 그리던 라벨을 외부로 이동 (양방향 O2 가 chip 4개로 차트 면적 점유하던 문제 해소).
+  const r = _resolveGas(gas);
+  const thresholds = r.isO2
+    ? [
+        { at: r.dangerHigh, color: 'danger', label: `위험 ${r.dangerHigh}${r.unit}` },
+        { at: r.warnHigh,   color: 'warn',   label: `주의 ${r.warnHigh}${r.unit}` },
+        { at: r.warnLow,    color: 'warn',   label: `주의 ${r.warnLow}${r.unit}` },
+        { at: r.dangerLow,  color: 'danger', label: `위험 ${r.dangerLow}${r.unit}` },
+      ]
+    : [
+        ...(r.warn != null ? [{ at: r.warn, color: 'warn', label: `주의 ${r.warn}${r.unit}` }] : []),
+        ...(r.danger != null ? [{ at: r.danger, color: 'danger', label: `위험 ${r.danger}${r.unit}` }] : []),
+      ];
 
   const card = document.createElement('div');
   card.className = `chart-card ${borderClass}`;
@@ -161,6 +286,7 @@ function buildGasCard(gas, value, risk) {
         ${value != null ? value + ' ' + cfg.unit : '-'}
       </span>
     </div>
+    <div class="chart-chips">${renderThresholdChipsHTML(thresholds)}</div>
     <div class="card-chart-wrap">
       <canvas id="canvas-${gas}"></canvas>
     </div>
@@ -361,9 +487,12 @@ function startGasClock() {
 /* ────────────────────────────────────────────
    초기화
 ────────────────────────────────────────────── */
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('tab-realtime')?.addEventListener('click', () => switchGasTab('realtime'));
   document.getElementById('tab-ai')?.addEventListener('click',       () => switchGasTab('ai'));
+
+  // 임계치 fetch 먼저 — 빈 캐시 상태에서 차트 그리면 임계 라인 hardcoded fallback 으로 잘못 표시.
+  await loadGasThresholds();
 
   startGasClock();
   renderGasGrid({});

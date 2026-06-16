@@ -19,7 +19,28 @@ _cache: dict = {"mode": settings.DUMMY_SCENARIO_MODE, "fetched_at": 0.0}
 _FASTAPI_BASE_URL = f"http://{settings.DUMMY_TARGET_HOST}:{settings.DUMMY_TARGET_PORT}"
 _MODE_URL = f"{_FASTAPI_BASE_URL}/internal/scenario/mode"
 
-ALLOWED_MODES = {"mixed", "normal", "warning", "danger"}
+ALLOWED_MODES = {
+    "mixed",
+    "normal",
+    "warning",
+    "danger",
+    # power_dummy 단일 시나리오 모드 — 가스/위치 더미는 fallback("mixed") 처리.
+    # W0 변경 (skill/plan/power-ai-un-downgrade-phase2-apply.md §3):
+    # spike 제거, night_abnormal/motor_stuck 신규.
+    "overload",
+    "voltage_drop",
+    "phase_loss",
+    "degradation",
+    "night_abnormal",
+    "motor_stuck",
+    # gas_dummy 단일 시나리오 모드 — 전력/위치 더미는 fallback("mixed") 처리.
+    "co_leak",
+    "h2s_leak",
+    "fire",
+    "chemical_spill",
+    "o2_depletion",  # 이성현 추가 — 9종 확장 (산소 결핍)
+    "sensor_fault",  # 이성현 추가 — 9종 확장 (센서 오작동)
+}
 
 
 def get_scenario_mode() -> str:

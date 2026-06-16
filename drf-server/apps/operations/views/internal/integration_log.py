@@ -1,12 +1,15 @@
-from rest_framework import status
+# apps/operations/views/internal/integration_log.py
+# 이성현 수정 — IP 화이트리스트 → ServiceTokenAuthentication 으로 교체
+# Docker 환경에서 FastAPI 컨테이너 IP가 172.18.x.x 라 127.0.0.1 화이트리스트가 항상 403
+
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.authentication import ServiceTokenAuthentication
 from apps.operations.serializers import IntegrationLogCreateSerializer
-
-# alarm_router(fastapi)와 대칭 패턴 — localhost-only IP 화이트리스트
-_LOCAL_IPS = {"127.0.0.1", "::1", "localhost"}
 
 
 class IntegrationLogInternalCreateView(APIView):
@@ -14,24 +17,30 @@ class IntegrationLogInternalCreateView(APIView):
     POST /api/internal/integration-logs/  — FastAPI → DRF IntegrationLog 기록
 
     [보안]
-    localhost(127.0.0.1/::1)에서만 호출 가능. 외부 IP 시 403.
-    JWT 인증 우회 (internal-only) — permission_classes = [AllowAny].
+    INTERNAL_SERVICE_TOKEN 헤더 검증. IP 화이트리스트 대신 토큰 인증 사용.
+    Docker 네트워크 환경에서 FastAPI 컨테이너 IP가 달라도 정상 작동.
 
     [부하 정책]
     fire-and-forget 권장 (호출 측에서 raise_on_error=False로 본 흐름 비차단).
     """
 
+    # 이성현 수정 — ServiceTokenAuthentication 으로 교체
+    authentication_classes = [ServiceTokenAuthentication]
     permission_classes = [AllowAny]
-    authentication_classes = []  # JWT 우회
 
+    @extend_schema(
+        tags=["Internal"],
+        summary="IntegrationLog 기록 (FastAPI → DRF)",
+        request=IntegrationLogCreateSerializer,
+        responses=inline_serializer(
+            name="IntegrationLogCreateResponse",
+            fields={
+                "id": serializers.IntegerField(),
+                "created_at": serializers.DateTimeField(),
+            },
+        ),
+    )
     def post(self, request):
-        client_ip = request.META.get("REMOTE_ADDR", "")
-        if client_ip not in _LOCAL_IPS:
-            return Response(
-                {"detail": "내부 전용 엔드포인트입니다."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
         serializer = IntegrationLogCreateSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

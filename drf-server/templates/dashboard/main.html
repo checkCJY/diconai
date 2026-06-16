@@ -6,11 +6,16 @@
 <title>산재 예방 통합 관제 시스템</title>
 <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
 <link rel="stylesheet" href="{% static 'css/components/header.css' %}">
+<link rel="stylesheet" href="{% static 'css/shared/chart-helpers.css' %}">
 <!-- Leaflet CSS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Lucide Icons — 이벤트 패널 alarm_type 아이콘 (이모지 → 단색 SVG).
+   디자이너 SVG 받기 전 임시안. lucide.createIcons() 는 [data-lucide] 속성 element 만 SVG 로 replace.
+   시연 직전 0.x 고정 버전 명시 권장 (현재 @latest 는 메이저 업그레이드 시 호환 깨질 가능성).-->
+<script src="https://unpkg.com/lucide@latest"></script>
 <script>window.FACTORY_MAP_URL = "{% static 'img/factory_map.svg' %}";</script>
 </head>
 <body>
@@ -42,10 +47,13 @@
 <script src="{% static 'js/shared/auth.js' %}"></script>
 <script src="{% static 'js/shared/ws-client.js' %}"></script>
 <script src="{% static 'js/shared/alarm-popup.js' %}"></script>
+<script src="{% static 'js/shared/alarm-badge.js' %}"></script>
+<script src="{% static 'js/shared/time-format.js' %}"></script>
 <script src="{% static 'js/shared/alarm-mapper.js' %}"></script>
 <script src="{% static 'js/shared/level-mapper.js' %}"></script>
 <script src="{% static 'js/shared/worker-ws.js' %}"></script>
 <script src="{% static 'js/dashboard/panels/event-panel.js' %}"></script>
+<script src="{% static 'js/shared/chart-helpers.js' %}"></script>
 <script src="{% static 'js/dashboard/charts.js' %}"></script>
 <script src="{% static 'js/dashboard/panels/map-panel.js' %}"></script>
 <script src="{% static 'js/shared/layout.js' %}"></script>

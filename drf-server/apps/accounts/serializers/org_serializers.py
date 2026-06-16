@@ -29,7 +29,7 @@ class DeptTreeItemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Department
-        fields = ["id", "name", "code", "leader_id", "leader_name", "children"]
+        fields = ["id", "name", "code", "parent_id", "company_id", "leader_id", "leader_name", "children"]
 
 
 class CompanyTreeSerializer(serializers.ModelSerializer):

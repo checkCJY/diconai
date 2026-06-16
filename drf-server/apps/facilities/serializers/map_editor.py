@@ -35,6 +35,7 @@ class FacilityMapSerializer(serializers.ModelSerializer):
         ]
 
 
+# 이성현 작업
 class GasSensorMapSerializer(serializers.ModelSerializer):
     type = serializers.SerializerMethodField()
     code = serializers.SerializerMethodField()
@@ -47,7 +48,7 @@ class GasSensorMapSerializer(serializers.ModelSerializer):
         return obj.device_id
 
     def get_placed(self, obj):
-        return True  # DeviceBase는 항상 x, y 보유
+        return not (obj.x == 0 and obj.y == 0)
 
     class Meta:
         model = GasSensor
@@ -63,6 +64,7 @@ class GasSensorMapSerializer(serializers.ModelSerializer):
         ]
 
 
+# 이성현 작업
 class PowerDeviceMapSerializer(serializers.ModelSerializer):
     type = serializers.SerializerMethodField()
     code = serializers.SerializerMethodField()
@@ -75,7 +77,7 @@ class PowerDeviceMapSerializer(serializers.ModelSerializer):
         return obj.device_id
 
     def get_placed(self, obj):
-        return True
+        return not (obj.x == 0 and obj.y == 0)
 
     class Meta:
         model = PowerDevice
@@ -91,6 +93,7 @@ class PowerDeviceMapSerializer(serializers.ModelSerializer):
         ]
 
 
+# 이성현 작업
 class PositionNodeMapSerializer(serializers.ModelSerializer):
     type = serializers.SerializerMethodField()
     code = serializers.SerializerMethodField()
@@ -103,7 +106,7 @@ class PositionNodeMapSerializer(serializers.ModelSerializer):
         return obj.device_id
 
     def get_placed(self, obj):
-        return True
+        return not (obj.x == 0 and obj.y == 0)
 
     class Meta:
         model = PositionNode

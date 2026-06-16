@@ -1,0 +1,85 @@
+apiVersion: v1 # k8s API 버전 선언
+kind: Service # 클러스터 내부에서 drf 파드에 접근할 네트워크 엔드포인트
+metadata:
+  name: drf # 다른 파드가 "drf:8000" 으로 접속할 때 이 이름을 DNS로 사용
+  namespace: diconai
+spec:
+  selector:
+    app: drf # 아래 Deployment의 파드 라벨과 매칭
+  ports:
+    - port: 8000 # Service가 클러스터 내부에 노출하는 포트
+      targetPort: 8000 # 실제 파드 컨테이너의 포트
+  type: NodePort # minikube 에서 브라우저로 직접 접속하기 위해 NodePort 사용 (운영에선 Ingress로 교체)
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: drf
+  namespace: diconai
+spec:
+  replicas: 1 # 단일 인스턴스 — DB 마이그레이션 중복 실행 방지
+  strategy:
+    type: Recreate # 이성현 수정 — 구 파드 완전 종료 후 신 파드 기동 (동시 실행 불가 의도 명시)
+  selector:
+    matchLabels:
+      app: drf
+  template:
+    metadata:
+      labels:
+        app: drf # Service의 selector와 일치해야 트래픽이 연결됨
+    spec:
+      containers:
+        - name: drf
+          image: diconai/drf:dev # minikube에 직접 빌드해서 올려야 함 (eval $(minikube docker-env) 후 build)
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000 # gunicorn이 바인딩하는 포트
+          envFrom: # configmap.yaml과 secret.yaml의 값을 환경변수로 한꺼번에 주입
+            - configMapRef:
+                name: diconai-config # configmap.yaml의 모든 키를 환경변수로 주입
+            - secretRef:
+                name: diconai-secret # secret.yaml의 모든 키를 환경변수로 주입
+          env: # 위 envFrom으로 주입한 값 중 drf에만 필요한 값을 추가/덮어씀
+            - name: DJANGO_SETTINGS_MODULE
+              value: "config.settings.prod" # settings가 분리됐으므로 운영용 파일 명시
+            - name: RUN_MIGRATIONS
+              value: "1" # drf 컨테이너만 마이그레이션 실행 (celery는 0으로 설정)
+            - name: COLLECT_STATIC
+              value: "1" # 정적 파일 수집 — 운영 모드에서는 whitenoise가 서빙
+            - name: PROMETHEUS_MULTIPROC_DIR
+              value: "/app/prometheus_multiproc/drf" # drf 전용 메트릭 디렉토리 (celery와 충돌 방지)
+          args: # gunicorn 실행 명령 (docker-compose와 동일, --reload 제거)
+            - gunicorn
+            - config.wsgi:application
+            - --bind=0.0.0.0:8000
+            - --workers=2 # k8s에서는 reload 불필요, workers 2개로 동시성 확보
+            - --threads=4 # 워커당 스레드 4개
+            - --access-logfile=- # 접근 로그를 stdout으로 출력 (k8s 로그 수집 호환)
+            - --config=/app/gunicorn.conf.py
+          readinessProbe: # drf가 응답할 준비가 됐는지 확인 — 통과 전까지 트래픽 차단
+            httpGet:
+              path: /health/ # docker-compose의 healthcheck와 동일한 엔드포인트
+              port: 8000
+            initialDelaySeconds: 30    # 마이그레이션 + gunicorn 기동 시간 확보
+            periodSeconds: 15
+            failureThreshold: 5
+          livenessProbe:
+            httpGet:
+              path: /health/
+              port: 8000
+            initialDelaySeconds: 60    # 이성현 수정 — migrate+reset+collectstatic 완료 시간 고려
+            periodSeconds: 30
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: "200m" # 최소 보장 CPU
+              memory: "256Mi" # 최소 보장 메모리
+            limits:
+              cpu: "500m" # 최대 사용 CPU
+              memory: "512Mi" # 최대 사용 메모리
+          volumeMounts:
+            - name: prometheus-multiproc # prometheus 멀티프로세스 메트릭 디렉토리
+              mountPath: /app/prometheus_multiproc/drf # PROMETHEUS_MULTIPROC_DIR과 일치해야 함
+      volumes:
+        - name: prometheus-multiproc
+          emptyDir: {} # 파드 재시작 시 초기화되는 임시 디렉토리 — 메트릭은 재시작마다 새로 수집

@@ -1,7 +1,12 @@
 # monitoring/serializers/power_data.py
+import time
+
+from django.db import IntegrityError, OperationalError
+
 from rest_framework import serializers
 
 from apps.core.constants import RiskLevel, SensorStatus
+from apps.core.metrics import DB_SAVE_DURATION, DB_SAVE_TOTAL
 from apps.facilities.models.devices import PowerDevice
 from apps.monitoring.models import PowerData, PowerEvent
 from apps.monitoring.services.power_alarm import trigger_power_alarms
@@ -70,6 +75,13 @@ class _ChannelEntrySerializer(serializers.Serializer):
         choices=RiskLevel.choices,
         default=RiskLevel.NORMAL,
     )
+    is_anomaly = serializers.BooleanField(required=False, default=False)
+    anomaly_type = serializers.ChoiceField(
+        choices=PowerData.AnomalyType.choices,
+        required=False,
+        allow_null=True,
+        default=None,
+    )
 
 
 class PowerDataBulkIngestSerializer(serializers.Serializer):
@@ -80,21 +92,26 @@ class PowerDataBulkIngestSerializer(serializers.Serializer):
       device_id   : PowerDevice.device_id
       measured_at : 장치 측정 시각 — FastAPI가 UTC ISO 문자열로 주입
       data_type   : "current" | "voltage" | "watt"
-      channels    : [{channel: int, value: float, risk_level: str}, ...]
+      channels    : [{channel: int, value: float, risk_level: str,
+                       is_anomaly: bool?, anomaly_type: str?}, ...]
                     — PowerMeasurementPayload.to_channel_values() 변환 후 전달
 
     처리:
       - device_id → PowerDevice FK 조회
       - 16채널 PowerData 일괄 생성 (bulk_create, uq 충돌 시 무시)
       - 통신 불능 채널: value=None, sensor_status='comm_failure'로 저장
+      - is_anomaly/anomaly_type 은 더미 시뮬레이터 라벨 (IF 학습 평가용).
+        운영 장비 페이로드는 비워서 기본값(False/None) 저장.
     """
 
     device_id = serializers.CharField(max_length=50)
     measured_at = serializers.DateTimeField()
     data_type = serializers.ChoiceField(choices=PowerData.DataType.choices)
     channels = _ChannelEntrySerializer(many=True)
+    ingress_ts = serializers.FloatField(required=False, allow_null=True, default=None)
 
     def create(self, validated_data):
+        ingress_ts = validated_data.pop("ingress_ts", None)
         device = PowerDevice.objects.get(device_id=validated_data["device_id"])
         objs = [
             PowerData(
@@ -104,12 +121,51 @@ class PowerDataBulkIngestSerializer(serializers.Serializer):
                 value=ch["value"],
                 sensor_status=ch["sensor_status"],
                 risk_level=ch["risk_level"],
+                is_anomaly=ch.get("is_anomaly", False),
+                anomaly_type=ch.get("anomaly_type"),
                 measured_at=validated_data["measured_at"],
             )
             for ch in validated_data["channels"]
         ]
-        PowerData.objects.bulk_create(objs, ignore_conflicts=True)
-        trigger_power_alarms(
-            objs, device
-        )  # watt 채널에 대해 위험도 판정 후 알람 라우팅
-        return objs
+        # DB_SAVE_TOTAL: bulk_create 호출 성공/실패를 추적한다.
+        # ignore_conflicts=True이므로 중복 행은 조용히 skip — IntegrityError는 실질적으로 발생 안 함.
+        # 그러나 SQLite "database is locked"은 발생 가능하므로 OperationalError를 캡처한다.
+        _t = time.perf_counter()
+        try:
+            PowerData.objects.bulk_create(objs, ignore_conflicts=True)
+        except OperationalError as e:
+            error_type = (
+                "db_locked" if "database is locked" in str(e).lower() else "other"
+            )
+            DB_SAVE_TOTAL.labels(
+                model="power", result="error", error_type=error_type
+            ).inc()
+            raise
+        except IntegrityError:
+            DB_SAVE_TOTAL.labels(
+                model="power", result="error", error_type="integrity"
+            ).inc()
+            raise
+        except Exception:
+            DB_SAVE_TOTAL.labels(
+                model="power", result="error", error_type="other"
+            ).inc()
+            raise
+        finally:
+            DB_SAVE_DURATION.labels(model="power").observe(time.perf_counter() - _t)
+
+        DB_SAVE_TOTAL.labels(model="power", result="ok", error_type="").inc()
+
+        # ignore_conflicts=True 시 conflict 행은 저장 skip되지만 objs 리스트엔 그대로 남는다.
+        # 미저장 행에 알람을 발화하지 않도록 unique 조건으로 실제 저장된 행만 재조회.
+        # (power_device, channel, data_type, measured_at) 복합 UNIQUE 보장 — Phase 1 C3.
+        saved = list(
+            PowerData.objects.filter(
+                power_device=device,
+                measured_at=validated_data["measured_at"],
+                data_type=validated_data["data_type"],
+                channel__in=[o.channel for o in objs],
+            )
+        )
+        trigger_power_alarms(saved, device, ingress_ts=ingress_ts)
+        return saved

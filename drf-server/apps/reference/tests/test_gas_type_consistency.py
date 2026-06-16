@@ -15,6 +15,7 @@ class GasTypeConsistencyTest(TestCase):
     fixtures = ["gas_type"]
 
     def test_gas_type_enum_matches_common_code(self):
+        """GasTypeChoices 이넘 코드와 CommonCode(GAS_TYPE) 활성 코드 집합 일치 확인."""
         try:
             group = CodeGroup.objects.get(code="GAS_TYPE")
         except CodeGroup.DoesNotExist:

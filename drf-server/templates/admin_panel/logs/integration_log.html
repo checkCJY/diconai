@@ -1,0 +1,96 @@
+{% extends 'admin_panel/base.html' %}
+{% load static %}
+{% block title %}시스템 연동 로그{% endblock %}
+{% block content %}
+<section class="page-header">
+    <div class="header-titles">
+        <div class="breadcrumb">로그 및 연동 관리 &gt; 연동 로그</div>
+        <h2 class="page-title">시스템 연동 로그</h2>
+        <p class="page-desc">데이터 수집, 전송, 시스템 간 연동 이력을 조회합니다.</p>
+    </div>
+</section>
+
+<section class="filter-card">
+    <div class="filter-inputs" style="flex-wrap:wrap; gap:16px;">
+        <div class="input-group" style="min-width:260px;">
+            <label>조회 기간</label>
+            <div class="date-range-wrap">
+                <div class="date-range-inputs">
+                    <input type="date" id="dateFrom">
+                    <span class="date-range-sep">~</span>
+                    <input type="date" id="dateTo">
+                </div>
+                <div class="date-quick-btns">
+                    <button class="date-quick-btn" data-range="today">오늘</button>
+                    <button class="date-quick-btn" data-range="yesterday">어제</button>
+                    <button class="date-quick-btn active" data-range="week">최근 7일</button>
+                    <button class="date-quick-btn" data-range="month">이번달</button>
+                </div>
+            </div>
+        </div>
+        <div class="input-group">
+            <label>연동 구분</label>
+            <select id="filterType">
+                <option value="">전체</option>
+                <option value="collect">수집</option>
+                <option value="transmit">전송</option>
+                <option value="sync">연동</option>
+            </select>
+        </div>
+        <div class="input-group">
+            <label>연동 대상</label>
+            <input type="text" id="filterTarget" placeholder="연동 대상 시스템">
+        </div>
+        <div class="input-group" style="flex:2;">
+            <label>발생 내용</label>
+            <input type="text" id="filterKeyword" placeholder="발생 내용 검색">
+        </div>
+    </div>
+    <div class="filter-actions">
+        <button class="btn-outline" id="btnReset">초기화</button>
+        <button class="btn-dark" id="btnSearch">검색</button>
+    </div>
+</section>
+
+<section class="table-card">
+    <div class="log-toolbar">
+        <div class="log-toolbar-left">
+            <span class="total-count">전체 <strong id="totalCount">0</strong>건</span>
+        </div>
+        <div class="log-toolbar-right">
+            <button class="btn-export" id="btnExport">📥 로그 내보내기</button>
+            <select class="sort-select" id="sortSelect">
+                <option value="recent">최신순</option>
+                <option value="oldest">오래된순</option>
+            </select>
+        </div>
+    </div>
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:160px">발생시간</th>
+                    <th style="width:100px">연동 구분</th>
+                    <th style="width:180px">연동 대상</th>
+                    <th style="width:80px">결과</th>
+                    <th>발생 내용</th>
+                </tr>
+            </thead>
+            <tbody id="logTableBody">
+                <tr><td colspan="5" class="empty-state">데이터를 불러오는 중...</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="table-footer">
+        <span class="page-info" id="pageInfo">0 - 0 / 0</span>
+        <div class="pagination" id="pagination"></div>
+    </div>
+</section>
+{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/admin/logs.css' %}">
+{% endblock %}
+{% block extra_js %}
+<script src="{% static 'js/admin/logs/log_utils.js' %}"></script>
+<script src="{% static 'js/admin/logs/integration_log.js' %}"></script>
+{% endblock %}

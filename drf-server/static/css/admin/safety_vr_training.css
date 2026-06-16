@@ -1,0 +1,446 @@
+/* admin/safety_vr_training.css — VR 교육 관리 페이지
+   ※ 헤더 영역은 safety_checklist.css 와 동일한 톤·간격으로 통일했습니다. */
+
+/* ── 페이지 헤더(공통) ─────────────────────────────────── */
+.page-header .header-actions {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+}
+
+/* 헤더 메타 박스 — 라벨 + 값(또는 select) 두 줄.
+   체크리스트의 "최근 반영일 / 날짜"와 동일한 스타일. */
+.header-meta {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    padding: 8px 16px;
+    background: #f1f5f9;
+    border-radius: 8px;
+    min-width: 160px;
+    line-height: 1.2;
+}
+
+.header-meta .meta-label {
+    font-size: 11px;
+    color: #94a3b8;
+    font-weight: 500;
+}
+
+/* 박스 안에 들어가는 facility 드롭다운 — 박스 폭에 맞추고 톤은
+   화이트 카드 위 select 컨벤션을 따른다. */
+.facility-select {
+    width: 100%;
+    height: 28px;
+    padding: 0 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #0f172a;
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.facility-select:focus {
+    outline: none;
+    border-color: #3b82f6;
+}
+
+.page-header .header-actions .btn-outline,
+.page-header .header-actions .btn-primary {
+    padding: 0 18px;
+    height: 44px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.page-header .header-actions .btn-outline {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    color: #475569;
+}
+
+.page-header .header-actions .btn-outline:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+}
+
+.page-header .header-actions .btn-outline:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.page-header .header-actions .btn-primary {
+    background: #3b82f6;
+    color: #fff;
+    border: none;
+}
+
+.page-header .header-actions .btn-primary:hover {
+    background: #2563eb;
+}
+
+/* ── 상단 요약 카드 ────────────────────────────────────── */
+.vr-summary {
+    margin: 20px 0;
+    padding: 20px 24px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+}
+
+.vr-summary .summary-item label {
+    font-size: 12px;
+    color: #64748b;
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+}
+
+.vr-summary .summary-item .value {
+    font-size: 15px;
+    color: #0f172a;
+    font-weight: 600;
+    padding: 8px 12px;
+    background: #f1f5f9;
+    border-radius: 6px;
+    min-height: 18px;
+}
+
+/* ── 비어있을 때 ───────────────────────────────────────── */
+.vr-empty {
+    margin: 32px 0;
+    padding: 48px 24px;
+    background: #f8fafc;
+    border: 1px dashed #cbd5e1;
+    border-radius: 12px;
+    text-align: center;
+    color: #64748b;
+}
+
+.vr-empty h3 {
+    color: #475569;
+    font-size: 16px;
+    margin-bottom: 8px;
+}
+
+/* ── 본문 2-pane ───────────────────────────────────────── */
+.vr-layout {
+    margin: 20px 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr);
+    gap: 20px;
+}
+
+.vr-layout .pane-header {
+    margin-bottom: 16px;
+}
+
+.vr-layout .pane-header h3 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 4px;
+}
+
+.vr-layout .pane-header .pane-desc {
+    font-size: 13px;
+    color: #64748b;
+    margin: 0;
+}
+
+.video-pane,
+.info-pane {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 24px;
+}
+
+/* 영상 */
+.video-frame {
+    position: relative;
+    background: #dbeafe;
+    border-radius: 10px;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+}
+
+.video-frame video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #0f172a;
+}
+
+.duration-badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 1;
+    background: rgba(15, 23, 42, 0.85);
+    color: #fff;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.pane-footer {
+    margin-top: 16px;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.pane-footer strong {
+    font-size: 14px;
+    color: #0f172a;
+}
+
+.pane-footer .muted {
+    font-size: 12px;
+    color: #64748b;
+}
+
+/* 정보 패널 */
+.info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 0;
+}
+
+.info-grid > div {
+    min-width: 0;
+}
+
+.info-grid > div.full {
+    grid-column: 1 / -1;
+}
+
+.info-grid dt {
+    font-size: 12px;
+    color: #64748b;
+    margin-bottom: 6px;
+    font-weight: 500;
+}
+
+.info-grid dd {
+    margin: 0;
+    padding: 10px 12px;
+    background: #f8fafc;
+    border-radius: 6px;
+    font-size: 14px;
+    color: #0f172a;
+    white-space: pre-wrap;
+    word-break: break-word;
+    min-height: 38px;
+}
+
+/* ── 수정 모달 ─────────────────────────────────────────── */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.modal-overlay[hidden] {
+    display: none;
+}
+
+.modal-dialog {
+    background: #fff;
+    border-radius: 12px;
+    width: min(720px, 92vw);
+    max-height: 90vh;
+    overflow: auto;
+    padding: 28px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.modal-header h3 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.modal-desc {
+    font-size: 13px;
+    color: #64748b;
+    margin: 0 0 20px;
+}
+
+.edit-body {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    gap: 20px;
+}
+
+.media-pane {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.thumb-preview {
+    background: #dbeafe;
+    border-radius: 10px;
+    aspect-ratio: 4 / 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.thumb-preview .placeholder {
+    color: #1d4ed8;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.media-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.media-actions .btn-outline {
+    flex: 1;
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    color: #475569;
+    border-radius: 8px;
+    height: 40px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.picked-name {
+    font-size: 12px;
+    color: #64748b;
+}
+
+.info-note {
+    margin-top: 12px;
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.info-note strong {
+    display: block;
+    font-size: 13px;
+    color: #0f172a;
+    margin-bottom: 4px;
+}
+
+.info-note p {
+    margin: 0;
+    font-size: 12px;
+    color: #64748b;
+    line-height: 1.5;
+}
+
+.form-pane {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.form-pane .input-group label {
+    font-size: 12px;
+    color: #64748b;
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+}
+
+.form-pane .input-group input,
+.form-pane .input-group textarea {
+    width: 100%;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 14px;
+    color: #0f172a;
+    background: #fff;
+    box-sizing: border-box;
+    font-family: inherit;
+}
+
+.form-pane .input-group input[readonly] {
+    background: #f1f5f9;
+    color: #475569;
+}
+
+.modal-actions {
+    margin-top: 20px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.modal-actions .btn-outline,
+.modal-actions .btn-primary {
+    padding: 0 22px;
+    height: 40px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.modal-actions .btn-outline {
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    color: #475569;
+}
+
+.modal-actions .btn-primary {
+    background: #3b82f6;
+    color: #fff;
+    border: none;
+}
+
+.modal-actions .btn-primary:hover {
+    background: #2563eb;
+}
+
+@media (max-width: 1024px) {
+    .vr-summary {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .vr-layout {
+        grid-template-columns: 1fr;
+    }
+    .edit-body {
+        grid-template-columns: 1fr;
+    }
+}

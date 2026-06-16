@@ -1,3 +1,25 @@
+"""
+사용자 관리 어드민 시리얼라이저 — 등록/수정/상세/목록 4종.
+
+[department vs facility 처리 비대칭]
+- `department_id`: UserDepartment 중간 테이블에 (user, department, is_primary=True)
+  row를 별도로 생성/갱신해야 하므로 명시 pop + 분기 처리.
+- `facility_id`: CustomUser.facility 직접 FK라 `source="facility"`로 매핑하면
+  DRF가 validated_data에 Facility 객체를 넣어줌. 그래도 가독성을 위해 명시 pop +
+  setattr (department 패턴과 시각적 일관성).
+
+[partial PATCH의 "키 누락 vs null"]
+Update에서 `"facility" in validated_data` 플래그로 두 케이스를 구분:
+- 키 누락 → 변경 없음 (기존 facility 유지)
+- 키 명시(None 포함) → setattr로 적용 (None이면 비우기)
+이 의미를 살리지 않으면 PATCH로 facility를 비울 방법이 사라진다.
+
+[Detail의 SerializerMethodField 일관성]
+`facility_id`도 SerializerMethodField로 통일 — department_id/position_id와 동일
+패턴 유지를 위해. 단순 `IntegerField(read_only=True)`로도 동작하지만 다음 개발자가
+혼란스럽지 않도록.
+"""
+
 import re
 
 from django.contrib.auth import get_user_model
@@ -6,6 +28,7 @@ from datetime import timedelta
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 from apps.accounts.models import Department
+from apps.facilities.models.facility import Facility
 
 User = get_user_model()
 
@@ -26,6 +49,9 @@ class AccountsAdminListSerializer(serializers.ModelSerializer):
         return dept.name if dept else None
 
     position = serializers.CharField(source="position.name", default=None)
+    facility_name = serializers.CharField(
+        source="facility.name", default=None, read_only=True
+    )
     last_login_at = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
 
@@ -48,6 +74,7 @@ class AccountsAdminListSerializer(serializers.ModelSerializer):
             "name",
             "username",
             "department",
+            "facility_name",
             "position",
             "user_type",
             "phone",
@@ -79,6 +106,12 @@ class AccountsAdminCreateSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
     )
+    facility_id = serializers.PrimaryKeyRelatedField(
+        queryset=Facility.objects.filter(is_active=True),
+        source="facility",
+        required=False,
+        allow_null=True,
+    )
 
     def validate_password(self, value):
         if " " in value:
@@ -96,9 +129,14 @@ class AccountsAdminCreateSerializer(serializers.ModelSerializer):
         password = validated_data.pop("password")
         status = validated_data.pop("status")
         department = validated_data.pop("department_id", None)  # Department 객체
+        # facility_id 필드는 source="facility"로 매핑되어 validated_data["facility"]에 Facility 객체로 들어옴.
+        # 단순 FK라 junction 모델 없이 직접 setattr로 처리 (department와 다른 점).
+        facility = validated_data.pop("facility", None)
 
         user = User(**validated_data)
         user.set_password(password)
+        if facility is not None:
+            user.facility = facility
         if status == "inactive":
             user.is_active = False
         user.save()
@@ -121,6 +159,7 @@ class AccountsAdminCreateSerializer(serializers.ModelSerializer):
             "name",
             "email",
             "department_id",
+            "facility_id",
             "position",
             "user_type",
             "phone",
@@ -135,6 +174,8 @@ class AccountsAdminDetailSerializer(serializers.ModelSerializer):
     department_name = serializers.SerializerMethodField()
     position_id = serializers.SerializerMethodField()
     position_name = serializers.SerializerMethodField()
+    facility_id = serializers.SerializerMethodField()
+    facility_name = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
 
     def get_department_id(self, obj):
@@ -149,6 +190,12 @@ class AccountsAdminDetailSerializer(serializers.ModelSerializer):
 
     def get_position_name(self, obj):
         return obj.position.name if obj.position else None
+
+    def get_facility_id(self, obj):
+        return obj.facility_id
+
+    def get_facility_name(self, obj):
+        return obj.facility.name if obj.facility else None
 
     def get_status(self, obj):
         if not obj.is_active:
@@ -166,6 +213,8 @@ class AccountsAdminDetailSerializer(serializers.ModelSerializer):
             "email",
             "department_id",
             "department_name",
+            "facility_id",
+            "facility_name",
             "position_id",
             "position_name",
             "user_type",
@@ -190,6 +239,12 @@ class AccountsAdminUpdateSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
     )
+    facility_id = serializers.PrimaryKeyRelatedField(
+        queryset=Facility.objects.filter(is_active=True),
+        source="facility",
+        required=False,
+        allow_null=True,
+    )
 
     def validate_password(self, value):
         if " " in value:
@@ -207,9 +262,16 @@ class AccountsAdminUpdateSerializer(serializers.ModelSerializer):
         password = validated_data.pop("password", None)
         status_val = validated_data.pop("status", None)
         department = validated_data.pop("department_id", None)  # Department 객체
+        # facility_id 필드는 source="facility"로 매핑됨. partial PATCH에서 "facility" 키가
+        # 없으면 미변경, 있으면 (None 포함) 값으로 setattr — 이 동작이 비우기를 가능케 함.
+        facility_provided = "facility" in validated_data
+        facility = validated_data.pop("facility", None)
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
+
+        if facility_provided:
+            instance.facility = facility
 
         if department is not None:
             UserDepartment.objects.update_or_create(
@@ -241,6 +303,7 @@ class AccountsAdminUpdateSerializer(serializers.ModelSerializer):
             "name",
             "email",
             "department_id",
+            "facility_id",
             "position",
             "phone",
             "password",

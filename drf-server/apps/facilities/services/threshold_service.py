@@ -28,6 +28,7 @@ from django.core.cache import cache
 
 from apps.core.constants import RiskLevel
 
+_MISS = object()  # 이성현 추가 — negative caching용 sentinel (None과 "캐시 미스" 구분)
 _CACHE_PREFIX = "threshold"
 _CACHE_TTL = 3600  # 1시간
 
@@ -57,9 +58,9 @@ def get_threshold(
     또는 미존재 시 None.
     """
     key = _cache_key(group_code, item, facility_id)
-    cached = cache.get(key)
-    if cached is not None:
-        return cached
+    cached = cache.get(key, _MISS)  # 이성현 수정 — None도 캐시에서 구분
+    if cached is not _MISS:
+        return cached  # None이어도 캐시 히트면 반환
 
     from apps.facilities.models import Threshold
 
@@ -74,6 +75,7 @@ def get_threshold(
         threshold = qs.filter(facility__isnull=True).first()
 
     if threshold is None:
+        cache.set(key, None, _CACHE_TTL)  # 이성현 수정 — 없음(None)도 캐시
         return None
 
     payload = {
@@ -131,25 +133,146 @@ def evaluate_gas_risk(
     return RiskLevel.NORMAL
 
 
-def evaluate_power_risk(watt: float | None) -> str:
+def _get_channel_rated(device_id: int, channel: int, key: str) -> Decimal | None:
     """
-    전력 watt → RiskLevel 문자열.
-    power_default 그룹은 전사 1개 정책 (facility 무관) — facility_id 매개변수 미지원.
-    이전: power_alarm.py의 _evaluate(watt) 로직.
+    PowerDevice.channel_meta[str(channel)][key]를 Decimal로 반환. 미지정 시 None.
+
+    [캐시] device_id 단위 60초 TTL — 어드민 수정 반영 지연 ≤60초.
     """
-    if watt is None:
+    cache_key = f"power_channel_meta:{device_id}"
+    meta = cache.get(cache_key)
+    if meta is None:
+        from apps.facilities.models import PowerDevice
+
+        try:
+            meta = PowerDevice.objects.values_list("channel_meta", flat=True).get(
+                id=device_id
+            )
+        except PowerDevice.DoesNotExist:
+            meta = {}
+        cache.set(cache_key, meta or {}, 60)
+
+    entry = (meta or {}).get(str(channel)) or {}
+    raw = entry.get(key)
+    if raw is None:
+        return None
+    try:
+        return Decimal(str(raw))
+    except (ValueError, TypeError):
+        return None
+
+
+def _evaluate_with_rated(
+    value: float, rated: Decimal, threshold: dict, bidirectional: bool = False
+) -> str:
+    """
+    정격 % 환산 + 임계치 비교 (단방향/양방향).
+
+    [시맨틱] >= (가스 evaluate_gas_risk와 일관)
+    - 단방향: val_pct >= danger_max → DANGER, >= warning_max → WARNING
+    - 양방향(전압): val_pct <= danger_min OR >= danger_max → DANGER
+                    val_pct <= warning_min OR >= warning_max → WARNING
+    """
+    if rated == 0:
+        return RiskLevel.NORMAL
+    pct = Decimal(str(value)) / rated * Decimal("100")
+
+    if bidirectional:
+        if threshold["danger_min"] is not None and pct <= threshold["danger_min"]:
+            return RiskLevel.DANGER
+        if threshold["danger_max"] is not None and pct >= threshold["danger_max"]:
+            return RiskLevel.DANGER
+        if threshold["warning_min"] is not None and pct <= threshold["warning_min"]:
+            return RiskLevel.WARNING
+        if threshold["warning_max"] is not None and pct >= threshold["warning_max"]:
+            return RiskLevel.WARNING
         return RiskLevel.NORMAL
 
+    if threshold["danger_max"] is not None and pct >= threshold["danger_max"]:
+        return RiskLevel.DANGER
+    if threshold["warning_max"] is not None and pct >= threshold["warning_max"]:
+        return RiskLevel.WARNING
+    return RiskLevel.NORMAL
+
+
+def _legacy_power_w_absolute(watt: float) -> str:
+    """power_default.power_w 절대값 fallback (정격 정보 부재 시).
+
+    [시맨틱] > strict — 기존 동작과 호환 (test_power_alarm_flow.py 회귀 방지).
+    """
     threshold = get_threshold("power_default", "power_w")
     if threshold is None:
         return RiskLevel.NORMAL
-
     val = Decimal(str(watt))
     if threshold["danger_max"] is not None and val > threshold["danger_max"]:
         return RiskLevel.DANGER
     if threshold["warning_max"] is not None and val > threshold["warning_max"]:
         return RiskLevel.WARNING
     return RiskLevel.NORMAL
+
+
+def evaluate_power_risk(
+    watt: float | None, channel: int | None = None, device_id: int | None = None
+) -> str:
+    """
+    전력 W → RiskLevel.
+
+    [경로]
+    1) channel/device_id 지정 + 채널 정격(rated_w) 있음 + power_facility_default 존재
+       → 정격 % 환산, >= 시맨틱
+    2) 그 외 → power_default.power_w 절대값 fallback, > 시맨틱 (후방 호환)
+
+    [Phase 4 hook]
+    단일 exit point — IF 결합 시 dict 반환으로 확장 가능
+    ({"threshold_risk": ..., "anomaly_score": ..., "combined_risk": ...}).
+    """
+    result = RiskLevel.NORMAL
+    if watt is not None:
+        rated = (
+            _get_channel_rated(device_id, channel, "rated_w")
+            if device_id is not None and channel is not None
+            else None
+        )
+        if rated is not None:
+            threshold = get_threshold("power_facility_default", "power_w")
+            if threshold is not None:
+                result = _evaluate_with_rated(watt, rated, threshold)
+            else:
+                result = _legacy_power_w_absolute(watt)
+        else:
+            result = _legacy_power_w_absolute(watt)
+    return result
+
+
+def evaluate_current_risk(amp: float | None, channel: int, device_id: int) -> str:
+    """
+    전류 A → RiskLevel. 단방향(상한). 정격(rated_a) 또는 임계치 부재 시 NORMAL.
+    legacy 절대값 fallback 없음 — power_default.current row 미존재.
+    """
+    result = RiskLevel.NORMAL
+    if amp is not None:
+        rated = _get_channel_rated(device_id, channel, "rated_a")
+        if rated is not None:
+            threshold = get_threshold("power_facility_default", "current")
+            if threshold is not None:
+                result = _evaluate_with_rated(amp, rated, threshold)
+    return result
+
+
+def evaluate_voltage_risk(volt: float | None, channel: int, device_id: int) -> str:
+    """
+    전압 V → RiskLevel. 양방향(저전압도 위험). 정격(rated_v) 또는 임계치 부재 시 NORMAL.
+    """
+    result = RiskLevel.NORMAL
+    if volt is not None:
+        rated = _get_channel_rated(device_id, channel, "rated_v")
+        if rated is not None:
+            threshold = get_threshold("power_facility_default", "voltage")
+            if threshold is not None:
+                result = _evaluate_with_rated(
+                    volt, rated, threshold, bidirectional=True
+                )
+    return result
 
 
 def invalidate_threshold_cache(

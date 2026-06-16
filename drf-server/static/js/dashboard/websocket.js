@@ -51,13 +51,15 @@ function _pushGasHistory(key, label, currentVal) {
   if (h.labels.length > _HIST_MAX) { h.labels.shift(); h.current.shift(); h.predicted.shift(); }
 }
 
-// 현재 선택 가스의 차트를 히스토리 데이터로 교체 렌더링한다.
+// 현재 선택 가스의 차트를 히스토리 데이터로 교체 렌더링 + 가스별 SoT 임계치로 thresholdZones 업데이트.
 function _switchGasChart(key) {
   if (!gasChart || !_aiGasHist[key]) return;
   const h = _aiGasHist[key];
   gasChart.data.labels              = [...h.labels];
   gasChart.data.datasets[0].data   = [...h.current];
   gasChart.data.datasets[1].data   = [...h.predicted];
+  // 가스 전환 시 임계치도 함께 — DASH_GAS_THRESHOLDS[key] 의 warning/danger 라인을 표시.
+  if (typeof updateGasThresholds === 'function') updateGasThresholds(key);
   gasChart.update('none');
 }
 
@@ -75,12 +77,12 @@ function _renderAIGasNav() {
 
   if (nameEl) {
     nameEl.textContent = gas.name;
-    nameEl.className   = risk === 'danger' ? 'danger-text fw' : risk === 'warning' ? 'caution-text fw' : 'fw';
+    nameEl.className   = `fw ${LevelMapper.toTextClass(risk)}`.trim();
   }
   if (countEl)   countEl.textContent   = `${_aiGasIdx + 1} / ${_GAS_META.length}`;
   if (currentEl) {
     currentEl.textContent = val != null ? `${val} ${gas.unit}` : '--';
-    currentEl.className   = `big ${risk === 'danger' ? 'danger-text' : risk === 'warning' ? 'caution-text' : ''}`;
+    currentEl.className   = `big ${LevelMapper.toTextClass(risk)}`.trim();
   }
   if (maxEl) maxEl.textContent = val != null ? `${(val * 1.3).toFixed(2)} ${gas.unit}` : '--';
 
@@ -105,10 +107,11 @@ function _pushChannelHistory(idx, label, value) {
 }
 
 // 현재 선택된 채널(idx)의 히스토리 데이터로 전력 차트를 교체 렌더링한다.
-// idx 0 = "전체 사용량"(kW 단위), idx 1+ = 설비별(W 단위)이므로 단위에 맞춰 Y축/임계치도 교체한다.
+// idx 0 = "전체 사용량"(kW 단위, 채널 정격 합 × % 임계치), idx 1+ = 설비별(W 단위, 채널 정격 × % 임계치).
 function _switchPowerChart(idx) {
   if (!powerChart || !_aiPowerHist[idx]) return;
-  applyPowerChartUnit(idx === 0 ? 'kW' : 'W');
+  // idx 1+ 은 channel = idx (1~16). idx 0 은 전체 — channel 불필요.
+  applyPowerChartUnit(idx === 0 ? 'kW' : 'W', idx);
   const h = _aiPowerHist[idx];
   powerChart.data.labels           = [...h.labels];
   powerChart.data.datasets[0].data = [...h.data];
@@ -126,9 +129,7 @@ function _renderAIPowerNav() {
 
   if (nameEl) {
     nameEl.textContent = pred.name;
-    const riskCls = pred.risk_level === 'danger'  ? 'danger-text'
-                  : pred.risk_level === 'warning' ? 'caution-text' : '';
-    nameEl.className = `fw ai-equip-name ${riskCls}`.trim();
+    nameEl.className = `fw ai-equip-name ${LevelMapper.toTextClass(pred.risk_level)}`.trim();
   }
   if (etaEl) etaEl.textContent = pred.eta_min != null ? `${pred.eta_min} 분 뒤` : '-';
   if (loadEl) {
@@ -329,7 +330,8 @@ function initWebSocket() {
         const pct  = data.power_change_pct;
         const sign = pct >= 0 ? '▲ +' : '▼ ';
         powerChangePct.textContent = `기준 대비 ${sign}${pct}%`;
-        powerChangePct.className   = pct >= 15 ? 'danger-text' : 'caution-text';
+        // 증감률 임계 — 15%+ 위험, 미만은 주의로 매핑
+        powerChangePct.className   = LevelMapper.toTextClass(pct >= 15 ? 'danger' : 'warning');
       }
 
       if (powerTableBody) {
@@ -406,7 +408,9 @@ function initWebSocket() {
         data.alarms.forEach(alarm => {
           const alarmData = AlarmMapper.fromSensorsAlarm(alarm);
           // 새 이벤트(danger/warning)만 중앙 팝업 — 조치완료 전 동일 이벤트 재발화는 팝업 없음
-          if (alarm.is_new_event) AlarmPopup.show(alarmData);
+          // 2026-05-15 알람 재설계: event_resolved_at 박힌 RESOLVED 신호도 show 로 흘려
+          // _handleResolved 분기가 같은 event_id 떠있는 팝업 close + 토스트 처리.
+          if (alarm.is_new_event || alarm.event_resolved_at) AlarmPopup.show(alarmData);
           // 정상화는 우하단 토스트
           if (alarm.risk_level === 'normal' && typeof AlarmToast !== 'undefined') {
             AlarmToast.show(alarmData);

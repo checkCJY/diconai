@@ -22,11 +22,14 @@ logger = logging.getLogger(__name__)
 FASTAPI_BASE_URL = f"http://{settings.DUMMY_TARGET_HOST}:{settings.DUMMY_TARGET_PORT}"
 FASTAPI_POSITION_URL = f"{FASTAPI_BASE_URL}/api/positioning/receive"
 
+DRF_BASE_URL = f"http://{settings.DUMMY_TARGET_HOST.replace('fastapi', 'drf')}:8000"
+DRF_WORKERS_URL = f"{DRF_BASE_URL}/api/internal/workers/"
+
 # node_id는 PositionNode.device_id 형식 (Phase 3-a). 더미는 4명 모두 NODE-001로 가정.
 # 실제 펌웨어 환경에서는 작업자 위치별로 가장 가까운 노드 ID가 동적으로 들어옴.
 DUMMY_WORKERS: list[dict] = [
     {
-        "worker_id": 1,
+        "username": "worker_a",
         "worker_name": "작업자 A",
         "facility_id": 1,
         "x": 150.0,
@@ -37,7 +40,7 @@ DUMMY_WORKERS: list[dict] = [
         "node_id": "NODE-001",
     },
     {
-        "worker_id": 2,
+        "username": "worker_b",
         "worker_name": "작업자 B",
         "facility_id": 1,
         "x": 600.0,
@@ -48,7 +51,7 @@ DUMMY_WORKERS: list[dict] = [
         "node_id": "NODE-001",
     },
     {
-        "worker_id": 3,
+        "username": "worker_c",
         "worker_name": "작업자 C",
         "facility_id": 1,
         "x": 950.0,
@@ -59,7 +62,7 @@ DUMMY_WORKERS: list[dict] = [
         "node_id": "NODE-001",
     },
     {
-        "worker_id": 4,
+        "username": "worker_d",
         "worker_name": "작업자 D",
         "facility_id": 1,
         "x": 350.0,
@@ -70,6 +73,24 @@ DUMMY_WORKERS: list[dict] = [
         "node_id": "NODE-001",
     },
 ]
+
+
+# 이성현 추가 — DRF /api/internal/workers/ 호출해서 username → id 매핑 반환
+def _fetch_worker_ids() -> dict[str, int]:
+    """시작 시 DRF에서 worker 목록을 받아 {username: id} 형태로 반환한다."""
+    try:
+        resp = requests.get(
+            DRF_WORKERS_URL,
+            # INTERNAL_SERVICE_TOKEN 으로 인증 (IP 화이트리스트 대신)
+            headers={"Authorization": f"Bearer {settings.DRF_SERVICE_TOKEN}"},
+            timeout=5,
+        )
+        resp.raise_for_status()
+        # [{"id": 3, "username": "worker_a"}, ...] → {"worker_a": 3, ...}
+        return {w["username"]: w["id"] for w in resp.json()}
+    except Exception as exc:
+        logger.error("worker id 조회 실패: %s", exc)
+        return {}
 
 
 def _step_worker(w: dict) -> None:
@@ -125,6 +146,14 @@ def send_data(url: str, payload: list[dict], label: str) -> None:
 def run() -> None:
     """더미 전송 루프를 시작한다. DUMMY_SEND_INTERVAL_SEC 주기로 위치를 갱신·전송한다."""
     interval = settings.DUMMY_SEND_INTERVAL_SEC
+    # 이성현 추가 — 시작 시 DRF에서 실제 worker id 조회
+    id_map = _fetch_worker_ids()
+    if not id_map:
+        logger.error("worker 정보 없음. 먼저 실행: python manage.py seed_dummy_data")
+        return
+    for w in DUMMY_WORKERS:
+        w["worker_id"] = id_map[w["username"]]
+
     logger.info("=== 위치 더미 전송 시작 (주기: %ds) ===", interval)
     while True:
         for w in DUMMY_WORKERS:

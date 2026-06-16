@@ -9,9 +9,26 @@
         <a href="/admin-panel/map-editor/" {% if active_nav == 'map_editor' %}class="active"{% endif %}><span class="icon">지도 편집</span></a>
         <a href="/admin-panel/data/gas/" {% if active_nav == 'data' %}class="active"{% endif %}><span class="icon">가스 데이터</span></a>
         <a href="/admin-panel/data/power/" {% if active_nav == 'power_data' %}class="active"{% endif %}><span class="icon">전력 데이터</span></a>
-        <a href="#" {% if active_nav == 'log' %}class="active"{% endif %}><span class="icon">로그</span></a>
-        <a href="#" {% if active_nav == 'notice' %}class="active"{% endif %}><span class="icon">공지사항</span></a>
-        <a href="#" {% if active_nav == 'event' %}class="active"{% endif %}><span class="icon">이벤트</span></a>
-        <a href="#" {% if active_nav == 'policy' %}class="active"{% endif %}><span class="icon">안전 정책/기준 관리</span></a>
+        <a href="/admin-panel/data/retention-policy/" {% if active_nav == 'retention_policy' %}class="active"{% endif %}><span class="icon">데이터 보관 정책</span></a>
+        <div class="snb-group {% if active_nav in 'system_log,activity_log,integration_log,map_edit_log' %}open{% endif %}" id="snbLogGroup">
+            <button class="snb-group-btn" id="snbLogToggle">
+                <span class="icon">로그</span>
+                <span class="snb-arrow">▾</span>
+            </button>
+            <div class="snb-sub">
+                <a href="/admin-panel/logs/system/"      {% if active_nav == 'system_log'      %}class="active"{% endif %}>시스템 로그</a>
+                <a href="/admin-panel/logs/activity/"    {% if active_nav == 'activity_log'    %}class="active"{% endif %}>사용자 활동 로그</a>
+                <a href="/admin-panel/logs/integration/" {% if active_nav == 'integration_log' %}class="active"{% endif %}>연동 로그</a>
+                <a href="/admin-panel/logs/map-edit/"    {% if active_nav == 'map_edit_log'    %}class="active"{% endif %}>지도 편집 로그</a>
+            </div>
+        </div>
+        <a href="/admin-panel/notices/" {% if active_nav == 'notice' %}class="active"{% endif %}><span class="icon">공지사항</span></a>
+        <a href="/admin-panel/alerts/policies/" {% if active_nav == 'alert_policy' %}class="active"{% endif %}><span class="icon">알림/이벤트 관리</span></a>
+        <a href="/admin-panel/events/history/" {% if active_nav == 'event_history' %}class="active"{% endif %}><span class="icon">이벤트 이력 조회</span></a>
+        <a href="/admin-panel/common-codes/" {% if active_nav == 'common_code' %}class="active"{% endif %}><span class="icon">공통코드 관리</span></a>
+        <a href="/admin-panel/thresholds/" {% if active_nav == 'threshold' %}class="active"{% endif %}><span class="icon">임계치 기준 관리</span></a>
+        <a href="/admin-panel/risk-standards/" {% if active_nav == 'risk_standard' %}class="active"{% endif %}><span class="icon">위험 기준 관리</span></a>
+        <a href="/admin-panel/safety/checklist/" {% if active_nav == 'policy' %}class="active"{% endif %}><span class="icon">안전 정책/기준 관리</span></a>
+        <a href="/admin-panel/safety/vr-training/" {% if active_nav == 'vr_training' %}class="active"{% endif %}><span class="icon">VR 교육 관리</span></a>
     </nav>
 </aside>

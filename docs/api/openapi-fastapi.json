@@ -36,10 +36,46 @@
             }
           },
           "422": {
-            "description": "페이로드 검증 실패"
+            "description": "페이로드 검증 실패",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "validation_failed",
+                    "message": "요청 데이터 검증에 실패했습니다.",
+                    "details": [
+                      {
+                        "loc": [
+                          "body",
+                          "field"
+                        ],
+                        "msg": "field required",
+                        "type": "value_error.missing"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
           },
           "500": {
-            "description": "서버 내부 오류"
+            "description": "서버 내부 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "internal_error",
+                    "message": "서버 내부 오류가 발생했습니다."
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -74,13 +110,62 @@
             }
           },
           "422": {
-            "description": "페이로드 검증 실패 (예: o2 범위 초과)"
+            "description": "페이로드 검증 실패 (예: o2 범위 초과)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "validation_failed",
+                    "message": "요청 데이터 검증에 실패했습니다.",
+                    "details": [
+                      {
+                        "loc": [
+                          "body",
+                          "field"
+                        ],
+                        "msg": "field required",
+                        "type": "value_error.missing"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
           },
           "502": {
-            "description": "DRF 저장 실패"
+            "description": "DRF 저장 실패",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "upstream_unavailable",
+                    "message": "상위 서비스에 연결할 수 없습니다."
+                  }
+                }
+              }
+            }
           },
           "503": {
-            "description": "DRF 서버 연결 불가"
+            "description": "DRF 서버 연결 불가",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "upstream_unavailable",
+                    "message": "상위 서비스에 연결할 수 없습니다."
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -115,10 +200,46 @@
             }
           },
           "422": {
-            "description": "페이로드 검증 실패"
+            "description": "페이로드 검증 실패",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "validation_failed",
+                    "message": "요청 데이터 검증에 실패했습니다.",
+                    "details": [
+                      {
+                        "loc": [
+                          "body",
+                          "field"
+                        ],
+                        "msg": "field required",
+                        "type": "value_error.missing"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
           },
           "502": {
-            "description": "DRF 저장 실패 (BackgroundTask 비동기라 본 응답에는 영향 없음)"
+            "description": "DRF 저장 실패 (BackgroundTask 비동기라 본 응답에는 영향 없음)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "upstream_unavailable",
+                    "message": "상위 서비스에 연결할 수 없습니다."
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -153,10 +274,46 @@
             }
           },
           "422": {
-            "description": "페이로드 검증 실패"
+            "description": "페이로드 검증 실패",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "validation_failed",
+                    "message": "요청 데이터 검증에 실패했습니다.",
+                    "details": [
+                      {
+                        "loc": [
+                          "body",
+                          "field"
+                        ],
+                        "msg": "field required",
+                        "type": "value_error.missing"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
           },
           "502": {
-            "description": "DRF 저장 실패 (BackgroundTask 비동기라 본 응답에는 영향 없음)"
+            "description": "DRF 저장 실패 (BackgroundTask 비동기라 본 응답에는 영향 없음)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "upstream_unavailable",
+                    "message": "상위 서비스에 연결할 수 없습니다."
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -191,10 +348,46 @@
             }
           },
           "422": {
-            "description": "페이로드 검증 실패"
+            "description": "페이로드 검증 실패",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "validation_failed",
+                    "message": "요청 데이터 검증에 실패했습니다.",
+                    "details": [
+                      {
+                        "loc": [
+                          "body",
+                          "field"
+                        ],
+                        "msg": "field required",
+                        "type": "value_error.missing"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
           },
           "502": {
-            "description": "DRF 저장 실패 (BackgroundTask 비동기라 본 응답에는 영향 없음)"
+            "description": "DRF 저장 실패 (BackgroundTask 비동기라 본 응답에는 영향 없음)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "upstream_unavailable",
+                    "message": "상위 서비스에 연결할 수 없습니다."
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -229,10 +422,46 @@
             }
           },
           "422": {
-            "description": "페이로드 검증 실패"
+            "description": "페이로드 검증 실패",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "validation_failed",
+                    "message": "요청 데이터 검증에 실패했습니다.",
+                    "details": [
+                      {
+                        "loc": [
+                          "body",
+                          "field"
+                        ],
+                        "msg": "field required",
+                        "type": "value_error.missing"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
           },
           "502": {
-            "description": "DRF 저장 실패 (BackgroundTask 비동기라 본 응답에는 영향 없음)"
+            "description": "DRF 저장 실패 (BackgroundTask 비동기라 본 응답에는 영향 없음)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "upstream_unavailable",
+                    "message": "상위 서비스에 연결할 수 없습니다."
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -243,7 +472,7 @@
           "positioning"
         ],
         "summary": "작업자 위치 배열 수신",
-        "description": "더미 스크립트 또는 IoT 장비로부터 작업자 위치 배열을 수신한다.\n\n**처리 흐름**:\n1. 공유 상태(`worker_positions`) 갱신\n2. `/ws/positions/`(1초 주기) 및 `/ws/sensors/`(broadcast tick)에서 브라우저로 송신\n3. DRF로 비동기 영속화 (`POST /api/positioning/receive/`)\n4. 지오펜스 진입 판정은 브라우저 측에서 좌표 비교로 수행",
+        "description": "더미 스크립트 또는 IoT 장비로부터 작업자 위치 배열을 수신한다.\n\n**처리 흐름**:\n1. Redis worker 상태 갱신\n2. `/ws/positions/`(1초 주기) 및 `/ws/sensors/`(broadcast tick)에서 브라우저로 송신\n3. DRF로 비동기 영속화 (`POST /api/positioning/receive/`)\n4. 지오펜스 진입 판정은 브라우저 측에서 좌표 비교로 수행",
         "operationId": "receive_positions_api_positioning_receive_post",
         "requestBody": {
           "content": {
@@ -271,7 +500,30 @@
             }
           },
           "422": {
-            "description": "페이로드 검증 실패 (예: x/y 음수)"
+            "description": "페이로드 검증 실패 (예: x/y 음수)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "validation_failed",
+                    "message": "요청 데이터 검증에 실패했습니다.",
+                    "details": [
+                      {
+                        "loc": [
+                          "body",
+                          "field"
+                        ],
+                        "msg": "field required",
+                        "type": "value_error.missing"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -283,7 +535,7 @@
         ],
         "summary": "Celery → WebSocket 알람 브리지 (localhost 전용)",
         "description": "DRF Celery 태스크가 알람을 생성한 뒤 이 엔드포인트를 호출하면 FastAPI의 `active_alarms` 큐에 추가되어 다음 broadcast tick(1초)에 브라우저로 전달된다.\n\n**보안**: 127.0.0.1/::1/localhost에서만 호출 가능. 외부 호출은 403.\n\n**개인 알림**: `alarm_type=geofence_intrusion` + `worker_id` 지정 시 해당 작업자의 `/ws/worker/{user_id}/` 채널로도 즉시 push.",
-        "operationId": "push_alarm_internal_alarms_push__post",
+        "operationId": "push_alarm_handler_internal_alarms_push__post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -304,10 +556,46 @@
             }
           },
           "403": {
-            "description": "localhost 외부에서 호출"
+            "description": "localhost 외부에서 호출",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "permission_denied",
+                    "message": "이 작업을 수행할 권한이 없습니다."
+                  }
+                }
+              }
+            }
           },
           "422": {
-            "description": "AlarmPayload 검증 실패"
+            "description": "AlarmPayload 검증 실패",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "validation_failed",
+                    "message": "요청 데이터 검증에 실패했습니다.",
+                    "details": [
+                      {
+                        "loc": [
+                          "body",
+                          "field"
+                        ],
+                        "msg": "field required",
+                        "type": "value_error.missing"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -318,7 +606,7 @@
           "internal"
         ],
         "summary": "현재 시나리오 모드 조회",
-        "description": "더미 스크립트가 polling으로 호출. 환경변수 `DUMMY_SCENARIO_MODE`로 부팅 시 초기값.\n\n모드: `mixed`(기본 확률 기반) / `normal` / `warning` / `danger`.",
+        "description": "더미 스크립트가 polling으로 호출. 환경변수 `DUMMY_SCENARIO_MODE`로 부팅 시 초기값.\n\n모드: `mixed` / `normal` / `warning` / `danger` / 전력 `overload`·`voltage_drop`·`phase_loss`·`degradation`·`night_abnormal`·`motor_stuck` / 가스 `co_leak`·`h2s_leak`·`fire`·`chemical_spill`.",
         "operationId": "get_mode_internal_scenario_mode_get",
         "responses": {
           "200": {
@@ -340,7 +628,7 @@
           "internal"
         ],
         "summary": "시나리오 모드 변경",
-        "description": "프론트엔드 시연 컨트롤에서 호출해 더미 데이터의 위험도 분포를 강제한다.\n\n- `normal`: 모든 가스/전력 정상 범위\n- `warning`: 모든 가스/전력 주의 범위\n- `danger`: 모든 가스/전력 위험 범위\n- `mixed`: 확률 기반 (기본 동작)",
+        "description": "프론트엔드 시연 컨트롤·테스트 스크립트에서 호출해 더미 데이터의 위험도/시나리오를 강제한다.\n\n**공통 모드** (가스·전력·위치 더미 모두 적용)\n- `mixed`: 확률 기반 (기본 동작)\n- `normal` / `warning` / `danger`: 전 채널/가스 동일 레벨 강제\n\n**전력 전용 단일 시나리오 모드** (IF 학습 격리 테스트 — 가스/위치는 fallback 'mixed')\n- `overload` / `voltage_drop` / `phase_loss` / `degradation`\n- `night_abnormal` (KST 22~05 시간대 외 진입 무시) / `motor_stuck`\n\n**가스 전용 단일 시나리오 모드** (IF 학습 격리 테스트 — 전력/위치는 fallback 'mixed')\n- `co_leak` / `h2s_leak` / `fire` / `chemical_spill`",
         "operationId": "set_mode_internal_scenario_mode_post",
         "requestBody": {
           "content": {
@@ -366,10 +654,266 @@
             }
           },
           "400": {
-            "description": "허용되지 않은 모드값"
+            "description": "허용되지 않은 모드값",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "validation_failed",
+                    "message": "요청 데이터 검증에 실패했습니다.",
+                    "details": [
+                      {
+                        "loc": [
+                          "body",
+                          "field"
+                        ],
+                        "msg": "field required",
+                        "type": "value_error.missing"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
           },
           "422": {
-            "description": "ModePayload 검증 실패"
+            "description": "ModePayload 검증 실패",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "validation_failed",
+                    "message": "요청 데이터 검증에 실패했습니다.",
+                    "details": [
+                      {
+                        "loc": [
+                          "body",
+                          "field"
+                        ],
+                        "msg": "field required",
+                        "type": "value_error.missing"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai/predict": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "IF 이상탐지 추론",
+        "description": "최근 N 틱 측정값으로 sliding window 피처를 산출하고 활성 IF 모델로 추론.\n모델은 sensor_type 별 active row (drf-server `MLModel.is_active=True`) 사용. 캐시 TTL 만료 시 자동 재로드.",
+        "operationId": "predict_ai_predict_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PredictRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "window_values 길이 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "validation_failed",
+                    "message": "요청 데이터 검증에 실패했습니다.",
+                    "details": [
+                      {
+                        "loc": [
+                          "body",
+                          "field"
+                        ],
+                        "msg": "field required",
+                        "type": "value_error.missing"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "active 모델 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "not_found",
+                    "message": "요청하신 리소스를 찾을 수 없습니다."
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "모델 파일 누락 또는 DRF 조회 실패",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "internal_error",
+                    "message": "서버 내부 오류가 발생했습니다."
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "validation_failed",
+                    "message": "요청 데이터 검증에 실패했습니다.",
+                    "details": [
+                      {
+                        "loc": [
+                          "body",
+                          "field"
+                        ],
+                        "msg": "field required",
+                        "type": "value_error.missing"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai/reload": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "모델 캐시 무효화",
+        "description": "TTL 만료 전이라도 강제 reload. 학습 직후 운영자가 호출.\n\n쿼리 파라미터:\n- `sensor_type` (필수): power | gas\n- `algorithm` (옵션): isolation_forest | arima. 미지정 시 sensor_type 안 모든 cache evict (편의)\n- `sensor_identifier` (옵션, default '')\n\nalgorithm 미지정 + sensor_identifier 미지정 → sensor_type 전체 evict.\n둘 다 지정 → 해당 매칭 단위 1건 evict.",
+        "operationId": "reload_model_ai_reload_post",
+        "parameters": [
+          {
+            "name": "sensor_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "power",
+              "title": "Sensor Type"
+            }
+          },
+          {
+            "name": "algorithm",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Algorithm"
+            }
+          },
+          {
+            "name": "sensor_identifier",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sensor Identifier"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Reload Model Ai Reload Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "validation_failed",
+                    "message": "요청 데이터 검증에 실패했습니다.",
+                    "details": [
+                      {
+                        "loc": [
+                          "body",
+                          "field"
+                        ],
+                        "msg": "field required",
+                        "type": "value_error.missing"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -479,9 +1023,100 @@
               }
             ],
             "title": "Worker Id"
+          },
+          "target_worker_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Target Worker Ids",
+            "default": []
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "anomaly_meta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnomalyMeta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "event_resolved_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Resolved At"
+          },
+          "event_ack_users": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Event Ack Users",
+            "default": []
+          },
+          "ingress_ts": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ingress Ts"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
           }
         },
-        "additionalProperties": true,
         "type": "object",
         "required": [
           "alarm_type",
@@ -491,6 +1126,58 @@
           "is_new_event"
         ],
         "title": "AlarmPayload"
+      },
+      "AnomalyMeta": {
+        "properties": {
+          "combined_risk": {
+            "type": "string",
+            "title": "Combined Risk"
+          },
+          "anomaly_score": {
+            "type": "number",
+            "title": "Anomaly Score"
+          },
+          "device_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Id"
+          },
+          "channel": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel"
+          },
+          "data_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "combined_risk",
+          "anomaly_score"
+        ],
+        "title": "AnomalyMeta",
+        "description": "ANOMALY 알람 전용 ML 메타 — AlarmPayload.anomaly_meta 에 nested.\n\n[확장 정책]\nmulti-variate IF / CPD / spike detection 추가 시 본 모델에만 필드 추가\n(combined_risk/anomaly_score 외에 cpd_change_score, ar_residual 등). 외부\nAlarmPayload 는 그대로 유지 → 다른 alarm_type · 브라우저 처리 영향 0."
       },
       "DeviceInfoPayload": {
         "properties": {
@@ -619,6 +1306,25 @@
             ],
             "title": "Status",
             "default": "normal"
+          },
+          "anomaly_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "co_leak",
+                  "h2s_leak",
+                  "fire",
+                  "chemical_spill",
+                  "o2_depletion",
+                  "sensor_fault"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anomaly Type"
           }
         },
         "type": "object",
@@ -670,6 +1376,19 @@
         ],
         "title": "GasDataResponse",
         "description": "가스 측정값 수신 확인 응답.\n\nstatus는 서버에서 9가지 가스 임계치를 재평가해 결정.\n추가로 가스별 위험도(`*_risk`: 'normal'/'warning'/'danger')가 동적으로 포함된다."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
       },
       "ModePayload": {
         "properties": {
@@ -789,6 +1508,20 @@
             "type": "number",
             "minimum": -1.0,
             "title": "Slave72"
+          },
+          "anomaly_labels": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anomaly Labels"
           }
         },
         "type": "object",
@@ -1046,6 +1779,20 @@
             "type": "number",
             "minimum": -1.0,
             "title": "Slave72"
+          },
+          "anomaly_labels": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anomaly Labels"
           }
         },
         "type": "object",
@@ -1157,6 +1904,20 @@
             "type": "number",
             "minimum": -1.0,
             "title": "Slave72"
+          },
+          "anomaly_labels": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anomaly Labels"
           }
         },
         "type": "object",
@@ -1182,6 +1943,71 @@
         "title": "PowerWattPayload",
         "description": "16채널 전력(W) 측정값 페이로드."
       },
+      "PredictRequest": {
+        "properties": {
+          "sensor_type": {
+            "type": "string",
+            "title": "Sensor Type",
+            "description": "power | gas"
+          },
+          "sensor_identifier": {
+            "type": "string",
+            "maxLength": 64,
+            "title": "Sensor Identifier",
+            "description": "예: 'power:device_1:ch3:watt'"
+          },
+          "window_values": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "minItems": 2,
+            "title": "Window Values",
+            "description": "최근 N 틱 raw 측정값 (N ≥ 학습 시 window)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sensor_type",
+          "sensor_identifier",
+          "window_values"
+        ],
+        "title": "PredictRequest"
+      },
+      "PredictResponse": {
+        "properties": {
+          "anomaly_score": {
+            "type": "number",
+            "title": "Anomaly Score"
+          },
+          "prediction": {
+            "type": "string",
+            "title": "Prediction"
+          },
+          "model_version": {
+            "type": "integer",
+            "title": "Model Version"
+          },
+          "sensor_identifier": {
+            "type": "string",
+            "title": "Sensor Identifier"
+          },
+          "features": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Features"
+          }
+        },
+        "type": "object",
+        "required": [
+          "anomaly_score",
+          "prediction",
+          "model_version",
+          "sensor_identifier",
+          "features"
+        ],
+        "title": "PredictResponse"
+      },
       "SensorLocation": {
         "properties": {
           "x": {
@@ -1200,6 +2026,46 @@
         ],
         "title": "SensorLocation",
         "description": "지오펜스 연산용 픽셀 좌표 (설비 도면 기준)."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
       },
       "WorkerPositionSchema": {
         "properties": {
@@ -1234,6 +2100,17 @@
             "type": "string",
             "format": "date-time",
             "title": "Measured At"
+          },
+          "node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Id"
           }
         },
         "type": "object",
@@ -1246,7 +2123,40 @@
           "measured_at"
         ],
         "title": "WorkerPositionSchema",
-        "description": "작업자 위치 데이터 스키마 — Pydantic 검증"
+        "description": "작업자 위치 데이터 스키마 — Pydantic 검증.\n\nnode_id 는 PositionNode.device_id 그대로 (예: \"NODE-001\"). 펌웨어 페이로드 갱신\n전에는 None."
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "표준 에러 코드."
+              },
+              "message": {
+                "type": "string",
+                "description": "사람이 읽을 한 줄 메시지."
+              },
+              "details": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                },
+                "nullable": true,
+                "description": "검증 실패 시 필드별 오류 목록."
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ]
       }
     }
   },
@@ -1274,6 +2184,10 @@
     {
       "name": "health",
       "description": "헬스체크"
+    },
+    {
+      "name": "ai",
+      "description": "IF 이상탐지 추론 (STEP B)"
     }
   ]
 }

@@ -133,7 +133,7 @@ class AccountsAdminDetailView(APIView):
         try:
             return (
                 User.objects.prefetch_related("dept_memberships__department")
-                .select_related("position")
+                .select_related("position", "facility")
                 .get(pk=pk)
             )
         except User.DoesNotExist:

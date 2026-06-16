@@ -1,0 +1,1199 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>전력 IF Architecture 의사결정 — 부첨</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --accent: #C28A3D;
+  --accent-dark: #A06F2A;
+  --accent-pale: #FAF7F0;
+  --accent-border: #E2D5BA;
+  --ink: #2C2C30;
+  --mute: #7A7A85;
+  --line: #E5E5EA;
+  --th-bg: #F5F5F7;
+}
+* { box-sizing: border-box; }
+
+@page {
+  size: A4;
+  margin: 22mm 20mm 22mm 20mm;
+  @top-right { content: "전력 IF Architecture 의사결정"; font-family: 'Noto Sans KR', sans-serif; font-size: 9pt; color: #7A7A85; }
+  @bottom-left { content: "기술 문서 — 부첨"; font-family: 'Noto Sans KR', sans-serif; font-size: 9pt; color: #7A7A85; }
+  @bottom-right { content: counter(page) " / " counter(pages); font-family: 'Noto Sans KR', sans-serif; font-size: 9pt; color: #7A7A85; }
+}
+@page :first { @top-right { content: ""; } @bottom-left { content: ""; } @bottom-right { content: ""; } }
+
+html, body { font-family: 'Inter', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif; font-size: 10.5pt; line-height: 1.7; color: var(--ink); margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
+@media screen { body { max-width: 800px; margin: 40px auto; padding: 40px; background: #fff; box-shadow: 0 0 30px rgba(0,0,0,0.08); } }
+
+p { margin: 0.7em 0; }
+
+.cover { page-break-after: always; min-height: calc(100vh - 60px); display: flex; flex-direction: column; justify-content: center; padding-top: 40mm; }
+@media print { .cover { min-height: 240mm; } }
+.cover .brand { font-size: 10pt; letter-spacing: 0.18em; font-weight: 700; color: var(--accent); margin-bottom: 22pt; }
+.cover .brand .sep { color: var(--mute); font-weight: 400; margin: 0 0.6em; }
+.cover .brand .small { color: var(--mute); font-weight: 400; letter-spacing: 0.05em; }
+.cover h1 { font-size: 38pt; font-weight: 900; line-height: 1.15; margin: 0 0 14pt 0; color: var(--ink); letter-spacing: -0.01em; }
+.cover .accent-line { width: 48pt; height: 2pt; background: var(--accent); margin: 18pt 0; }
+.cover .subtitle { font-size: 14pt; font-weight: 500; color: var(--ink); margin: 6pt 0 4pt 0; }
+.cover .tagline { font-size: 11pt; font-weight: 400; color: var(--mute); }
+.cover .meta { margin: 38pt 0 26pt 0; font-size: 10pt; }
+.cover .meta-row { display: flex; margin-bottom: 5pt; }
+.cover .meta-label { width: 90pt; color: var(--mute); font-weight: 400; }
+.cover .meta-val { color: var(--ink); font-weight: 500; }
+.cover .tags { display: flex; flex-wrap: wrap; gap: 7pt; margin-top: 16pt; }
+.tag { display: inline-block; border: 0.7pt solid var(--accent); color: var(--accent); border-radius: 100px; padding: 3pt 13pt; font-size: 9.5pt; font-weight: 500; }
+
+.body { padding-top: 6pt; }
+.body h2 { font-size: 17pt; font-weight: 700; margin: 32pt 0 14pt 0; page-break-after: avoid; color: var(--ink); padding-bottom: 7pt; border-bottom: 0.6pt solid var(--line); }
+.body h2 .num { color: var(--accent); margin-right: 12pt; font-weight: 700; }
+.body h3 { font-size: 12.5pt; font-weight: 700; margin: 24pt 0 10pt 0; page-break-after: avoid; }
+.body h3 .num { color: var(--accent); margin-right: 8pt; font-weight: 700; }
+.body h4 { font-size: 11pt; margin: 18pt 0 8pt 0; page-break-after: avoid; }
+
+table { width: 100%; border-collapse: collapse; margin: 12pt 0; font-size: 9.8pt; }
+th, td { text-align: left; padding: 8pt 10pt; vertical-align: top; border-bottom: 0.4pt solid var(--line); }
+thead th { background: var(--th-bg); font-weight: 700; color: var(--ink); border-bottom: 1pt solid var(--line); }
+tr { page-break-inside: avoid; }
+
+blockquote { background: var(--accent-pale); border: 0.6pt solid var(--accent-border); border-left: 2.5pt solid var(--accent); border-radius: 3pt; padding: 10pt 16pt; margin: 12pt 0; color: var(--ink); page-break-inside: avoid; }
+blockquote p { margin: 0.4em 0; }
+blockquote strong { color: var(--accent-dark); }
+
+code { font-family: 'JetBrains Mono', 'Noto Sans Mono CJK KR', monospace; background: var(--th-bg); padding: 1pt 5pt; border-radius: 3pt; font-size: 0.88em; color: var(--accent-dark); }
+pre { background: var(--th-bg); padding: 11pt 13pt; border-radius: 4pt; font-size: 9pt; line-height: 1.55; overflow-x: auto; page-break-inside: avoid; }
+pre code { background: none; padding: 0; color: var(--ink); }
+
+ul, ol { margin: 7pt 0; padding-left: 24pt; }
+li { margin: 4pt 0; }
+strong { font-weight: 700; color: var(--ink); }
+em { font-style: italic; color: var(--mute); }
+hr { border: none; border-top: 0.6pt solid var(--line); margin: 20pt 0; }
+
+table, blockquote, pre { page-break-inside: avoid; }
+</style>
+</head>
+<body>
+
+<section class="cover">
+  <div class="brand"><span>D I C O N A I</span><span class="sep">·</span><span class="small">기 술 문 서</span></div>
+  <h1>전력 IF Architecture<br>의사결정</h1>
+  <div class="accent-line"></div>
+  <div class="subtitle">채널 단위 채택의 흐름 · PoC · 향후 결정 trigger</div>
+  <div class="tagline">옵션 B → D → E → 커리큘럼 회귀 → 채널 상관성 PoC</div>
+
+  <div class="meta">
+    <div class="meta-row"><div class="meta-label">작성자</div><div class="meta-val">최재용</div></div>
+    <div class="meta-row"><div class="meta-label">작성일</div><div class="meta-val">2026-05-29</div></div>
+    <div class="meta-row"><div class="meta-label">대상</div><div class="meta-val">IoT 전력 실시간 이상탐지 · Isolation Forest architecture</div></div>
+  </div>
+
+  <div class="tags">
+    <span class="tag">Isolation Forest</span>
+    <span class="tag">채널 단위</span>
+    <span class="tag">multivariate</span>
+    <span class="tag">Pearson</span>
+    <span class="tag">DTW</span>
+    <span class="tag">null baseline</span>
+  </div>
+</section>
+
+<section class="body">
+<h2 id="목차">목차</h2>
+<ol type="1">
+<li>초록</li>
+<li>의사결정 개요와 타임라인</li>
+<li>설계 철학</li>
+<li>의사결정 흐름 (시간순·결정 중심)</li>
+<li>전력 AI 본문과의 접합부</li>
+<li>채널 상관성 PoC</li>
+<li>트레이드오프</li>
+<li>한계와 향후 과제</li>
+<li>별첨</li>
+</ol>
+<hr />
+<h2 id="초록">1. 초록</h2>
+<blockquote>
+<p><strong>ABSTRACT</strong></p>
+<p>전력 IF의 channel 단위 architecture는 옵션 B(채널 3-D raw) → D(하이브리드) → E(디바이스 16-D) → 커리큘럼 정합 회귀의 4단계 의식 흐름을 거쳐 채택했음.</p>
+<p>처음 3단계는 학습 프레임워크(STEP 1~5)를 충분히 참조하지 않은 추상적 설계 사고였음. 4단계에서 학습 문서 재정독으로 옵션 B~E가 임의 설계였음을 인지하고 a247fb3 commit(STEP 3 + STEP F 정합 구현체)으로 회귀했음.</p>
+<p>회귀 직후 강사 multivariate IF 외부 제안(05-29)에 대해 즉시 구조 변경 대신 Pearson + DTW + null baseline PoC로 정량 응답했음. motor(ch1/3/8/13)·panel(ch11/16) cluster 후보를 식별했으나 더미 tautology·N=1·6일치 한계로 architecture 결정은 D+30 운영 데이터 재측정 + D+45~D+90 3 architecture F1 비교로 보류했음.</p>
+<p>핵심 설계 동기는 “학습 프레임워크 우선 · 피드백 자의적 해석 차단 · 정량 측정 응답 · 정직한 한계 인정”임.</p>
+</blockquote>
+<hr />
+<h2 id="의사결정-개요와-타임라인">2. 의사결정 개요와 타임라인</h2>
+<p>전력 IF architecture 의사결정은 4단계 의식 흐름 → 1회 PoC 측정 → 운영 데이터 재측정 plan의 순서임.</p>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>4단계</strong></th>
+<th><strong>0.69</strong></th>
+<th><strong>0.91</strong></th>
+<th><strong>2~3</strong></th>
+<th><strong>D+30~D+90</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>옵션 B → D → E → 커리큘럼</td>
+<td>PoC DTW 실측/null</td>
+<td>motor-panel DTW/null (분리)</td>
+<td>cluster 후보 모델 수</td>
+<td>architecture 확정 기간</td>
+</tr>
+</tbody>
+</table>
+<pre><code>[옵션 B]       [옵션 D]        [옵션 E]        [커리큘럼 회귀]      [PoC]              [D+30 재측정]
+3-D raw    →   하이브리드  →   16-D 12모델 →   a247fb3 4-D     →   cluster 후보   →   운영 데이터
+57모델         60모델          (강사 피드백)    engineered           식별                정량 검증
+추상 직관      collinearity    피드백 해석      학습 문서 재정독     multivariate        3 arch F1 비교
+                                                                    제안 응답</code></pre>
+<p><em>그림 1. 의사결정 흐름 — 추상 직관 4단계 → 커리큘럼 회귀 → 외부 제안에 정량 응답</em></p>
+<h3 id="타임라인">2.1 타임라인</h3>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>날짜</th>
+<th>단계</th>
+<th>핵심</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>05-13</td>
+<td>a247fb3 인프라 완성</td>
+<td>STEP 3 + STEP F 커리큘럼 정합 구현. 4피처 IF, 채널 단위.</td>
+</tr>
+<tr class="even">
+<td>(연속)</td>
+<td>옵션 B 검토</td>
+<td>채널 × 3-D raw. 57모델. V·I·W collinearity 미검토.</td>
+</tr>
+<tr class="odd">
+<td>(연속)</td>
+<td>옵션 D 전환</td>
+<td>채널 1-D × 16 + 디바이스 16-D × 1. 60모델. collinearity 회피.</td>
+</tr>
+<tr class="even">
+<td>(연속)</td>
+<td>옵션 E 회귀</td>
+<td>강사 “공장 환경 다수 가동” 피드백. 디바이스 16-D, 12모델. 부록 증빙 5건 설계.</td>
+</tr>
+<tr class="odd">
+<td>(연속)</td>
+<td>커리큘럼 정합 회귀</td>
+<td>학습 문서 7건 재정독. 옵션 B~E 임의 설계 인지. a247fb3 채택.</td>
+</tr>
+<tr class="even">
+<td><strong>05-29</strong></td>
+<td><strong>채널 상관성 PoC</strong></td>
+<td><strong>강사 multivariate IF 제안. Pearson + DTW + null baseline 측정. cluster 후보 식별. 결정 보류.</strong></td>
+</tr>
+<tr class="odd">
+<td>D+30</td>
+<td>운영 데이터 PoC 재측정 (예정)</td>
+<td>cluster 재현·cross-category 감쇠·디바이스 간 일관성 검증</td>
+</tr>
+<tr class="even">
+<td>D+45</td>
+<td>3 architecture F1 비교 (예정)</td>
+<td>16ch 일괄 / cluster / 채널별 학습 + SHAP attribution</td>
+</tr>
+<tr class="odd">
+<td>D+90</td>
+<td>architecture 확정 (예정)</td>
+<td>F1 + SHAP 결과 기반 정량 채택</td>
+</tr>
+</tbody>
+</table>
+<p>옵션 B~D 검토 시점은 의식의 흐름이라 정확한 git 머지일이 없음. 핵심 마일스톤은 굵게 표기했음.</p>
+<hr />
+<h2 id="설계-철학">3. 설계 철학</h2>
+<p>본 의사결정의 축은 다음 세 원칙임.</p>
+<ol type="1">
+<li>학습 프레임워크가 추상 설계보다 우선</li>
+<li>외부 입력에 정량 측정으로 응답</li>
+<li>도메인 의존 결정 인지</li>
+</ol>
+<h3 id="학습-프레임워크가-추상-설계보다-우선">3.1 학습 프레임워크가 추상 설계보다 우선</h3>
+<p>초기 옵션 B~E 검토는 추상적 직관에 의존했음. “채널마다 다른 장비, 다변량이 단변량보다 강함” 정도의 가정만 깔려 있었음.</p>
+<p>학습 문서(STEP 1~5)는 (device, channel, data_type) × engineered features(value/roll_mean/roll_std/diff)를 명시했고 a247fb3가 이를 구현했음. 학습 프레임워크가 있으면 1순위 참조하고, 추상 설계는 그 안에서 변형하는 것이 올바른 순서임.</p>
+<h3 id="외부-입력에-정량-측정으로-응답">3.2 외부 입력에 정량 측정으로 응답</h3>
+<p>강사 외부 multivariate IF 제안(05-29)에 대해 즉시 구조 변경 대신 PoC로 정량 응답했음.</p>
+<p>외부 권위가 있는 제안이라도 베이스라인 유지, 측정, 결정 보류가 정답 패턴임을 4단계에서 학습했고 5단계 PoC에서 실제로 적용했음.</p>
+<blockquote>
+<p><strong>결정 근거</strong> 05-29 작성. 근거: 2026-05-29 channel-correlation-poc.md §5 — “본 PoC의 가치는 정답 도출이 아니라 분석 파이프라인 + 비교 baseline + null 기준선 확보임”.</p>
+</blockquote>
+<h3 id="도메인-의존-결정">3.3 도메인 의존 결정</h3>
+<p>architecture 결정은 도메인 특성에 따라 다른 답이 나옴. 가스(분 단위 즉시 위험)와 전력(시간~일 단위 점진 변화)이 다른 ARIMA 처리(가스 = 격하 / 전력 = Un-격하)를 채택한 것과 동일 원칙임.</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>도메인</th>
+<th>사고 시간 척도</th>
+<th>architecture 결정</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>가스</td>
+<td>분 단위 즉시 위험</td>
+<td>다변량(CO+H2S+CO2 등) 자동 정당. 동시 패턴이 진짜 신호.</td>
+</tr>
+<tr class="even">
+<td>전력</td>
+<td>시간~일 단위 점진 변화</td>
+<td>channel 단위 분리가 자동 정당하지 않음. cluster 구조에 따라 달라짐. 본 부첨 §6 PoC가 답하려는 질문.</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>원칙</strong> 도메인이 결정 변수면 일반 해결책을 추구하지 말 것. 가스의 채널 통합이 전력에 그대로 적용되지 않음. 전력의 channel 단위 결정도 cluster 측정으로 다시 열려 있음.</p>
+</blockquote>
+<blockquote>
+<p><strong>결정 근거</strong> ai-model-study-2026-05-17.md §2.4 격하 vs Un-격하 매트릭스. “가스 격하는 도메인에 맞춘 최적화이지 일반 해결책이 아님” 원칙을 architecture 결정에 확장 적용했음.</p>
+</blockquote>
+<hr />
+<h2 id="의사결정-흐름-시간순결정-중심">4. 의사결정 흐름 (시간순·결정 중심)</h2>
+<p>옵션 B → D → E → 커리큘럼 회귀 → PoC 순서로 4단계 의식 흐름과 1회 정량 측정으로 진행했음.</p>
+<h3 id="옵션-b-채널-3-d-raw">4.1 옵션 B — 채널 × 3-D raw</h3>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>전</th>
+<th></th>
+<th>후</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>모델 단위·입력 결정 없음. 채널마다 다른 장비 가정만 있음.</td>
+<td>→</td>
+<td>모델 단위 = (device, channel). 입력 = 3-D [current, voltage, watt] raw. 디바이스당 16모델. 운영(9가스 + 3전력) 합계 <strong>57모델</strong>.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>근거 (당시)</strong></p>
+<p>채널마다 다른 장비가 연결된다는 직관. 3-D가 1-D보다 다변량 신호를 더 잡을 거라는 가정.</p>
+<blockquote>
+<p><strong>한계 (다음 단계에서 정량 확인)</strong> V·I·W collinearity 미검토. 채널 간 패턴 학습 불가.</p>
+</blockquote>
+<blockquote>
+<p><strong>증빙</strong> 학습 문서 미참조 상태의 추상 직관. 구체 측정 없음.</p>
+</blockquote>
+<h3 id="옵션-d-채널-1-d-16-디바이스-16-d-1-하이브리드">4.2 옵션 D — 채널 1-D × 16 + 디바이스 16-D × 1 (하이브리드)</h3>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>전</th>
+<th></th>
+<th>후</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>옵션 B (57모델, 실효 1.5-D)</td>
+<td>→</td>
+<td>채널 1-D current × 16 + 디바이스 16-D current × 1 = 17모델/디바이스. 운영 <strong>60모델</strong>.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>근거 (collinearity 정량)</strong></p>
+<ul>
+<li>voltage ≈ 규제 220V. 분산이 극소라 정보량이 거의 0.</li>
+<li>W = V × I × cos(φ). V가 일정한 환경에서 W와 I의 선형 상관이 0.99에 가까움.</li>
+<li>결과: 옵션 B의 3-D raw 실효 차원이 약 1.5-D 수준.</li>
+</ul>
+<p><strong>전환 의도</strong></p>
+<ul>
+<li>단일 채널 이상은 1-D 모델이 잡음.</li>
+<li>채널 간 패턴은 16-D 모델이 잡음.</li>
+<li>voltage·watt를 베이스라인에서 제외해 collinearity 회피.</li>
+</ul>
+<blockquote>
+<p><strong>한계 (다음 단계에서 인지)</strong> 모델 수 12 → 60 (5배 증가). 운영 부담 측면 미검토.</p>
+</blockquote>
+<h3 id="옵션-e-디바이스-16-d-current-단일">4.3 옵션 E — 디바이스 16-D current 단일</h3>
+<table>
+<thead>
+<tr class="header">
+<th>전</th>
+<th></th>
+<th>후</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>옵션 D (60모델, 채널 + 디바이스 분리)</td>
+<td>→</td>
+<td>디바이스 16-D current 단일 모델. 디바이스당 1모델. 운영 <strong>12모델</strong>.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>근거</strong></p>
+<p>강사 피드백 액면 “모델이 많아지면 공장환경에서의 가동이 문제”. current 외 voltage·watt 제외 (collinearity로 정보 미미).</p>
+<p><strong>근거 정량화 (강사 피드백이 무엇을 지칭했나)</strong></p>
+<p>“공장 가동 문제”의 구체 비용은 도입 사전 확인(ai-model-study §3.1)에서 3개 리스크로 정리됐음.</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>리스크</th>
+<th>단계별 정량</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>DB 폭주</td>
+<td>1 device × 16ch × 3 type 기준 일 138K row, 1년 약 50M row. 10 device 확장 시 1년 약 500M row. SQLite 운용 불가.</td>
+</tr>
+<tr class="even">
+<td>모델 관리 운영 부담</td>
+<td>모델 파일 수가 1~2개에서 수십~수백 개 단위로 증가. 학습 batch가 30초에서 수시간 단위로 증가.</td>
+</tr>
+<tr class="odd">
+<td>추론 latency</td>
+<td>asyncio가 sklearn predict (CPU bound)를 serial 처리. 다수 sensor 동시 송출 시 backpressure 발생.</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>연결</strong> 옵션 E의 12모델 축소는 위 3개 리스크 전면 회피를 의도했음. 단 학습 프레임워크 미참조 위에서 회피했기 때문에 회귀 단계(§4.4)에서 정정됨.</p>
+</blockquote>
+<p><strong>부록 증빙 설계 (강사 “변경하려면 증빙” 요구 대응)</strong></p>
+<table>
+<thead>
+<tr class="header">
+<th>번호</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>D-1</td>
+<td>V·I·W collinearity 정량화</td>
+</tr>
+<tr class="even">
+<td>D-2</td>
+<td>옵션 B/D/E 탐지 성능 비교</td>
+</tr>
+<tr class="odd">
+<td>D-3</td>
+<td>자원 부담 측정</td>
+</tr>
+<tr class="even">
+<td>D-4</td>
+<td>합성 vs 실데이터 비교</td>
+</tr>
+<tr class="odd">
+<td>D-5</td>
+<td>max_samples=256 동작 문서화</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>잘못 (다음 단계에서 인지)</strong> 강사 피드백 자의적 확대 해석. 실제 의도는 “운영 부담 인지”였으나 받은 해석은 “구조 바꿔라”였음. 옵션 B → D → E 모두 학습 프레임워크 미참조 위에 쌓였음.</p>
+</blockquote>
+<h3 id="커리큘럼-정합-회귀-a247fb3-채택">4.4 커리큘럼 정합 회귀 — a247fb3 채택</h3>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>전</th>
+<th></th>
+<th>후</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>옵션 E (디바이스 16-D 스냅샷, 시간성·engineered features 없음)</td>
+<td>→</td>
+<td>(device, channel, data_type) × 4-D engineered features [value, roll_mean, roll_std, diff]. window 30, contamination 0.01. <strong>a247fb3 commit 그대로</strong>.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>근거 (커리큘럼 직접 인용)</strong></p>
+<table>
+<thead>
+<tr class="header">
+<th>커리큘럼 위치</th>
+<th>인용</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>STEP 3 예제</td>
+<td><code>FEATURES = ["value", "roll_mean", "roll_std", "diff"]</code></td>
+</tr>
+<tr class="even">
+<td>STEP 3 예제</td>
+<td><code>IsolationForest(contamination=0.01, random_state=42)</code></td>
+</tr>
+<tr class="odd">
+<td>STEP 5 STEP C</td>
+<td>“device_id별 + 가스 항목별 최근 N개”</td>
+</tr>
+<tr class="even">
+<td>STEP 5 STEP F</td>
+<td>“value, rolling mean, rolling std, diff 같은 feature를 구성”</td>
+</tr>
+</tbody>
+</table>
+<p><strong>a247fb3 ↔︎ 커리큘럼 1:1 매핑</strong></p>
+<p>위 4개 인용 모두 코드와 일치 (<code>apps/ml/services/feature_service.py</code>, <code>train_anomaly_model</code> 디폴트값).</p>
+<p><strong>4 features의 의미 (STEP 3 → a247fb3 매핑 상세)</strong></p>
+<p>각 feature가 잡는 이상 패턴은 도입 사전 확인(ai-model-study §1.3)에서 정리됐음.</p>
+<table>
+<thead>
+<tr class="header">
+<th>feature</th>
+<th>계산</th>
+<th>잡는 이상 패턴</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>value</code></td>
+<td><code>arr[-1]</code> (현재값)</td>
+<td>학습 분포 밖의 큰 값. 갑작스러운 부하.</td>
+</tr>
+<tr class="even">
+<td><code>roll_mean</code></td>
+<td><code>arr.mean()</code> (30틱 평균)</td>
+<td>점진적 상승·하강 trend. 모터 부하 증가.</td>
+</tr>
+<tr class="odd">
+<td><code>roll_std</code></td>
+<td><code>arr.std(ddof=0)</code> (30틱 표준편차)</td>
+<td>변동 폭 증가. 베어링 마모, 회로 노이즈.</td>
+</tr>
+<tr class="even">
+<td><code>diff</code></td>
+<td><code>arr[-1] - arr[-2]</code> (1차 차분)</td>
+<td>단발 spike. 전력 surge.</td>
+</tr>
+</tbody>
+</table>
+<p>위치(value) + trend(roll_mean) + 분산(roll_std) + 변화율(diff)이 시간 시계열 기본 통계 요약을 구성함. STEP 3 학습의 4피처 선정이 자의적이지 않은 도메인 정당성을 가짐.</p>
+<p><strong>인지한 점</strong></p>
+<p>학습 프레임워크 미참조 → 추상 설계 → 임의 회귀의 연쇄였음. 정답은 이미 구현된 a247fb3였음.</p>
+<blockquote>
+<p><strong>증빙</strong> 학습 문서 7건 재정독 결과. 근거: STEP 1~5 학습 자료, a247fb3 commit (<code>apps/ml/</code>).</p>
+</blockquote>
+<h3 id="채널-상관성-poc-외부-multivariate-if-제안-대응-2026-05-29">4.5 채널 상관성 PoC — 외부 multivariate IF 제안 대응 (2026-05-29)</h3>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>전</th>
+<th></th>
+<th>후</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>강사 “디바이스 기준 multivariate IF가 표준” 외부 제안. Phase 1~3 reflex라면 즉시 구조 변경.</td>
+<td>→</td>
+<td>베이스라인(per-channel) 유지. Pearson + DTW + null baseline PoC 당일 실행. 결정 보류.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>측정 결과 (§6 상술)</strong></p>
+<ul>
+<li>실측 DTW 0.184 / null 0.266. 비율 0.69.</li>
+<li>motor-panel DTW 0.241 = null의 91%. 카테고리 간 무관.</li>
+<li>cluster 후보: 모터 ch1/3/8/13, 패널 ch11/16.</li>
+</ul>
+<p><strong>채택안</strong></p>
+<p>per-channel 유지. architecture 결정은 D+30 운영 데이터 재측정 후로 보류.</p>
+<blockquote>
+<p><strong>고려한 대안 · 포기한 것</strong> per-cluster(2~3모델/디바이스) 즉시 채택을 포기했음. 더미 tautology, N=1, 6일치 한계로 정당성 부족. 운영 데이터 재측정 + 3 architecture F1 비교(D+45~D+90) trigger로 등록했음.</p>
+</blockquote>
+<blockquote>
+<p><strong>증빙</strong> PoC 측정 결과 (§6). 근거: 2026-05-29 channel-correlation-poc.md.</p>
+</blockquote>
+<hr />
+<h2 id="전력-ai-본문과의-접합부">5. 전력 AI 본문과의 접합부</h2>
+<p>본 부첨은 전력 AI 본문 §4.3 (1채널 PoC) + §7.1 트레이드오프 매트릭스의 “추론 단위 = 채널별 단변량(4모델)” 결정의 의식 흐름 상술임. 전력 AI 본문은 <strong>별도 부록으로 본 폴더에 함께 동봉</strong>됨.</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>접합부</th>
+<th>본 부첨의 역할</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>§4.3 1채널 PoC 결정 근거</td>
+<td>“왜 채널별 단변량인가”의 의식 흐름 trace. 옵션 B~E 경유.</td>
+</tr>
+<tr class="even">
+<td>§7.1 트레이드오프 매트릭스</td>
+<td>“포기한 것 = panel-multivariate(1모델 16채널 흡수)”의 정량 근거. PoC.</td>
+</tr>
+<tr class="odd">
+<td>§7.3 단계별 재검토 로드맵 D+30~D+90</td>
+<td>“채널 간 상관성 측정 → 강하면 panel-multivariate PoC”의 trigger 정량화.</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>용어 주의</strong> 본문 §4.3은 “1ch PoC → 4ch 확장”의 채널 수 확장임. 본 부첨은 “channel 단위 → cluster/device 단위”의 architecture 확장임. 두 축이 직교임. 혼동 금지.</p>
+</blockquote>
+<blockquote>
+<p><strong>제출 구조</strong> 본 부첨은 “IF 선정 부록” 한 묶음으로 제출됨. 전력 AI 본문 PDF, 알람 시스템 본문 PDF는 각각 별도 부록으로 함께 제출됨.</p>
+</blockquote>
+<hr />
+<h2 id="채널-상관성-poc-2026-05-29">6. 채널 상관성 PoC (2026-05-29)</h2>
+<p>채택 의사결정 보류 정당화의 정량 증빙임. 더미 6일치·N=1·watt 단독의 한계를 명시해 과대서술을 차단했음.</p>
+<h3 id="측정-조건">6.1 측정 조건</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>항목</th>
+<th>값</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>데이터 범위</td>
+<td>2026-05-22 ~ 2026-05-28 (6일치)</td>
+</tr>
+<tr class="even">
+<td>디바이스</td>
+<td>PowerDevice pk=1 (단일, N=1)</td>
+</tr>
+<tr class="odd">
+<td>측정 종류</td>
+<td>watt</td>
+</tr>
+<tr class="even">
+<td>총 row</td>
+<td>1,123,920 행. wide-format 9,853 × 16ch.</td>
+</tr>
+<tr class="odd">
+<td>Pearson</td>
+<td>16×16 전체 (<code>pandas.corr</code>)</td>
+</tr>
+<tr class="even">
+<td>DTW</td>
+<td>1,000 다운샘플. Z-score 정규화. numpy 직접 구현.</td>
+</tr>
+<tr class="odd">
+<td>Null baseline</td>
+<td>각 채널 독립 셔플(seed=42) × 5회 평균 DTW</td>
+</tr>
+<tr class="even">
+<td>실행 명령</td>
+<td><code>python manage.py measure_channel_correlation --since 2026-05-22 --until 2026-05-28 --dtw-samples 1000</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="결과-null-baseline-vs-실측">6.2 결과 — null baseline vs 실측</h3>
+<table>
+<thead>
+<tr class="header">
+<th>항목</th>
+<th>값</th>
+<th>의미</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>실측 DTW 평균</td>
+<td>0.184</td>
+<td></td>
+</tr>
+<tr class="even">
+<td>Null baseline (셔플 5회)</td>
+<td>0.266 ± 0.001</td>
+<td>분산 매우 작음 (안정)</td>
+</tr>
+<tr class="odd">
+<td>비율 (실측/null)</td>
+<td><strong>0.69</strong></td>
+<td>셔플보다 명확히 닮은 신호</td>
+</tr>
+</tbody>
+</table>
+<p><strong>카테고리별 평균 (null 대비)</strong></p>
+<table>
+<thead>
+<tr class="header">
+<th>카테고리 쌍</th>
+<th>DTW d</th>
+<th>null 대비</th>
+<th>해석</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>panel-panel</td>
+<td>0.116</td>
+<td>0.44</td>
+<td>가장 닮음</td>
+</tr>
+<tr class="even">
+<td>motor-motor</td>
+<td>0.146</td>
+<td>0.55</td>
+<td>두 번째</td>
+</tr>
+<tr class="odd">
+<td>motor-panel</td>
+<td><strong>0.241</strong></td>
+<td><strong>0.91</strong></td>
+<td>셔플 수준. 카테고리 간 분리 명확.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="top-5-닮은-채널쌍-dtw-거리-짧은-순">6.3 Top-5 닮은 채널쌍 (DTW 거리 짧은 순)</h3>
+<table>
+<thead>
+<tr class="header">
+<th>번호</th>
+<th>쌍</th>
+<th>카테고리</th>
+<th>d</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>ch3 ↔︎ ch13</td>
+<td>motor-motor</td>
+<td>0.0321</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>ch8 ↔︎ ch13</td>
+<td>motor-motor</td>
+<td>0.0390</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td>ch1 ↔︎ ch13</td>
+<td>motor-motor</td>
+<td>0.0424</td>
+</tr>
+<tr class="even">
+<td>4</td>
+<td>ch11 ↔︎ ch16</td>
+<td>panel-panel</td>
+<td>0.0455</td>
+</tr>
+<tr class="odd">
+<td>5</td>
+<td>ch1 ↔︎ ch3</td>
+<td>motor-motor</td>
+<td>0.0461</td>
+</tr>
+</tbody>
+</table>
+<p><strong>cluster 후보 (가설)</strong></p>
+<ul>
+<li>모터 hub: ch1 / ch3 / ch8 / ch13. Pearson 0.83~0.93, DTW 0.03~0.05.</li>
+<li>패널 pair: ch11 / ch16. DTW 0.045.</li>
+</ul>
+<blockquote>
+<p><strong>과대서술 금지 — PoC 한계</strong> PoC는 더미 데이터 한정의 “관찰 + 가설” 단계임. cluster 후보를 “정답 후보”로 단정 금지. 다음 4개 한계로 architecture 즉시 채택 불가.</p>
+</blockquote>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>한계</th>
+<th>영향</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Tautology 위험 (가장 큰 한계)</td>
+<td>더미가 카테고리 템플릿으로 생성됨. cluster 발견이 도메인 신호인지 더미 구조 재발견인지 분리 불가. 운영 데이터로 cluster 재현 측정 필수.</td>
+</tr>
+<tr class="even">
+<td>단일 디바이스 (N=1)</td>
+<td>디바이스 간 cluster 일관성 미검증. A 디바이스 모터군과 B 디바이스 모터군이 다를 가능성.</td>
+</tr>
+<tr class="odd">
+<td>6일치 (1주 미만)</td>
+<td>주간 사이클 1회 미만. 시간 안정성 미측정.</td>
+</tr>
+<tr class="even">
+<td>watt 단독</td>
+<td>current·voltage 미측정. 다변량 architecture에서 다른 결과 가능.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="분석-종합-3-architecture-비교">6.4 분석 종합 — 3 architecture 비교</h3>
+<table>
+<thead>
+<tr class="header">
+<th>옵션</th>
+<th>모델 수/디바이스</th>
+<th>데이터 지지</th>
+<th>약점</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>per-channel (현 a247fb3)</td>
+<td>16</td>
+<td>부분 지지</td>
+<td>모터 cluster 4개가 redundant. cluster 패턴 못 잡음.</td>
+</tr>
+<tr class="even">
+<td>per-device 16-D (옵션 E)</td>
+<td>1</td>
+<td>미지지</td>
+<td>motor-panel이 셔플 수준. 무관 신호를 한 벡터에 묶음. 격리 정보 희석.</td>
+</tr>
+<tr class="odd">
+<td><strong>per-cluster (신규 후보)</strong></td>
+<td><strong>2~3</strong></td>
+<td><strong>강하게 지지</strong></td>
+<td>데이터가 가리키는 방향. 단 tautology와 N=1 한계 존재.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>per-cluster 가설 구조</strong></p>
+<ul>
+<li>모터 cluster (1모델): ch1, ch3, ch8, ch13 × engineered features</li>
+<li>패널 cluster (1모델): ch9, ch10, ch11, ch16 × engineered features</li>
+<li>잔여 채널 (ch2, ch5, ch6, ch7, ch12, ch14, ch15): 채널별 단변량 유지 또는 cluster 편입</li>
+</ul>
+<p>디바이스당 2~3모델 × 3대 = 6~9모델. 현재 per-channel 16 × 3 = 48모델 대비 감소.</p>
+<blockquote>
+<p><strong>증빙</strong> 2026-05-29 channel-correlation-poc.md §3~4.</p>
+</blockquote>
+<hr />
+<h2 id="트레이드오프">7. 트레이드오프</h2>
+<p>옵션 B → D → E → 커리큘럼 회귀 → PoC 각 단계의 “채택 / 포기한 것 / 정당화”를 한 자리에 정리했음.</p>
+<h3 id="트레이드오프-매트릭스">7.1 트레이드오프 매트릭스</h3>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>결정</th>
+<th>채택</th>
+<th>포기한 것</th>
+<th>얻은 것 · 정당화</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>옵션 B</td>
+<td>채널 × 3-D raw</td>
+<td>모델 단순 통합</td>
+<td>직관적 다변량 가정. 사후 정량 근거 부재.</td>
+</tr>
+<tr class="even">
+<td>옵션 D</td>
+<td>채널 1-D + 디바이스 16-D 하이브리드</td>
+<td>옵션 B의 단순 구조</td>
+<td>collinearity 회피 + 채널 간 패턴 학습. 단 모델 수 5배 증가.</td>
+</tr>
+<tr class="odd">
+<td>옵션 E</td>
+<td>디바이스 16-D current 단일</td>
+<td>채널별 sensitivity</td>
+<td>모델 수 12개로 운영 부담 감소. 단 강사 피드백 자의적 해석 위에 구축됨.</td>
+</tr>
+<tr class="even">
+<td>커리큘럼 회귀</td>
+<td>(device, channel, data_type) × 4-D engineered (a247fb3)</td>
+<td>옵션 B~E 임의 설계</td>
+<td>학습 프레임워크 정합. STEP 3·F 인용 가능.</td>
+</tr>
+<tr class="odd">
+<td>PoC 응답</td>
+<td>per-channel 유지 + PoC 측정</td>
+<td>즉시 architecture 변경</td>
+<td>4단계 학습 사항 적용. 분석 파이프라인·null baseline 확보.</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>관통하는 원칙</strong> 각 단계의 “포기”가 다음 단계에서 “왜 포기했어야 했는가”로 정당화됨. 옵션 B의 collinearity 미검토 포기가 D에서 정량 확인됐고, D의 운영 부담 포기가 E의 피드백을 받았고, E의 임의 설계 포기가 커리큘럼 회귀로 학습 프레임워크를 회복시켰고, PoC의 즉시 채택 포기가 운영 데이터 재측정으로 정량 결정을 준비시킴.</p>
+</blockquote>
+<h3 id="자체-식별한-학습-p1p4">7.2 자체 식별한 학습 (P1~P4)</h3>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>번호</th>
+<th>학습</th>
+<th>적용</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>P1</td>
+<td>학습 프레임워크 미참조로 옵션 B~E 임의 설계 연쇄</td>
+<td>학습 문서 재정독으로 회복</td>
+</tr>
+<tr class="even">
+<td>P2</td>
+<td>피드백 자의적 확대 해석. “운영 부담 인지”가 “구조 바꿔라”로 변질.</td>
+<td>액면 그대로 받기로 원칙 등록</td>
+</tr>
+<tr class="odd">
+<td>P3</td>
+<td>외부 권위 제안에 즉시 구조 변경 reflex</td>
+<td>베이스라인 유지 + PoC 정량 응답으로 패턴 확립</td>
+</tr>
+<tr class="even">
+<td>P4</td>
+<td>PoC 결과의 즉시 채택 reflex. cluster 후보 발견 시 채택 욕구.</td>
+<td>한계(tautology, N=1, 6일치) 최상위 명시로 차단</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>정직성 노트</strong> 옵션 B~E 3단계가 학습 프레임워크 미참조 위에 쌓인 것임을 §4에 명시했음. PoC의 한계 4개를 §6.3에 최상위로 배치했음. 약점을 검증 수치로 뒷받침해 과대서술을 차단했음.</p>
+</blockquote>
+<hr />
+<h2 id="한계와-향후-과제">8. 한계와 향후 과제</h2>
+<p>architecture 확정은 D+30~D+90 정량 검증을 거쳐야 함.</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>항목</th>
+<th>내용</th>
+<th>상태</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>운영 데이터 PoC 재측정 (D+30~D+45)</td>
+<td>2주치 wide-format 추출. Pearson + DTW + null baseline 재측정. cluster 재현·cross-category 감쇠·디바이스 간 일관성 검증.</td>
+<td>운영 데이터 누적 후</td>
+</tr>
+<tr class="even">
+<td>3 architecture F1 비교 (D+45~D+90)</td>
+<td>(A) 16ch 일괄 / (B) cluster 단위 / (C) 채널별. F1 + SHAP attribution + 자원 측정.</td>
+<td>PoC 재현 확인 시</td>
+</tr>
+<tr class="odd">
+<td>architecture 확정 (D+90+)</td>
+<td>F1 + SHAP 기반 정량 채택. trigger 매트릭스 §8.1.</td>
+<td>후속</td>
+</tr>
+</tbody>
+</table>
+<h3 id="정량-의사결정-trigger">8.1 정량 의사결정 trigger</h3>
+<table>
+<thead>
+<tr class="header">
+<th>조건</th>
+<th>채택안</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>cluster 재현됨 + F1(B) &gt; F1(C) + Δ ≥ 0.05</td>
+<td>per-cluster 채택</td>
+</tr>
+<tr class="even">
+<td>cluster 재현됨 + F1(B) ≈ F1(C)</td>
+<td>per-channel 유지 (단순함 우선)</td>
+</tr>
+<tr class="odd">
+<td>cluster 재현 안 됨</td>
+<td>per-channel 유지</td>
+</tr>
+<tr class="even">
+<td>F1(A) &gt; F1(B) 및 F1(A) &gt; F1(C)</td>
+<td>per-device 재검토 (가능성 낮음)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="단계별-모델-수-스케일-per-cluster-채택의-운영-효과">8.2 단계별 모델 수 스케일 — per-cluster 채택의 운영 효과</h3>
+<p>PoC 결과 per-cluster 채택 시 모델 수 17N에서 (2~3)N + 16N으로 압축 가능. 도입 사전 확인 §3.4의 단계별 스케일에 본 부첨 결과를 더한 표.</p>
+<table>
+<thead>
+<tr class="header">
+<th>단계</th>
+<th>범위</th>
+<th>per-channel (Un-격하 + IF)</th>
+<th>per-cluster (PoC 결과 시)</th>
+<th>IF 압축률</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>1채널 PoC (현재)</td>
+<td>1</td>
+<td>1</td>
+<td>—</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>1 device, 16 채널</td>
+<td>17 (1 IF + 16 ARIMA)</td>
+<td>2~3 IF + 16 ARIMA = 18~19</td>
+<td>IF 1 → 2~3</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td>N devices (5~)</td>
+<td>17N</td>
+<td>(2~3)N + 16N = 18~19N</td>
+<td>IF만 약 85% 감소</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>해석</strong> ARIMA는 단일 시계열 specific이라 채널별 분리가 강제됨 (16N 고정). per-cluster 채택의 압축 효과는 IF 모델 수에 한정됨. 다만 IF는 모델 파일, 학습 batch, 캐시 관리의 주력이라 운영 효과가 큼.</p>
+</blockquote>
+<blockquote>
+<p><strong>연결</strong> §4.3 옵션 E의 정량 비용 표(DB 폭주·모델 관리·latency)가 17N의 부담을 가리켰고, 본 §8.2가 per-cluster 채택 시 IF 부담을 어떻게 줄일 수 있는지 정량화했음. 단 PoC 결과는 더미 한정이라 §8.1 trigger 만족 시에만 채택.</p>
+</blockquote>
+<blockquote>
+<p><strong>증빙</strong> ai-model-study §3.4 (전력 단계별 모델 수), §7.1 (단계별 작업).</p>
+</blockquote>
+<p>본 부첨은 시연 자료가 아니라 의사결정 trace의 부첨 자료임. 인용 시 “현재 채택 = per-channel, 변경 trigger = D+45 F1 비교”로 사용할 것.</p>
+<hr />
+<h2 id="별첨">9. 별첨</h2>
+<h3 id="의사결정-흐름">9.1 의사결정 흐름</h3>
+<pre><code>[옵션 B 3-D raw]     [옵션 D 하이브리드]    [옵션 E 16-D]        [커리큘럼 회귀]
+57모델           →   60모델             →   12모델            →   a247fb3 채택
+추상 직관             collinearity 인지     강사 피드백 해석       학습 문서 재정독
+                                                                       ↓
+                                                              [PoC 2026-05-29]
+                                                              cluster 후보 식별
+                                                              외부 multivariate 응답
+                                                                       ↓
+                                                       [D+30 운영 데이터 재측정 (예정)]
+                                                                       ↓
+                                                  [D+45~D+90 3 architecture F1 비교 (예정)]
+                                                                       ↓
+                                                       [D+90+ architecture 확정 (예정)]</code></pre>
+<p>옵션 B~E의 3단계는 학습 프레임워크 미참조 단계였음. 커리큘럼 회귀 이후가 정답 흐름.</p>
+<p><em>그림 2. 의사결정 흐름 — 추상 직관 4단계 → 커리큘럼 회귀 → PoC → 운영 데이터 검증</em></p>
+<h3 id="동봉-자료-증빙자료-폴더">9.2 동봉 자료 (증빙자료/ 폴더)</h3>
+<p>처음 본 사람이 본 부첨의 모든 주장을 직접 검증할 수 있도록 원본 자료를 도메인별로 동봉했음.</p>
+<pre><code>증빙자료/
+├── 00_README.md            증빙자료 인덱스 + 26항목 표 + 권장 읽기 순서
+├── power/                  전력 IF 관련 17개 (부첨 13 + 본문 PDF 근거 4)
+├── alarm/                  알람 결합 관련 21개 (부첨 6 + 본문 PDF 근거 15)
+├── perf/                   성능·검증 관련 4개
+└── 공용/
+    ├── STEP/               학습 자료 STEP 0~5 (6개)
+    └── PoC/                채널 상관성 PoC + raw CSV (3개)</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th>폴더</th>
+<th>파일 수</th>
+<th>부첨 인용 위치</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>power/</code></td>
+<td>17개</td>
+<td>§4 전체, §3.3 도메인 의존, §8.2 17N 스케일 (+ 전력 본문 PDF §9.3 근거 4)</td>
+</tr>
+<tr class="even">
+<td><code>alarm/</code></td>
+<td>21개</td>
+<td>§1 초록 Track 2→T1 흐름, §5 본문 접합부 (+ 알람 본문 PDF §9.3 근거 15)</td>
+</tr>
+<tr class="odd">
+<td><code>perf/</code></td>
+<td>4개</td>
+<td>§6 정직성 노트 배경, 본문 §6 검증 원본</td>
+</tr>
+<tr class="even">
+<td><code>공용/STEP/</code></td>
+<td>6개</td>
+<td>§3.1 학습 프레임워크, §4.4 a247fb3 매핑</td>
+</tr>
+<tr class="odd">
+<td><code>공용/PoC/</code></td>
+<td>3개</td>
+<td>§6 채널 상관성 PoC 전체</td>
+</tr>
+</tbody>
+</table>
+<p>증빙자료 51개 (HTML 부첨 근거 32 + 전력·알람 본문 PDF §9.3 근거 19). 전력 AI 본문·알람 시스템 본문 PDF는 별도 부록으로 본 폴더에 함께 동봉됨.</p>
+<h3 id="근거-문서-인덱스-요약-상세는-증빙자료00_readme.md-26항목-표-참조">9.3 근거 문서 인덱스 (요약 — 상세는 <code>증빙자료/00_README.md</code> 26항목 표 참조)</h3>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>#</th>
+<th>구분</th>
+<th>동봉 위치</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1~13</td>
+<td>전력 IF 관련 (본문 SoT·트레이드오프·설계의사결정·다채널·ai-model-study·임계치·더미·un-downgrade·5축)</td>
+<td><code>증빙자료/power/</code></td>
+</tr>
+<tr class="even">
+<td>14~19</td>
+<td>알람 결합 관련 (Track 2→T1·AI mute·decide_alarm·자료인덱스·anomaly_inference)</td>
+<td><code>증빙자료/alarm/</code></td>
+</tr>
+<tr class="odd">
+<td>20~23</td>
+<td>성능·검증 (정확도·리드타임·SQLite 사고·통합진단)</td>
+<td><code>증빙자료/perf/</code></td>
+</tr>
+<tr class="even">
+<td>24</td>
+<td>학습 프레임워크 STEP 0~5</td>
+<td><code>증빙자료/공용/STEP/</code></td>
+</tr>
+<tr class="odd">
+<td>25~26</td>
+<td>채널 상관성 PoC + raw CSV</td>
+<td><code>증빙자료/공용/PoC/</code></td>
+</tr>
+<tr class="even">
+<td>별도</td>
+<td>전력AI 본문 PDF, 알람 본문 PDF</td>
+<td>별도 부록 (본 부첨과 함께 제출)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="검증-경로-주장-증빙">9.4 검증 경로 (주장 → 증빙)</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>부첨 주장</th>
+<th>검증 자료</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>옵션 B의 3-D raw 실효 1.5-D (§4.2)</td>
+<td><code>power/2026-05-17_[study]AI이상탐지모델-학습정리.md</code> §1.3</td>
+</tr>
+<tr class="even">
+<td>강사 피드백의 정량 비용 3개 리스크 (§4.3)</td>
+<td><code>power/2026-05-17_[study]AI이상탐지모델-학습정리.md</code> §3.1</td>
+</tr>
+<tr class="odd">
+<td>a247fb3 = STEP 3 + STEP F 정합 (§4.4)</td>
+<td><code>공용/STEP/STEP_3_Isolation_Forest.md</code> + <code>STEP_5_프로젝트_로드맵.md</code> STEP F</td>
+</tr>
+<tr class="even">
+<td>4 features의 의미 (§4.4)</td>
+<td><code>power/2026-05-17_[study]AI이상탐지모델-학습정리.md</code> §1.3</td>
+</tr>
+<tr class="odd">
+<td>PoC DTW·null·비율 수치 전체 (§6.2)</td>
+<td><code>공용/PoC/channel-correlation-poc-2026-05-29.md</code> §3 + raw CSV</td>
+</tr>
+<tr class="even">
+<td>motor-panel = null의 91% (§6.2)</td>
+<td><code>공용/PoC/channel-correlation-poc-2026-05-29.md</code> §3.2</td>
+</tr>
+<tr class="odd">
+<td>cluster 후보 ch1/3/8/13, ch11/16 (§6.3)</td>
+<td><code>공용/PoC/channel-correlation-poc-2026-05-29.md</code> §3.3 + <code>dtw_16x16.csv</code></td>
+</tr>
+<tr class="even">
+<td>Tautology·N=1·6일치 한계 (§6.3)</td>
+<td><code>공용/PoC/channel-correlation-poc-2026-05-29.md</code> §6.1</td>
+</tr>
+<tr class="odd">
+<td>도메인 의존 결정 (§3.3)</td>
+<td>power/2026-05-17_[study]AI이상탐지모델-학습정리.md §2.4</td>
+</tr>
+</tbody>
+</table>
+
+</section>
+
+<script>
+document.querySelectorAll('.body h2, .body h3').forEach(function(h) {
+  var html = h.innerHTML;
+  var m = html.match(/^(\d+(?:\.\d+)?\.?)\s+(.*)$/s);
+  if (m) { h.innerHTML = '<span class="num">' + m[1] + '</span>' + m[2]; }
+});
+</script>
+</body>
+</html>
