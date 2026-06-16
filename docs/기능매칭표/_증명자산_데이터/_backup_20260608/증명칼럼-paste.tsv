@@ -1,0 +1,250 @@
+기능ID	구분	기능명	구현상태	증명버킷	Swagger	curl/증명수단	백엔드경로_정정(필요시)
+NTC-01	관리자	공지사항 목록 조회	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (NTC-01) → GET /api/admin/notices/
+NTC-02	관리자	공지사항 등록/수정/삭제	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (NTC-02) → POST/PATCH/DELETE /api/admin/notices/(/{id}/), POST/DELETE .
+CMM-01	관리자	공통 코드 조회	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (CMM-01) → GET /api/admin/code-groups/, GET /api/admin/code-groups/{gro
+CMM-02	관리자	공통 코드 등록/수정	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (CMM-02) → POST/PATCH/DELETE /api/admin/code-groups/(/{id}/), POST .../
+RSK-03	관리자	위험 기준 조회	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (RSK-03) → GET /api/admin/risk-standards/
+RSK-04	관리자	위험 기준 등록/수정	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (RSK-04) → PATCH /api/admin/risk-standards/{id}/ — 조회·수정만(생성/삭제 미지원, 3
+THR-01	관리자	임계치 기준 조회	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (THR-01) → GET /api/admin/threshold-groups/, GET .../{gid}/thresholds/
+THR-02	관리자	임계치 기준 등록/수정	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (THR-02) → POST/PATCH/DELETE /api/admin/threshold-groups/(/{id}/), .../
+LOG-01	관리자	시스템 로그 조회	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (LOG-01) → GET /api/admin/system-logs/
+LOG-02	관리자	사용자 활동 로그 조회	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (LOG-02) → GET /api/admin/activity-logs/
+LOG-03	관리자	연동 로그 조회	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (LOG-03) → GET /api/admin/integration-logs/
+GAS-01	관리자	유해가스 센서 목록 조회	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (GAS-01) → GET /api/gas-sensors/	GET /api/gas-sensors/ → facilities/views/gas_sensor_admin.py (IsSuperAdmin)
+GAS-02	관리자	유해가스 센서 검색	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (GAS-02) → GET /api/gas-sensors/ 필터	GET /api/gas-sensors/ 필터
+GAS-03	관리자	유해가스 센서 등록	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (GAS-03) → POST /api/gas-sensors/, GET .../next-code/	POST /api/gas-sensors/, GET .../next-code/
+GAS-04	관리자	유해가스 센서 상세 조회	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (GAS-04) → GET /api/gas-sensors/{id}/	GET /api/gas-sensors/{id}/
+GAS-05	관리자	유해가스 센서 정보 수정	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (GAS-05) → PUT /api/gas-sensors/{id}/	PUT /api/gas-sensors/{id}/
+GAS-06	관리자	유해가스 센서 사용 여부 설정	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (GAS-06) → DELETE /api/gas-sensors/{id}/ (소프트), POST .../bulk-delete/	DELETE /api/gas-sensors/{id}/ (소프트), POST .../bulk-delete/
+GAS-07	관리자	유해가스 센서 점검 이력 조회	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (GAS-07) → GET /api/gas-sensors/{sensor_pk}/inspections/	GET /api/gas-sensors/{sensor_pk}/inspections/
+GAS-08	관리자	유해가스 센서 점검 등록	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (GAS-08) → POST /api/gas-sensors/{sensor_pk}/inspections/, POST .../ins	POST /api/gas-sensors/{sensor_pk}/inspections/, POST .../inspections/{id}/action
+SAF-01	관리자	안전 확인 체크리스트 조회	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (SAF-01) → GET /api/admin/safety/checklist/state/, GET /api/admin/safet
+SAF-02	관리자	안전 확인 체크리스트 등록/수정	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (SAF-02) → POST/PATCH/DELETE /api/admin/safety/sections/·items/, POST .
+VR-01	관리자	VR 교육 콘텐츠 조회	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (VR-01) → GET /api/admin/training/vr-training/?facility_id=
+VR-02	관리자	VR 교육 콘텐츠 등록/수정	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (VR-02) → POST /api/admin/training/vr-training/replace/ (영상), PATCH ..
+DAT-01	관리자	유해가스 센서 데이터 조회	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (DAT-01) → GET /api/admin/gas-data/, GET .../export/ (CSV), GET .../sen
+DAT-02	관리자	전력 사용 데이터 조회	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (DAT-02) → GET /api/admin/power-data/, GET .../export/ (CSV), GET .../d
+DAT-04	관리자	데이터 보관 주기 조회	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (DAT-04) → GET /api/admin/retention-policies/
+DAT-05	관리자	데이터 보관 주기 설정	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (DAT-05) → PATCH /api/admin/retention-policies/{id}/, POST .../{id}/pre
+MEV-01	사용자	이벤트 목록 로드	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (MEV-01) → GET /alerts/api/events/
+MEV-02	사용자	탭 카운트 로드	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (MEV-02) → GET /alerts/api/events/?status= 상태별 호출/집계
+MEV-03	사용자	조치 필요 탭	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (MEV-03) → GET /alerts/api/events/?status=pending
+MEV-04	사용자	조치 중 탭	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (MEV-04) → GET /alerts/api/events/?status=in_progress
+MEV-05	사용자	조치 완료 탭	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (MEV-05) → GET /alerts/api/events/?status=resolved
+MEV-06	사용자	행 클릭	O	🖥️클라전용	—	JS참조: detail/event_list.js
+MEV-07	사용자	위험 상태 배지	O	🖥️클라전용	—	JS참조: detail/event_list.js
+MEV-08	사용자	조치 상태 배지	O	🖥️클라전용	—	JS참조: detail/event_list.js
+MEV-09	사용자	발생 시간 포맷	O	🖥️클라전용	—	JS참조: detail/event_list.js
+MEV-10	사용자	빈 상태	O	🖥️클라전용	—	JS참조: detail/event_list.js
+MEV-11	사용자	실시간 이벤트 수신	O	🔌WS	—	WS푸시로그: integration-logs?integration_type=transmit&keyword=alarm_type
+MEVD-01	사용자	상세 로드	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (MEVD-01) → GET /alerts/api/events/{id}/
+MEVD-02	사용자	상태 배지	O	🖥️클라전용	—	JS참조: detail/event_detail.js
+MEVD-03	사용자	이벤트명	O	🖥️클라전용	—	JS참조: detail/event_detail.js
+MEVD-04	사용자	권고 조치 렌더	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (MEVD-04) → GET 응답 recommended_actions = AlertPolicy.recommended_actions
+MEVD-05	사용자	권고 조치 기본값	O	🖥️클라전용	—	JS참조: detail/event_detail.js
+MEVD-06	사용자	연관 대상	O	🖥️클라전용	—	JS참조: detail/event_detail.js
+MEVD-07	사용자	상태 버튼 선택	O	🖥️클라전용	—	JS참조: detail/event_detail.js
+MEVD-08	사용자	변경 설명	O	🖥️클라전용	—	JS참조: detail/event_detail.js
+MEVD-09	사용자	변경 버튼	O	🖥️클라전용	—	JS참조: detail/event_detail.js
+MEVD-10	사용자	모달 취소	O	🖥️클라전용	—	JS참조: detail/event_detail.js
+MEVD-11	사용자	모달 확인	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (MEVD-11) → PATCH /alerts/api/events/{id}/update_status/
+MEVD-12	사용자	연관 모니터링	O	🖥️클라전용	—	sheet3 마일스톤·제작기간(팀실측)
+MEVD-13	사용자	확인 버튼	O	🖥️클라전용	—	JS참조: detail/event_detail.js
+MGS-01	사용자	센서 목록 로드	O	🔌WS	—	WS푸시로그: integration-logs?integration_type=transmit&keyword=alarm_type
+MGS-02	사용자	센서 행 클릭	O	🖥️클라전용	—	JS참조: detail/gas_monitoring.js·websocket_gas.js
+MGS-03	사용자	위험/주의/정상 카운트	O	🖥️클라전용	—	JS참조: detail/gas_monitoring.js·websocket_gas.js
+MGS-04	사용자	가스 상세 테이블	O	🖥️클라전용	—	JS참조: detail/gas_monitoring.js·websocket_gas.js
+MGS-05	사용자	실시간 탭	O	🖥️클라전용	—	JS참조: detail/gas_monitoring.js·websocket_gas.js
+MGS-06	사용자	AI 예측 탭	O	🖥️클라전용	—	JS참조: detail/gas_monitoring.js·websocket_gas.js
+MGS-07	사용자	차트 렌더링	O	🖥️클라전용	—	JS참조: detail/gas_monitoring.js·websocket_gas.js
+MGS-08	사용자	차트 상태 색상	O	🖥️클라전용	—	JS참조: detail/gas_monitoring.js·websocket_gas.js
+MGS-09	사용자	임계치 라인	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (MGS-09) → GET /api/monitoring/gas/thresholds/
+MGS-10	사용자	위험 범위 배경	O	🖥️클라전용	—	JS참조: detail/gas_monitoring.js·websocket_gas.js
+MGS-11	사용자	센서 선택 차트 갱신	O	🖥️클라전용	—	JS참조: detail/gas_monitoring.js·websocket_gas.js
+MGS-12	사용자	상태 바	O	🖥️클라전용	—	JS참조: detail/gas_monitoring.js·websocket_gas.js
+CHK-01	사용자	체크리스트 로드	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (CHK-01) → GET /api/safety/checklist/active/
+CHK-02	사용자	항목 체크	O	🖥️클라전용	—	JS참조: detail/safety_checklist.js
+CHK-03	사용자	섹션별 표시	O	🖥️클라전용	—	JS참조: detail/safety_checklist.js
+CHK-04	사용자	전체 선택	O	🖥️클라전용	—	JS참조: detail/safety_checklist.js
+CHK-05	사용자	취소	O	🖥️클라전용	—	JS참조: detail/safety_checklist.js
+CHK-06	사용자	다음(활성화)	O	🖥️클라전용	—	JS참조: detail/safety_checklist.js
+CHK-07	사용자	다음(비활성)	O	🖥️클라전용	—	JS참조: detail/safety_checklist.js
+CHK-08	사용자	완료 확인	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (CHK-08) → POST /dashboard/api/safety-status/
+HST-01	사용자	나의 월간 캘린더 로드	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (HST-01) → GET /dashboard/api/safety-history/
+HST-02	사용자	이전 월	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (HST-02) → GET /dashboard/api/safety-history/?month= 재호출
+HST-03	사용자	다음 월	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (HST-03) → GET /dashboard/api/safety-history/?month= 재호출
+HST-04	사용자	다운로드 Excel	O	🖥️클라전용	—	JS참조: detail/safety_history.js
+HST-05	사용자	인쇄	O	🖥️클라전용	—	JS참조: detail/safety_history.js
+HST-06	사용자	탭 전환	O	🖥️클라전용	—	JS참조: detail/safety_history.js
+HST-07	사용자	전체 이력 로드	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (HST-07) → GET /dashboard/api/workers-list/
+HST-08	사용자	부서 필터	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (HST-08) → GET /dashboard/api/workers-list/?department_id= (서버 필터)
+HST-09	사용자	이름 검색	O	🖥️클라전용	—	JS참조: detail/safety_history.js
+HST-10	사용자	직원 체크박스	O	🖥️클라전용	—	JS참조: detail/safety_history.js
+HST-11	사용자	직원 행 클릭	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (HST-11) → GET /dashboard/api/safety-history/?worker_id=&month= (관리자 스코
+HST-12	사용자	우측 월 네비	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (HST-12) → GET /dashboard/api/safety-history/?worker_id=&month= 재호출
+HST-13	사용자	관리자 다운로드	O	🖥️클라전용	—	JS참조: detail/safety_history.js
+HST-14	사용자	관리자 인쇄	O	🖥️클라전용	—	JS참조: detail/safety_history.js
+VR-01	사용자	VR 콘텐츠 로드	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (VR-01) → GET /dashboard/api/vr-content/active/
+VR-02	사용자	재생	O	🖥️클라전용	—	JS참조: detail/safety_vr.js
+VR-03	사용자	일시정지	O	🖥️클라전용	—	JS참조: detail/safety_vr.js
+VR-04	사용자	Skip 방지	O	🖥️클라전용	—	JS참조: detail/safety_vr.js
+VR-05	사용자	재생속도 1.0 고정	O	🖥️클라전용	—	JS참조: detail/safety_vr.js
+VR-06	사용자	키보드 차단	O	🖥️클라전용	—	JS참조: detail/safety_vr.js
+VR-07	사용자	우클릭 차단	O	🖥️클라전용	—	JS참조: detail/safety_vr.js
+VR-08	사용자	진행 위치 저장	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (VR-08) → POST /dashboard/api/vr-progress/
+VR-09	사용자	진행 위치 복원	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (VR-09) → GET /dashboard/api/vr-progress/
+VR-10	사용자	완료 활성화	O	🖥️클라전용	—	JS참조: detail/safety_vr.js
+VR-11	사용자	이전	O	🖥️클라전용	—	JS참조: detail/safety_vr.js
+VR-12	사용자	이전 취소	O	🖥️클라전용	—	JS참조: detail/safety_vr.js
+VR-13	사용자	이전 확인	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (VR-13) → POST /dashboard/api/vr-progress/ 저장 후 클라이언트 라우팅
+VR-14	사용자	완료	O	🖥️클라전용	—	JS참조: detail/safety_vr.js
+VR-15	사용자	완료 확인	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (VR-15) → POST /dashboard/api/safety-status/
+LGN-01	사용자	아이디 입력	O	🖥️클라전용	—	JS참조: auth/login.js
+LGN-02	사용자	아이디 초기화	O	🖥️클라전용	—	JS참조: auth/login.js
+LGN-03	사용자	비밀번호 입력	O	🖥️클라전용	—	JS참조: auth/login.js
+LGN-04	사용자	비밀번호 초기화	O	🖥️클라전용	—	JS참조: auth/login.js
+LGN-05	사용자	로그인 제출	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (LGN-05) → POST /api/auth/login/
+LGN-06	사용자	서버 오류 표시	O	🖥️클라전용	—	JS참조: auth/login.js
+PRF-01	사용자	프로필 로드	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (PRF-01) → GET /api/auth/profile/
+PRF-02	사용자	비밀번호 변경 모달 열기	O	🖥️클라전용	—	JS참조: detail/my_profile.js
+PRF-03	사용자	현재 비밀번호 입력	O	🖥️클라전용	—	JS참조: detail/my_profile.js
+PRF-04	사용자	신규 비밀번호 입력	O	🖥️클라전용	—	JS참조: detail/my_profile.js
+PRF-05	사용자	비밀번호 확인 입력	O	🖥️클라전용	—	JS참조: detail/my_profile.js
+PRF-06	사용자	입력란 초기화	O	🖥️클라전용	—	JS참조: detail/my_profile.js
+PRF-07	사용자	모달 취소	O	🖥️클라전용	—	JS참조: detail/my_profile.js
+PRF-08	사용자	비밀번호 변경 제출	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (PRF-08) → POST /api/auth/password/change/
+PRF-09	사용자	변경 완료 확인	O	🖥️클라전용	—	JS참조: detail/my_profile.js
+DSH-01	사용자	나의 안전 확인 바로가기	O	🖥️클라전용	—	JS참조: dashboard/app.js·panels/
+DSH-02	사용자	작업자 현황 상세 보기	O	🖥️클라전용	—	JS참조: dashboard/app.js·panels/
+DSH-03	사용자	시연 시나리오 모드 전환	O	🖥️클라전용	—	JS참조: dashboard/app.js·panels/
+DSH-04	사용자	지도 레이어 탭	O	🖥️클라전용	—	JS참조: dashboard/app.js·panels/
+DSH-05	사용자	지도 확대	O	🖥️클라전용	—	JS참조: dashboard/app.js·panels/
+DSH-06	사용자	지도 축소	O	🖥️클라전용	—	JS참조: dashboard/app.js·panels/
+DSH-07	사용자	지도 초기화	O	🖥️클라전용	—	JS참조: dashboard/app.js·panels/
+DSH-08	사용자	구역 그리기(관리자)	△	🖥️클라전용	—	JS참조: dashboard/app.js·panels/
+DSH-09	사용자	이벤트 상세 보기	O	🖥️클라전용	—	JS참조: dashboard/app.js·panels/
+DSH-10	사용자	가스 상세 보기	O	🖥️클라전용	—	JS참조: dashboard/app.js·panels/
+DSH-11	사용자	가스 AI 내비게이션	O	🖥️클라전용	—	JS참조: dashboard/app.js·panels/
+DSH-12	사용자	전력 상세 보기	O	🖥️클라전용	—	JS참조: dashboard/app.js·panels/
+DSH-13	사용자	전력 AI 내비게이션	O	🖥️클라전용	—	JS참조: dashboard/app.js·panels/
+DSH-14	사용자	실시간 이벤트 수신	O	🔌WS	—	WS푸시로그: integration-logs?integration_type=transmit&keyword=alarm_type
+DSH-15	사용자	실시간 작업자 위치 갱신	O	🔌WS	—	WS푸시로그: integration-logs?integration_type=transmit&keyword=alarm_type
+MPW-01	사용자	설비 목록 로드	O	🔌WS	—	WS푸시로그: integration-logs?integration_type=transmit&keyword=alarm_type
+MPW-02	사용자	설비 행 선택	O	🖥️클라전용	—	JS참조: detail/power_system.js·websocket_power.js
+MPW-03	사용자	위험/주의/정상 카운트	O	🖥️클라전용	—	JS참조: detail/power_system.js·websocket_power.js
+MPW-04	사용자	설비 선택 클릭	O	🖥️클라전용	—	JS참조: detail/power_system.js·websocket_power.js
+MPW-05	사용자	실시간 탭	O	🖥️클라전용	—	JS참조: detail/power_system.js·websocket_power.js
+MPW-06	사용자	AI 예측 탭	O	🖥️클라전용	—	JS참조: detail/power_system.js·websocket_power.js
+MPW-07	사용자	차트 렌더링	O	🖥️클라전용	—	JS참조: detail/power_system.js·websocket_power.js
+MPW-08	사용자	차트 상태 색상	O	🖥️클라전용	—	JS참조: detail/power_system.js·websocket_power.js
+MPW-09	사용자	임계치 라인	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (MPW-09) → GET /api/monitoring/power/thresholds/
+MPW-10	사용자	설비별 차트 갱신	O	🖥️클라전용	—	JS참조: detail/power_system.js·websocket_power.js
+MPW-11	사용자	[재가동]	△	❌미구현	—	sheet3 마일스톤·제작기간(팀실측)
+MPW-12	사용자	상태 바	O	🖥️클라전용	—	JS참조: detail/power_system.js·websocket_power.js
+SPW-01	관리자	스마트전력시스템 목록 조회	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (SPW-01) → GET /api/power-devices/	GET /api/power-devices/ → facilities/views/power_device_admin.py (IsSuperAdmin)
+SPW-02	관리자	스마트전력시스템 검색	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (SPW-02) → GET /api/power-devices/ 필터, GET .../codes/	GET /api/power-devices/ 필터, GET .../codes/
+SPW-03	관리자	스마트전력시스템 등록	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (SPW-03) → POST /api/power-devices/, GET .../next-code/	POST /api/power-devices/, GET .../next-code/
+SPW-04	관리자	스마트전력시스템 상세 조회	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (SPW-04) → GET /api/power-devices/{id}/	GET /api/power-devices/{id}/
+SPW-05	관리자	스마트전력시스템 정보 수정	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (SPW-05) → PUT /api/power-devices/{id}/	PUT /api/power-devices/{id}/
+SPW-06	관리자	스마트전력시스템 사용 여부 설정	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (SPW-06) → DELETE /api/power-devices/{id}/, POST .../bulk-delete/	DELETE /api/power-devices/{id}/, POST .../bulk-delete/
+SPW-07	관리자	연결 설비 정보 조회	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (SPW-07) → POST /api/power-devices/check-connection/ (TCP)	POST /api/power-devices/check-connection/ (TCP)
+SPW-08	관리자	설비 연결 설정	△	❌미구현	—	sheet3 마일스톤·제작기간(팀실측)
+SPW-09	관리자	스마트전력시스템 점검 이력 조회	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (SPW-09) → GET /api/power-devices/{device_pk}/inspections/	GET /api/power-devices/{device_pk}/inspections/
+SPW-10	관리자	스마트전력시스템 점검 등록	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (SPW-10) → POST /api/power-devices/{device_pk}/inspections/, POST .../i	POST /api/power-devices/{device_pk}/inspections/, POST .../inspections/{id}/acti
+USR-01	관리자	사용자 목록 조회	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (USR-01) → GET /api/admin/accounts/?page=&page_size=&name=&department=&
+USR-02	관리자	사용자 검색 및 필터	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (USR-02) → GET /api/admin/accounts/ 쿼리 파라미터 필터·정렬
+USR-03	관리자	사용자 등록	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (USR-03) → POST /api/admin/accounts/
+USR-04	관리자	사용자 상세 조회	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (USR-04) → GET /api/admin/accounts/{id}/
+USR-05	관리자	사용자 정보 수정	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (USR-05) → PATCH /api/admin/accounts/{id}/ (비밀번호 제외)
+USR-06	관리자	사용자 계정 잠금/해제	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (USR-06) → POST /api/admin/accounts/{id}/lock/ (locked_until 100년 뒤) ·
+USR-07	관리자	사용자 비밀번호 재설정	△	❌미구현	—	sheet3 마일스톤·제작기간(팀실측)
+USR-08	관리자	사용자 삭제	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (USR-08) → DELETE /api/admin/accounts/{id}/
+USR-09	관리자	사용자 등록/수정 완료	O	🖥️클라전용	—	JS참조: static/js/…
+NOT-01	관리자	알림 정책 조회	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (NOT-01) → GET /api/admin/alerts/policies/
+NOT-02	관리자	알림 정책 등록/수정	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (NOT-02) → POST/PATCH/DELETE /api/admin/alerts/policies/(/{id}/)
+NOT-03	관리자	알림 수신 대상 조회	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (NOT-03) → GET /api/admin/alerts/policies/{id}/ (수신 대상 포함)
+NOT-04	관리자	알림 수신 대상 설정	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (NOT-04) → PATCH /api/admin/alerts/policies/{id}/ (수신 대상)
+NOT-05	관리자	알림 발송 이력 조회	△	❌미구현	—	sheet3 마일스톤·제작기간(팀실측)
+ORG-01	관리자	조직 조회	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (ORG-01) → GET /api/admin/organizations/tree/
+ORG-02	관리자	조직 등록	△	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (ORG-02) → POST/PATCH/DELETE /api/admin/departments/(/{id}/) — 백엔드 완비
+ORG-03	관리자	조직 검색	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (ORG-03) → GET /api/admin/departments/{pk}/members/?q= (구성원), 트리 검색
+ORG-04	관리자	조직 구성원 상세 조회	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (ORG-04) → GET /api/admin/departments/{pk}/members/
+ORG-05	관리자	부서 정보 조회	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (ORG-05) → GET /api/admin/departments/{id}/  (목록 아님, 상세)	GET /api/admin/departments/{id}/  (목록 아님, 상세)
+ORG-06	관리자	구성원 수정	△	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (ORG-06) → POST .../members/add|move|remove|assign-leader/ — 백엔드 완비
+LOC-01	관리자	위치 노드 목록 조회	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (LOC-01) → GET /api/map-editor/objects/?facility_id=
+LOC-02	관리자	위치 노드 검색 및 정렬	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (LOC-02) → GET /api/map-editor/objects/ + 클라이언트 필터
+LOC-03	관리자	위치 노드 등록	△	❌미구현	—	sheet3 마일스톤·제작기간(팀실측)
+LOC-04	관리자	위치 노드 상세 정보 확인	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (LOC-04) → GET /api/map-editor/objects/ 항목
+LOC-05	관리자	위치 노드 사용 여부 설정	O	🖥️클라전용	—	JS참조: static/js/…
+LOC-06	관리자	위치 노드 점검 실행 및 이력 조회	△	❌미구현	—	sheet3 마일스톤·제작기간(팀실측)
+LOC-07	관리자	위치 노드 정보 수정	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (LOC-07) → POST /api/map-editor/save/
+LOC-08	관리자	위치 노드 삭제	△	❌미구현	—	sheet3 마일스톤·제작기간(팀실측)
+LOC-09	관리자	위치 노드 저장 완료	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (LOC-09) → POST /api/map-editor/save/ (일괄 트랜잭션)
+RTM-01	사용자	레이어 탭 전환	O	🖥️클라전용	—	JS참조: dashboard/panels/map-panel.js·charts.js
+RTM-02	사용자	확대	O	🖥️클라전용	—	JS참조: dashboard/panels/map-panel.js·charts.js
+RTM-03	사용자	축소	O	🖥️클라전용	—	JS참조: dashboard/panels/map-panel.js·charts.js
+RTM-04	사용자	초기화	O	🖥️클라전용	—	JS참조: dashboard/panels/map-panel.js·charts.js
+RTM-05	사용자	사업장 선택	△	🖥️클라전용	—	JS참조: dashboard/panels/map-panel.js·charts.js
+RTM-06	사용자	층 선택	△	🖥️클라전용	—	JS참조: dashboard/panels/map-panel.js·charts.js
+RTM-07	사용자	전체 맞춤	O	🖥️클라전용	—	JS참조: dashboard/panels/map-panel.js·charts.js
+RTM-08	사용자	구역 그리기(관리자)	△	🖥️클라전용	—	JS참조: dashboard/panels/map-panel.js·charts.js
+RTM-09	사용자	구역 완료	△	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (RTM-09) → POST /api/geofences/
+RTM-10	사용자	구역 취소	△	🖥️클라전용	—	JS참조: dashboard/panels/map-panel.js·charts.js
+RTM-11	사용자	레이어 ON/OFF	O	🖥️클라전용	—	JS참조: dashboard/panels/map-panel.js·charts.js
+RTM-12	사용자	AI 타임라인 슬라이더	O	🖥️클라전용	—	JS참조: dashboard/panels/map-panel.js·charts.js
+RTM-13	사용자	범례 토글	O	🖥️클라전용	—	JS참조: dashboard/panels/map-panel.js·charts.js
+RTM-14	사용자	실시간 이벤트 수신	O	🔌WS	—	WS푸시로그: integration-logs?integration_type=transmit&keyword=alarm_type
+WKR-01	사용자	작업자 목록 로드	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (WKR-01) → GET /dashboard/api/workers-list/
+WKR-02	사용자	실시간 위치 수신	O	🔌WS	—	WS푸시로그: integration-logs?integration_type=transmit&keyword=alarm_type
+WKR-03	사용자	전체 작업자 수	O	🖥️클라전용	—	JS참조: detail/monitoring_workers.js·panels/worker-panel.js
+WKR-04	사용자	현재 출입 작업자 수	O	🖥️클라전용	—	JS참조: detail/monitoring_workers.js·panels/worker-panel.js
+WKR-05	사용자	위험 단계 필터	△	❌미구현	—	sheet3 마일스톤·제작기간(팀실측)
+WKR-06	사용자	전체 선택	△	🖥️클라전용	—	JS참조: detail/monitoring_workers.js·panels/worker-panel.js
+WKR-07	사용자	행 선택	△	🖥️클라전용	—	JS참조: detail/monitoring_workers.js·panels/worker-panel.js
+WKR-08	사용자	행 클릭	O	🖥️클라전용	—	JS참조: detail/monitoring_workers.js·panels/worker-panel.js
+WKR-09	사용자	연결 상태 아이콘	O	🖥️클라전용	—	JS참조: detail/monitoring_workers.js·panels/worker-panel.js
+WKR-10	사용자	현재 상태 배지	O	🖥️클라전용	—	JS참조: detail/monitoring_workers.js·panels/worker-panel.js
+WKR-11	사용자	마지막 연결	O	🖥️클라전용	—	JS참조: detail/monitoring_workers.js·panels/worker-panel.js
+WKR-12	사용자	선택 알림 전송	△	❌미구현	—	sheet3 마일스톤·제작기간(팀실측)
+WKR-13	사용자	전체 알림 전송	△	❌미구현	—	sheet3 마일스톤·제작기간(팀실측)
+WKR-14	사용자	작업자 위치 지도	X	❌미구현	—	sheet3 마일스톤·제작기간(팀실측)
+WKR-15	사용자	프로필 표시	O	🖥️클라전용	—	JS참조: detail/monitoring_workers.js·panels/worker-panel.js
+WKR-16	사용자	위험 현황 아이콘	O	🖥️클라전용	—	JS참조: detail/monitoring_workers.js·panels/worker-panel.js
+WKR-17	사용자	개인 알림 전송	△	❌미구현	—	sheet3 마일스톤·제작기간(팀실측)
+MAP-01	관리자	자동 배치 결과 조회	△	❌미구현	—	sheet3 마일스톤·제작기간(팀실측)
+MAP-02	관리자	설비 위치/영역 매핑	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (MAP-02) → POST /api/map-editor/save/ (좌표·크기 일괄 저장)
+MAP-03	관리자	설비/스마트전력시스템 연결 설정	△	❌미구현	—	sheet3 마일스톤·제작기간(팀실측)
+MAP-04	관리자	위험구역 생성/수정/삭제	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (MAP-04) → POST /api/map-editor/save/ — 지오펜스 신규생성·수정·삭제 포함
+MAP-05	관리자	임시 저장	O	🖥️클라전용	—	JS참조: static/js/…
+MAP-06	관리자	운영 반영	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (MAP-06) → POST /api/map-editor/save/ (트랜잭션 일괄 반영)
+MAP-07	관리자	설비 매핑 해제	△	❌미구현	—	sheet3 마일스톤·제작기간(팀실측)
+MAP-08	관리자	자동 배치 위치 보정	△	❌미구현	—	sheet3 마일스톤·제작기간(팀실측)
+MAP-09	관리자	설비 매핑/편집 이력 조회	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (MAP-09) → GET /api/admin/map-edit-logs/
+EVT-01	관리자	이벤트 처리 기준 조회	X	❌미구현	—	sheet3 마일스톤·제작기간(팀실측)
+EVT-02	관리자	이벤트 처리 기준 등록/수정	X	❌미구현	—	sheet3 마일스톤·제작기간(팀실측)
+EVT-03	관리자	이벤트 이력 조회	O	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (EVT-03) → GET /api/admin/alerts/events/
+RSK-01	관리자	위험 유형 조회	△	❌미구현	—	sheet3 마일스톤·제작기간(팀실측)
+RSK-02	관리자	위험 유형 등록/수정	△	❌미구현	—	sheet3 마일스톤·제작기간(팀실측)
+MNU-01	관리자	메뉴 관리 메인 조회	△	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (MNU-01) → △ 조회 API(GET /dashboard/api/menu/)만 — 역할별 노출 설정/저장 어드민 API 없
+MNU-02	관리자	사용자 역할 선택	△	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (MNU-02) → △ 조회 API(GET /dashboard/api/menu/)만 — 역할별 노출 설정/저장 어드민 API 없
+MNU-03	관리자	역할 활성/비활성 설정	△	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (MNU-03) → △ 조회 API(GET /dashboard/api/menu/)만 — 역할별 노출 설정/저장 어드민 API 없
+MNU-04	관리자	역할 상세 조회	△	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (MNU-04) → △ 조회 API(GET /dashboard/api/menu/)만 — 역할별 노출 설정/저장 어드민 API 없
+MNU-05	관리자	웹 메인 메뉴 노출 설정	△	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (MNU-05) → △ 조회 API(GET /dashboard/api/menu/)만 — 역할별 노출 설정/저장 어드민 API 없
+MNU-06	관리자	웹 관리자 메뉴 노출 설정	△	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (MNU-06) → △ 조회 API(GET /dashboard/api/menu/)만 — 역할별 노출 설정/저장 어드민 API 없
+MNU-07	관리자	메뉴 노출 저장	△	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (MNU-07) → △ 조회 API(GET /dashboard/api/menu/)만 — 역할별 노출 설정/저장 어드민 API 없
+EQP-01	관리자	설비 목록 조회	△	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (EQP-01) → GET /api/equipments/	GET /api/equipments/ → facilities/views/facility_admin.py (EquipmentAdminListVie
+EQP-02	관리자	설비 검색	△	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (EQP-02) → GET /api/equipments/?q=&type= (필터)	GET /api/equipments/?q=&type= (필터)
+EQP-03	관리자	설비 등록	△	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (EQP-03) → POST /api/equipments/ (상세·수정·일괄삭제: GET/PUT/DELETE /api/equip	POST /api/equipments/ (상세·수정·일괄삭제: GET/PUT/DELETE /api/equipments/{id}/, POST ..
+EQP-04	관리자	설비 상세 조회	△	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (EQP-04) → GET /api/equipments/{id}/	GET /api/equipments/{id}/
+EQP-05	관리자	설비 정보 수정	△	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (EQP-05) → PUT /api/equipments/{id}/	PUT /api/equipments/{id}/
+EQP-06	관리자	설비 사용 여부 설정	△	✅REST+Swagger	✅ @extend_schema	기능별-curl.sh (EQP-06) → DELETE /api/equipments/{id}/ (소프트), POST .../bulk-delete/	DELETE /api/equipments/{id}/ (소프트), POST .../bulk-delete/
+COL-01	관리자	수집 항목 조회	X	❌미구현	—	sheet3 마일스톤·제작기간(팀실측)
+COL-02	관리자	수집 항목 등록/수정	X	❌미구현	—	sheet3 마일스톤·제작기간(팀실측)
+DAT-03	관리자	위치 노드 데이터 조회	X	❌미구현	—	sheet3 마일스톤·제작기간(팀실측)
+POS-01	관리자	직위 목록 조회	△	❌미구현	—	sheet3 마일스톤·제작기간(팀실측)
+POS-02	관리자	직위 등록	△	❌미구현	—	sheet3 마일스톤·제작기간(팀실측)
+POS-03	관리자	직위 검색	△	❌미구현	—	sheet3 마일스톤·제작기간(팀실측)
+POS-04	관리자	직위 수정	△	❌미구현	—	sheet3 마일스톤·제작기간(팀실측)
+POS-05	관리자	직위 사용 여부 설정	△	❌미구현	—	sheet3 마일스톤·제작기간(팀실측)
+POS-06	관리자	직위 삭제	△	❌미구현	—	sheet3 마일스톤·제작기간(팀실측)
+POS-07	관리자	직위 등록/수정 완료	△	❌미구현	—	sheet3 마일스톤·제작기간(팀실측)
