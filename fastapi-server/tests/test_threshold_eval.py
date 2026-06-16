@@ -41,18 +41,22 @@ def mock_channel_meta(monkeypatch):
     ],
 )
 def test_calculate_power_risk(value, data_type, expected):
+    """정격 % 환산 후 watt/current/voltage 위험 등급 일치."""
     assert calculate_power_risk(value, data_type, "device_1", 1) == expected
 
 
 def test_calculate_power_risk_none_value():
+    """value=None → normal 반환 (센서 미수신 안전 처리)."""
     assert calculate_power_risk(None, "watt", "device_1", 1) == "normal"
 
 
 def test_calculate_power_risk_no_rated_entry(monkeypatch):
+    """정격 메타 미등록 채널 → normal 반환 (환산 불가 시 안전 측)."""
     monkeypatch.setattr("power.services.channel_meta_cache._channel_meta_by_device", {})
     assert calculate_power_risk(9000, "watt", "device_1", 1) == "normal"
 
 
 def test_calculate_power_risk_unknown_data_type():
+    """미지원 data_type → ValueError 발생 (fail-fast)."""
     with pytest.raises(ValueError, match="Unknown data_type"):
         calculate_power_risk(100, "invalid", "device_1", 1)

@@ -27,6 +27,7 @@ def _body_for(post, url):
 
 
 def test_gas_danger_sends_admin_and_worker_here(settings):
+    """가스 danger → 관리자·작업자 채널 모두 발송, 작업자에 @here 멘션 확인."""
     _enable(settings)
     with patch.object(ds.httpx, "post") as post:
         post.return_value.status_code = 204
@@ -45,6 +46,7 @@ def test_gas_danger_sends_admin_and_worker_here(settings):
 
 
 def test_gas_warning_admin_only(settings):
+    """가스 warning → 관리자 채널만 발송, 작업자 채널 미발송 확인."""
     _enable(settings)
     with patch.object(ds.httpx, "post") as post:
         post.return_value.status_code = 204
@@ -60,6 +62,7 @@ def test_gas_warning_admin_only(settings):
 
 
 def test_geofence_personal_mention(settings, monkeypatch):
+    """지오펜스 알람 → discord_id 보유 작업자에 개인 멘션(<@id>) 발송 확인."""
     _enable(settings)
     monkeypatch.setattr(ds, "_get_worker_discord_id", lambda wid: "12345")
     with patch.object(ds.httpx, "post") as post:
@@ -79,6 +82,7 @@ def test_geofence_personal_mention(settings, monkeypatch):
 
 
 def test_geofence_without_discord_id_skips_worker(settings, monkeypatch):
+    """지오펜스 알람 → discord_id 없는 작업자는 발송 생략, 관리자만 발송 확인."""
     _enable(settings)
     monkeypatch.setattr(ds, "_get_worker_discord_id", lambda wid: "")
     with patch.object(ds.httpx, "post") as post:
@@ -96,6 +100,7 @@ def test_geofence_without_discord_id_skips_worker(settings, monkeypatch):
 
 
 def test_disabled_sends_nothing(settings):
+    """DISCORD_ALARM_ENABLED=False → 어떤 채널에도 발송하지 않음 확인."""
     settings.DISCORD_ALARM_ENABLED = False
     settings.DISCORD_WEBHOOK_ADMIN = ADMIN
     settings.DISCORD_WEBHOOK_WORKER = WORKER

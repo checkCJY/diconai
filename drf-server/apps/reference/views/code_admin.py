@@ -14,7 +14,13 @@ POST       /api/admin/codes/bulk-deactivate/            — 코드 일괄 미사
 코드 삭제: 개별 삭제는 허용. 일괄은 bulk-deactivate(미사용 전환) 사용.
 """
 
-from rest_framework import status
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiResponse,
+    extend_schema,
+    inline_serializer,
+)
+from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -28,6 +34,8 @@ from apps.reference.serializers.code_admin import (
     CommonCodeWriteSerializer,
 )
 
+_TAG = "Admin — 공통코드"
+
 
 class CodeGroupAdminListView(APIView):
     """GET  /api/admin/code-groups/ — 그룹 목록 (이름·코드 검색 지원)
@@ -36,6 +44,14 @@ class CodeGroupAdminListView(APIView):
 
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=[_TAG],
+        summary="코드 그룹 목록",
+        parameters=[
+            OpenApiParameter("q", str, description="그룹명 또는 그룹코드 부분 검색"),
+        ],
+        responses=CodeGroupSerializer(many=True),
+    )
     def get(self, request):
         qs = CodeGroup.objects.all()
 
@@ -47,6 +63,12 @@ class CodeGroupAdminListView(APIView):
         serializer = CodeGroupSerializer(qs, many=True)
         return Response(serializer.data)
 
+    @extend_schema(
+        tags=[_TAG],
+        summary="코드 그룹 생성",
+        request=CodeGroupWriteSerializer,
+        responses={201: CodeGroupSerializer},
+    )
     def post(self, request):
         serializer = CodeGroupWriteSerializer(data=request.data)
         if not serializer.is_valid():
@@ -71,10 +93,22 @@ class CodeGroupAdminDetailView(APIView):
         except CodeGroup.DoesNotExist:
             return None
 
+    @extend_schema(
+        tags=[_TAG],
+        summary="코드 그룹 수정",
+        request=CodeGroupWriteSerializer,
+        responses={
+            200: CodeGroupSerializer,
+            404: OpenApiResponse(description="코드 그룹을 찾을 수 없음"),
+        },
+    )
     def patch(self, request, pk):
         group = self._get(pk)
         if not group:
-            return Response({"detail": "코드 그룹을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"detail": "코드 그룹을 찾을 수 없습니다."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
         serializer = CodeGroupWriteSerializer(group, data=request.data, partial=True)
         if not serializer.is_valid():
@@ -83,15 +117,29 @@ class CodeGroupAdminDetailView(APIView):
         group = serializer.save()
         return Response(CodeGroupSerializer(group).data)
 
+    @extend_schema(
+        tags=[_TAG],
+        summary="코드 그룹 삭제",
+        responses={
+            204: OpenApiResponse(description="삭제 성공"),
+            400: OpenApiResponse(description="하위 코드가 있어 삭제 불가"),
+            404: OpenApiResponse(description="코드 그룹을 찾을 수 없음"),
+        },
+    )
     def delete(self, request, pk):
         group = self._get(pk)
         if not group:
-            return Response({"detail": "코드 그룹을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"detail": "코드 그룹을 찾을 수 없습니다."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
         # 하위 코드가 있으면 삭제 차단 — 먼저 코드를 모두 삭제해야 함
         if group.codes.exists():
             return Response(
-                {"detail": "코드 값이 있는 그룹은 삭제할 수 없습니다. 먼저 코드를 모두 삭제하세요."},
+                {
+                    "detail": "코드 값이 있는 그룹은 삭제할 수 없습니다. 먼저 코드를 모두 삭제하세요."
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -112,20 +160,43 @@ class CommonCodeAdminListView(APIView):
         except CodeGroup.DoesNotExist:
             return None
 
+    @extend_schema(
+        tags=[_TAG],
+        summary="공통코드 목록",
+        responses={
+            200: CommonCodeSerializer(many=True),
+            404: OpenApiResponse(description="코드 그룹을 찾을 수 없음"),
+        },
+    )
     def get(self, request, group_id):
         group = self._get_group(group_id)
         if not group:
-            return Response({"detail": "코드 그룹을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"detail": "코드 그룹을 찾을 수 없습니다."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
         # sort_order → code 순으로 정렬 (모델 Meta.ordering 와 동일)
         qs = CommonCode.objects.filter(group=group)
         serializer = CommonCodeSerializer(qs, many=True)
         return Response(serializer.data)
 
+    @extend_schema(
+        tags=[_TAG],
+        summary="공통코드 생성",
+        request=CommonCodeWriteSerializer,
+        responses={
+            201: CommonCodeSerializer,
+            404: OpenApiResponse(description="코드 그룹을 찾을 수 없음"),
+        },
+    )
     def post(self, request, group_id):
         group = self._get_group(group_id)
         if not group:
-            return Response({"detail": "코드 그룹을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"detail": "코드 그룹을 찾을 수 없습니다."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
         serializer = CommonCodeWriteSerializer(data=request.data)
         if not serializer.is_valid():
@@ -149,10 +220,21 @@ class CommonCodeAdminDetailView(APIView):
         except CommonCode.DoesNotExist:
             return None
 
+    @extend_schema(
+        tags=[_TAG],
+        summary="공통코드 수정",
+        request=CommonCodeWriteSerializer,
+        responses={
+            200: CommonCodeSerializer,
+            404: OpenApiResponse(description="코드를 찾을 수 없음"),
+        },
+    )
     def patch(self, request, pk):
         code = self._get(pk)
         if not code:
-            return Response({"detail": "코드를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"detail": "코드를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND
+            )
 
         serializer = CommonCodeWriteSerializer(code, data=request.data, partial=True)
         if not serializer.is_valid():
@@ -161,10 +243,20 @@ class CommonCodeAdminDetailView(APIView):
         code = serializer.save()
         return Response(CommonCodeSerializer(code).data)
 
+    @extend_schema(
+        tags=[_TAG],
+        summary="공통코드 삭제",
+        responses={
+            204: OpenApiResponse(description="삭제 성공"),
+            404: OpenApiResponse(description="코드를 찾을 수 없음"),
+        },
+    )
     def delete(self, request, pk):
         code = self._get(pk)
         if not code:
-            return Response({"detail": "코드를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"detail": "코드를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND
+            )
 
         code.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -179,10 +271,24 @@ class CommonCodeBulkDeactivateView(APIView):
 
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(
+        tags=[_TAG],
+        summary="공통코드 일괄 미사용 전환",
+        request=inline_serializer(
+            name="CommonCodeBulkDeactivateRequest",
+            fields={"ids": serializers.ListField(child=serializers.IntegerField())},
+        ),
+        responses=inline_serializer(
+            name="CommonCodeBulkDeactivateResponse",
+            fields={"updated": serializers.IntegerField()},
+        ),
+    )
     def post(self, request):
         ids = request.data.get("ids", [])
         if not isinstance(ids, list) or not ids:
-            return Response({"detail": "ids 목록이 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": "ids 목록이 필요합니다."}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         updated = CommonCode.objects.filter(pk__in=ids).update(is_active=False)
         return Response({"updated": updated})

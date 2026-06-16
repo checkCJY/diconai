@@ -29,8 +29,8 @@
 | 항목 | 이전 (수동) | 이후 (Docker) |
 |---|---|---|
 | Redis 시작 | `sudo service redis-server start` | `make up` (자동) |
-| DRF 시작 | `cd drf-server && python manage.py runserver` | `make up` (자동, gunicorn 3-worker) |
-| FastAPI 시작 | `cd fastapi-server && uvicorn app:app --port 8001` | `make up` (자동, uvicorn 2-worker) |
+| DRF 시작 | `cd drf-server && python manage.py runserver` | `make up` (자동, gunicorn 1-worker / 4-thread, compose command override) |
+| FastAPI 시작 | `cd fastapi-server && uvicorn app:app --port 8001` | `make up` (자동, uvicorn 1-worker, Dockerfile 기본값) |
 | Celery worker | 별도 터미널: `celery -A config worker` | `make up` (자동) |
 | Celery beat | 거의 미실행 (배치 누락 위험) | `make up` (자동 시간 배치) |
 | 마이그레이션 적용 | 수동 `python manage.py migrate` | drf 컨테이너 entrypoint 자동 |
@@ -45,13 +45,13 @@
 
 1. **재현성** — 누구나 같은 이미지로 같은 동작. WSL/macOS/Linux 어디서 띄워도 동일.
 2. **격리** — 호스트 시스템에 Python·Redis·Postgres 안 깔아도 됨. 다른 프로젝트와 의존성 충돌 없음.
-3. **헬스체크** — 컨테이너가 자기 상태를 알림. `make ps` 한 줄로 7개 모두 OK인지 확인.
+3. **헬스체크** — 컨테이너가 자기 상태를 알림. `make ps` 한 줄로 12개 모두 OK인지 확인.
 4. **메트릭** — `http_requests_total`, p95 latency가 자동으로 Grafana에 차트로 그려짐. 장애 전조 감지.
 5. **의존성 관리** — `depends_on: condition: service_healthy`로 fastapi는 drf가 healthy 된 후에만 뜸. 시작 순서 자동.
 
 ---
 
-## 4. 7-서비스 구조
+## 4. 12-서비스 구조
 
 ```
 ┌───────────────────────── 호스트 (WSL2) ──────────────────────────┐
@@ -63,33 +63,39 @@
 │                                                                  │
 │  ┌─ Docker compose network (서비스명으로 통신) ────────────────┐ │
 │  │                                                             │ │
-│  │   drf ──HTTP──► fastapi   (FASTAPI_INTERNAL_URL=http://     │ │
-│  │    │                                  fastapi:8001)         │ │
-│  │    │                                                        │ │
-│  │   celery-worker ──► fastapi (/internal/alarms/push/)        │ │
-│  │   celery-beat   ──► drf DB (Django ORM)                     │ │
 │  │   fastapi  ──HTTP──► drf  (DRF_BASE_URL=http://drf:8000)    │ │
+│  │   drf      ──HTTP──► fastapi (FASTAPI_INTERNAL_URL=http://  │ │
+│  │                                       fastapi:8001)         │ │
+│  │   celery-worker-alarm  ──► fastapi (/internal/alarms/push/) │ │
+│  │   celery-worker-metric ──► drf DB·redis (주기 메트릭)       │ │
+│  │   celery-beat          ──► 큐에 주기 태스크 발행            │ │
 │  │                                                             │ │
-│  │   drf/celery×2 ──► redis  (REDIS_URL=redis://redis:6379)    │ │
-│  │   prometheus  ──► drf:8000/metrics, fastapi:8001/metrics    │ │
+│  │   drf/celery×3 ──► postgres (POSTGRES_HOST=postgres:5432)   │ │
+│  │   drf/celery×3 ──► redis    (REDIS_URL=redis://redis:6379)  │ │
+│  │   prometheus  ──► drf·fastapi /metrics + exporter×3         │ │
 │  │   grafana     ──► prometheus:9090                           │ │
 │  │                                                             │ │
 │  └─────────────────────────────────────────────────────────────┘ │
 │                                                                  │
-│  bind mount: drf-server/db.sqlite3  ←→  drf/celery 컨테이너      │
-│  bind mount: drf-server/media       ←→  drf 컨테이너             │
+│  volume: postgres_data (DB 영속) · drf_static · redis_data       │
+│  bind mount: ./drf-server:/app (소스) · media · ml_models(ro)    │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
 | # | 서비스 | 이미지 | 역할 |
 |---|---|---|---|
-| 1 | `drf` | 자체 빌드 (Django + gunicorn) | REST API, 어드민, DB, 인증 |
+| 1 | `drf` | 자체 빌드 (Django + gunicorn) | REST API, 어드민, 인증, HTML 렌더링 |
 | 2 | `fastapi` | 자체 빌드 (FastAPI + uvicorn) | 센서 수신, WebSocket 브로드캐스트 |
-| 3 | `redis` | `redis:7-alpine` | Celery 브로커 + Django 캐시 |
-| 4 | `celery-worker` | drf 이미지 재사용 | 알람 영속화, 알람 push 트리거 |
-| 5 | `celery-beat` | drf 이미지 재사용 | 매일 새벽 3시 데이터 보관 배치 |
-| 6 | `prometheus` | `prom/prometheus` | 15초마다 /metrics scrape |
-| 7 | `grafana` | `grafana/grafana` | 시각화 + 알림 (예정) |
+| 3 | `postgres` | `postgres:16-alpine` | 영속 저장소 (2026-05-22 SQLite→PG 전환) |
+| 4 | `redis` | `redis:7-alpine` | Celery 브로커 + Django 캐시 |
+| 5 | `celery-worker-alarm` | drf 이미지 재사용 | 알람 영속화·이벤트 변환·push 트리거 (alarm 큐) |
+| 6 | `celery-worker-metric` | drf 이미지 재사용 | 보관정책·큐 길이·DB 상태 등 주기 메트릭 (metric 큐) |
+| 7 | `celery-beat` | drf 이미지 재사용 | 주기 태스크 스케줄링 (데이터 보관 매일 09:30 등) |
+| 8 | `prometheus` | `prom/prometheus` | 15초마다 /metrics scrape |
+| 9 | `grafana` | `grafana/grafana` | 메트릭 시각화 대시보드 |
+| 10 | `redis_exporter` | `oliver006/redis_exporter` | Redis 메트릭 노출 (:9121) |
+| 11 | `postgres_exporter` | `prometheuscommunity/postgres-exporter` | PostgreSQL 메트릭 노출 (:9187) |
+| 12 | `node_exporter` | `prom/node-exporter` | 호스트 리소스 메트릭 노출 (:9100) |
 
 ---
 
@@ -132,8 +138,8 @@ python -c "import secrets; print(secrets.token_urlsafe(32))"   # ③ JWT_SIGNING
 
 ```yaml
 drf:
+  env_file: ./.env.docker   # POSTGRES_* (DB 접속 정보) 등은 여기서 주입
   environment:
-    DATABASE_URL: sqlite:////app/db.sqlite3
     REDIS_URL:    redis://redis:6379/0
     FASTAPI_INTERNAL_URL: http://fastapi:8001
 ```
@@ -283,7 +289,7 @@ grep -E "^(DJANGO_SECRET_KEY|INTERNAL_SERVICE_TOKEN|DRF_SERVICE_TOKEN|JWT_SIGNIN
 ```bash
 make build       # 첫 빌드는 5~10분 (이후 캐시로 1분 내외)
 make up          # 백그라운드 기동
-make ps          # 7개 모두 (healthy)/Up 인지
+make ps          # 12개 모두 (healthy)/Up 인지
 ```
 
 ### 8-6. 검증
@@ -356,7 +362,7 @@ make restart s=drf
 # 2) celery-worker만 재기동 (코드는 drf 이미지에 들어있으므로 재빌드 필요)
 make rebuild s=drf      # 또는 모든 drf 기반 컨테이너
 make up
-# beat 스케줄 추가했다면 config/settings.py CELERY_BEAT_SCHEDULE 수정 후 같은 절차
+# beat 스케줄 추가했다면 config/settings/base.py CELERY_BEAT_SCHEDULE 수정 후 같은 절차
 ```
 
 #### 정적파일 변경
@@ -418,13 +424,13 @@ wscat -c "ws://localhost:8001/ws/worker/1/?token=$JWT"
 ```bash
 make sh s=drf            # /bin/sh 진입
 make shell-drf           # Django shell (manage.py shell)
-make exec s=drf cmd="python manage.py dbshell"   # SQLite CLI
+make exec s=drf cmd="python manage.py dbshell"   # psql CLI (PostgreSQL)
 ```
 
 #### 로그 모니터링
 
 ```bash
-make logs              # 7개 컨테이너 전체
+make logs              # 12개 컨테이너 전체
 make logs s=fastapi    # fastapi만
 docker compose logs -f --since=10m fastapi | grep -i error   # 최근 10분 에러만
 ```
@@ -507,7 +513,7 @@ docker compose up -d --force-recreate fastapi celery-worker
 
 ## 11. 알려진 한계
 
-- **SQLite 다중 writer**: drf + celery-worker + celery-beat가 같은 SQLite 파일에 접근. 부하 시 `SQLITE_BUSY` 가능. 다음 스프린트 Postgres 전환에서 해소.
+- **SQLite 다중 writer**: drf + celery-worker + celery-beat가 같은 SQLite 파일에 접근. 부하 시 `SQLITE_BUSY` 가능. 다음 스프린트 Postgres 전환에서 해소. (✅ 2026-05-22 완료 — PostgreSQL 16 전환됨)
 - **단일 호스트**: 모든 서비스가 한 머신. 멀티 노드 필요 시 K8s 검토.
 - **TLS 없음**: HTTP만. 도메인/공개 노출 시 nginx + Let's Encrypt 필요.
 - **WSL 의존**: Windows 환경은 Docker Desktop + WSL2 필수. 사내 보안정책으로 Docker Desktop 사용 불가하면 Rancher Desktop 또는 podman 대안 검토.
@@ -525,7 +531,7 @@ docker compose up -d --force-recreate fastapi celery-worker
 
 ### Next (다음 스프린트, 1~3주)
 
-- **Postgres 전환** (트리거: SQLite 락 발생 시. 공수: 1~2일) — `DATABASE_URL` 교체, `docker-compose.yml`에 postgres 서비스 추가, 데이터 이전 절차 (`dumpdata` → `loaddata`)
+- **Postgres 전환** (트리거: SQLite 락 발생 시. 공수: 1~2일) — `DATABASE_URL` 교체, `docker-compose.yml`에 postgres 서비스 추가, 데이터 이전 절차 (`dumpdata` → `loaddata`) (✅ 2026-05-22 완료 — PostgreSQL 16 전환됨)
 - **AI 시계열 분석 컨테이너** (트리거: 메모리 `ai_anomaly_scope_2026_05_11.md` 범위. 공수: 1주) — 가스 STEP 1~4 + multivariate IF
 - **nginx + TLS** (트리거: 도메인 도입 시. 공수: 1~2일) — 정적/미디어 서빙 + WS 프록시 + Let's Encrypt
 - **dev/prod compose 분리** (트리거: 운영 환경 구분 필요 시. 공수: 반나절) — `docker-compose.dev.yml` (hot reload, DEBUG=True), `docker-compose.prod.yml` (replicas, restart=always)

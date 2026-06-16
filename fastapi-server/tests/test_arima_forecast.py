@@ -34,6 +34,7 @@ def _build_mock(forecast: float, ci_low: float, ci_high: float):
 
 
 def test_arima_forecast_returns_expected_keys():
+    """반환 dict 가 기대 키(forecast/ci_lower/ci_upper/actual/is_violation) 보유."""
     mock = _build_mock(forecast=100.0, ci_low=80.0, ci_high=120.0)
     result = _arima_forecast([90.0, 95.0, 105.0, 110.0], mock)
     assert set(result.keys()) == {
@@ -46,6 +47,7 @@ def test_arima_forecast_returns_expected_keys():
 
 
 def test_arima_forecast_values():
+    """forecast/CI/actual(마지막 값) 반환값이 mock 입력과 일치."""
     mock = _build_mock(forecast=100.0, ci_low=80.0, ci_high=120.0)
     result = _arima_forecast([90.0, 95.0, 105.0, 110.0], mock)
     assert result["forecast"] == 100.0
@@ -60,18 +62,21 @@ def test_arima_forecast_values():
 
 
 def test_arima_forecast_violation_false_when_actual_within_ci():
+    """actual 이 CI 구간 내 → is_violation=False."""
     mock = _build_mock(forecast=100.0, ci_low=80.0, ci_high=120.0)
     result = _arima_forecast([90.0, 110.0], mock)  # actual=110, CI=[80,120]
     assert result["is_violation"] is False
 
 
 def test_arima_forecast_violation_true_when_actual_above_ci_upper():
+    """actual 이 CI 상한 초과 → is_violation=True."""
     mock = _build_mock(forecast=100.0, ci_low=80.0, ci_high=120.0)
     result = _arima_forecast([90.0, 150.0], mock)  # actual=150 > 120
     assert result["is_violation"] is True
 
 
 def test_arima_forecast_violation_true_when_actual_below_ci_lower():
+    """actual 이 CI 하한 미만 → is_violation=True."""
     mock = _build_mock(forecast=100.0, ci_low=80.0, ci_high=120.0)
     result = _arima_forecast([90.0, 50.0], mock)  # actual=50 < 80
     assert result["is_violation"] is True

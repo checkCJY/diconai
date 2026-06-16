@@ -2,7 +2,8 @@
 # 이성현 수정 — IP 화이트리스트 → ServiceTokenAuthentication 으로 교체
 # Docker 환경에서 FastAPI 컨테이너 IP가 172.18.x.x 라 127.0.0.1 화이트리스트가 항상 403
 
-from rest_framework import status
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -27,6 +28,18 @@ class IntegrationLogInternalCreateView(APIView):
     authentication_classes = [ServiceTokenAuthentication]
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        tags=["Internal"],
+        summary="IntegrationLog 기록 (FastAPI → DRF)",
+        request=IntegrationLogCreateSerializer,
+        responses=inline_serializer(
+            name="IntegrationLogCreateResponse",
+            fields={
+                "id": serializers.IntegerField(),
+                "created_at": serializers.DateTimeField(),
+            },
+        ),
+    )
     def post(self, request):
         serializer = IntegrationLogCreateSerializer(data=request.data)
         if not serializer.is_valid():

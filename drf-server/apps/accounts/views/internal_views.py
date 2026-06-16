@@ -2,6 +2,8 @@
 # 이성현 추가 — 내부 서비스(FastAPI)용 worker 목록 조회 API
 
 from django.contrib.auth import get_user_model
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework import serializers
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -29,6 +31,18 @@ class InternalWorkerListView(APIView):
     authentication_classes = [ServiceTokenAuthentication]
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        tags=["Internal"],
+        summary="worker 목록 조회 (FastAPI → DRF)",
+        responses=inline_serializer(
+            name="InternalWorkerListResponse",
+            fields={
+                "id": serializers.IntegerField(),
+                "username": serializers.CharField(),
+            },
+            many=True,
+        ),
+    )
     def get(self, request):
         # worker 타입 유저만 id, username 반환
         workers = User.objects.filter(user_type=UserType.WORKER).values(

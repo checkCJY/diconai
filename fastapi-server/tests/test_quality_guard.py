@@ -44,6 +44,7 @@ from power.services.quality_guard import (
     ],
 )
 def test_classify_sensor_status(value, data_type, expected):
+    """값/타입별 센서 상태 판정 (정상/comm_failure/overflow) 일치."""
     assert classify_sensor_status(value, data_type) == expected
 
 

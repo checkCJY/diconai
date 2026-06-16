@@ -31,6 +31,7 @@ _PREFIX = "test_iot_"
 
 def _gas_payload(device_id: str) -> dict:
     from datetime import datetime, timezone
+
     return {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "device_id": device_id,
@@ -52,14 +53,22 @@ def _gas_payload(device_id: str) -> dict:
 def _power_payload(device_id: str) -> dict:
     return {
         "device_id": device_id,
-        "slave01": 1000.0, "slave02": 1000.0,
-        "slave11": 1000.0, "slave12": 1000.0,
-        "slave21": 1000.0, "slave22": 1000.0,
-        "slave31": 1000.0, "slave32": 1000.0,
-        "slave41": 1000.0, "slave42": 1000.0,
-        "slave51": 1000.0, "slave52": 1000.0,
-        "slave61": 1000.0, "slave62": 1000.0,
-        "slave71": 1000.0, "slave72": 1000.0,
+        "slave01": 1000.0,
+        "slave02": 1000.0,
+        "slave11": 1000.0,
+        "slave12": 1000.0,
+        "slave21": 1000.0,
+        "slave22": 1000.0,
+        "slave31": 1000.0,
+        "slave32": 1000.0,
+        "slave41": 1000.0,
+        "slave42": 1000.0,
+        "slave51": 1000.0,
+        "slave52": 1000.0,
+        "slave61": 1000.0,
+        "slave62": 1000.0,
+        "slave71": 1000.0,
+        "slave72": 1000.0,
     }
 
 
@@ -89,7 +98,9 @@ async def _device_loop(url: str, payload: dict, duration: float, stats: _Stats) 
                 await asyncio.sleep(min(_INTERVAL, remaining))
 
 
-def _report(gas_n: int, power_n: int, gas_stats: _Stats, power_stats: _Stats, elapsed: float) -> None:
+def _report(
+    gas_n: int, power_n: int, gas_stats: _Stats, power_stats: _Stats, elapsed: float
+) -> None:
     sep = "=" * 55
     print(f"\n{sep}")
     print(f"  IoT 부하 테스트 결과 — 가스 {gas_n}대 / 전력 {power_n}대")
@@ -108,7 +119,7 @@ def _report(gas_n: int, power_n: int, gas_stats: _Stats, power_stats: _Stats, el
         rps = stats.total / elapsed if elapsed > 0 else 0
         print(f"    RPS          : {rps:.1f}")
 
-    print(f"\n  Grafana → FastAPI 응답시간 p95 / 에러율 5xx / stream_lag 확인")
+    print("\n  Grafana → FastAPI 응답시간 p95 / 에러율 5xx / stream_lag 확인")
     print(sep)
 
 
@@ -122,15 +133,21 @@ async def _run(gas_n: int, power_n: int, duration: float) -> None:
 
     for i in range(1, gas_n + 1):
         device_id = f"{_PREFIX}gas_{i:03d}"
-        tasks.append(asyncio.create_task(
-            _device_loop(_GAS_URL, _gas_payload(device_id), duration, gas_stats)
-        ))
+        tasks.append(
+            asyncio.create_task(
+                _device_loop(_GAS_URL, _gas_payload(device_id), duration, gas_stats)
+            )
+        )
 
     for i in range(1, power_n + 1):
         device_id = f"{_PREFIX}pwr_{i:03d}"
-        tasks.append(asyncio.create_task(
-            _device_loop(_POWER_WATT_URL, _power_payload(device_id), duration, power_stats)
-        ))
+        tasks.append(
+            asyncio.create_task(
+                _device_loop(
+                    _POWER_WATT_URL, _power_payload(device_id), duration, power_stats
+                )
+            )
+        )
 
     t0 = time.perf_counter()
     await asyncio.gather(*tasks)

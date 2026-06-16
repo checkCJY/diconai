@@ -48,6 +48,7 @@ def _patch_gas(monkeypatch):
 
 @pytest.mark.django_db
 def test_gas_danger_requires_two_ticks(gas_sensor, settings, monkeypatch):
+    """가스 danger 1틱 미발화, 연속 2틱째 발화 확인."""
     settings.DANGER_CONFIRM_TICKS = 2
     cache.clear()
     fire_delay = _patch_gas(monkeypatch)
@@ -64,6 +65,7 @@ def test_gas_danger_requires_two_ticks(gas_sensor, settings, monkeypatch):
 
 @pytest.mark.django_db
 def test_gas_danger_streak_resets_on_normal(gas_sensor, settings, monkeypatch):
+    """danger 사이 normal 틱 → 스트릭 리셋되어 미발화 확인."""
     settings.DANGER_CONFIRM_TICKS = 2
     cache.clear()
     fire_delay = _patch_gas(monkeypatch)
@@ -83,6 +85,7 @@ def test_gas_danger_streak_resets_on_normal(gas_sensor, settings, monkeypatch):
 
 @pytest.mark.django_db
 def test_power_danger_watt_requires_two_ticks(power_device, settings, monkeypatch):
+    """전력 watt 축 danger 1틱 미발화, 연속 2틱째 발화 확인."""
     settings.DANGER_CONFIRM_TICKS = 2
     cache.clear()
     fire_delay = MagicMock()

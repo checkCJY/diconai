@@ -8,6 +8,7 @@ from apps.notifications.services.template_renderer import render_alert_message
 
 
 def test_simple_substitution():
+    """변수 치환 템플릿이 context 값으로 렌더링됨 확인."""
     rendered = render_alert_message(
         template="{{ source_label }}에서 {{ value }}{{ unit }} 초과",
         context={"source_label": "GS-001", "value": 50, "unit": "ppm"},
@@ -16,6 +17,7 @@ def test_simple_substitution():
 
 
 def test_if_branch_danger():
+    """level=='danger' → if 분기 참 가지로 렌더링됨 확인."""
     template = (
         "{{ source_label }}: "
         "{% if level == 'danger' %}🚨 긴급{% else %}⚠️ 주의{% endif %}"
@@ -28,6 +30,7 @@ def test_if_branch_danger():
 
 
 def test_if_branch_warning():
+    """level!='danger' → if 분기 else 가지로 렌더링됨 확인."""
     template = "{% if level == 'danger' %}🚨{% else %}⚠️{% endif %} {{ source_label }}"
     rendered = render_alert_message(
         template=template,
@@ -37,6 +40,7 @@ def test_if_branch_warning():
 
 
 def test_empty_template_returns_fallback():
+    """빈 템플릿 → fallback 문자열 반환 확인."""
     rendered = render_alert_message(
         template="", context={"source_label": "GS-001"}, fallback="기본 메시지"
     )
@@ -44,6 +48,7 @@ def test_empty_template_returns_fallback():
 
 
 def test_syntax_error_returns_fallback():
+    """문법 오류 템플릿 → fallback 문자열 반환 확인."""
     # 잘못된 문법 — fallback
     rendered = render_alert_message(
         template="{% if %}",  # 표현식 누락

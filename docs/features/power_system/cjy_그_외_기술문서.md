@@ -105,7 +105,7 @@ drf-server/
 
 > 추가일: 2026-05-19 (브랜치 `feature/power_zscore_cp`). 전력 도메인이 STEP 5 권고 (Threshold + IF + Z-score + Change Point + ARIMA) 5축 완성한 시점 기록.
 >
-> 시간순 상세: [drf-server/docs/refactoring/power-ai-zscore-changepoint-2026-05-19.md](../../../drf-server/docs/refactoring/power-ai-zscore-changepoint-2026-05-19.md) (적용 보고) + [docs/codereviews/2026_05_19/power-5axis-policy-flow.md](../../codereviews/2026_05_19/power-5axis-policy-flow.md) (흐름·함수 분석).
+> 시간순 상세: [drf-server/docs/refactoring/power-ai-zscore-changepoint-2026-05-19.md](../../../drf-server/docs/refactoring/power-ai-zscore-changepoint-2026-05-19.md) (적용 보고) + [docs/codereviews/2026_05_19/power-5axis-policy-flow.md](../../archive/codereviews/2026_05_19/power-5axis-policy-flow.md) (흐름·함수 분석).
 
 ### 4.1 📁 AI 관련 파일 구조
 
@@ -295,10 +295,10 @@ UI 활용 예시:
 
 | 시점 | 단계 | 문서 |
 |---|---|---|
-| 2026-05-13 | IF 윈도우 비교 | [docs/changelog/ml/if_window_comparison_2026_05_13.md](../../changelog/ml/if_window_comparison_2026_05_13.md) |
-| 2026-05-13 | power dummy 패턴 정리 | [docs/changelog/ml/power_dummy_audit_2026_05_13.md](../../changelog/ml/power_dummy_audit_2026_05_13.md) |
-| 2026-05-14 | IF 알람 결합 (트랙 1 v2) | [docs/changelog/ml/if_alarm_binding_power_2026_05_14.md](../../changelog/ml/if_alarm_binding_power_2026_05_14.md) |
+| 2026-05-13 | IF 윈도우 비교 | [docs/changelog/ml/if_window_comparison_2026_05_13.md](../../archive/changelog/ml/if_window_comparison_2026_05_13.md) |
+| 2026-05-13 | power dummy 패턴 정리 | [docs/changelog/ml/power_dummy_audit_2026_05_13.md](../../archive/changelog/ml/power_dummy_audit_2026_05_13.md) |
+| 2026-05-14 | IF 알람 결합 (트랙 1 v2) | [docs/changelog/ml/if_alarm_binding_power_2026_05_14.md](../../archive/changelog/ml/if_alarm_binding_power_2026_05_14.md) |
 | 2026-05-18 | IF + ARIMA un-downgrade (3축) | [skill/전력 AI un-downgrade ... 보고.md](../../../skill/전력%20AI%20un-downgrade%20(IF%20%2B%20ARIMA)%20통합%20작업%20복습%20및%20보고.md) |
-| 2026-05-19 | Z-score + CP + 5축 + 코드리뷰 보강 | [drf-server/docs/refactoring/power-ai-zscore-changepoint-2026-05-19.md](../../../drf-server/docs/refactoring/power-ai-zscore-changepoint-2026-05-19.md) + [docs/codereviews/2026_05_19/power-5axis-policy-flow.md](../../codereviews/2026_05_19/power-5axis-policy-flow.md) |
+| 2026-05-19 | Z-score + CP + 5축 + 코드리뷰 보강 | [drf-server/docs/refactoring/power-ai-zscore-changepoint-2026-05-19.md](../../../drf-server/docs/refactoring/power-ai-zscore-changepoint-2026-05-19.md) + [docs/codereviews/2026_05_19/power-5axis-policy-flow.md](../../archive/codereviews/2026_05_19/power-5axis-policy-flow.md) |
 
 본 § 4 (살아있는 spec) 는 위 시간순 문서들의 **현 시점 합본** — 시간순 docs 가 "어떻게 도달했는가", 본 § 가 "지금 어떻게 동작하는가".

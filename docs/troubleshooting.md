@@ -29,7 +29,7 @@
 **원인**: 단일 cooldown 규칙이 risk_level 변화를 무시
 **조치**: 위험도 격상(WARNING→DANGER)에 한해 cooldown bypass. 60s TTL 단축으로 `_AckStore` 가설 해소
 
-세션 상세: [docs/refactor/2026_05_26_alarm_demo_session.md](refactor/2026_05_26_alarm_demo_session.md)
+진단 상세: [docs/archive/codereviews/2026_05_20/alarm-symptom-bottleneck-diagnosis.md](archive/codereviews/2026_05_20/alarm-symptom-bottleneck-diagnosis.md)
 
 ### 3. 알람 팝업 Docker 환경 깨짐
 
@@ -65,7 +65,7 @@
 
 ## 시연 직전 점검
 
-[docs/templates/self-check.md](templates/self-check.md) 사용 — 시연 1~2일 전에 항목별 체크.
+[docs/submission/templates/self-check.md](submission/templates/self-check.md) 사용 — 시연 1~2일 전에 항목별 체크.
 
 ## 증빙자료 추천
 
@@ -81,6 +81,6 @@
 ## 참고 문서
 
 - 사고 이력: [docs/incidents/](incidents/)
-- 코드리뷰 결과: [docs/codereviews/](codereviews/)
-- 단일 기능 변경 이력: [docs/changelog/single_features/](changelog/single_features/)
-- 시연 안정화 세션: [docs/refactor/2026_05_26_alarm_demo_session.md](refactor/2026_05_26_alarm_demo_session.md)
+- 코드리뷰 결과: [docs/archive/codereviews/](archive/codereviews/)
+- 단일 기능 변경 이력: [docs/archive/changelog/single_features/](archive/changelog/single_features/)
+- 알람 증상 진단 세션: [docs/archive/codereviews/2026_05_20/alarm-symptom-bottleneck-diagnosis.md](archive/codereviews/2026_05_20/alarm-symptom-bottleneck-diagnosis.md)

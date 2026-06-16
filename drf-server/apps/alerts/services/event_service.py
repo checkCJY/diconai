@@ -79,6 +79,10 @@ def create_alarm_and_event(
         event_qs = event_qs.filter(source_power_device_id=power_device_id)
     elif geofence_id:
         event_qs = event_qs.filter(source_geofence_id=geofence_id)
+        # 구역 진입은 작업자별 사건 — 같은 구역이라도 작업자가 다르면 별도 Event.
+        # (센서/전력은 발생원 단위 병합이라 worker_id 무관)
+        if worker_id:
+            event_qs = event_qs.filter(worker_id=worker_id)
 
     active_event = event_qs.first()
 

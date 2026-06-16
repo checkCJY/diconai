@@ -43,13 +43,20 @@ async def test_flush_loop_broadcasts_batch_and_advances_cursor():
     async def fake_tail():
         return "3-0"
 
+    async def fake_state():
+        # 배치 broadcast 전 1회 조회되는 state — build_broadcast_payload 가 mock 이라 내용 무관.
+        return {}
+
     lag_metric = Mock()
     with (
         patch.object(ws_router, "sensor_clients", [object()]),
         patch.object(ws_router, "read_alarms_blocking", fake_read),
         patch.object(ws_router, "_send_to_all", fake_send),
         patch.object(ws_router, "stream_tail_id", fake_tail),
-        patch.object(ws_router, "build_broadcast_payload", lambda include_alarms: {}),
+        patch.object(ws_router, "fetch_broadcast_state", fake_state),
+        patch.object(
+            ws_router, "build_broadcast_payload", lambda state, include_alarms: {}
+        ),
         patch.object(ws_router, "ALARM_STREAM_LAG", lag_metric),
     ):
         with pytest.raises(_StopLoop):
@@ -108,6 +115,9 @@ async def test_flush_loop_pops_ingress_ts_and_observes_latency():
     async def fake_tail():
         return "1-0"
 
+    async def fake_state():
+        return {}
+
     label_calls = []
     metric = Mock()
     metric.labels.side_effect = lambda **kw: (label_calls.append(kw), metric)[1]
@@ -117,7 +127,10 @@ async def test_flush_loop_pops_ingress_ts_and_observes_latency():
         patch.object(ws_router, "read_alarms_blocking", fake_read),
         patch.object(ws_router, "_send_to_all", fake_send),
         patch.object(ws_router, "stream_tail_id", fake_tail),
-        patch.object(ws_router, "build_broadcast_payload", lambda include_alarms: {}),
+        patch.object(ws_router, "fetch_broadcast_state", fake_state),
+        patch.object(
+            ws_router, "build_broadcast_payload", lambda state, include_alarms: {}
+        ),
         patch.object(ws_router, "E2E_ALARM_LATENCY", metric),
     ):
         with pytest.raises(_StopLoop):

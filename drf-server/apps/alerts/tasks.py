@@ -329,17 +329,19 @@ def fire_geofence_alarm_task(
     geofence_id: int,
     geofence_name: str,
     risk_level: str,
-    sensor_source_label: str,
+    sensor_source_label: str | None = None,
 ):
-    """위험구역 진입 알람 — AlarmRecord/Event 생성 후 FastAPI WS 큐에 푸시."""
+    """위험구역 진입 알람 — AlarmRecord/Event 생성 후 FastAPI WS 큐에 푸시.
+
+    sensor_source_label 은 구역 내 위험 센서가 있을 때만 채워진다. 센서와 무관하게
+    관리자가 지정한 위험구역 진입(sensor_source_label=None)은 센서 임계치 문구를 뺀다.
+    """
     from apps.alerts.services.event_service import create_alarm_and_event
     from apps.core.constants import AlarmType
 
     label = {"danger": "긴급", "warning": "주의"}.get(risk_level, "")
-    summary = (
-        f"[{label}] 작업자가 위험구역 '{geofence_name}'에 진입했습니다."
-        f" ({sensor_source_label} 임계치 초과)"
-    )
+    suffix = f" ({sensor_source_label} 임계치 초과)" if sensor_source_label else ""
+    summary = f"[{label}] 작업자가 위험구역 '{geofence_name}'에 진입했습니다.{suffix}"
 
     try:
         event, alarm = create_alarm_and_event(

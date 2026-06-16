@@ -267,7 +267,8 @@ services:
   postgres_exporter:
     image: prometheuscommunity/postgres-exporter:v0.15.0
     environment:
-      DATA_SOURCE_NAME: postgresql://diconai:diconai1234@postgres:5432/diconai?sslmode=disable
+      # 시크릿 하드코딩 제거 — .env.docker 의 POSTGRES_* 를 그대로 사용 (DB 비번과 자동 일치)
+      DATA_SOURCE_NAME: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
     depends_on:
       postgres:
         condition: service_healthy

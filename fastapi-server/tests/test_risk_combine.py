@@ -27,15 +27,18 @@ from ai.risk_combine import combine_risk, combine_risk_3axis, combine_risk_5axis
     ],
 )
 def test_combine_risk_matrix(threshold_risk, ml_prediction, expected):
+    """2축(threshold × IF) combine_risk 매트릭스 결과 일치."""
     assert combine_risk(threshold_risk, ml_prediction) == expected
 
 
 def test_combine_risk_unknown_threshold_raises():
+    """미지원 threshold 라벨 → ValueError 발생."""
     with pytest.raises(ValueError, match="Unknown combination"):
         combine_risk("invalid_level", "normal")
 
 
 def test_combine_risk_unknown_prediction_raises():
+    """미지원 IF 예측 라벨 → ValueError 발생."""
     with pytest.raises(ValueError, match="Unknown combination"):
         combine_risk("normal", "invalid_pred")
 
@@ -70,6 +73,7 @@ def test_combine_risk_unknown_prediction_raises():
 def test_combine_risk_3axis_matrix(
     threshold_risk, if_prediction, arima_violation, expected
 ):
+    """3축(threshold × IF × ARIMA) 12 cell 매트릭스 + 두 AI 동의 격상 일치."""
     assert (
         combine_risk_3axis(threshold_risk, if_prediction, arima_violation) == expected
     )
@@ -103,6 +107,7 @@ def test_combine_risk_3axis_two_ai_agreement_escalates():
 
 
 def test_combine_risk_3axis_unknown_combination_raises():
+    """3축 미지원 조합 → ValueError 발생 (fail-fast)."""
     with pytest.raises(ValueError, match="Unknown 3axis combination"):
         combine_risk_3axis("invalid_level", "normal", False)
     with pytest.raises(ValueError, match="Unknown 3axis combination"):
@@ -146,6 +151,7 @@ def test_combine_risk_3axis_unknown_combination_raises():
 def test_combine_risk_5axis_priority_matrix(
     threshold, if_pred, arima, z, cp, expected_combined, expected_source
 ):
+    """5축 우선순위 매트릭스가 (combined, escalation_source) 튜플로 일치."""
     combined, source = combine_risk_5axis(threshold, if_pred, arima, z, cp)
     assert combined == expected_combined
     assert source == expected_source
